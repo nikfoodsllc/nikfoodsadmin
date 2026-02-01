@@ -119,10 +119,15 @@ interface ComboFoodItem {
       price: number;
       portionId: string;
       isDefault?: boolean;
+      isAvailable?: boolean;
     }>;
+    sequence?: number;
   }>;
+  hasSpiceLevel: boolean;
+  spiceLevel?: string[];
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
+  isDraft?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -85,6 +85,9 @@ export default function FoodItemsTable({
               }}
             >
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Actions
+              </TableCell>
+              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Image
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
@@ -108,12 +111,6 @@ export default function FoodItemsTable({
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Available
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Status
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Actions
-              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -121,7 +118,7 @@ export default function FoodItemsTable({
               <FoodItemSkeleton />
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={9} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No food items found
                   </Typography>

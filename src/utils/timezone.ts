@@ -26,7 +26,20 @@ export function toPSTDate(date: DateInput): Date | null {
   if (!date) return null;
 
   try {
-    const dateObj = new Date(date);
+    let dateString = date;
+
+    // Handle YYYY-MM-DD format specifically to avoid timezone shift issues
+    // When creating a Date from 'YYYY-MM-DD' string, JavaScript treats it as UTC midnight
+    // Converting to PST (UTC-8/UTC-7) shifts it to the previous day
+    // Solution: Append 'T12:00:00' to create noon time, ensuring it stays within the correct day
+    if (typeof date === 'string') {
+      const yyyyMmDdRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+      if (yyyyMmDdRegex.test(date)) {
+        dateString = `${date}T12:00:00`;
+      }
+    }
+
+    const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) return null;
 
     return toDate(dateObj, { timeZone: PST_TIMEZONE });

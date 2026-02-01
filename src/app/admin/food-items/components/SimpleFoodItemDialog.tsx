@@ -22,9 +22,13 @@ import {
   MenuItem,
   SelectChangeEvent,
   Divider,
+  Alert,
+  Autocomplete,
 } from '@mui/material';
 import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
+import { FoodModifier } from '@/types/modifier';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SimpleFoodItem {
   _id?: string;
@@ -52,7 +56,7 @@ interface SimpleFoodItemDialogProps {
   onSave: (data: SimpleFoodItem, imageFile: File | null) => void;
 }
 
-const spiceLevels = ['Mild', 'Normal', 'Medium', 'Semi-Spicy', 'Super-Spicy'];
+const spiceLevels = ['Mild (Kid Friendly)', 'Normal', 'Medium Spice', 'Spicy'];
 
 const getDefaultFormData = (): SimpleFoodItem => ({
   name: '',
@@ -71,6 +75,14 @@ const getDefaultFormData = (): SimpleFoodItem => ({
   isDraft: false,
 });
 
+const defaultTemplateProperties = {
+  veg: true,
+  hasSpiceLevel: false,
+  spiceLevel: [],
+  isEcoFriendlyContainer: false,
+  ecoContainerCharge: 0,
+};
+
 export default function SimpleFoodItemDialog({
   open,
   item,
@@ -78,6 +90,8 @@ export default function SimpleFoodItemDialog({
   onClose,
   onSave,
 }: SimpleFoodItemDialogProps) {
+  const { token } = useAuth();
+
   const getInitialFormData = useCallback((): SimpleFoodItem => {
     return item ? { ...item } : getDefaultFormData();
   }, [item]);
@@ -85,6 +99,45 @@ export default function SimpleFoodItemDialog({
   const [formData, setFormData] = useState<SimpleFoodItem>(getInitialFormData);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [modifiers, setModifiers] = useState<FoodModifier[]>([]);
+  const [selectedModifier, setSelectedModifier] = useState<FoodModifier | null>(null);
+  const [loadingModifiers, setLoadingModifiers] = useState(false);
+  const [modifierError, setModifierError] = useState<string | null>(null);
+
+  // Fetch modifiers when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchModifiers();
+    }
+  }, [open]);
+
+  // Fetch modifiers from API
+  const fetchModifiers = async () => {
+    setLoadingModifiers(true);
+    setModifierError(null);
+    try {
+      const response = await fetch('/api/admin/modifiers?itemType=simple&limit=100', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch modifiers');
+      }
+
+      const result = await response.json();
+      const modifiersWithTemplates = (result.data?.modifiers || []).filter(
+        (m: FoodModifier) => m.templateProperties && Object.keys(m.templateProperties).length > 0
+      );
+      setModifiers(modifiersWithTemplates);
+    } catch (error) {
+      console.error('Error fetching modifiers:', error);
+      setModifierError(error instanceof Error ? error.message : 'Failed to load modifiers');
+    } finally {
+      setLoadingModifiers(false);
+    }
+  };
 
   // Reset form when dialog opens or item changes
   useEffect(() => {
@@ -95,6 +148,7 @@ export default function SimpleFoodItemDialog({
         setFormData(newFormData);
         setImageFile(null);
         setErrors({});
+        setSelectedModifier(null);
       });
     }
   }, [open, item]);
@@ -135,6 +189,31 @@ export default function SimpleFoodItemDialog({
   const handleSpiceLevelChange = (event: SelectChangeEvent<string[]>) => {
     const value = event.target.value as string[];
     handleChange('spiceLevel', value);
+  };
+
+  // Handle modifier selection
+  const handleModifierChange = (modifier: FoodModifier | null) => {
+    setSelectedModifier(modifier);
+
+    if (modifier && modifier.templateProperties) {
+      // Apply template properties to form
+      const props = modifier.templateProperties;
+      const updates: Partial<SimpleFoodItem> = {};
+
+      if (props.veg !== undefined) updates.veg = props.veg;
+      if (props.hasSpiceLevel !== undefined) updates.hasSpiceLevel = props.hasSpiceLevel;
+      if (props.spiceLevel !== undefined) updates.spiceLevel = props.spiceLevel;
+      if (props.isEcoFriendlyContainer !== undefined) updates.isEcoFriendlyContainer = props.isEcoFriendlyContainer;
+      if (props.ecoContainerCharge !== undefined) updates.ecoContainerCharge = props.ecoContainerCharge;
+
+      setFormData((prev) => ({ ...prev, ...updates }));
+    } else if (modifier === null) {
+      // Reset to default values when "No modifier" is selected
+      setFormData((prev) => ({
+        ...prev,
+        ...defaultTemplateProperties,
+      }));
+    }
   };
 
   const validate = () => {
@@ -313,6 +392,71 @@ export default function SimpleFoodItemDialog({
               },
             }}
           />
+
+          <Divider />
+
+          {/* Modifier Template Selection */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: '#374151' }}>
+              Apply Modifier Template
+            </Typography>
+            <Autocomplete
+              options={modifiers}
+              getOptionLabel={(option) => option.name}
+              value={selectedModifier}
+              onChange={(_, newValue) => handleModifierChange(newValue)}
+              loading={loadingModifiers}
+              disabled={loading}
+              fullWidth
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Select a modifier template"
+                  placeholder="Choose a template to apply preset values"
+                  helperText={modifierError || "Templates quickly populate property values below"}
+                  error={!!modifierError}
+                  disabled={loading}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#4F8CFF',
+                      },
+                    },
+                    '& .MuiInputLabel-root.Mui-focused': {
+                      color: '#4F8CFF',
+                    },
+                  }}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {loadingModifiers ? <CircularProgress size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+              clearIcon={<IconX size={16} />}
+              noOptionsText="No modifier templates available"
+              isOptionEqualToValue={(option, value) => option._id?.toString() === value._id?.toString()}
+            />
+            {selectedModifier && (
+              <Alert
+                severity="success"
+                sx={{
+                  mt: 2,
+                  backgroundColor: '#F0FDF4',
+                  color: '#166534',
+                  '& .MuiAlert-icon': {
+                    color: '#166534',
+                  },
+                }}
+              >
+                Template "{selectedModifier.name}" applied. You can modify the values below before saving.
+              </Alert>
+            )}
+          </Box>
 
           <Divider />
 

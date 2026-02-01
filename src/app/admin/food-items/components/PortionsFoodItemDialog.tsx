@@ -55,7 +55,7 @@ interface PortionsFoodItemDialogProps {
   onSave: (data: PortionsFoodItem, imageFile: File | null) => void;
 }
 
-const spiceLevels = ['Mild', 'Normal', 'Medium', 'Semi-Spicy', 'Super-Spicy'];
+const spiceLevels = ['Mild (Kid Friendly)', 'Normal', 'Medium Spice', 'Spicy'];
 
 const getDefaultFormData = (): PortionsFoodItem => ({
   name: '',
