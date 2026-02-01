@@ -38,6 +38,9 @@ interface ComboItem {
 interface Section {
   title: string;
   selectedItems: ComboItem[];
+  minSelection?: number;
+  maxSelection?: number;
+  isRequired?: boolean;
 }
 
 interface ComboSectionManagerProps {
@@ -61,6 +64,9 @@ export default function ComboSectionManager({
     const newSection: Section = {
       title: `Section ${sections.length + 1}`,
       selectedItems: [],
+      minSelection: 1,
+      maxSelection: 1,
+      isRequired: true,
     };
     onChange([...sections, newSection]);
     setExpandedSection(sections.length);
@@ -194,6 +200,33 @@ export default function ComboSectionManager({
       ...newSections[sectionIndex].selectedItems[itemIndex],
       isAvailable: !currentValue,
     };
+    onChange(newSections);
+  };
+
+  const handleSectionRequiredToggle = (sectionIndex: number, isRequired: boolean) => {
+    const newSections = [...sections];
+    newSections[sectionIndex] = {
+      ...newSections[sectionIndex],
+      isRequired,
+      minSelection: isRequired ? 1 : 0,
+      maxSelection: isRequired ? 1 : Math.max(1, newSections[sectionIndex].selectedItems.length),
+    };
+    onChange(newSections);
+  };
+
+  const handleMinSelectionChange = (sectionIndex: number, value: number) => {
+    const newSections = [...sections];
+    const section = newSections[sectionIndex];
+    const maxItems = section.selectedItems.length;
+    newSections[sectionIndex].minSelection = Math.max(0, Math.min(value, maxItems));
+    onChange(newSections);
+  };
+
+  const handleMaxSelectionChange = (sectionIndex: number, value: number) => {
+    const newSections = [...sections];
+    const section = newSections[sectionIndex];
+    const maxItems = section.selectedItems.length;
+    newSections[sectionIndex].maxSelection = Math.max(1, Math.min(value, maxItems));
     onChange(newSections);
   };
 
@@ -596,6 +629,106 @@ export default function ComboSectionManager({
                     })}
                   </Box>
                 )}
+
+                {/* Section Settings */}
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: 2,
+                    backgroundColor: '#F9FAFB',
+                    borderRadius: 1,
+                    border: '1px solid #E5E7EB',
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: '#374151' }}>
+                    Section Settings
+                  </Typography>
+
+                  {/* Required Toggle */}
+                  <Box sx={{ mb: 2 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={section.isRequired ?? true}
+                          onChange={(e) => handleSectionRequiredToggle(sectionIndex, e.target.checked)}
+                          disabled={disabled}
+                          size="small"
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': {
+                              color: '#4F8CFF',
+                            },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                              backgroundColor: '#4F8CFF',
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          Required Section
+                        </Typography>
+                      }
+                    />
+                  </Box>
+
+                  {/* Min/Max Selection Inputs */}
+                  <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+                    <TextField
+                      label="Min Selection"
+                      type="number"
+                      value={section.minSelection ?? (section.isRequired ? 1 : 0)}
+                      onChange={(e) => handleMinSelectionChange(sectionIndex, parseInt(e.target.value) || 0)}
+                      disabled={disabled}
+                      size="small"
+                      slotProps={{
+                        htmlInput: {
+                          min: 0,
+                          max: section.selectedItems.length,
+                        },
+                      }}
+                      fullWidth
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          backgroundColor: '#fff',
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#4F8CFF',
+                          },
+                        },
+                      }}
+                    />
+                    <TextField
+                      label="Max Selection"
+                      type="number"
+                      value={section.maxSelection ?? 1}
+                      onChange={(e) => handleMaxSelectionChange(sectionIndex, parseInt(e.target.value) || 1)}
+                      disabled={disabled}
+                      size="small"
+                      slotProps={{
+                        htmlInput: {
+                          min: 1,
+                          max: section.selectedItems.length,
+                        },
+                      }}
+                      fullWidth
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          backgroundColor: '#fff',
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#4F8CFF',
+                          },
+                        },
+                      }}
+                    />
+                  </Box>
+
+                  {/* Helper Text */}
+                  <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+                    {section.isRequired
+                      ? `Customers must select between ${section.minSelection || 1} and ${section.maxSelection || 1} item(s)`
+                      : `Optional: Customers may select up to ${section.maxSelection || section.selectedItems.length} item(s)`
+                    }
+                  </Typography>
+                </Box>
               </Box>
             )}
           </Paper>

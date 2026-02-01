@@ -29,6 +29,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconX,
+  IconTemplate,
 } from '@tabler/icons-react';
 import Image from 'next/image';
 
@@ -54,6 +55,11 @@ const navItems: NavItem[] = [
     title: 'Food Category',
     href: '/admin/food-category',
     icon: IconCategory,
+  },
+  {
+    title: 'Modifiers',
+    href: '/admin/modifiers',
+    icon: IconTemplate,
   },
   {
     title: 'Manage Days',

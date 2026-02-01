@@ -203,6 +203,9 @@ const sectionSchema = z.object({
   title: z.string(),
   selectedItems: z.array(comboItemSchema),
   sequence: z.number().optional(),
+  minSelection: z.number().optional().default(1),
+  maxSelection: z.number().optional().default(1),
+  isRequired: z.boolean().optional().default(true),
 });
 
 // Zod schema for food item validation
@@ -289,6 +292,9 @@ interface Section {
   title: string;
   selectedItems: ComboItem[];
   sequence?: number;
+  minSelection?: number;
+  maxSelection?: number;
+  isRequired?: boolean;
 }
 
 interface FoodItem {

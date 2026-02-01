@@ -64,7 +64,12 @@ interface ComboFoodItem {
       isAvailable?: boolean; // Individual item availability within combo
     }>;
     sequence?: number;
+    minSelection?: number;
+    maxSelection?: number;
+    isRequired?: boolean;
   }>;
+  hasSpiceLevel: boolean;
+  spiceLevel?: string[];
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   isDraft?: boolean;
@@ -90,10 +95,14 @@ const getDefaultFormData = (): ComboFoodItem => ({
   public_id: '',
   itemType: 'combo',
   sections: [],
+  hasSpiceLevel: false,
+  spiceLevel: [],
   isEcoFriendlyContainer: false,
   ecoContainerCharge: 0,
   isDraft: false,
 });
+
+const spiceLevels = ['Mild (Kid Friendly)', 'Normal', 'Medium Spice', 'Spicy'];
 
 export default function ComboFoodItemDialog({
   open,
@@ -171,6 +180,11 @@ export default function ComboFoodItemDialog({
         return newErrors;
       });
     }
+  };
+
+  const handleSpiceLevelChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value as string[];
+    handleChange('spiceLevel', value);
   };
 
   const validate = () => {
@@ -506,6 +520,72 @@ export default function ComboFoodItemDialog({
               label={<Typography variant="body2">{formData.isDraft ? 'Draft Mode' : 'Published'}</Typography>}
             />
           </Box>
+
+          <Divider />
+
+          {/* Spice Level Toggle */}
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.hasSpiceLevel}
+                  onChange={(e) => handleChange('hasSpiceLevel', e.target.checked)}
+                  disabled={loading}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#4F8CFF',
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      backgroundColor: '#4F8CFF',
+                    },
+                  }}
+                />
+              }
+              label={<Typography variant="body2">Has Spice Level Options</Typography>}
+            />
+          </Box>
+
+          {/* Spice Levels Multi-Select */}
+          {formData.hasSpiceLevel && (
+            <FormControl fullWidth>
+              <InputLabel id="spice-level-label">Spice Levels</InputLabel>
+              <Select
+                labelId="spice-level-label"
+                multiple
+                value={formData.spiceLevel || []}
+                onChange={handleSpiceLevelChange}
+                input={<OutlinedInput label="Spice Levels" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((level) => (
+                      <Chip
+                        key={level}
+                        label={level}
+                        size="small"
+                        sx={{
+                          backgroundColor: '#FFF4E4',
+                          color: '#FF9F0D',
+                          fontWeight: 500,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+                disabled={loading}
+                sx={{
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#4F8CFF',
+                  },
+                }}
+              >
+                {spiceLevels.map((level) => (
+                  <MenuItem key={level} value={level}>
+                    {level}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           <Divider />
 

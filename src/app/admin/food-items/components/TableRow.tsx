@@ -72,6 +72,36 @@ export default function TableRow({ item, categories, index, onEdit, onDelete }: 
         },
       }}
     >
+      {/* Actions */}
+      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <IconButton
+            size="small"
+            onClick={() => onEdit(item)}
+            sx={{
+              color: '#4F8CFF',
+              '&:hover': {
+                backgroundColor: '#E6F0FF',
+              },
+            }}
+          >
+            <IconEdit size={18} />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => onDelete(item)}
+            sx={{
+              color: '#EF4444',
+              '&:hover': {
+                backgroundColor: '#FEE2E2',
+              },
+            }}
+          >
+            <IconTrash size={18} />
+          </IconButton>
+        </Box>
+      </TableCell>
+
       {/* Image */}
       <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
         <Box
@@ -281,56 +311,6 @@ export default function TableRow({ item, categories, index, onEdit, onDelete }: 
           >
             {item.available ? 'Available' : 'Unavailable'}
           </Typography>
-        </Box>
-      </TableCell>
-
-      {/* Status - Draft Badge */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
-        {item.isDraft && (
-          <Chip
-            label="Draft"
-            size="small"
-            sx={{
-              fontSize: '11px',
-              fontWeight: 600,
-              height: 24,
-              backgroundColor: '#6B7280',
-              color: 'white',
-              '& .MuiChip-label': {
-                paddingX: 1,
-              },
-            }}
-          />
-        )}
-      </TableCell>
-
-      {/* Actions */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          <IconButton
-            size="small"
-            onClick={() => onEdit(item)}
-            sx={{
-              color: '#4F8CFF',
-              '&:hover': {
-                backgroundColor: '#E6F0FF',
-              },
-            }}
-          >
-            <IconEdit size={18} />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => onDelete(item)}
-            sx={{
-              color: '#EF4444',
-              '&:hover': {
-                backgroundColor: '#FEE2E2',
-              },
-            }}
-          >
-            <IconTrash size={18} />
-          </IconButton>
         </Box>
       </TableCell>
     </MuiTableRow>
