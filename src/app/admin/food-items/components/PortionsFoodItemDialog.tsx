@@ -95,12 +95,9 @@ export default function PortionsFoodItemDialog({
   useEffect(() => {
     if (open) {
       const newFormData = item ? { ...item } : getDefaultFormData();
-      // Defer state updates to avoid cascading renders warning
-      queueMicrotask(() => {
-        setFormData(newFormData);
-        setImageFile(null);
-        setErrors({});
-      });
+      setFormData(newFormData);
+      setImageFile(null);
+      setErrors({});
     }
   }, [open, item]);
 
