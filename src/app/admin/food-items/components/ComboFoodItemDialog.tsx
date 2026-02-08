@@ -136,16 +136,13 @@ export default function ComboFoodItemDialog({
         );
         newFormData = { ...newFormData, sections: sortedSections };
       }
-      // Defer state updates to avoid cascading renders warning
-      queueMicrotask(() => {
-        setFormData(newFormData);
-        setImageFile(null);
-        setErrors({});
-        // Reset price confirmation state
-        setPriceConfirmDialogOpen(false);
-        setZeroPricedItems([]);
-        setPendingFormData(null);
-      });
+      setFormData(newFormData);
+      setImageFile(null);
+      setErrors({});
+      // Reset price confirmation state
+      setPriceConfirmDialogOpen(false);
+      setZeroPricedItems([]);
+      setPendingFormData(null);
     }
   }, [open, item]);
 

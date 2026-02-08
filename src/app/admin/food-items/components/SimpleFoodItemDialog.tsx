@@ -143,13 +143,10 @@ export default function SimpleFoodItemDialog({
   useEffect(() => {
     if (open) {
       const newFormData = item ? { ...item } : getDefaultFormData();
-      // Defer state updates to avoid cascading renders warning
-      queueMicrotask(() => {
-        setFormData(newFormData);
-        setImageFile(null);
-        setErrors({});
-        setSelectedModifier(null);
-      });
+      setFormData(newFormData);
+      setImageFile(null);
+      setErrors({});
+      setSelectedModifier(null);
     }
   }, [open, item]);
 
