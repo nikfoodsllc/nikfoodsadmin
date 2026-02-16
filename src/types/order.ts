@@ -15,6 +15,16 @@ export type OrderStatus =
 
 export type PaymentStatus = 'unpaid' | 'paid' | 'failed' | 'refunded';
 
+export type EmailStatus = 'pending' | 'sent' | 'failed' | 'retrying';
+
+export interface EmailStatusInfo {
+  status: EmailStatus;
+  attempts: number;
+  lastAttempt?: Date;
+  error?: string;
+  messageId?: string;
+}
+
 /**
  * Mapping type discriminator for CategoryFoodMapping
  * - FLAT: Standard flat listing where food items appear in category sequence
@@ -101,9 +111,28 @@ export interface FoodItemSnapshot {
   image?: string;
   category?: string; // @deprecated Populated from CategoryFoodMapping for backward compatibility
   description?: string;
-  spiceLevel?: string;
-  portions?: number;
-  sections?: { _id: string; name: string; items: { _id: string; name: string }[] }[]; // Combo sections for displaying combo selections
+  veg?: boolean;
+  hasSpiceLevel?: boolean;
+  spiceLevel?: string[];
+  portions?: string[]; // Array of portion names (e.g., ["Full", "Half"])
+  portionPrices?: number[];
+  hasCombo?: boolean;
+  sections?: Array<{
+    _id: string;
+    title: string;
+    description?: string;
+    selectedItems: Array<{
+      _id: string;
+      item: {
+        _id: string;
+        name: string;
+        price: number;
+      };
+      portion?: string;
+      price: number;
+      isDefault: boolean;
+    }>;
+  }>; // Combo sections for displaying combo selections
 }
 
 export interface OrderDayItem {
@@ -111,13 +140,18 @@ export interface OrderDayItem {
   quantity: number;
   price: number;
   spiceLevel?: string;
-  portions?: number;
-  comboSelections?: Record<string, string>; // { sectionId: itemId }
+  selectedPortion?: string; // Portion name (e.g., "Full", "Half")
+  portions?: number; // Portion index for backwards compatibility
+  isEcoFriendlyContainer?: boolean;
+  ecoContainerCharge?: number;
+  comboSelections?: Record<string, string[]>; // { sectionId: itemId[] }
+  notes?: string;
 }
 
 export interface OrderDay {
   day: string; // e.g., "Monday", "Tuesday"
   deliveryDate: Date | string;
+  actualDeliveryDate?: Date | string; // Calculated delivery date after clubbing logic
   items: OrderDayItem[];
   dayTotal: number;
 }
@@ -156,6 +190,7 @@ export interface Order {
   taxes: number; // 10% of subtotal
   tip: number; // User selected tip
   discount?: DiscountInfo;
+  minOrderValue?: number; // Minimum order value required for delivery
   totalPaid: number;
   currency: string; // 'usd' | 'inr'
   status: OrderStatus;
@@ -163,6 +198,8 @@ export interface Order {
   paymentMethod: PaymentMethod;
   stripePaymentIntentId?: string; // Only for card payments
   deliveryMessages?: string[]; // Cart clubbing messages
+  hasReview?: boolean; // Whether this order has been reviewed
+  emailStatus?: EmailStatusInfo; // Track email sending status
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -198,4 +235,29 @@ export interface AvailableDate {
   dayWiseCategoryEnabled: boolean; // Enable day-wise category listing for this date
   createdAt?: Date | string;
   updatedAt?: Date | string;
+}
+
+/**
+ * DeliveryOrderReport Interface
+ * Represents an order in the delivery report for CSV export.
+ * Used by the delivery report API and CSV export functionality.
+ */
+export interface DeliveryOrderReport {
+  orderId: string;
+  orderDate: Date | string;
+  customerInfo: CustomerInfo;
+  address: AddressSnapshot;
+  deliveryDate: Date | string;
+  deliveryDay: string;
+  items: OrderDayItem[];
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  subtotal: number;
+  platformFee: number;
+  deliveryFee: number;
+  taxes: number;
+  tip: number;
+  totalPaid: number;
+  deliveryMessages?: string[];
 }

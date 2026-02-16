@@ -22,23 +22,10 @@ import {
   Collapse,
   Chip,
 } from '@mui/material';
-import { IconRefresh, IconChevronDown, IconChevronUp, IconMapPin, IconPhone, IconPackage } from '@tabler/icons-react';
+import { IconRefresh, IconChevronDown, IconChevronUp, IconMapPin, IconPhone, IconPackage, IconDownload } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrderDayItem, AddressSnapshot } from '@/types/order';
 import { formatPSTDate, formatPSTTime } from '@/utils/timezone';
-
-interface OrderItem {
-  food: {
-    _id: string;
-    name: string;
-    image?: string;
-  };
-  quantity: number;
-  spiceLevel?: string;
-  portions?: number;
-  price: number;
-  comboSelections?: Record<string, string>;
-}
 
 interface DeliveryOrder {
   orderId: string;
@@ -49,7 +36,7 @@ interface DeliveryOrder {
     phone: string;
   };
   address: AddressSnapshot;
-  items: OrderItem[];
+  items: OrderDayItem[]; // Use full OrderDayItem type
   status: string;
   paymentStatus: string;
   paymentMethod: string;
@@ -200,6 +187,174 @@ export default function DeliveryReportPage() {
     }).format(amount);
   };
 
+  const exportToCSV = () => {
+    if (!reportData || !reportData.orders) return;
+
+    const MAX_ITEMS = 10;
+
+    // CSV Headers
+    const headers = [
+      // Order Info
+      'Order ID',
+      'Order Date',
+      'Order Time',
+      'Delivery Day',
+      'Status',
+      'Payment Status',
+      'Payment Method',
+      // Customer Info
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      // Address
+      'Street',
+      'Apartment',
+      'Floor',
+      'City',
+      'State',
+      'Zip Code',
+      'Landmark',
+    ];
+
+    // Add item columns for each position
+    for (let i = 1; i <= MAX_ITEMS; i++) {
+      headers.push(
+        `Item ${i} Name`,
+        `Item ${i} Quantity`,
+        `Item ${i} Price`,
+        `Item ${i} Spice Level`,
+        `Item ${i} Portion`,
+        `Item ${i} Eco Container`,
+        `Item ${i} Eco Charge`,
+        `Item ${i} Notes`,
+        `Item ${i} Combo Selections`
+      );
+    }
+
+    // Pricing
+    headers.push(
+      'Subtotal',
+      'Delivery Fee',
+      'Eco Container Charges',
+      'Tip',
+      'Total'
+    );
+
+    // Delivery Messages
+    headers.push('Delivery Messages');
+
+    // Convert orders to CSV rows
+    const csvRows = reportData.orders.map(order => {
+      const row = [];
+
+      // Order Info
+      row.push(order.orderId);
+      row.push(formatPSTDate(order.orderDate.toString()));
+      row.push(formatPSTTime(order.orderDate));
+      row.push(order.deliveryDay || '');
+      row.push(order.status);
+      row.push(order.paymentStatus);
+      row.push(order.paymentMethod);
+
+      // Customer Info
+      row.push(order.customerInfo.name);
+      row.push(order.customerInfo.email);
+      row.push(order.customerInfo.phone);
+
+      // Address
+      row.push(order.address.street);
+      row.push(order.address.apartment || '');
+      row.push(order.address.floor || '');
+      row.push(order.address.city);
+      row.push(order.address.state);
+      row.push(order.address.zipCode);
+      row.push(order.address.landmark || '');
+
+      // Items - fill up to MAX_ITEMS
+      for (let i = 0; i < MAX_ITEMS; i++) {
+        const item = order.items[i];
+        if (item) {
+          row.push(item.food.name || '');
+          row.push(item.quantity.toString());
+          row.push(formatCurrency(item.price));
+          row.push(item.spiceLevel || '');
+          row.push(item.selectedPortion || (item.food.portions?.[item.portions || 0]) || '');
+          row.push(item.isEcoFriendlyContainer ? 'Yes' : 'No');
+          row.push(item.ecoContainerCharge ? formatCurrency(item.ecoContainerCharge) : '');
+          row.push(item.notes || '');
+
+          // Format combo selections
+          if (item.comboSelections && item.food.sections) {
+            const comboText = item.food.sections
+              .map(section => {
+                const selectedItemIds = item.comboSelections![section._id] || [];
+                const selectedItems = section.selectedItems.filter(si =>
+                  selectedItemIds.includes(si._id)
+                );
+                if (selectedItems.length === 0) return '';
+                return `${section.title}: ${selectedItems.map(si => si.item.name).join(', ')}`;
+              })
+              .filter(Boolean)
+              .join(' | ');
+            row.push(comboText);
+          } else {
+            row.push('');
+          }
+        } else {
+          // Empty columns for unused item positions
+          for (let j = 0; j < 9; j++) {
+            row.push('');
+          }
+        }
+      }
+
+      // Calculate eco charges
+      const totalEcoCharges = order.items.reduce((sum, item) =>
+        sum + (item.ecoContainerCharge || 0) * item.quantity, 0
+      );
+
+      // Pricing
+      row.push(formatCurrency(order.subtotal));
+      row.push(formatCurrency(order.deliveryFee));
+      row.push(formatCurrency(totalEcoCharges));
+      row.push(formatCurrency(order.tip));
+      row.push(formatCurrency(order.totalPaid));
+
+      // Delivery Messages
+      row.push(order.deliveryMessages ? order.deliveryMessages.join('; ') : '');
+
+      return row.map(cell => {
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(',');
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...csvRows
+    ].join('\n');
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    const dateStr = selectedDate || formatPSTDate(new Date().toISOString());
+    link.setAttribute('href', url);
+    link.setAttribute('download', `delivery-report-${dateStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showSnackbar('CSV exported successfully!', 'success');
+  };
+
   // Group orders by location (city-state-zip)
   const groupOrdersByLocation = (orders: DeliveryOrder[]) => {
     const grouped: Record<string, DeliveryOrder[]> = {};
@@ -242,7 +397,7 @@ export default function DeliveryReportPage() {
     );
   };
 
-  const renderItems = (items: OrderItem[]) => {
+  const renderItems = (items: OrderDayItem[]) => {
     return (
       <Box sx={{ mt: 1 }}>
         {items.map((item, idx) => (
@@ -257,7 +412,20 @@ export default function DeliveryReportPage() {
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
               <IconPackage size={16} style={{ marginTop: '2px', color: '#6B7280', flexShrink: 0 }} />
               <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                {/* Item name with veg indicator */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+                  {/* Veg indicator */}
+                  {item.food.veg !== undefined && (
+                    <Box sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      backgroundColor: item.food.veg ? '#10B981' : '#EF4444',
+                      border: '2px solid',
+                      borderColor: item.food.veg ? '#10B981' : '#EF4444',
+                      flexShrink: 0,
+                    }} />
+                  )}
                   <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827', fontSize: '13px' }}>
                     {item.food.name}
                   </Typography>
@@ -272,41 +440,97 @@ export default function DeliveryReportPage() {
                       fontWeight: 600,
                     }}
                   />
-                  {item.portions && (
+                  {item.isEcoFriendlyContainer && (
                     <Chip
-                      label={`${item.portions} portions`}
+                      label="🌱 Eco Container"
                       size="small"
                       sx={{
                         height: 20,
                         fontSize: '11px',
-                        backgroundColor: '#FEF3C7',
-                        color: '#92400E',
+                        backgroundColor: '#D1FAE5',
+                        color: '#065F46',
                         fontWeight: 600,
                       }}
                     />
                   )}
                 </Box>
-                {item.spiceLevel && (
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', ml: 3 }}>
-                    Spice Level: {item.spiceLevel}
+
+                {/* Description */}
+                {item.food.description && (
+                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', display: 'block', fontStyle: 'italic', ml: 3.25 }}>
+                    {item.food.description}
                   </Typography>
                 )}
-                {item.comboSelections && Object.keys(item.comboSelections).length > 0 && (
-                  <Box sx={{ ml: 3, mt: 0.5 }}>
+
+                {/* Customizations */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5, ml: 3.25 }}>
+                  {item.spiceLevel && (
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                      Spice: {item.spiceLevel}
+                    </Typography>
+                  )}
+                  {(item.selectedPortion || item.portions !== undefined) && (
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                      Portion: {item.selectedPortion || (item.food.portions?.[item.portions || 0]) || `#${item.portions}`}
+                    </Typography>
+                  )}
+                  {item.isEcoFriendlyContainer && item.ecoContainerCharge && (
+                    <Typography variant="caption" sx={{ color: '#059669', fontWeight: 500, fontSize: '12px' }}>
+                      +{formatCurrency(item.ecoContainerCharge)} per item
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Combo selections */}
+                {item.comboSelections && Object.keys(item.comboSelections).length > 0 && item.food.sections && (
+                  <Box sx={{ ml: 3.25, mt: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', fontWeight: 500 }}>
                       Combo Selections:
                     </Typography>
-                    {Object.entries(item.comboSelections).map(([sectionId, itemId]) => (
-                      <Typography
-                        key={`${sectionId}-${itemId}`}
-                        variant="caption"
-                        sx={{ color: '#6B7280', fontSize: '12px', display: 'block', ml: 1 }}
-                      >
-                        • {itemId}
-                      </Typography>
-                    ))}
+                    {item.food.sections.map(section => {
+                      const selectedItemIds = item.comboSelections![section._id] || [];
+                      const selectedItems = section.selectedItems.filter(si =>
+                        selectedItemIds.includes(si._id)
+                      );
+                      if (selectedItems.length === 0) return null;
+
+                      return (
+                        <Box key={section._id} sx={{ ml: 1 }}>
+                          <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                            {section.title}:
+                          </Typography>
+                          {selectedItems.map(si => (
+                            <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151', fontSize: '12px' }}>
+                              • {si.item.name} {si.portion && `(${si.portion})`}
+                            </Typography>
+                          ))}
+                        </Box>
+                      );
+                    })}
                   </Box>
                 )}
+
+                {/* Customer notes */}
+                {item.notes && (
+                  <Box sx={{ ml: 3.25, mt: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', fontStyle: 'italic' }}>
+                      Note: {item.notes}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Item total */}
+                <Box sx={{ mt: 0.5, ml: 3.25 }}>
+                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                    Price: {formatCurrency(item.price)} × {item.quantity}
+                    {item.isEcoFriendlyContainer && item.ecoContainerCharge && (
+                      <> + Eco ({formatCurrency(item.ecoContainerCharge)} × {item.quantity})</>
+                    )}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '13px', ml: 0.5 }}>
+                    = {formatCurrency(item.price * item.quantity + (item.ecoContainerCharge || 0) * item.quantity)}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </Box>
@@ -501,6 +725,16 @@ export default function DeliveryReportPage() {
                   <Typography variant="body2" sx={{ color: '#6B7280' }}>Delivery Fee</Typography>
                   <Typography variant="body2" sx={{ color: '#111827' }}>{formatCurrency(order.deliveryFee)}</Typography>
                 </Box>
+                {order.items.some(item => item.isEcoFriendlyContainer && item.ecoContainerCharge) && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <Typography variant="body2" sx={{ color: '#6B7280' }}>Eco Container Charges</Typography>
+                    <Typography variant="body2" sx={{ color: '#111827' }}>
+                      {formatCurrency(order.items.reduce((sum, item) =>
+                        sum + (item.ecoContainerCharge || 0) * item.quantity, 0
+                      ))}
+                    </Typography>
+                  </Box>
+                )}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                   <Typography variant="body2" sx={{ color: '#6B7280' }}>Tip</Typography>
                   <Typography variant="body2" sx={{ color: '#111827' }}>{formatCurrency(order.tip)}</Typography>
@@ -616,6 +850,21 @@ export default function DeliveryReportPage() {
             >
               Today
             </Button>
+            <Tooltip title="Export to CSV">
+              <Button
+                variant="outlined"
+                onClick={exportToCSV}
+                disabled={loading || !reportData || reportData.orders.length === 0}
+                startIcon={<IconDownload size={18} />}
+                sx={{
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  px: 3,
+                }}
+              >
+                Export CSV
+              </Button>
+            </Tooltip>
             <Tooltip title="Refresh data">
               <IconButton
                 onClick={handleRefresh}
