@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { Order } from '@/types/order';
 import { ObjectId } from 'mongodb';
+import { toPSTDate } from '@/utils/timezone';
 
 /**
  * Verify JWT token and check admin role
@@ -64,25 +65,15 @@ export async function GET(request: NextRequest) {
 
     if (date) {
       // Filter for specific date
-      const targetDate = new Date(date);
-      const startOfDay = new Date(targetDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(targetDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      dateFilter.$gte = startOfDay;
-      dateFilter.$lte = endOfDay;
+      // Match the exact date format stored in database (handles both Date and string)
+      dateFilter.$eq = date;
     } else if (startDate || endDate) {
       // Filter for date range
       if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        dateFilter.$gte = start;
+        dateFilter.$gte = startDate;
       }
       if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        dateFilter.$lte = end;
+        dateFilter.$lte = endDate;
       }
     } else {
       return NextResponse.json(

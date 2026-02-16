@@ -21,8 +21,10 @@ import {
   TableRow,
   Paper,
   CircularProgress,
+  Collapse,
+  IconButton,
 } from '@mui/material';
-import { IconX } from '@tabler/icons-react';
+import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
 import { Order, OrderStatus } from '@/types/order';
@@ -46,6 +48,7 @@ export default function OrderDetailsDialog({
 }: OrderDetailsDialogProps) {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('pending');
   const [updating, setUpdating] = useState(false);
+  const [expandedCombos, setExpandedCombos] = useState<Set<string>>(new Set());
 
   // Update selected status when order changes
   useState(() => {
@@ -53,6 +56,27 @@ export default function OrderDetailsDialog({
       setSelectedStatus(order.status);
     }
   });
+
+  // Calculate total eco container charges
+  const totalEcoCharges = order?.items.reduce((total, day) => {
+    return total + day.items.reduce((dayTotal, item) => {
+      return dayTotal + (item.ecoContainerCharge || 0) * item.quantity;
+    }, 0);
+  }, 0) || 0;
+
+  const hasEcoContainerCharges = totalEcoCharges > 0;
+
+  const toggleCombo = (itemId: string) => {
+    setExpandedCombos(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
 
   if (!order) return null;
 
@@ -132,7 +156,7 @@ export default function OrderDetailsDialog({
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 2, marginBottom: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, marginBottom: 2, flexWrap: 'wrap' }}>
             <Box>
               <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', display: 'block', marginBottom: 0.5 }}>
                 Order Status
@@ -145,6 +169,16 @@ export default function OrderDetailsDialog({
               </Typography>
               <StatusBadge status={order.paymentStatus} type="payment" />
             </Box>
+            {order.minOrderValue !== undefined && order.minOrderValue > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', display: 'block', marginBottom: 0.5 }}>
+                  Min Order Value
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: '#4F8CFF' }}>
+                  {safeFormatCurrency(order.minOrderValue)}
+                </Typography>
+              </Box>
+            )}
           </Box>
         </Box>
 
@@ -216,9 +250,16 @@ export default function OrderDetailsDialog({
           </Typography>
           {order.items.map((dayOrder, dayIndex) => (
             <Box key={dayIndex} sx={{ marginBottom: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: '#4F8CFF', marginBottom: 1 }}>
-                {dayOrder.day} - {formatPSTDate(dayOrder.deliveryDate)}
-              </Typography>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#4F8CFF', marginBottom: 0.5 }}>
+                  {dayOrder.day} - {dayOrder.actualDeliveryDate ? formatPSTDate(dayOrder.actualDeliveryDate) : formatPSTDate(dayOrder.deliveryDate)}
+                </Typography>
+                {dayOrder.actualDeliveryDate && String(dayOrder.actualDeliveryDate) !== String(dayOrder.deliveryDate) && (
+                  <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                    (Original: {formatPSTDate(dayOrder.deliveryDate)})
+                  </Typography>
+                )}
+              </Box>
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E5E7EB', marginBottom: 1 }}>
                 <Table size="small">
                   <TableHead>
@@ -230,28 +271,115 @@ export default function OrderDetailsDialog({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {dayOrder.items.map((item, itemIndex) => (
-                      <TableRow key={itemIndex}>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {item.food.name}
-                          </Typography>
-                          {item.spiceLevel && (
-                            <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                              Spice: {item.spiceLevel}
-                            </Typography>
-                          )}
-                          {item.portions && (
-                            <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
-                              Portions: {item.portions}
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell align="center">{item.quantity}</TableCell>
-                        <TableCell align="right">{safeFormatCurrency(item.price)}</TableCell>
-                        <TableCell align="right">{safeFormatCurrency(item.price * item.quantity)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {dayOrder.items.map((item, itemIndex) => {
+                      const itemUniqueId = `${dayIndex}-${itemIndex}`;
+                      const isComboExpanded = expandedCombos.has(itemUniqueId);
+                      const hasComboSelections = item.comboSelections && Object.keys(item.comboSelections).length > 0 && item.food.sections;
+
+                      return (
+                        <TableRow key={itemIndex}>
+                          <TableCell>
+                            {/* Item name with veg indicator */}
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                              {item.food.veg !== undefined && (
+                                <Box sx={{
+                                  mt: 0.5,
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  backgroundColor: item.food.veg ? '#10B981' : '#EF4444',
+                                  border: '2px solid',
+                                  borderColor: item.food.veg ? '#10B981' : '#EF4444',
+                                  flexShrink: 0,
+                                }} />
+                              )}
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {item.food.name}
+                                </Typography>
+                                {item.food.description && (
+                                  <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', fontStyle: 'italic' }}>
+                                    {item.food.description}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+
+                            {/* Customizations row */}
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5, ml: 1.75 }}>
+                              {item.spiceLevel && (
+                                <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                                  Spice: {item.spiceLevel}
+                                </Typography>
+                              )}
+                              {(item.selectedPortion || item.portions !== undefined) && (
+                                <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                                  Portion: {item.selectedPortion || (item.food.portions?.[item.portions || 0]) || `#${item.portions}`}
+                                </Typography>
+                              )}
+                              {item.isEcoFriendlyContainer && (
+                                <Typography variant="caption" sx={{ color: '#059669', fontWeight: 500 }}>
+                                  🌱 Eco Container {item.ecoContainerCharge && `(+${safeFormatCurrency(item.ecoContainerCharge)})`}
+                                </Typography>
+                              )}
+                            </Box>
+
+                            {/* Combo selections */}
+                            {hasComboSelections && (
+                              <Box sx={{ ml: 1.75, mt: 0.5 }}>
+                                <Box
+                                  sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+                                  onClick={() => toggleCombo(itemUniqueId)}
+                                >
+                                  <Typography variant="caption" sx={{ fontWeight: 600, color: '#4F8CFF', mr: 0.5 }}>
+                                    Combo Selections
+                                  </Typography>
+                                  {isComboExpanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+                                </Box>
+                                <Collapse in={isComboExpanded}>
+                                  <Box sx={{ pl: 1, borderLeft: '2px solid #E5E7EB', mt: 0.5 }}>
+                                    {item.food.sections!.map(section => {
+                                      const selectedItemIds = item.comboSelections![section._id] || [];
+                                      const selectedItems = section.selectedItems.filter(si =>
+                                        selectedItemIds.includes(si._id)
+                                      );
+                                      if (selectedItems.length === 0) return null;
+
+                                      return (
+                                        <Box key={section._id} sx={{ mb: 0.5 }}>
+                                          <Typography variant="caption" sx={{ color: '#6B7280', fontWeight: 500 }}>
+                                            {section.title}:
+                                          </Typography>
+                                          {selectedItems.map(si => (
+                                            <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151' }}>
+                                              • {si.item.name} {si.portion && `(${si.portion})`}
+                                            </Typography>
+                                          ))}
+                                        </Box>
+                                      );
+                                    })}
+                                  </Box>
+                                </Collapse>
+                              </Box>
+                            )}
+
+                            {/* Customer notes */}
+                            {item.notes && (
+                              <Box sx={{ ml: 1.75, mt: 0.5 }}>
+                                <Typography variant="caption" sx={{ color: '#6B7280', fontStyle: 'italic' }}>
+                                  Note: {item.notes}
+                                </Typography>
+                              </Box>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">{item.quantity}</TableCell>
+                          <TableCell align="right">{safeFormatCurrency(item.price)}</TableCell>
+                          <TableCell align="right">
+                            {safeFormatCurrency(item.price * item.quantity + (item.ecoContainerCharge || 0) * item.quantity)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     <TableRow>
                       <TableCell colSpan={3} sx={{ fontWeight: 600, borderTop: '2px solid #E5E7EB' }}>
                         Day Total
@@ -287,6 +415,12 @@ export default function OrderDetailsDialog({
               <Typography variant="body2" sx={{ color: '#6B7280' }}>Delivery Fee</Typography>
               <Typography variant="body2" sx={{ fontWeight: 500 }}>{safeFormatCurrency(order.deliveryFee)}</Typography>
             </Box>
+            {hasEcoContainerCharges && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" sx={{ color: '#6B7280' }}>Eco Container Charges</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>{safeFormatCurrency(totalEcoCharges)}</Typography>
+              </Box>
+            )}
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Typography variant="body2" sx={{ color: '#6B7280' }}>Taxes</Typography>
               <Typography variant="body2" sx={{ fontWeight: 500 }}>{safeFormatCurrency(order.taxes)}</Typography>
@@ -337,6 +471,57 @@ export default function OrderDetailsDialog({
             )}
           </Box>
         </Box>
+
+        {/* Additional Information */}
+        {(order.hasReview !== undefined || order.emailStatus || (order.deliveryMessages && order.deliveryMessages.length > 0)) && (
+          <>
+            <Divider sx={{ marginY: 2 }} />
+            <Box sx={{ marginBottom: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}>
+                Additional Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                {order.hasReview !== undefined && (
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                      Review Status
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {order.hasReview ? '✓ Reviewed' : 'Not reviewed'}
+                    </Typography>
+                  </Box>
+                )}
+                {order.emailStatus && (
+                  <Box sx={{ gridColumn: '1 / -1' }}>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                      Email Status
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {order.emailStatus.status} (Attempts: {order.emailStatus.attempts})
+                    </Typography>
+                    {order.emailStatus.error && (
+                      <Typography variant="caption" sx={{ color: '#EF4444' }}>
+                        Error: {order.emailStatus.error}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+                {order.deliveryMessages && order.deliveryMessages.length > 0 && (
+                  <Box sx={{ gridColumn: '1 / -1' }}>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                      Delivery Messages
+                    </Typography>
+                    {order.deliveryMessages.map((msg, idx) => (
+                      <Typography key={idx} variant="body2" sx={{ fontWeight: 500 }}>
+                        {msg}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </>
+        )}
 
         <Divider sx={{ marginY: 2 }} />
 

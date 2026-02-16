@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, Typography, Alert, Snackbar, CircularProgress } from '@mui/material';
+import { Box, Typography, Alert, Snackbar, CircularProgress, Button } from '@mui/material';
 import OrdersTable from './OrdersTable';
 import OrderFilters from './OrderFilters';
 import OrderDetailsDialog from './OrderDetailsDialog';
+import ExportToCsvDialog from './ExportToCsvDialog';
+import { IconDownload } from '@tabler/icons-react';
 import TablePagination from '../../food-items/components/TablePagination';
 import { Order, OrderStatus } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +31,7 @@ export default function OrdersPage() {
   const [sortBy, setSortBy] = useState('date_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const itemsPerPage = 10;
 
   const [snackbar, setSnackbar] = useState<{
@@ -221,6 +224,23 @@ export default function OrdersPage() {
     setCurrentPage(page);
   };
 
+  const handleExportClick = () => {
+    setExportDialogOpen(true);
+  };
+
+  const handleExportDialogClose = () => {
+    setExportDialogOpen(false);
+  };
+
+  const handleExportSuccess = () => {
+    setExportDialogOpen(false);
+    showSnackbar('CSV exported successfully');
+  };
+
+  const handleExportError = (message: string) => {
+    showSnackbar(message, 'error');
+  };
+
   const totalPages = Math.ceil(totalOrders / itemsPerPage);
 
   return (
@@ -240,6 +260,24 @@ export default function OrdersPage() {
           Orders
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<IconDownload size={18} />}
+            onClick={handleExportClick}
+            sx={{
+              textTransform: 'none',
+              borderRadius: 2,
+              px: 3,
+              borderColor: '#E5E7EB',
+              color: '#374151',
+              '&:hover': {
+                borderColor: '#4F8CFF',
+                backgroundColor: 'rgba(79, 140, 255, 0.04)',
+              },
+            }}
+          >
+            Export to CSV
+          </Button>
           <Typography variant="body2" sx={{ color: '#6B7280' }}>
             Total: {totalOrders} orders
           </Typography>
@@ -294,6 +332,15 @@ export default function OrdersPage() {
         loading={dialogLoading}
         onClose={handleDialogClose}
         onStatusUpdate={handleStatusUpdate}
+      />
+
+      {/* Export to CSV Dialog */}
+      <ExportToCsvDialog
+        open={exportDialogOpen}
+        token={token}
+        onClose={handleExportDialogClose}
+        onExportSuccess={handleExportSuccess}
+        onExportError={handleExportError}
       />
 
       {/* Snackbar for notifications */}
