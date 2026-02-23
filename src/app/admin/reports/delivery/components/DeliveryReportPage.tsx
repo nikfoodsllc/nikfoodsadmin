@@ -854,7 +854,7 @@ export default function DeliveryReportPage() {
               <Button
                 variant="outlined"
                 onClick={exportToCSV}
-                disabled={loading || !reportData || reportData.orders.length === 0}
+                disabled={loading || !reportData || !reportData.orders || reportData.orders.length === 0}
                 startIcon={<IconDownload size={18} />}
                 sx={{
                   textTransform: 'none',
