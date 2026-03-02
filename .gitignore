@@ -191,3 +191,4 @@ storybook-static
 # ---------------------------------
 .svelte-kit
 # End of .gitignore file
+/scripts

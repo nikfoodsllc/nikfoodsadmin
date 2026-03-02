@@ -13,6 +13,7 @@
     "@emotion/styled": "^11.14.1",
     "@hello-pangea/dnd": "^16.6.0",
     "@mui/material": "^7.3.5",
+    "@mui/x-date-pickers": "^8.27.2",
     "@tabler/icons-react": "^3.35.0",
     "bcryptjs": "^2.4.3",
     "date-fns": "^4.1.0",

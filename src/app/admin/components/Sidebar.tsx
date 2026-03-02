@@ -96,6 +96,11 @@ const navItems: NavItem[] = [
         href: '/admin/reports/delivery',
         icon: IconMapPin,
       },
+      {
+        title: 'Ordered Items',
+        href: '/admin/reports/ordered-items',
+        icon: IconShoppingCart,
+      },
     ],
   },
   {
