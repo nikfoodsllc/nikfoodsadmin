@@ -136,6 +136,19 @@ export async function GET(request: NextRequest) {
       throw new Error(result.error || 'Failed to fetch orders');
     }
 
+    // Sort each order's items array by delivery date in ascending order
+    const sortedOrders = (result.data || []).map((order) => {
+      if (order.items && order.items.length > 0) {
+        const sortedItems = [...order.items].sort((a, b) => {
+          const dateA = a.actualDeliveryDate || a.deliveryDate;
+          const dateB = b.actualDeliveryDate || b.deliveryDate;
+          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        });
+        return { ...order, items: sortedItems };
+      }
+      return order;
+    });
+
     return NextResponse.json({
       data: {
         items: result.data || [],

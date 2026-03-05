@@ -20,7 +20,7 @@ import {
   Tooltip,
   Chip,
 } from '@mui/material';
-import { IconRefresh, IconDownload } from '@tabler/icons-react';
+import { IconRefresh, IconDownload, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatPSTDate } from '@/utils/timezone';
 import CustomDateRangePicker, { DateRange } from './CustomDateRangePicker';
@@ -41,6 +41,11 @@ interface OrderedItem {
   itemPrice: number;
   ecoContainer: boolean;
   ecoContainerAvailable: boolean;
+  ecoContainerPrice: number;
+  hasCombo?: boolean;
+  isComboSelection?: boolean;
+  comboSectionTitle?: string;
+  comboItemName?: string;
 }
 
 interface OrderedItemsReportData {
@@ -60,6 +65,8 @@ export default function OrderedItemsReportPage() {
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     endDate: new Date(),
   });
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -156,11 +163,121 @@ export default function OrderedItemsReportPage() {
     setDateRange(range);
   };
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // Toggle direction if clicking the same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, set to ascending by default
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedItems = () => {
+    if (!reportData || !reportData.items) return [];
+    
+    const items = [...reportData.items];
+    
+    if (!sortField) return items;
+    
+    return items.sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+      
+      switch (sortField) {
+        case 'orderId':
+          aVal = a.orderId;
+          bVal = b.orderId;
+          break;
+        case 'orderDate':
+          aVal = new Date(a.orderDate).getTime();
+          bVal = new Date(b.orderDate).getTime();
+          break;
+        case 'deliveryDate':
+          aVal = new Date(a.deliveryDate).getTime();
+          bVal = new Date(b.deliveryDate).getTime();
+          break;
+        case 'customerName':
+          aVal = a.customerName.toLowerCase();
+          bVal = b.customerName.toLowerCase();
+          break;
+        case 'itemName':
+          aVal = a.itemName.toLowerCase();
+          bVal = b.itemName.toLowerCase();
+          break;
+        case 'portionQuantity':
+          aVal = a.portionQuantity || '';
+          bVal = b.portionQuantity || '';
+          break;
+        case 'quantity':
+          aVal = a.quantity;
+          bVal = b.quantity;
+          break;
+        case 'spiceLevel':
+          aVal = a.spiceLevel || '';
+          bVal = b.spiceLevel || '';
+          break;
+        case 'itemPrice':
+          aVal = a.itemPrice;
+          bVal = b.itemPrice;
+          break;
+        case 'ecoContainer':
+          aVal = a.ecoContainer ? 1 : 0;
+          bVal = b.ecoContainer ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const renderSortIcon = (field: string) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? (
+      <IconArrowUp size={14} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
+    ) : (
+      <IconArrowDown size={14} style={{ marginLeft: 4, verticalAlign: 'middle' }} />
+    );
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
     }).format(amount);
+  };
+
+  const extractPortionQuantity = (portionQuantity: string): number => {
+    if (!portionQuantity) return 0;
+    // Extract numeric value from portion quantity (e.g., '12Oz' -> 12, 'Full' -> 1)
+    const match = portionQuantity.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 1;
+  };
+
+  const calculateItemTotalPrice = (item: OrderedItem): number => {
+    // For combo selections, the itemPrice is the full combo price
+    // The total should be combo price * quantity
+    return item.itemPrice * item.quantity;
+  };
+
+  const calculateEcoContainerTotalPrice = (item: OrderedItem): number => {
+    // Only show eco container price for the first combo selection row
+    // to avoid duplicate eco container charges
+    if (item.isComboSelection) {
+      // Only show eco container price for non-combo items or first selection
+      return item.ecoContainer ? item.ecoContainerPrice * item.quantity : 0;
+    }
+    return item.ecoContainer ? item.ecoContainerPrice * item.quantity : 0;
+  };
+
+  const calculateTotalOrderedQty = (portionQuantity: string, quantity: number): number => {
+    const portionQty = extractPortionQuantity(portionQuantity);
+    return portionQty * quantity;
   };
 
   const exportToCSV = () => {
@@ -172,15 +289,15 @@ export default function OrderedItemsReportPage() {
       'Order Date',
       'Delivery Date',
       'Customer Name',
-      'Customer Phone',
       'Item Name',
-      'Item Description',
       'Portion Quantity',
       'Quantity',
       'Spice Level',
       'Item Price',
-      'Eco Container Available',
       'Eco Container Selected',
+      'Eco Container Price',
+      'Sub Total',
+      'Total Ordered Qty',
     ];
 
     // Convert items to CSV rows
@@ -190,15 +307,15 @@ export default function OrderedItemsReportPage() {
         formatPSTDate(item.orderDate.toString()),
         formatPSTDate(item.deliveryDate.toString()),
         item.customerName,
-        item.customerPhone,
         item.itemName,
-        item.itemDescription || '',
         item.portionQuantity,
         item.quantity.toString(),
         item.spiceLevel,
         formatCurrency(item.itemPrice),
-        item.ecoContainerAvailable ? 'Yes' : 'No',
         item.ecoContainer ? 'Yes' : 'No',
+        formatCurrency(item.ecoContainerPrice),
+        formatCurrency(calculateItemTotalPrice(item)),
+        calculateTotalOrderedQty(item.portionQuantity, item.quantity).toString(),
       ];
 
       return row.map(cell => {
@@ -447,40 +564,185 @@ export default function OrderedItemsReportPage() {
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: '#F9FAFB' }}>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Order ID
+                    <TableCell 
+                      onClick={() => handleSort('orderId')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Order ID{renderSortIcon('orderId')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Order Date
+                    <TableCell 
+                      onClick={() => handleSort('orderDate')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Order Date{renderSortIcon('orderDate')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Delivery Date
+                    <TableCell 
+                      onClick={() => handleSort('deliveryDate')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Delivery Date{renderSortIcon('deliveryDate')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Customer Name
+                    <TableCell 
+                      onClick={() => handleSort('customerName')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Customer Name{renderSortIcon('customerName')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Item Name
+                    <TableCell 
+                      onClick={() => handleSort('itemName')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Item Name{renderSortIcon('itemName')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Portion
+                    <TableCell 
+                      onClick={() => handleSort('portionQuantity')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Portion{renderSortIcon('portionQuantity')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Quantity
+                    <TableCell 
+                      onClick={() => handleSort('quantity')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Quantity{renderSortIcon('quantity')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Spice Level
+                    <TableCell 
+                      onClick={() => handleSort('spiceLevel')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Spice Level{renderSortIcon('spiceLevel')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Price
+                    <TableCell 
+                      onClick={() => handleSort('itemPrice')}
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Price{renderSortIcon('itemPrice')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
-                      Eco Container
+                    <TableCell 
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Eco Container Price
                     </TableCell>
+                    <TableCell 
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Sub Total
+                    </TableCell>
+                    <TableCell 
+                      sx={{ 
+                        fontWeight: 600, 
+                        fontSize: '13px', 
+                        color: '#374151', 
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Total Ordered Qty
+                    </TableCell>
+
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {reportData.items.map((item, index) => (
+                  {getSortedItems().map((item, index) => (
                     <TableRow
                       key={`${item._id}-${index}`}
                       sx={{
@@ -526,47 +788,16 @@ export default function OrderedItemsReportPage() {
                       <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {formatCurrency(item.itemPrice)}
                       </TableCell>
-                      <TableCell sx={{ fontSize: '13px', color: '#6B7280' }}>
-                        {item.ecoContainerAvailable ? (
-                          item.ecoContainer ? (
-                            <Chip
-                              label="Yes"
-                              size="small"
-                              sx={{
-                                height: 20,
-                                fontSize: '11px',
-                                backgroundColor: '#D1FAE5',
-                                color: '#065F46',
-                                fontWeight: 600,
-                              }}
-                            />
-                          ) : (
-                            <Chip
-                              label="No"
-                              size="small"
-                              sx={{
-                                height: 20,
-                                fontSize: '11px',
-                                backgroundColor: '#FEE2E2',
-                                color: '#991B1B',
-                                fontWeight: 600,
-                              }}
-                            />
-                          )
-                        ) : (
-                          <Chip
-                            label="N/A"
-                            size="small"
-                            sx={{
-                              height: 20,
-                              fontSize: '11px',
-                              backgroundColor: '#F3F4F6',
-                              color: '#6B7280',
-                              fontWeight: 600,
-                            }}
-                          />
-                        )}
+                      <TableCell sx={{ fontSize: '13px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                        {item.ecoContainer ? formatCurrency(item.ecoContainerPrice) : '-'}
                       </TableCell>
+                      <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        {formatCurrency(calculateItemTotalPrice(item))}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        {calculateTotalOrderedQty(item.portionQuantity, item.quantity)}
+                      </TableCell>
+
                     </TableRow>
                   ))}
                 </TableBody>
