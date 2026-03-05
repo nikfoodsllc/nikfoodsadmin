@@ -12,10 +12,12 @@ import {
   Box,
   Alert,
   CircularProgress,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import { IconDownload } from '@tabler/icons-react';
-import { DeliveryOrderReport } from '@/types/order';
-import { generateDeliveryCSV, downloadCSV } from '@/utils/csv';
+import { Order } from '@/types/order';
+import { generateOrdersListingCSV, downloadCSV } from '@/utils/csv';
 import { formatPSTDate } from '@/utils/timezone';
 
 interface ExportToCsvDialogProps {
@@ -24,6 +26,14 @@ interface ExportToCsvDialogProps {
   onClose: () => void;
   onExportSuccess: () => void;
   onExportError: (message: string) => void;
+  // Add filter props
+  searchQuery?: string;
+  selectedStatus?: string;
+  selectedPaymentStatus?: string;
+  selectedPaymentMethod?: string;
+  startDate?: string;
+  endDate?: string;
+  sortBy?: string;
 }
 
 export default function ExportToCsvDialog({
@@ -32,9 +42,18 @@ export default function ExportToCsvDialog({
   onClose,
   onExportSuccess,
   onExportError,
+  searchQuery = '',
+  selectedStatus = 'all',
+  selectedPaymentStatus = 'all',
+  selectedPaymentMethod = 'all',
+  startDate = '',
+  endDate = '',
+  sortBy = 'date_desc',
 }: ExportToCsvDialogProps) {
-  const [selectedDate, setSelectedDate] = useState('');
-  const [orders, setOrders] = useState<DeliveryOrderReport[]>([]);
+  const [useCurrentFilters, setUseCurrentFilters] = useState(true);
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [orders, setOrders] = useState<Order[]>([]);
   const [orderCount, setOrderCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -43,37 +62,53 @@ export default function ExportToCsvDialog({
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      // Set today's date as default
-      const today = new Date().toISOString().split('T')[0];
-      setSelectedDate(today);
+      // Set default dates from current filters
+      setExportStartDate(startDate);
+      setExportEndDate(endDate);
+      setUseCurrentFilters(true);
       setOrders([]);
       setOrderCount(null);
       setFetchError('');
     }
-  }, [open]);
+  }, [open, startDate, endDate]);
 
-  // Fetch orders when date changes
+  // Fetch orders when filters change
   useEffect(() => {
-    if (open && selectedDate) {
-      fetchOrdersForDate();
+    if (open && useCurrentFilters) {
+      fetchOrdersForExport();
     }
-  }, [selectedDate, open]);
+  }, [useCurrentFilters, open, searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, exportStartDate, exportEndDate, sortBy]);
 
-  const fetchOrdersForDate = async () => {
-    if (!selectedDate || !token) return;
+  const fetchOrdersForExport = async () => {
+    if (!token) return;
 
     setLoading(true);
     setFetchError('');
     setOrderCount(null);
 
     try {
+      // Build query parameters - same as OrdersPage
       const params = new URLSearchParams();
-      params.append('date', selectedDate);
+      if (searchQuery) params.append('search', searchQuery);
+      if (selectedStatus !== 'all') params.append('status', selectedStatus);
+      if (selectedPaymentStatus !== 'all') params.append('paymentStatus', selectedPaymentStatus);
+      if (selectedPaymentMethod !== 'all') params.append('paymentMethod', selectedPaymentMethod);
+      
+      // Use export dates if not using current filters, otherwise use the dates from props
+      const effectiveStartDate = useCurrentFilters ? exportStartDate : exportStartDate;
+      const effectiveEndDate = useCurrentFilters ? exportEndDate : exportEndDate;
+      
+      if (effectiveStartDate) params.append('startDate', effectiveStartDate);
+      if (effectiveEndDate) params.append('endDate', effectiveEndDate);
+      if (sortBy) params.append('sortBy', sortBy);
+      
+      // Set a high limit to get all orders for export
+      params.append('limit', '10000');
 
-      const response = await fetch(`/api/admin/reports/delivery?${params.toString()}`, {
-        headers: token ? {
+      const response = await fetch(`/api/admin/orders?${params.toString()}`, {
+        headers: {
           Authorization: `Bearer ${token}`,
-        } : undefined,
+        },
       });
 
       if (!response.ok) {
@@ -81,8 +116,8 @@ export default function ExportToCsvDialog({
         throw new Error(errorData.error || 'Failed to fetch orders');
       }
 
-      const result = await response.json();
-      const fetchedOrders = result.data?.orders || [];
+      const data = await response.json();
+      const fetchedOrders = data.data?.items || [];
 
       setOrders(fetchedOrders);
       setOrderCount(fetchedOrders.length);
@@ -96,7 +131,7 @@ export default function ExportToCsvDialog({
   };
 
   const handleExport = async () => {
-    if (!selectedDate || orders.length === 0) {
+    if (orders.length === 0) {
       onExportError('No orders to export');
       return;
     }
@@ -104,11 +139,14 @@ export default function ExportToCsvDialog({
     setExporting(true);
 
     try {
-      // Generate CSV content
-      const csvContent = generateDeliveryCSV(orders);
+      // Generate CSV content with new function matching table structure
+      const csvContent = generateOrdersListingCSV(orders);
 
-      // Generate filename with delivery date
-      const filename = `orders-delivery-${selectedDate}.csv`;
+      // Generate filename with date range
+      const dateStr = exportStartDate && exportEndDate
+        ? `${exportStartDate}-to-${exportEndDate}`
+        : exportStartDate || exportEndDate || 'all';
+      const filename = `orders-${dateStr}.csv`;
 
       // Trigger download
       downloadCSV(csvContent, filename);
@@ -122,8 +160,12 @@ export default function ExportToCsvDialog({
     }
   };
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedDate(e.target.value);
+  const handleDateChange = (field: 'start' | 'end', value: string) => {
+    if (field === 'start') {
+      setExportStartDate(value);
+    } else {
+      setExportEndDate(value);
+    }
   };
 
   const handleClose = () => {
@@ -131,6 +173,8 @@ export default function ExportToCsvDialog({
       onClose();
     }
   };
+
+  const hasActiveFilters = searchQuery || selectedStatus !== 'all' || selectedPaymentStatus !== 'all' || selectedPaymentMethod !== 'all' || startDate || endDate;
 
   return (
     <Dialog
@@ -154,12 +198,40 @@ export default function ExportToCsvDialog({
           borderBottom: '1px solid #E5E7EB',
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '18px' }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '18px' }}>
           Export Orders to CSV
         </Typography>
       </DialogTitle>
 
       <DialogContent sx={{ paddingX: 3, paddingY: 3 }}>
+        {/* Use Current Filters Checkbox */}
+        {hasActiveFilters && (
+          <Box sx={{ marginBottom: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={useCurrentFilters}
+                  onChange={(e) => setUseCurrentFilters(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontSize: '13px', color: '#374151' }}>
+                  Use current page filters
+                </Typography>
+              }
+            />
+            <Typography variant="caption" sx={{ display: 'block', color: '#6B7280', ml: 3.5, mt: 0.5 }}>
+              {searchQuery && `Search: "${searchQuery}"`}
+              {selectedStatus !== 'all' && ` • Status: ${selectedStatus}`}
+              {selectedPaymentStatus !== 'all' && ` • Payment: ${selectedPaymentStatus}`}
+              {startDate && ` • From: ${formatPSTDate(startDate)}`}
+              {endDate && ` • To: ${formatPSTDate(endDate)}`}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Date Range */}
         <Box sx={{ marginBottom: 2 }}>
           <Typography
             variant="body2"
@@ -170,21 +242,42 @@ export default function ExportToCsvDialog({
               marginBottom: 1,
             }}
           >
-            Delivery Date
+            Date Range
           </Typography>
-          <TextField
-            type="date"
-            value={selectedDate}
-            onChange={handleDateChange}
-            size="small"
-            fullWidth
-            disabled={loading || exporting}
-            sx={{
-              '& .MuiInputBase-root': {
-                backgroundColor: '#fff',
-              },
-            }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              type="date"
+              label="Start Date"
+              value={exportStartDate}
+              onChange={(e) => handleDateChange('start', e.target.value)}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              disabled={loading || exporting || useCurrentFilters}
+              sx={{
+                flex: 1,
+                minWidth: 160,
+                '& .MuiInputBase-root': {
+                  backgroundColor: '#fff',
+                },
+              }}
+            />
+            <TextField
+              type="date"
+              label="End Date"
+              value={exportEndDate}
+              onChange={(e) => handleDateChange('end', e.target.value)}
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              disabled={loading || exporting || useCurrentFilters}
+              sx={{
+                flex: 1,
+                minWidth: 160,
+                '& .MuiInputBase-root': {
+                  backgroundColor: '#fff',
+                },
+              }}
+            />
+          </Box>
         </Box>
 
         {loading && (
@@ -212,14 +305,14 @@ export default function ExportToCsvDialog({
         {!loading && !fetchError && orderCount !== null && (
           <Alert severity="info" sx={{ marginTop: 2 }}>
             {orderCount === 0
-              ? `No orders found for ${formatPSTDate(selectedDate)}`
-              : `${orderCount} order${orderCount === 1 ? '' : 's'} found for ${formatPSTDate(selectedDate)}`}
+              ? 'No orders found for the selected criteria'
+              : `${orderCount} order${orderCount === 1 ? '' : 's'} found for export`}
           </Alert>
         )}
 
         {!loading && !fetchError && orderCount !== null && orderCount > 0 && (
           <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', marginTop: 1 }}>
-            Each order will be exported as a single row with all items combined
+            Export will include all columns: Order Date, Order ID, Customer Name, Email, Order Status, Payment Status, Sub Total, Service Fee, Tax, Tip, Grand Total, Phone, Address, Apt. No., Gate Code, Instruction to Driver, Deliver On
           </Typography>
         )}
       </DialogContent>
@@ -238,7 +331,7 @@ export default function ExportToCsvDialog({
         <Button
           variant="contained"
           onClick={handleExport}
-          disabled={!selectedDate || loading || exporting || orderCount === 0}
+          disabled={loading || exporting || orderCount === 0}
           startIcon={exporting ? <CircularProgress size={16} /> : <IconDownload size={18} />}
           sx={{
             textTransform: 'none',

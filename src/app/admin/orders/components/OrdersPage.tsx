@@ -11,6 +11,7 @@ import { IconDownload } from '@tabler/icons-react';
 import TablePagination from '../../food-items/components/TablePagination';
 import { Order, OrderStatus } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
+import { getMaxUniqueDeliveryDays } from '@/utils/delivery';
 
 export default function OrdersPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
@@ -112,7 +113,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, startDate, endDate, sortBy, currentPage]);
+  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, startDate, endDate, sortBy, currentPage, token]);
 
   // Fetch orders when filters change
   useEffect(() => {
@@ -241,6 +242,9 @@ export default function OrdersPage() {
     showSnackbar(message, 'error');
   };
 
+  // Calculate maximum unique delivery days across all orders using new utility
+  const maxDeliveryDays = getMaxUniqueDeliveryDays(orders);
+
   const totalPages = Math.ceil(totalOrders / itemsPerPage);
 
   return (
@@ -311,6 +315,7 @@ export default function OrdersPage() {
           orders={orders}
           loading={loading}
           onViewDetails={handleViewDetails}
+          maxDeliveryDays={maxDeliveryDays}
         />
       </Box>
 
@@ -341,6 +346,13 @@ export default function OrdersPage() {
         onClose={handleExportDialogClose}
         onExportSuccess={handleExportSuccess}
         onExportError={handleExportError}
+        searchQuery={searchQuery}
+        selectedStatus={selectedStatus}
+        selectedPaymentStatus={selectedPaymentStatus}
+        selectedPaymentMethod={selectedPaymentMethod}
+          startDate={startDate}
+          endDate={endDate}
+          sortBy={sortBy}
       />
 
       {/* Snackbar for notifications */}

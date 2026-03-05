@@ -230,6 +230,14 @@ export default function OrderDetailsDialog({
             {order.address.floor && `, Floor ${order.address.floor}`}
             <br />
             {order.address.city}, {order.address.state} {order.address.zipCode}
+            {order.address.entrance && (
+              <>
+                <br />
+                <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                  Gate Code: {order.address.entrance}
+                </Typography>
+              </>
+            )}
             {order.address.landmark && (
               <>
                 <br />
