@@ -19,10 +19,18 @@ import {
   IconButton,
   Tooltip,
   Chip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
+  SelectChangeEvent,
+  useTheme,
 } from '@mui/material';
 import { IconRefresh, IconDownload, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatPSTDate } from '@/utils/timezone';
+import { OrderStatus } from '@/types/order';
 import CustomDateRangePicker, { DateRange } from './CustomDateRangePicker';
 
 interface OrderedItem {
@@ -42,6 +50,7 @@ interface OrderedItem {
   ecoContainer: boolean;
   ecoContainerAvailable: boolean;
   ecoContainerPrice: number;
+  orderStatus: OrderStatus;
   hasCombo?: boolean;
   isComboSelection?: boolean;
   comboSectionTitle?: string;
@@ -67,6 +76,19 @@ export default function OrderedItemsReportPage() {
   });
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedStatuses, setSelectedStatuses] = useState<OrderStatus[]>([]);
+  const theme = useTheme();
+
+  // Order status options with display labels
+  const statusOptions: { value: OrderStatus; label: string }[] = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'preparing', label: 'Preparing' },
+    { value: 'ready', label: 'Ready' },
+    { value: 'out_for_delivery', label: 'Out for Delivery' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ];
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -118,6 +140,11 @@ export default function OrderedItemsReportPage() {
       const params = new URLSearchParams();
       params.append('startDate', dateRange.startDate.toISOString().split('T')[0]);
       params.append('endDate', dateRange.endDate.toISOString().split('T')[0]);
+      
+      // Add status filter if any statuses are selected
+      if (selectedStatuses.length > 0) {
+        params.append('status', selectedStatuses.join(','));
+      }
 
       const response = await fetch(`/api/admin/reports/ordered-items?${params.toString()}`, {
         headers: {
@@ -140,7 +167,7 @@ export default function OrderedItemsReportPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dateRange, token]);
+  }, [dateRange, token, selectedStatuses]);
 
   // Auto-load data on mount
   useEffect(() => {
@@ -161,6 +188,18 @@ export default function OrderedItemsReportPage() {
 
   const handleDateRangeChange = (range: DateRange) => {
     setDateRange(range);
+  };
+
+  const handleStatusChange = (event: SelectChangeEvent<typeof selectedStatuses>) => {
+    const value = event.target.value;
+    setSelectedStatuses(
+      typeof value === 'string' ? value.split(',') as OrderStatus[] : value
+    );
+  };
+
+  const getStatusLabel = (status: OrderStatus): string => {
+    const option = statusOptions.find(opt => opt.value === status);
+    return option?.label || status;
   };
 
   const handleSort = (field: string) => {
@@ -226,6 +265,10 @@ export default function OrderedItemsReportPage() {
           aVal = a.ecoContainer ? 1 : 0;
           bVal = b.ecoContainer ? 1 : 0;
           break;
+        case 'orderStatus':
+          aVal = getStatusLabel(a.orderStatus).toLowerCase();
+          bVal = getStatusLabel(b.orderStatus).toLowerCase();
+          break;
         default:
           return 0;
       }
@@ -288,6 +331,7 @@ export default function OrderedItemsReportPage() {
       'Order ID',
       'Order Date',
       'Delivery Date',
+      'Order Status',
       'Customer Name',
       'Item Name',
       'Portion Quantity',
@@ -306,6 +350,7 @@ export default function OrderedItemsReportPage() {
         item.orderId,
         formatPSTDate(item.orderDate.toString()),
         formatPSTDate(item.deliveryDate.toString()),
+        getStatusLabel(item.orderStatus),
         item.customerName,
         item.itemName,
         item.portionQuantity,
@@ -405,6 +450,69 @@ export default function OrderedItemsReportPage() {
               Date Range
             </Typography>
             <CustomDateRangePicker value={dateRange} onChange={handleDateRangeChange} />
+          </Box>
+
+          <Box>
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#374151',
+                marginBottom: 1,
+              }}
+            >
+              Order Status
+            </Typography>
+            <FormControl sx={{ minWidth: 200 }} size="small">
+              <InputLabel id="status-filter-label">Filter by Status</InputLabel>
+              <Select
+                labelId="status-filter-label"
+                multiple
+                value={selectedStatuses}
+                onChange={handleStatusChange}
+                input={<OutlinedInput label="Filter by Status" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip 
+                        key={value} 
+                        label={getStatusLabel(value)} 
+                        size="small"
+                        sx={{ 
+                          height: 22, 
+                          fontSize: '11px',
+                          backgroundColor: theme.palette.primary.main,
+                          color: '#fff',
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+                sx={{
+                  backgroundColor: '#fff',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#E5E7EB',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#4F8CFF',
+                  },
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    style: {
+                      maxHeight: 300,
+                    },
+                  },
+                }}
+              >
+                {statusOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
 
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', ml: 'auto' }}>
@@ -596,12 +704,12 @@ export default function OrderedItemsReportPage() {
                     >
                       Order Date{renderSortIcon('orderDate')}
                     </TableCell>
-                    <TableCell 
+                    <TableCell
                       onClick={() => handleSort('deliveryDate')}
-                      sx={{ 
-                        fontWeight: 600, 
-                        fontSize: '13px', 
-                        color: '#374151', 
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: '#374151',
                         whiteSpace: 'nowrap',
                         cursor: 'pointer',
                         userSelect: 'none',
@@ -612,12 +720,28 @@ export default function OrderedItemsReportPage() {
                     >
                       Delivery Date{renderSortIcon('deliveryDate')}
                     </TableCell>
-                    <TableCell 
+                    <TableCell
+                      onClick={() => handleSort('orderStatus')}
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: '#374151',
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        '&:hover': {
+                          backgroundColor: '#E5E7EB',
+                        },
+                      }}
+                    >
+                      Order Status{renderSortIcon('orderStatus')}
+                    </TableCell>
+                    <TableCell
                       onClick={() => handleSort('customerName')}
-                      sx={{ 
-                        fontWeight: 600, 
-                        fontSize: '13px', 
-                        color: '#374151', 
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: '#374151',
                         whiteSpace: 'nowrap',
                         cursor: 'pointer',
                         userSelect: 'none',
@@ -759,6 +883,33 @@ export default function OrderedItemsReportPage() {
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#6B7280', whiteSpace: 'nowrap' }}>
                         {formatPSTDate(item.deliveryDate.toString())}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        <Chip
+                          label={getStatusLabel(item.orderStatus)}
+                          size="small"
+                          sx={{
+                            height: 24,
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            backgroundColor:
+                              item.orderStatus === 'pending' ? '#FEF3C7' :
+                              item.orderStatus === 'confirmed' ? '#DBEAFE' :
+                              item.orderStatus === 'preparing' ? '#FED7AA' :
+                              item.orderStatus === 'ready' ? '#D1FAE5' :
+                              item.orderStatus === 'out_for_delivery' ? '#E0E7FF' :
+                              item.orderStatus === 'delivered' ? '#D1FAE5' :
+                              item.orderStatus === 'cancelled' ? '#FEE2E2' : '#F3F4F6',
+                            color:
+                              item.orderStatus === 'pending' ? '#92400E' :
+                              item.orderStatus === 'confirmed' ? '#1E40AF' :
+                              item.orderStatus === 'preparing' ? '#C2410C' :
+                              item.orderStatus === 'ready' ? '#065F46' :
+                              item.orderStatus === 'out_for_delivery' ? '#3730A3' :
+                              item.orderStatus === 'delivered' ? '#065F46' :
+                              item.orderStatus === 'cancelled' ? '#991B1B' : '#4B5563',
+                          }}
+                        />
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500 }}>
                         {item.customerName}
