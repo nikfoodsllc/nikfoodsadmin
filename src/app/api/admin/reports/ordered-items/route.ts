@@ -33,6 +33,8 @@ function verifyAuth(request: NextRequest) {
  * Query params:
  *   - startDate (optional): Filter from date (ISO format)
  *   - endDate (optional): Filter to date (ISO format)
+ *   - status (optional): Filter by order status (single or comma-separated list)
+ *       Valid values: pending, confirmed, preparing, ready, out_for_delivery, delivered, cancelled
  *
  * Returns:
  *   - items: Array of ordered items with all details
@@ -52,6 +54,19 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const statusParam = searchParams.get('status');
+
+    // Valid order statuses
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
+
+    // Parse status parameter (comma-separated)
+    let statusFilter: string[] = [];
+    if (statusParam) {
+      statusFilter = statusParam
+        .split(',')
+        .map(s => s.trim().toLowerCase())
+        .filter(s => validStatuses.includes(s));
+    }
 
     // Build filter query
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,6 +83,11 @@ export async function GET(request: NextRequest) {
         dateFilter.$lte = endDate;
       }
       filter['items.deliveryDate'] = dateFilter;
+    }
+
+    // Filter by order status
+    if (statusFilter.length > 0) {
+      filter.status = { $in: statusFilter };
     }
 
     // Build aggregation pipeline for ordered items
@@ -105,6 +125,7 @@ export async function GET(request: NextRequest) {
           ecoContainer: { $ifNull: ['$items.items.isEcoFriendlyContainer', false] },
           ecoContainerAvailable: { $ifNull: ['$items.items.food.isEcoFriendlyContainer', false] },
           ecoContainerPrice: { $ifNull: ['$items.items.ecoContainerCharge', 0] },
+          orderStatus: { $ifNull: ['$status', 'pending'] },
           // Include combo-related fields
           hasCombo: { $ifNull: ['$items.items.food.hasCombo', false] },
           comboSelections: { $ifNull: ['$items.items.comboSelections', null] },
@@ -234,6 +255,7 @@ export async function GET(request: NextRequest) {
                 ecoContainer: item.ecoContainer,
                 ecoContainerAvailable: item.ecoContainerAvailable,
                 ecoContainerPrice: item.ecoContainerPrice,
+                orderStatus: item.orderStatus,
                 hasCombo: true,
                 isComboSelection: true,
                 comboSectionTitle: section.title,
