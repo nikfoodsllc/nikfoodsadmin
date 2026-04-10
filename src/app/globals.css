@@ -1,0 +1,76 @@
+:root {
+  --font-inter: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Brand colors */
+  --primary: #f89c35;
+  --primary-light: #fbb76a;
+  --primary-dark: #d47b1a;
+
+  /* UI colors */
+  --background: #ffffff;
+  --background-dark: #f5f5f5;
+  --text: #333333;
+  --text-light: #666666;
+  --text-dark: #111111;
+  --category-card-bg: #FFF4E4;
+
+  /* Feedback colors */
+  --success: #4caf50;
+  --error: #f44336;
+  --warning: #ff9800;
+  --info: #2196f3;
+
+  /* Border and shadow */
+  --border: #e0e0e0;
+  --shadow: rgba(0, 0, 0, 0.1);
+
+  /* Misc */
+  --divider: #eeeeee;
+  --overlay: rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-inter);
+  color: var(--text);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Apply Inter font to components */
+.font-inter {
+  font-family: var(--font-inter);
+}
+
+/* Shimmer animation for loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-effect {
+  background: linear-gradient(90deg, #ececec 25%, #f5f5f5 50%, #ececec 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}

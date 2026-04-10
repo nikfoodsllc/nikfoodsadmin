@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js
+.next/
+out/
+
+# Production
+build/
+dist/
+
+# Vercel / deploy
+.vercel
+.netlify
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing & coverage (Vitest)
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+
+# Env — never commit secrets (keep .env.example committed)
+.env
+.env.*
+!.env.example
+!.env.template
+!.env.sample
+
+# Debug & package managers
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Caches
+.eslintcache
+.prettiercache
+.stylelintcache
+.turbo
+.cache/
+
+# Certificates & keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Misc
+*.tgz
