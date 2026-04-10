@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { deleteFromCloudinary } from '@/lib/cloudinary';
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Filter } from 'mongodb';
 
 // Interface for available days
 interface AvailableDay {
@@ -48,12 +48,13 @@ interface FoodCategory {
   updatedAt?: Date;
 }
 
-// Interface for CategoryFoodMapping
+// Interface for CategoryFoodMapping (FLAT rows from this route; day-wise uses other APIs)
 interface CategoryFoodMapping {
   _id?: ObjectId | string;
   foodItemId: ObjectId;
   categoryId: ObjectId;
   sequence: number;
+  mappingType: 'FLAT';
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -712,6 +713,7 @@ export async function POST(request: NextRequest) {
             foodItemId,
             categoryId,
             sequence: i,
+            mappingType: 'FLAT',
             createdAt: new Date(),
             updatedAt: new Date(),
           });
@@ -786,6 +788,8 @@ export async function PUT(request: NextRequest) {
     // Parse request body
     const body = await request.json();
     const { _id, isImageUpdated, ...rest } = body;
+    /** Only sync FLAT mappings when client explicitly sends `category` (omit = leave mappings unchanged). */
+    const categoryProvided = Object.prototype.hasOwnProperty.call(body, 'category');
 
     // Validate required fields
     if (!_id) {
@@ -824,7 +828,6 @@ export async function PUT(request: NextRequest) {
       name: data.name.trim(),
       description: data.description?.trim() || '',
       short_description: data.short_description?.trim() || 'A perfect balance of taste, aroma, and warmth.',
-      category: [], // Will be populated from CategoryFoodMapping
       veg: data.veg,
       available: data.available,
       isDraft: data.isDraft ?? false, // Default to false if not provided
@@ -895,6 +898,10 @@ export async function PUT(request: NextRequest) {
       updateData.sections = [];
     }
 
+    if (categoryProvided) {
+      updateData.category = [];
+    }
+
     // Update food item
     const updateResult = await db.updateOne<FoodItem>(
       'fooditems',
@@ -906,43 +913,47 @@ export async function PUT(request: NextRequest) {
       throw new Error(updateResult.error || 'Failed to update food item');
     }
 
-    // Update CategoryFoodMapping entries
-    // Delete existing mappings for this food item
-    const deleteResult = await db.delete<CategoryFoodMapping>('categoryfoodmapping', {
-      foodItemId: new ObjectId(_id)
-    });
+    // CategoryFoodMapping: only when client sent `category` (FLAT links). Preserves DAY_WISE date rows otherwise.
+    if (categoryProvided) {
+      const deleteFlatMappingsFilter: Filter<Record<string, unknown>> = {
+        foodItemId: new ObjectId(_id),
+        $or: [{ mappingType: 'FLAT' }, { mappingType: { $exists: false } }],
+      };
+      const deleteResult = await db.delete<CategoryFoodMapping>(
+        'categoryfoodmapping',
+        deleteFlatMappingsFilter as Filter<CategoryFoodMapping>
+      );
 
-    if (!deleteResult.success) {
-      console.error('Failed to delete old category mappings:', deleteResult.error);
-    }
-
-    // Create new mappings if categories are provided
-    if (data.category && data.category.length > 0) {
-      const foodItemId = new ObjectId(_id);
-      const mappingDocuments: CategoryFoodMapping[] = [];
-
-      for (let i = 0; i < data.category.length; i++) {
-        const categoryIdStr = data.category[i];
-        try {
-          const categoryId = new ObjectId(categoryIdStr);
-          mappingDocuments.push({
-            foodItemId,
-            categoryId,
-            sequence: i,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        } catch (error) {
-          console.error(`Invalid category ID ${categoryIdStr} for food item ${_id}:`, error);
-        }
+      if (!deleteResult.success) {
+        console.error('Failed to delete old FLAT category mappings:', deleteResult.error);
       }
 
-      // Insert all mappings in batch
-      if (mappingDocuments.length > 0) {
-        const mappingResult = await db.createMany<CategoryFoodMapping>('categoryfoodmapping', mappingDocuments);
-        if (!mappingResult.success) {
-          console.error('Failed to create category mappings:', mappingResult.error);
-          // Note: We don't rollback the food item update here as it already succeeded
+      if (data.category && data.category.length > 0) {
+        const foodItemId = new ObjectId(_id);
+        const mappingDocuments: CategoryFoodMapping[] = [];
+
+        for (let i = 0; i < data.category.length; i++) {
+          const categoryIdStr = data.category[i];
+          try {
+            const categoryId = new ObjectId(categoryIdStr);
+            mappingDocuments.push({
+              foodItemId,
+              categoryId,
+              sequence: i,
+              mappingType: 'FLAT',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          } catch (error) {
+            console.error(`Invalid category ID ${categoryIdStr} for food item ${_id}:`, error);
+          }
+        }
+
+        if (mappingDocuments.length > 0) {
+          const mappingResult = await db.createMany<CategoryFoodMapping>('categoryfoodmapping', mappingDocuments);
+          if (!mappingResult.success) {
+            console.error('Failed to create category mappings:', mappingResult.error);
+          }
         }
       }
     }
