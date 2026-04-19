@@ -133,6 +133,35 @@ interface ComboFoodItem {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
 
+/** Build JSON body so we never send `price: null` (Zod rejects null; portions items use portionPrices only). */
+function buildFoodItemSavePayload(
+  data: FoodItemFormData,
+  imageUrl: string,
+  publicId: string
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    ...data,
+    url: imageUrl,
+    public_id: publicId,
+  };
+
+  if (data.itemType === 'portions') {
+    delete payload.price;
+    const pp = data.portionPrices;
+    if (Array.isArray(pp)) {
+      payload.portionPrices = pp.map((p: unknown) => {
+        const n = Number(p);
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+      });
+    }
+  } else {
+    const n = Number(data.price);
+    payload.price = Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  return payload;
+}
+
 export default function FoodItemsPage() {
   const { token, loading: authLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
@@ -399,12 +428,7 @@ export default function FoodItemsPage() {
         isImageUpdated = true;
       }
 
-      // Prepare request data
-      const requestData = {
-        ...data,
-        url: imageUrl,
-        public_id: publicId,
-      };
+      const requestData = buildFoodItemSavePayload(data, imageUrl, publicId);
 
       const isEdit = !!data._id;
       const url = '/api/admin/food-items';

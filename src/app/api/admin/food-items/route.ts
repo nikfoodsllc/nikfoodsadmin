@@ -214,7 +214,11 @@ const foodItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
   short_description: z.string().optional(),
-  price: z.number().min(0, 'Price must be non-negative').optional(), // Optional for portions type
+  // Clients/DB may send null; optional() only allows undefined, not null
+  price: z.preprocess(
+    (v) => (v === null ? undefined : v),
+    z.number().min(0, 'Price must be non-negative').optional()
+  ), // Optional for portions type
   category: z.array(z.string()).optional(), // Category is now optional
   veg: z.boolean(),
   available: z.boolean(),
