@@ -83,6 +83,11 @@ const defaultTemplateProperties = {
   ecoContainerCharge: 0,
 };
 
+function safeNonNegativePrice(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 export default function SimpleFoodItemDialog({
   open,
   item,
@@ -93,7 +98,7 @@ export default function SimpleFoodItemDialog({
   const { token } = useAuth();
 
   const getInitialFormData = useCallback((): SimpleFoodItem => {
-    return item ? { ...item } : getDefaultFormData();
+    return item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
   }, [item]);
 
   const [formData, setFormData] = useState<SimpleFoodItem>(getInitialFormData);
@@ -142,7 +147,7 @@ export default function SimpleFoodItemDialog({
   // Reset form when dialog opens or item changes
   useEffect(() => {
     if (open) {
-      const newFormData = item ? { ...item } : getDefaultFormData();
+      const newFormData = item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
       setFormData(newFormData);
       setImageFile(null);
       setErrors({});
@@ -220,7 +225,7 @@ export default function SimpleFoodItemDialog({
       newErrors.name = 'Name is required';
     }
 
-    if (formData.price === undefined || formData.price < 0) {
+    if (formData.price == null || formData.price < 0) {
       newErrors.price = 'Price must be non-negative';
     }
 
