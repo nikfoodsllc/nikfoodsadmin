@@ -2,7 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, Typography, Alert, Snackbar, CircularProgress, Button } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Alert,
+  Snackbar,
+  CircularProgress,
+  Button,
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from '@mui/material';
 import OrdersTable from './OrdersTable';
 import OrderFilters from './OrderFilters';
 import OrderDetailsDialog from './OrderDetailsDialog';
@@ -33,6 +45,9 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<OrderStatus | ''>('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const itemsPerPage = 10;
 
   const [snackbar, setSnackbar] = useState<{
@@ -105,8 +120,23 @@ export default function OrdersPage() {
       }
 
       const data = await response.json();
-      setOrders(data.data?.items || []);
+      const nextOrders = data.data?.items || [];
+      setOrders(nextOrders);
       setTotalOrders(data.data?.total || 0);
+      setSelectedOrderIds((prev) => {
+        const visibleIds = new Set(
+          nextOrders
+            .map((order: Order) => order._id)
+            .filter((id: string | undefined): id is string => Boolean(id))
+        );
+        const nextSelected = new Set<string>();
+        prev.forEach((id) => {
+          if (visibleIds.has(id)) {
+            nextSelected.add(id);
+          }
+        });
+        return nextSelected;
+      });
     } catch (error) {
       console.error('Error fetching orders:', error);
       showSnackbar('Failed to load orders', 'error');
@@ -178,36 +208,43 @@ export default function OrdersPage() {
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handleStatusChange = (value: string) => {
     setSelectedStatus(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handlePaymentStatusChange = (value: string) => {
     setSelectedPaymentStatus(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handlePaymentMethodChange = (value: string) => {
     setSelectedPaymentMethod(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handleEndDateChange = (value: string) => {
     setEndDate(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handleSortByChange = (value: string) => {
     setSortBy(value);
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handleClearFilters = () => {
@@ -219,10 +256,12 @@ export default function OrdersPage() {
     setEndDate('');
     setSortBy('date_desc');
     setCurrentPage(1);
+    setSelectedOrderIds(new Set());
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    setSelectedOrderIds(new Set());
   };
 
   const handleExportClick = () => {
@@ -240,6 +279,85 @@ export default function OrdersPage() {
 
   const handleExportError = (message: string) => {
     showSnackbar(message, 'error');
+  };
+
+  const selectableOrderIds = orders
+    .map((order) => order._id)
+    .filter((id: string | undefined): id is string => Boolean(id));
+
+  const isAllSelected =
+    selectableOrderIds.length > 0 && selectableOrderIds.every((id) => selectedOrderIds.has(id));
+  const isIndeterminate = selectedOrderIds.size > 0 && !isAllSelected;
+  const hasSelection = selectedOrderIds.size > 0;
+
+  const handleToggleOrderSelection = (orderId: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) {
+        next.delete(orderId);
+      } else {
+        next.add(orderId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAllOrders = () => {
+    if (isAllSelected) {
+      setSelectedOrderIds(new Set());
+      return;
+    }
+    setSelectedOrderIds(new Set(selectableOrderIds));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedOrderIds(new Set());
+    setBulkStatus('');
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkStatus || selectedOrderIds.size === 0) {
+      return;
+    }
+
+    setBulkUpdating(true);
+    try {
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('/api/admin/orders', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ids: Array.from(selectedOrderIds),
+          status: bulkStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update selected orders');
+      }
+
+      const data = await response.json();
+      const modifiedCount = data?.data?.modifiedCount ?? selectedOrderIds.size;
+      showSnackbar(`Updated ${modifiedCount} order${modifiedCount === 1 ? '' : 's'} successfully`);
+      setSelectedOrderIds(new Set());
+      setBulkStatus('');
+      await fetchOrders();
+    } catch (error) {
+      console.error('Error updating selected orders:', error);
+      showSnackbar(
+        error instanceof Error ? error.message : 'Failed to update selected orders',
+        'error'
+      );
+    } finally {
+      setBulkUpdating(false);
+    }
   };
 
   // Calculate maximum unique delivery days across all orders using new utility
@@ -263,11 +381,81 @@ export default function OrdersPage() {
         <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827' }}>
           Orders
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {hasSelection && (
+            <>
+              <Chip
+                label={`${selectedOrderIds.size} selected`}
+                size="small"
+                sx={{
+                  backgroundColor: '#E6F0FF',
+                  color: '#4F8CFF',
+                  fontWeight: 500,
+                }}
+              />
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>Bulk Status</InputLabel>
+                <Select
+                  value={bulkStatus}
+                  label="Bulk Status"
+                  onChange={(e) => setBulkStatus(e.target.value as OrderStatus | '')}
+                  disabled={bulkUpdating}
+                  sx={{ backgroundColor: '#fff' }}
+                >
+                  <MenuItem value="">Select status</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="confirmed">Confirmed</MenuItem>
+                  <MenuItem value="preparing">Preparing</MenuItem>
+                  <MenuItem value="ready">Ready</MenuItem>
+                  <MenuItem value="out_for_delivery">Out for Delivery</MenuItem>
+                  <MenuItem value="delivered">Delivered</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="contained"
+                onClick={handleBulkStatusUpdate}
+                disabled={!bulkStatus || bulkUpdating}
+                sx={{
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  px: 2.5,
+                  backgroundColor: '#10B981',
+                  '&:hover': {
+                    backgroundColor: '#059669',
+                  },
+                  '&.Mui-disabled': {
+                    backgroundColor: '#D1D5DB',
+                    color: '#9CA3AF',
+                  },
+                }}
+              >
+                {bulkUpdating ? 'Updating...' : `Update Selected (${selectedOrderIds.size})`}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleClearSelection}
+                disabled={bulkUpdating}
+                sx={{
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  borderColor: '#E5E7EB',
+                  color: '#374151',
+                  '&:hover': {
+                    borderColor: '#4F8CFF',
+                    backgroundColor: 'rgba(79, 140, 255, 0.04)',
+                  },
+                }}
+              >
+                Clear
+              </Button>
+            </>
+          )}
           <Button
             variant="outlined"
             startIcon={<IconDownload size={18} />}
             onClick={handleExportClick}
+            disabled={bulkUpdating}
             sx={{
               textTransform: 'none',
               borderRadius: 2,
@@ -316,6 +504,12 @@ export default function OrdersPage() {
           loading={loading}
           onViewDetails={handleViewDetails}
           maxDeliveryDays={maxDeliveryDays}
+          selectedOrderIds={selectedOrderIds}
+          onSelectAll={handleToggleSelectAllOrders}
+          onSelectOrder={handleToggleOrderSelection}
+          isAllSelected={isAllSelected}
+          isIndeterminate={isIndeterminate}
+          disableSelection={bulkUpdating}
         />
       </Box>
 

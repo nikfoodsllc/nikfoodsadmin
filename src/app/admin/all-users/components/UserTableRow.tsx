@@ -1,6 +1,7 @@
 'use client';
 
-import { TableRow as MuiTableRow, TableCell, Typography, Chip } from '@mui/material';
+import { TableRow as MuiTableRow, TableCell, Typography, Chip, Box, IconButton, Tooltip } from '@mui/material';
+import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { UserWithAddresses } from '@/types/user';
 import { formatPSTDate } from '@/utils/timezone';
 
@@ -8,9 +9,17 @@ interface UserTableRowProps {
   user: UserWithAddresses;
   index: number;
   onViewDetails: (user: UserWithAddresses) => void;
+  onEditUser: (user: UserWithAddresses) => void;
+  onDeleteUser: (user: UserWithAddresses) => void;
 }
 
-export default function UserTableRow({ user, index, onViewDetails }: UserTableRowProps) {
+export default function UserTableRow({
+  user,
+  index,
+  onViewDetails,
+  onEditUser,
+  onDeleteUser,
+}: UserTableRowProps) {
   return (
     <MuiTableRow
       sx={{
@@ -83,6 +92,46 @@ export default function UserTableRow({ user, index, onViewDetails }: UserTableRo
         >
           {formatPSTDate(user.createdAt)}
         </Typography>
+      </TableCell>
+
+      {/* Action */}
+      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Update user">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditUser(user);
+              }}
+              sx={{
+                color: '#4F8CFF',
+                '&:hover': {
+                  backgroundColor: '#E6F0FF',
+                },
+              }}
+            >
+              <IconEdit size={16} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete user">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteUser(user);
+              }}
+              sx={{
+                color: '#EF4444',
+                '&:hover': {
+                  backgroundColor: '#FEE2E2',
+                },
+              }}
+            >
+              <IconTrash size={16} />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </TableCell>
     </MuiTableRow>
   );
