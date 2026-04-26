@@ -12,7 +12,6 @@ interface UserTableRowProps {
   onEditUser: (user: UserWithAddresses) => void;
   onDeleteUser: (user: UserWithAddresses) => void;
 }
-// dummy pr
 
 export default function UserTableRow({
   user,
@@ -24,7 +23,7 @@ export default function UserTableRow({
   return (
     <MuiTableRow
       sx={{
-        backgroundColor: index % 2 === 0 ? '#F6FAFF' : '#fff',
+        backgroundColor: index % 2 === 0 ? '#F6FAFF' : '#ffff',
         cursor: 'pointer',
         '&:hover': {
           backgroundColor: '#F0F6FF',
