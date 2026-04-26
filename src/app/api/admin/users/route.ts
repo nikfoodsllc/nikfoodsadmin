@@ -52,15 +52,23 @@ export async function GET(request: NextRequest) {
 
     // Build filter query
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filter: any = {};
+    const filter: any = {
+      $or: [{ isActive: true }, { isActive: { $exists: false } }],
+    };
 
     // Search by name, email, or phone
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
+      filter.$and = [
+        { $or: [{ isActive: true }, { isActive: { $exists: false } }] },
+        {
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } },
+          ],
+        },
       ];
+      delete filter.$or;
     }
 
     // Get total count for pagination

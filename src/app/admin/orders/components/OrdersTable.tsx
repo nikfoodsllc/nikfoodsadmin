@@ -10,6 +10,7 @@ import {
   TableRow,
   Paper,
   Typography,
+  Checkbox,
 } from '@mui/material';
 import OrderTableRow from './OrderTableRow';
 import OrderSkeleton from './OrderSkeleton';
@@ -21,9 +22,26 @@ interface OrdersTableProps {
   loading: boolean;
   onViewDetails: (order: Order) => void;
   maxDeliveryDays: number;
+  selectedOrderIds: Set<string>;
+  onSelectAll: () => void;
+  onSelectOrder: (orderId: string) => void;
+  isAllSelected: boolean;
+  isIndeterminate: boolean;
+  disableSelection?: boolean;
 }
 
-export default function OrdersTable({ orders, loading, onViewDetails, maxDeliveryDays }: OrdersTableProps) {
+export default function OrdersTable({
+  orders,
+  loading,
+  onViewDetails,
+  maxDeliveryDays,
+  selectedOrderIds,
+  onSelectAll,
+  onSelectOrder,
+  isAllSelected,
+  isIndeterminate,
+  disableSelection = false,
+}: OrdersTableProps) {
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
       <TableContainer
@@ -43,6 +61,23 @@ export default function OrdersTable({ orders, loading, onViewDetails, maxDeliver
                 backgroundColor: '#F9FAFB',
               }}
             >
+              <TableCell sx={{ width: 56, padding: '12px 8px' }}>
+                <Checkbox
+                  checked={isAllSelected}
+                  indeterminate={isIndeterminate}
+                  onChange={onSelectAll}
+                  disabled={loading || orders.length === 0 || disableSelection}
+                  sx={{
+                    color: '#9CA3AF',
+                    '&.Mui-checked': {
+                      color: '#4F8CFF',
+                    },
+                    '&.MuiCheckbox-indeterminate': {
+                      color: '#4F8CFF',
+                    },
+                  }}
+                />
+              </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Order Date
               </TableCell>
@@ -107,7 +142,7 @@ export default function OrdersTable({ orders, loading, onViewDetails, maxDeliver
               <OrderSkeleton />
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={17 + maxDeliveryDays} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={18 + maxDeliveryDays} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No orders found
                   </Typography>
@@ -121,6 +156,9 @@ export default function OrdersTable({ orders, loading, onViewDetails, maxDeliver
                   index={index}
                   onViewDetails={onViewDetails}
                   maxDeliveryDays={maxDeliveryDays}
+                  selected={Boolean(order._id && selectedOrderIds.has(order._id))}
+                  onToggleSelect={onSelectOrder}
+                  disableSelection={disableSelection || !order._id}
                 />
               ))
             )}
