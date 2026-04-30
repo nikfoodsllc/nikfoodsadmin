@@ -220,34 +220,74 @@ export default function OrderDetailsDialog({
         <Divider sx={{ marginY: 2 }} />
 
         {/* Delivery Address */}
-        <Box sx={{ marginBottom: 3 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}>
-            Delivery Address
-          </Typography>
-          <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
-            {order.address.street}
-            {order.address.apartment && `, Apt ${order.address.apartment}`}
-            {order.address.floor && `, Floor ${order.address.floor}`}
-            <br />
-            {order.address.city}, {order.address.state} {order.address.zipCode}
-            {order.address.entrance && (
-              <>
-                <br />
-                <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                  Gate Code: {order.address.entrance}
-                </Typography>
-              </>
-            )}
-            {order.address.landmark && (
-              <>
-                <br />
-                <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                  Landmark: {order.address.landmark}
-                </Typography>
-              </>
-            )}
-          </Typography>
-        </Box>
+       <Box sx={{ marginBottom: 3 }}>
+  <Typography
+    variant="subtitle2"
+    sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}
+  >
+    Delivery Address
+  </Typography>
+
+  <Box
+    sx={{
+      p: 2,
+      border: '1px solid #E5E7EB',
+      borderRadius: 2,
+      backgroundColor: '#FAFAFA'
+    }}
+  >
+
+    {/* street */}
+    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+      {order.address.street}
+    </Typography>
+
+    {/* apartment & floor */}
+   {/* apartment & floor */}
+{(order.address.apartment || order.address.floor) && (
+  <Box sx={{ mt: 1 }}>
+
+    <Typography
+      variant="caption"
+      sx={{
+        color: '#6B7280',
+        fontWeight: 600,
+        display: 'block'
+      }}
+    >
+      Apartment Details
+    </Typography>
+
+    <Typography variant="body2" sx={{ color: '#374151' }}>
+      {order.address.apartment && `Apartment: ${order.address.apartment}`}
+      {order.address.apartment && order.address.floor && ' | '}
+      {order.address.floor && `Floor: ${order.address.floor}`}
+    </Typography>
+
+  </Box>
+)}
+
+    {/* city */}
+    <Typography variant="body2">
+      {order.address.city}, {order.address.state} {order.address.zipCode}
+    </Typography>
+
+    {/* gate */}
+    {order.address.entrance && (
+      <Typography variant="caption" sx={{ color: '#6B7280' }}>
+        Gate Code: {order.address.entrance}
+      </Typography>
+    )}
+
+    {/* landmark */}
+    {order.address.landmark && (
+      <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+        Landmark: {order.address.landmark}
+      </Typography>
+    )}
+
+  </Box>
+</Box>
 
         <Divider sx={{ marginY: 2 }} />
 

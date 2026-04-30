@@ -19,9 +19,17 @@ interface UsersTableProps {
   users: UserWithAddresses[];
   loading: boolean;
   onViewDetails: (user: UserWithAddresses) => void;
+  onEditUser: (user: UserWithAddresses) => void;
+  onDeleteUser: (user: UserWithAddresses) => void;
 }
 
-export default function UsersTable({ users, loading, onViewDetails }: UsersTableProps) {
+export default function UsersTable({
+  users,
+  loading,
+  onViewDetails,
+  onEditUser,
+  onDeleteUser,
+}: UsersTableProps) {
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
       <TableContainer
@@ -53,6 +61,9 @@ export default function UsersTable({ users, loading, onViewDetails }: UsersTable
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Registered On
               </TableCell>
+              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Action
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -60,7 +71,7 @@ export default function UsersTable({ users, loading, onViewDetails }: UsersTable
               <UserSkeleton />
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={5} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No users found
                   </Typography>
@@ -73,6 +84,8 @@ export default function UsersTable({ users, loading, onViewDetails }: UsersTable
                   user={user}
                   index={index}
                   onViewDetails={onViewDetails}
+                  onEditUser={onEditUser}
+                  onDeleteUser={onDeleteUser}
                 />
               ))
             )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { TableRow as MuiTableRow, TableCell, Typography, Box, Button } from '@mui/material';
+import { TableRow as MuiTableRow, TableCell, Typography, Box, Button, Checkbox } from '@mui/material';
 import { IconEye } from '@tabler/icons-react';
 import StatusBadge from './StatusBadge';
 import { Order } from '@/types/order';
@@ -13,9 +13,20 @@ interface OrderTableRowProps {
   index: number;
   onViewDetails: (order: Order) => void;
   maxDeliveryDays: number;
+  selected: boolean;
+  onToggleSelect: (orderId: string) => void;
+  disableSelection?: boolean;
 }
 
-export default function OrderTableRow({ order, index, onViewDetails, maxDeliveryDays }: OrderTableRowProps) {
+export default function OrderTableRow({
+  order,
+  index,
+  onViewDetails,
+  maxDeliveryDays,
+  selected,
+  onToggleSelect,
+  disableSelection = false,
+}: OrderTableRowProps) {
   // Process delivery dates to sort and merge duplicates
   const processedDates = processDeliveryDates(order.items || []);
 
@@ -52,14 +63,34 @@ export default function OrderTableRow({ order, index, onViewDetails, maxDelivery
   return (
     <MuiTableRow
       sx={{
-        backgroundColor: index % 2 === 0 ? '#F6FAFF' : '#fff',
+        backgroundColor: selected ? '#E6F0FF' : index % 2 === 0 ? '#F6FAFF' : '#fff',
         cursor: 'pointer',
         '&:hover': {
-          backgroundColor: '#F0F6FF',
+          backgroundColor: selected ? '#D6E6FF' : '#F0F6FF',
         },
       }}
       onClick={() => onViewDetails(order)}
     >
+      {/* Select */}
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Checkbox
+          checked={selected}
+          disabled={disableSelection}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => {
+            if (order._id) {
+              onToggleSelect(order._id);
+            }
+          }}
+          sx={{
+            color: '#9CA3AF',
+            '&.Mui-checked': {
+              color: '#4F8CFF',
+            },
+          }}
+        />
+      </TableCell>
+
       {/* Order Date */}
       <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
         <Typography

@@ -1,194 +1,72 @@
-# Ignore ALL dot files by default
-.*
-
-# EXCEPTIONS - Track these specific dot files
-!.gitignore
-!.env.bak
-
-# CXGP03 Project - Comprehensive .gitignore
-# TypeScript, Next.js, npm
-# ======================================
 # Dependencies
-# ------------
-/node_modules
-/.pnp
-.pnp.*
+node_modules/
+.pnp
+.pnp.js
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-# Package manager files
+
+# Next.js
+.next/
+out/
+
+# Production
+build/
+dist/
+
+# Vercel / deploy
+.vercel
+.netlify
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing & coverage (Vitest)
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+
+# Env — never commit secrets (keep .env.example committed)
+.env
+.env.*
+!.env.example
+!.env.template
+!.env.sample
+
+# Debug & package managers
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
-lerna-debug.log*
 pnpm-debug.log*
-# Lock files (keep package-lock.json but ignore others if they appear)
-yarn.lock
-pnpm-lock.yaml
-# Next.js build outputs
-# --------------------
-/.next/
-/out/
-/build
-/.vercel
-# Production build artifacts
-# --------------------------
-/dist
-/.nuxt
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-# Coverage directory used by tools like istanbul
-# -----------------------------------------------
-/coverage
-*.lcov
-.nyc_output
-# TypeScript compilation
-# ----------------------
-*.tsbuildinfo
-next-env.d.ts
-# Environment files
-# -----------------
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.*.local
-# IDE and Editor files
-# VSCode
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-.idea/
-# WebStorm/IntelliJ
-*.iml
-*.ipr
-*.iws
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-# Vim
-*.swp
-*.swo
-*~
-# Emacs
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-.\#*
-# OS generated files
-# ------------------
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-# Logs
-# ----
-logs
-*.log
-# Temporary folders
-tmp/
-temp/
-.tmp/
-.temp/
-# Cache directories
-.cache/
-.parcel-cache/
+lerna-debug.log*
+
+# Caches
 .eslintcache
+.prettiercache
 .stylelintcache
-# Testing
-# -------
-junit.xml
-test-results/
-playwright-report/
-test-results.xml
-# Security and certificates
-# -------------------------
+.turbo
+.cache/
+
+# Certificates & keys
 *.pem
 *.key
 *.crt
 *.p12
 *.pfx
-# Local configuration files
-config/local.js
-config/local.json
-config/local.yml
-config/local.yaml
-# Database files
-# --------------
-*.db
-*.sqlite
-*.sqlite3
-# Backup files
-# -------------
-*.bak
-*.backup
-*.old
-*.orig
-*.rej
-# Generated documentation
-# -----------------------
-/docs/build
-/docs/_build
-# Build artifacts and distribution
-# --------------------------------
-dist/
-build/
-out/
-.next/
-# Storybook build outputs
-storybook-static
-# StyleLint
-# ----------
-# Optional npm cache directory
-# ----------------------------
-.npm
-# Optional eslint cache
-# Optional REPL history
-.node_repl_history
-# Output of 'npm pack'
-# -------------------
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Misc
 *.tgz
-# Yarn Integrity file
-.yarn-integrity
-# parcel-bundler cache (https://parceljs.org/)
-# --------------------------------------------
-.cache
-.parcel-cache
-# next.js build output
-.next
-# nuxt.js build output
-.nuxt
-# vuepress build output
-.vuepress/dist
-# Serverless directories
-.serverless/
-# FuseBox cache
-.fusebox/
-# DynamoDB Local files
-.dynamodb/
-# TernJS port file
-# ----------------
-.tern-port
-# Stores VSCode versions used for testing VSCode extensions
-# ---------------------------------------------------------
-.vscode-test
-# Local Netlify folder
-.netlify
-# SvelteKit build / generate output
-# ---------------------------------
-.svelte-kit
-# End of .gitignore file
-/scripts
