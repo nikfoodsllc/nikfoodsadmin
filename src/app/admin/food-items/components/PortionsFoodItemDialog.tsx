@@ -76,6 +76,12 @@ const getDefaultFormData = (): PortionsFoodItem => ({
   isDraft: false,
 });
 
+/** API rows may include unused top-level `price: null`; portions use `portionPrices` only — drop it so saves never send null. */
+function itemToPortionsFormData(item: PortionsFoodItem): PortionsFoodItem {
+  const { price: _omit, ...rest } = item as PortionsFoodItem & { price?: unknown };
+  return rest as PortionsFoodItem;
+}
+
 export default function PortionsFoodItemDialog({
   open,
   item,
@@ -84,7 +90,7 @@ export default function PortionsFoodItemDialog({
   onSave,
 }: PortionsFoodItemDialogProps) {
   const getInitialFormData = useCallback((): PortionsFoodItem => {
-    return item ? { ...item } : getDefaultFormData();
+    return item ? itemToPortionsFormData(item) : getDefaultFormData();
   }, [item]);
 
   const [formData, setFormData] = useState<PortionsFoodItem>(getInitialFormData);
@@ -94,7 +100,7 @@ export default function PortionsFoodItemDialog({
   // Reset form when dialog opens or item changes
   useEffect(() => {
     if (open) {
-      const newFormData = item ? { ...item } : getDefaultFormData();
+      const newFormData = item ? itemToPortionsFormData(item) : getDefaultFormData();
       setFormData(newFormData);
       setImageFile(null);
       setErrors({});
@@ -141,7 +147,10 @@ export default function PortionsFoodItemDialog({
 
   const handlePortionsChange = (portions: Array<{ name: string; price: number; isAvailable?: boolean }>) => {
     const portionNames = portions.map((p) => p.name);
-    const portionPrices = portions.map((p) => p.price);
+    const portionPrices = portions.map((p) => {
+      const n = Number(p.price);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    });
     const portionAvailability = portions.map((p) => p.isAvailable ?? true);
     setFormData((prev) => ({
       ...prev,
@@ -188,11 +197,16 @@ export default function PortionsFoodItemDialog({
   };
 
   // Convert portions array to required format for PortionManager
-  const portionsForManager = formData.portions.map((name, index) => ({
-    name,
-    price: formData.portionPrices[index] || 0,
-    isAvailable: formData.portionAvailability?.[index] ?? true,
-  }));
+  const portionsForManager = formData.portions.map((name, index) => {
+    const raw = formData.portionPrices[index];
+    const n = Number(raw);
+    const price = Number.isFinite(n) && n >= 0 ? n : 0;
+    return {
+      name,
+      price,
+      isAvailable: formData.portionAvailability?.[index] ?? true,
+    };
+  });
 
   return (
     <Dialog
