@@ -16,9 +16,7 @@ import {
   CircularProgress,
   Alert,
   Chip,
-  IconButton,
   Tooltip,
-  Button,
 } from '@mui/material';
 import { CategoryDayWiseItem } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,6 +60,8 @@ export default function DayWiseItemSelector({
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  /** Food item IDs protected from "Clear All" (session-only, not saved to API). */
+  const [lockedItemIds, setLockedItemIds] = useState<Set<string>>(() => new Set());
 
   // Fetch food items on component mount (dates are handled by useAvailableDates hook)
   useEffect(() => {
@@ -165,11 +165,26 @@ useEffect(() => {
     onChange(newDayWiseItems);
   };
 
+  const toggleRowLock = (itemId: string) => {
+    if (disabled) return;
+    setLockedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
   const handleClearAll = () => {
-    const clearedDayWiseItems: CategoryDayWiseItem[] = allDateLabels.map(dateInfo => ({
-      day: dateInfo.date,
-      items: []
-    }));
+    const clearedDayWiseItems: CategoryDayWiseItem[] = allDateLabels.map((dateInfo) => {
+      const dayEntry = value.find((item) => item.day === dateInfo.date);
+      const existingItems = dayEntry?.items || [];
+      const preserved = existingItems.filter((id) => lockedItemIds.has(id));
+      return {
+        day: dateInfo.date,
+        items: preserved,
+      };
+    });
     onChange(clearedDayWiseItems);
   };
 
@@ -245,24 +260,27 @@ useEffect(() => {
           Date-wise Item Assignment
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Chip
-            label="Clear All"
-            onClick={handleClearAll}
-            disabled={disabled}
-            variant="outlined"
-            size="small"
-            sx={{
-              '&:hover': {
-                backgroundColor: 'rgba(79, 140, 255, 0.04)',
-              }
-            }}
-          />
+          <Tooltip title="Unchecks all date assignments except rows with Lock enabled">
+            <Chip
+              label="Clear All"
+              onClick={handleClearAll}
+              disabled={disabled}
+              variant="outlined"
+              size="small"
+              sx={{
+                '&:hover': {
+                  backgroundColor: 'rgba(79, 140, 255, 0.04)',
+                },
+              }}
+            />
+          </Tooltip>
         </Box>
       </Box>
 
       <Typography variant="body2" sx={{ color: '#666', marginBottom: 2 }}>
         Select items that will be available for each configured date. Items will only appear in the category on their assigned dates.
         Only dates with "Day-wise Category" enabled in the Availability Calendar are shown.
+        Use <strong>Lock</strong> on a row to keep its date selections when you click Clear All.
       </Typography>
 
       <Box sx={{ overflowX: 'auto' }}>
@@ -271,8 +289,8 @@ useEffect(() => {
           sx={{
             boxShadow: 'none',
             border: '1px solid #E0E0E0',
-            maxHeight: 500,     // 👈 height set karo
-            overflowY: 'auto'   // 👈 vertical scroll enable
+            maxHeight: 500,
+            overflowY: 'auto',
           }}
         >
           
@@ -358,26 +376,53 @@ useEffect(() => {
                         left: 0,
                         backgroundColor: 'inherit',
                         zIndex: 1,
-                        borderRight: '1px solid #E0E0E0'
+                        borderRight: '1px solid #E0E0E0',
+                        verticalAlign: 'top',
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: item.veg ? '#4CAF50' : '#F44336',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#333', lineHeight: 1.2 }}>
-                            {item.name}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
-                            {safeFormatCurrency(item.price)}
-                          </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                        <Tooltip title="When enabled, Clear All will not remove this item from any date">
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={lockedItemIds.has(item._id)}
+                                onChange={() => toggleRowLock(item._id)}
+                                disabled={disabled}
+                                size="small"
+                                sx={{ py: 0 }}
+                              />
+                            }
+                            label={
+                              <Typography component="span" variant="caption" sx={{ color: '#555' }}>
+                                Lock row
+                              </Typography>
+                            }
+                            sx={{
+                              m: 0,
+                              mr: 0,
+                              alignItems: 'center',
+                              gap: 0.5,
+                            }}
+                          />
+                        </Tooltip>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              backgroundColor: item.veg ? '#4CAF50' : '#F44336',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#333', lineHeight: 1.2 }}>
+                              {item.name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                              {safeFormatCurrency(item.price)}
+                            </Typography>
+                          </Box>
                         </Box>
                       </Box>
                     </TableCell>
