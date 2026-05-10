@@ -95,19 +95,27 @@ export default function DayWiseItemSelector({
   }, [token, isAuthenticated]);
 
   // Create date labels array for display
-  const allDateLabels = useMemo(() => {
-    // Sort dates by date and return formatted labels
-    return availableDates
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map(date => ({
-        label: formatDateLabel(date.date),
-        shortLabel: formatDateShort(date.date),
-        displayLabel: formatDateWithDay(date.date),
-        date: date.date,
-        enabled: date.dayWiseCategoryEnabled
-      }));
-  }, [availableDates]);
+const allDateLabels = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
+  return availableDates
+    .filter((date) => {
+      const itemDate = new Date(date.date);
+      itemDate.setHours(0, 0, 0, 0);
+
+      // Only show today and future dates
+      return itemDate >= today;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((date) => ({
+      label: formatDateLabel(date.date),
+      shortLabel: formatDateShort(date.date),
+      displayLabel: formatDateWithDay(date.date),
+      date: date.date,
+      enabled: date.dayWiseCategoryEnabled,
+    }));
+}, [availableDates]);
   // Check if existing data uses old day-name format
   const hasLegacyDayFormat = useMemo(() => {
     return value.length > 0 && value.some(item => isDayName(item.day));
