@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { deleteFromCloudinary } from '@/lib/cloudinary';
-import { ObjectId } from 'mongodb';
+import { ObjectId, UpdateFilter } from 'mongodb';
 import { FoodCategory, CategoryListingType, CategoryDayWiseItem, CategoryFoodMapping } from '@/types/order';
 
 /**
@@ -279,6 +279,42 @@ function verifyAuth(request: NextRequest) {
   return { success: true, userId: verificationResult.payload.userId };
 }
 
+function categoryDocHasParentId(parentCategoryId: unknown): boolean {
+  if (parentCategoryId === undefined || parentCategoryId === null) return false;
+  if (typeof parentCategoryId === 'string') return parentCategoryId.trim().length > 0;
+  return true;
+}
+
+/**
+ * Resolve and validate parent category for a single-level hierarchy (parent must be top-level).
+ */
+async function resolveParentCategoryObjectId(
+  parentCategoryIdRaw: unknown,
+): Promise<{ ok: true; parentObjectId: ObjectId | undefined } | { ok: false; error: string }> {
+  if (parentCategoryIdRaw === undefined || parentCategoryIdRaw === null) {
+    return { ok: true, parentObjectId: undefined };
+  }
+  if (typeof parentCategoryIdRaw !== 'string' || !parentCategoryIdRaw.trim()) {
+    return { ok: true, parentObjectId: undefined };
+  }
+  const idStr = parentCategoryIdRaw.trim();
+  if (!ObjectId.isValid(idStr)) {
+    return { ok: false, error: 'parentCategoryId must be a valid category id' };
+  }
+  const parentOid = new ObjectId(idStr);
+  const parentResult = await db.readOne<FoodCategory>('foodcategories', { _id: parentOid });
+  if (!parentResult.success || !parentResult.data) {
+    return { ok: false, error: 'Parent category not found' };
+  }
+  if (categoryDocHasParentId(parentResult.data.parentCategoryId)) {
+    return {
+      ok: false,
+      error: 'Parent must be a top-level category (sub-categories cannot be parents)',
+    };
+  }
+  return { ok: true, parentObjectId: parentOid };
+}
+
 /**
  * Calculate item count for a category using CategoryFoodMapping
  * Now uses mapping collection for both flat and day-wise categories
@@ -504,7 +540,17 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, description, url, public_id, sequence, isDraft, listingType, dayWiseItems: inputDayWiseItems } = body;
+    const {
+      name,
+      description,
+      url,
+      public_id,
+      sequence,
+      isDraft,
+      listingType,
+      dayWiseItems: inputDayWiseItems,
+      parentCategoryId: parentCategoryIdRaw,
+    } = body;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -574,6 +620,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const parentResolved = await resolveParentCategoryObjectId(parentCategoryIdRaw);
+    if (!parentResolved.ok) {
+      return NextResponse.json({ error: parentResolved.error }, { status: 400 });
+    }
+
     // Auto-assign sequence if not provided
     let sequenceValue = sequence;
     if (sequenceValue === undefined || sequenceValue === null) {
@@ -604,6 +655,10 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+
+    if (parentResolved.parentObjectId) {
+      categoryData.parentCategoryId = parentResolved.parentObjectId;
+    }
 
     // Create category
     const result = await db.create<FoodCategory>('foodcategories', categoryData);
@@ -682,7 +737,19 @@ export async function PUT(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { _id, name, description, url, public_id, sequence, isDraft, listingType, dayWiseItems: inputDayWiseItems, isImageUpdated } = body;
+    const {
+      _id,
+      name,
+      description,
+      url,
+      public_id,
+      sequence,
+      isDraft,
+      listingType,
+      dayWiseItems: inputDayWiseItems,
+      isImageUpdated,
+      parentCategoryId: parentCategoryIdRaw,
+    } = body;
 
     // Validate required fields
     if (!_id) {
@@ -787,12 +854,46 @@ export async function PUT(request: NextRequest) {
     if (listingType !== undefined) updateData.listingType = listingType;
     if (inputDayWiseItems !== undefined) updateData.dayWiseItems = inputDayWiseItems;
 
+    let unsetParentCategoryId = false;
+    if ('parentCategoryId' in body) {
+      const raw = body.parentCategoryId;
+      if (raw === null || raw === '' || (typeof raw === 'string' && !raw.trim())) {
+        unsetParentCategoryId = true;
+      } else if (typeof raw === 'string') {
+        const parentResolved = await resolveParentCategoryObjectId(raw);
+        if (!parentResolved.ok) {
+          return NextResponse.json({ error: parentResolved.error }, { status: 400 });
+        }
+        if (!parentResolved.parentObjectId) {
+          unsetParentCategoryId = true;
+        } else if (parentResolved.parentObjectId.equals(categoryId)) {
+          return NextResponse.json(
+            { error: 'A category cannot be its own parent' },
+            { status: 400 }
+          );
+        } else {
+          updateData.parentCategoryId = parentResolved.parentObjectId;
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'parentCategoryId must be a string, empty string, or null' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updatePayload: UpdateFilter<FoodCategory> = { $set: updateData };
+    if (unsetParentCategoryId) {
+      updatePayload.$unset = { parentCategoryId: '' };
+      delete updateData.parentCategoryId;
+    }
+
     // Update category
     console.log('🔧 [PUT] Updating category with ID:', categoryId.toHexString());
     const updateResult = await db.updateOne<FoodCategory>(
       'foodcategories',
       { _id: categoryId },
-      { $set: updateData }
+      updatePayload
     );
 
     if (!updateResult.success) {

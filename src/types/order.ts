@@ -212,6 +212,8 @@ export interface CategoryDayWiseItem {
 
 export interface FoodCategory {
   _id?: ObjectId;
+  /** Top-level categories omit this; sub-categories reference a parent (one level only). */
+  parentCategoryId?: ObjectId | string;
   name: string;
   description?: string;
   url?: string;

@@ -17,23 +17,35 @@ import {
   Radio,
   FormLabel,
   Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import ImageUpload from './ImageUpload';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { FoodCategory, CategoryListingType } from '@/types/order';
-import { useAuth } from '@/contexts/AuthContext';
+
+function parentIdFromCategory(category: FoodCategory | null): string {
+  if (!category?.parentCategoryId) return '';
+  const p = category.parentCategoryId;
+  if (typeof p === 'string') return p;
+  return p.toString();
+}
 
 interface CategoryDialogProps {
   open: boolean;
   category: FoodCategory | null;
+  /** Top-level categories only; used as eligible parents for a one-level hierarchy. */
+  parentCategoryOptions: FoodCategory[];
   onClose: () => void;
   onSave: (data: Partial<Omit<FoodCategory, '_id'>> & { _id?: string; isImageUpdated?: boolean }) => Promise<void>;
 }
 
-export default function CategoryDialog({ open, category, onClose, onSave }: CategoryDialogProps) {
-  const { token } = useAuth();
+export default function CategoryDialog({ open, category, parentCategoryOptions, onClose, onSave }: CategoryDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [parentCategoryId, setParentCategoryId] = useState('');
   const [sequence, setSequence] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -48,6 +60,7 @@ export default function CategoryDialog({ open, category, onClose, onSave }: Cate
       if (category) {
         setName(category.name);
         setDescription(category.description || '');
+        setParentCategoryId(parentIdFromCategory(category));
         setSequence(category.sequence || 0);
         setImagePreview(category.url || null);
         setIsDraft(category.isDraft || false);
@@ -55,6 +68,7 @@ export default function CategoryDialog({ open, category, onClose, onSave }: Cate
       } else {
         setName('');
         setDescription('');
+        setParentCategoryId('');
         setSequence(0);
         setImagePreview(null);
         setIsDraft(false);
@@ -121,6 +135,7 @@ export default function CategoryDialog({ open, category, onClose, onSave }: Cate
         isDraft: saveAsDraft,
         listingType: listingType,
         dayWiseItems: [],
+        parentCategoryId: parentCategoryId.trim() || '',
       };
 
       if (category) {
@@ -190,6 +205,40 @@ export default function CategoryDialog({ open, category, onClose, onSave }: Cate
               },
             }}
           />
+
+          <FormControl fullWidth disabled={loading}>
+            <InputLabel id="parent-category-label">Parent category</InputLabel>
+            <Select
+              labelId="parent-category-label"
+              id="parent-category"
+              label="Parent category"
+              value={parentCategoryId}
+              onChange={(e) => setParentCategoryId(typeof e.target.value === 'string' ? e.target.value : '')}
+              sx={{
+                backgroundColor: '#F6FAFF',
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#4F8CFF',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#4F8CFF',
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>None (top-level category)</em>
+              </MenuItem>
+              {parentCategoryOptions
+                .filter((c) => !category || c._id?.toString() !== category._id?.toString())
+                .map((c) => (
+                  <MenuItem key={c._id?.toString()} value={c._id?.toString() || ''}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+            </Select>
+            <Typography variant="caption" sx={{ color: '#666', marginTop: 0.5, display: 'block' }}>
+              Sub-categories can sit under a top-level category (one level only).
+            </Typography>
+          </FormControl>
 
           <TextField
             label="Sequence"
