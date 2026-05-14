@@ -209,11 +209,11 @@ export default function DeliveryReportPage() {
       // Address
       'Street',
       'Apartment',
-      'Floor',
       'City',
       'State',
       'Zip Code',
       'Gate Code',
+      'Delivery Instructions',
       'Landmark',
     ];
 
@@ -265,11 +265,11 @@ export default function DeliveryReportPage() {
       // Address
       row.push(order.address.street);
       row.push(order.address.apartment || '');
-      row.push(order.address.floor || '');
       row.push(order.address.city);
       row.push(order.address.state);
       row.push(order.address.zipCode);
       row.push(order.address.entrance || '');
+      row.push(order.address.floor || '');
       row.push(order.address.landmark || '');
 
       // Items - fill up to MAX_ITEMS
@@ -380,7 +380,6 @@ export default function DeliveryReportPage() {
           <Typography variant="body2" sx={{ color: '#374151', fontSize: '13px' }}>
             {address.street}
             {address.apartment && `, ${address.apartment}`}
-            {address.floor && `, Floor: ${address.floor}`}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
@@ -392,6 +391,13 @@ export default function DeliveryReportPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
               Gate Code: {address.entrance}
+            </Typography>
+          </Box>
+        )}
+        {address.floor && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
+            <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+              Delivery instructions: {address.floor}
             </Typography>
           </Box>
         )}

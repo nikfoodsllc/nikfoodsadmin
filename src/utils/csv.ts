@@ -87,7 +87,8 @@ function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
     customerPhone,
     street,
     apartment,
-    '', // Gate Code - not available in current data structure
+    escapeCSVValue(order.address.entrance || ''),
+    escapeCSVValue(order.address.floor || ''),
     landmark,
     ...deliveryDateColumns,
   ].join(',');
@@ -122,6 +123,7 @@ export function generateOrdersListingCSV(orders: any[]): string {
     'Address',
     'Apt. No.',
     'Gate Code',
+    'Delivery Instructions',
     'Instruction to Driver',
   ];
 
@@ -208,10 +210,11 @@ function orderToCSVRow(order: DeliveryOrderReport): string {
   // Format address fields individually
   const street = escapeCSVValue(order.address.street);
   const apartment = escapeCSVValue(order.address.apartment || '');
-  const floor = escapeCSVValue(order.address.floor || '');
   const city = escapeCSVValue(order.address.city);
   const state = escapeCSVValue(order.address.state);
   const zipCode = escapeCSVValue(order.address.zipCode);
+  const gateCode = escapeCSVValue(order.address.entrance || '');
+  const deliveryInstructions = escapeCSVValue(order.address.floor || '');
   const landmark = escapeCSVValue(order.address.landmark || '');
 
   // Format customer info
@@ -248,10 +251,11 @@ function orderToCSVRow(order: DeliveryOrderReport): string {
     customerPhone,
     street,
     apartment,
-    floor,
     city,
     state,
     zipCode,
+    gateCode,
+    deliveryInstructions,
     landmark,
     orderDate,
     deliveryDate,
@@ -282,10 +286,11 @@ export function generateDeliveryCSV(orders: DeliveryOrderReport[]): string {
     'Customer Phone',
     'Street',
     'Apartment',
-    'Floor',
     'City',
     'State',
     'ZIP Code',
+    'Gate Code',
+    'Delivery Instructions',
     'Landmark',
     'Order Date',
     'Delivery Date',
