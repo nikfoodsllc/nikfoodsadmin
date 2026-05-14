@@ -13,7 +13,7 @@ export type DateRangePreset =
   | 'lastMonth'
   | 'thisYear';
 
-interface DateRange {
+export interface DateRange {
   startDate: Date;
   endDate: Date;
   label: string;

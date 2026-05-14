@@ -2,7 +2,7 @@
 
 import { Box, Typography, Card, CardContent } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { IconToolsKitchen2, IconTruckDelivery } from '@tabler/icons-react';
+import { IconToolsKitchen2, IconTruckDelivery, IconShoppingCart } from '@tabler/icons-react';
 
 export default function ReportsDashboardPage() {
   const router = useRouter();
@@ -23,6 +23,14 @@ export default function ReportsDashboardPage() {
       iconColor: '#5FD068',
       iconBgColor: '#EBFBEF',
       path: '/admin/reports/delivery',
+    },
+    {
+      title: 'Ordered Items',
+      description: 'View detailed ordered items report with customer details, quantities, spice levels, and pricing',
+      icon: IconShoppingCart,
+      iconColor: '#F59E0B',
+      iconBgColor: '#FEF3C7',
+      path: '/admin/reports/ordered-items',
     },
   ];
 

@@ -84,6 +84,11 @@ interface ComboFoodItemDialogProps {
   onSave: (data: ComboFoodItem, imageFile: File | null, priceUpdateInfo?: { priceUpdated: boolean; updatedCount: number }) => void;
 }
 
+function safeNonNegativePrice(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 const getDefaultFormData = (): ComboFoodItem => ({
   name: '',
   description: '',
@@ -113,7 +118,7 @@ export default function ComboFoodItemDialog({
   onSave,
 }: ComboFoodItemDialogProps) {
   const getInitialFormData = useCallback((): ComboFoodItem => {
-    return item ? { ...item } : getDefaultFormData();
+    return item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
   }, [item]);
 
   const [formData, setFormData] = useState<ComboFoodItem>(getInitialFormData);
@@ -128,7 +133,7 @@ export default function ComboFoodItemDialog({
   // Reset form when dialog opens or item changes
   useEffect(() => {
     if (open) {
-      let newFormData = item ? { ...item } : getDefaultFormData();
+      let newFormData = item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
       // Sort sections by sequence if present when loading existing item
       if (item && item.sections && item.sections.length > 0) {
         const sortedSections = [...item.sections].sort(
@@ -191,7 +196,7 @@ export default function ComboFoodItemDialog({
       newErrors.name = 'Name is required';
     }
 
-    if (formData.price === undefined || formData.price < 0) {
+    if (formData.price == null || formData.price < 0) {
       newErrors.price = 'Price must be non-negative';
     }
 

@@ -163,6 +163,7 @@ export interface AddressSnapshot {
   city: string;
   state: string;
   zipCode: string;
+  entrance?: string;
   landmark?: string;
 }
 

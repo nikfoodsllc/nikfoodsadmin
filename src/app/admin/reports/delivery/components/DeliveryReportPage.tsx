@@ -213,6 +213,7 @@ export default function DeliveryReportPage() {
       'City',
       'State',
       'Zip Code',
+      'Gate Code',
       'Landmark',
     ];
 
@@ -268,6 +269,7 @@ export default function DeliveryReportPage() {
       row.push(order.address.city);
       row.push(order.address.state);
       row.push(order.address.zipCode);
+      row.push(order.address.entrance || '');
       row.push(order.address.landmark || '');
 
       // Items - fill up to MAX_ITEMS
@@ -386,6 +388,13 @@ export default function DeliveryReportPage() {
             {address.city}, {address.state} {address.zipCode}
           </Typography>
         </Box>
+        {address.entrance && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
+            <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+              Gate Code: {address.entrance}
+            </Typography>
+          </Box>
+        )}
         {address.landmark && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5 }}>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>

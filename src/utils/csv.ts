@@ -1,5 +1,6 @@
 import { OrderDayItem, DeliveryOrderReport } from '@/types/order';
 import { formatPSTDate } from '@/utils/timezone';
+import { processDeliveryDates, ProcessedDeliveryDate } from '@/utils/delivery';
 
 /**
  * Escapes CSV values to handle commas, quotes, and newlines
@@ -14,6 +15,130 @@ function escapeCSVValue(value: string | number | undefined): string {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;
+}
+
+/**
+ * Gets the delivery dates for an order, processed and sorted
+ */
+function getProcessedDeliveryDates(order: any): ProcessedDeliveryDate[] {
+  if (!order.items || order.items.length === 0) return [];
+  return processDeliveryDates(order.items);
+}
+
+/**
+ * Converts an Order to a CSV row string for orders listing
+ */
+function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
+  // Format address fields
+  const street = escapeCSVValue(order.address.street);
+  const apartment = escapeCSVValue(order.address.apartment || order.address.floor || '');
+  const landmark = escapeCSVValue(order.address.landmark || '');
+
+  // Format customer info
+  const customerName = escapeCSVValue(order.customerInfo.name);
+  const customerEmail = escapeCSVValue(order.customerInfo.email);
+  const customerPhone = escapeCSVValue(order.customerInfo.phone);
+
+  // Format dates
+  const orderDate = escapeCSVValue(formatPSTDate(order.createdAt));
+  
+  // Format status and payment
+  const status = escapeCSVValue(order.status);
+  const paymentStatus = escapeCSVValue(order.paymentStatus);
+
+  // Format monetary values
+  const subtotal = order.subtotal.toFixed(2);
+  const platformFee = order.platformFee.toFixed(2);
+  const taxes = order.taxes.toFixed(2);
+  const tip = order.tip.toFixed(2);
+  const totalPaid = order.totalPaid.toFixed(2);
+
+  // Build delivery date columns dynamically using processed dates
+  const processedDates = getProcessedDeliveryDates(order);
+  const deliveryDateColumns: string[] = [];
+  
+  for (let i = 0; i < maxDeliveryDays; i++) {
+    const dateEntry = processedDates[i];
+    if (dateEntry) {
+      // Format: "Mar 05, 2026 (Days 1, 2)" or "Mar 05, 2026 (Day 1)"
+      const dayLabel = dateEntry.originalDays.length > 1
+        ? `Days ${dateEntry.originalDays.join(', ')}`
+        : `Day ${dateEntry.originalDays[0]}`;
+      const cellValue = `${dateEntry.date} (${dayLabel})`;
+      deliveryDateColumns.push(escapeCSVValue(cellValue));
+    } else {
+      deliveryDateColumns.push('');
+    }
+  }
+
+  // Combine all fields into CSV row
+  return [
+    orderDate,
+    escapeCSVValue(order.orderId),
+    customerName,
+    customerEmail,
+    status,
+    paymentStatus,
+    subtotal,
+    platformFee,
+    taxes,
+    tip,
+    totalPaid,
+    customerPhone,
+    street,
+    apartment,
+    '', // Gate Code - not available in current data structure
+    landmark,
+    ...deliveryDateColumns,
+  ].join(',');
+}
+
+/**
+ * Generates CSV content from orders data for listing page
+ * @param orders - Array of orders
+ * @returns Complete CSV string with headers and data rows
+ */
+export function generateOrdersListingCSV(orders: any[]): string {
+  // Calculate max unique delivery days across all orders
+  const maxDeliveryDays = orders.reduce((max, order) => {
+    const processedDates = getProcessedDeliveryDates(order);
+    return Math.max(max, processedDates.length);
+  }, 0);
+
+  // Build static headers
+  const staticHeaders = [
+    'Order Date',
+    'Order ID',
+    'Customer Name',
+    'Email',
+    'Order Status',
+    'Payment Status',
+    'Sub Total',
+    'Service Fee',
+    'Tax',
+    'Tip',
+    'Grand Total',
+    'Phone',
+    'Address',
+    'Apt. No.',
+    'Gate Code',
+    'Instruction to Driver',
+  ];
+
+  // Build dynamic delivery day headers
+  const deliveryDayHeaders = [];
+  for (let day = 1; day <= maxDeliveryDays; day++) {
+    deliveryDayHeaders.push(`Delivery Date ${day}`);
+  }
+
+  // Combine all headers
+  const headers = [...staticHeaders, ...deliveryDayHeaders];
+
+  // Generate rows
+  const rows = orders.map(order => orderToListingCSVRow(order, maxDeliveryDays));
+
+  // Combine headers and rows
+  return [headers.join(','), ...rows].join('\n');
 }
 
 /**

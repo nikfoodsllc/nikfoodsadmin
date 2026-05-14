@@ -4,6 +4,16 @@ import { db } from '@/lib/db';
 import { Order, OrderStatus } from '@/types/order';
 import { ObjectId } from 'mongodb';
 
+const VALID_ORDER_STATUSES: OrderStatus[] = [
+  'pending',
+  'confirmed',
+  'preparing',
+  'ready',
+  'out_for_delivery',
+  'delivered',
+  'cancelled',
+];
+
 /**
  * Verify JWT token and check admin role
  */
@@ -136,6 +146,19 @@ export async function GET(request: NextRequest) {
       throw new Error(result.error || 'Failed to fetch orders');
     }
 
+    // Sort each order's items array by delivery date in ascending order
+    const sortedOrders = (result.data || []).map((order) => {
+      if (order.items && order.items.length > 0) {
+        const sortedItems = [...order.items].sort((a, b) => {
+          const dateA = a.actualDeliveryDate || a.deliveryDate;
+          const dateB = b.actualDeliveryDate || b.deliveryDate;
+          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        });
+        return { ...order, items: sortedItems };
+      }
+      return order;
+    });
+
     return NextResponse.json({
       data: {
         items: result.data || [],
@@ -168,51 +191,113 @@ export async function PUT(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { _id, status } = body;
+    const { _id, ids, status } = body as {
+      _id?: string;
+      ids?: string[];
+      status?: OrderStatus;
+    };
 
-    // Validate required fields
-    if (!_id) {
-      return NextResponse.json({ error: 'Order ID is required' }, { status: 400 });
-    }
-
+    // Validate required status field
     if (!status) {
       return NextResponse.json({ error: 'Status is required' }, { status: 400 });
     }
 
     // Validate status value
-    const validStatuses: OrderStatus[] = [
-      'pending',
-      'confirmed',
-      'preparing',
-      'ready',
-      'out_for_delivery',
-      'delivered',
-      'cancelled',
-    ];
-
-    if (!validStatuses.includes(status)) {
+    if (!VALID_ORDER_STATUSES.includes(status)) {
       return NextResponse.json({ error: 'Invalid status value' }, { status: 400 });
     }
 
-    // Update order status
-    const updateResult = await db.updateOne<Order>(
+    // Reject ambiguous payload
+    if (_id && Array.isArray(ids)) {
+      return NextResponse.json(
+        { error: 'Provide either _id or ids, not both' },
+        { status: 400 }
+      );
+    }
+
+    // Single order update
+    if (_id) {
+      let objectId: ObjectId;
+      try {
+        objectId = new ObjectId(_id);
+      } catch {
+        return NextResponse.json({ error: 'Invalid Order ID format' }, { status: 400 });
+      }
+
+      const updateResult = await db.updateOne<Order>(
+        'orders',
+        { _id: objectId } as Record<string, unknown>,
+        { $set: { status, updatedAt: new Date() } }
+      );
+
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to update order status');
+      }
+
+      if (!updateResult.matchedCount) {
+        return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      }
+
+      // Fetch updated order
+      const updatedOrder = await db.readOne<Order>('orders', {
+        _id: objectId,
+      } as Record<string, unknown>);
+
+      return NextResponse.json({
+        data: updatedOrder.data,
+        message: 'Order status updated successfully',
+      });
+    }
+
+    // Bulk order update
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { error: 'Either _id or a non-empty ids array is required' },
+        { status: 400 }
+      );
+    }
+
+    if (ids.length > 100) {
+      return NextResponse.json(
+        { error: 'Maximum 100 orders can be updated in a single request' },
+        { status: 400 }
+      );
+    }
+
+    const uniqueIds = Array.from(new Set(ids));
+    let objectIds: ObjectId[];
+    try {
+      objectIds = uniqueIds.map((id) => new ObjectId(id));
+    } catch {
+      return NextResponse.json({ error: 'One or more order IDs are invalid' }, { status: 400 });
+    }
+
+    const countResult = await db.count<Order>(
       'orders',
-      { _id: new ObjectId(_id) } as Record<string, unknown>,
+      { _id: { $in: objectIds } } as Record<string, unknown>
+    );
+
+    if (!countResult.success) {
+      throw new Error(countResult.error || 'Failed to count matching orders');
+    }
+
+    const updateResult = await db.update<Order>(
+      'orders',
+      { _id: { $in: objectIds } } as Record<string, unknown>,
       { $set: { status, updatedAt: new Date() } }
     );
 
     if (!updateResult.success) {
-      throw new Error(updateResult.error || 'Failed to update order status');
+      throw new Error(updateResult.error || 'Failed to update order statuses');
     }
 
-    // Fetch updated order
-    const updatedOrder = await db.readOne<Order>('orders', {
-      _id: new ObjectId(_id),
-    } as Record<string, unknown>);
-
     return NextResponse.json({
-      data: updatedOrder.data,
-      message: 'Order status updated successfully',
+      data: {
+        requestedCount: uniqueIds.length,
+        matchedCount: countResult.count || 0,
+        modifiedCount: updateResult.modifiedCount || 0,
+      },
+      message: 'Order statuses updated successfully',
     });
   } catch (error) {
     console.error('Error in PUT /api/admin/orders:', error);

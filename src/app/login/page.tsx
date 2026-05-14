@@ -95,7 +95,7 @@ export default function LoginPage() {
             Admin Login
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Enter your credentials to access the admin panel -- dev
+            Enter your credentials to access the admin panel
           </Typography>
         </Box>
 

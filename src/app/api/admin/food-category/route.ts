@@ -354,6 +354,68 @@ async function fetchDayWiseItemsForCategory(categoryId: ObjectId): Promise<Categ
   }
 }
 
+
+// New code 
+
+// async function fetchDayWiseItemsForCategory(categoryId: ObjectId): Promise<CategoryDayWiseItem[]> {
+//   try {
+
+//     // get enabled dates only
+//     const availableDatesResult = await db.read(
+//       'availableDates',
+//       { dayWiseCategoryEnabled: true }
+//     );
+
+//     const validDates =
+//       availableDatesResult.success && availableDatesResult.data
+//         ? availableDatesResult.data.map((d: any) => d.date)
+//         : [];
+
+//     // fetch mappings
+//     const mappingResult = await db.read<CategoryFoodMapping>(
+//       'categoryfoodmapping',
+//       {
+//         categoryId: categoryId,
+//         mappingType: 'DAY_WISE'
+//       },
+//       {
+//         sort: { day: 1, sequence: 1 }
+//       }
+//     );
+
+//     if (!mappingResult.success || !mappingResult.data) {
+//       return [];
+//     }
+
+//     // group items by day
+//     const dayWiseMap = new Map<string, string[]>();
+
+//     for (const mapping of mappingResult.data) {
+
+//       // ❌ ignore old dates like Jan 28
+//       if (!validDates.includes(mapping.day)) continue;
+
+//       const day = mapping.day;
+//       const foodItemId = mapping.foodItemId.toString();
+
+//       if (!dayWiseMap.has(day)) {
+//         dayWiseMap.set(day, []);
+//       }
+
+//       dayWiseMap.get(day)!.push(foodItemId);
+//     }
+
+//     return Array.from(dayWiseMap.entries()).map(([day, items]) => ({
+//       day,
+//       items
+//     }));
+
+//   } catch (error) {
+//     console.error(`Error fetching day-wise items for category ${categoryId}:`, error);
+//     return [];
+//   }
+// }
+
 /**
  * GET /api/admin/food-category
  * List all food categories

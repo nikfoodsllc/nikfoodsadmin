@@ -114,58 +114,28 @@ export default function DayWiseItemSelector({
   }, [value]);
 
   // Sync value array with allDateLabels by matching day field
-  useEffect(() => {
-    if (allDateLabels.length === 0) {
-      return;
-    }
+// remove old dates like Jan 28 automatically
+useEffect(() => {
 
-    // Check if we need to sync (either empty value, legacy format, or dates changed)
-    const needsSync = value.length === 0 ||
-      hasLegacyDayFormat ||
-      !allDateLabels.every(dateInfo => value.some(item => item.day === dateInfo.date));
+  if (allDateLabels.length === 0) return;
 
-    if (!needsSync) {
-      return;
-    }
+  const cleanedDayWiseItems: CategoryDayWiseItem[] =
+    allDateLabels.map(dateInfo => {
 
-    // Build synced value array by matching day field with allDateLabels
-    const syncedDayWiseItems: CategoryDayWiseItem[] = allDateLabels.map(dateInfo => {
-      // Find existing entry for this date
-      const existingEntry = value.find(item => item.day === dateInfo.date);
+      const existing = value.find(
+        item => item.day === dateInfo.date
+      );
 
-      if (existingEntry) {
-        // Preserve existing items for this date
-        return {
-          day: dateInfo.date,
-          items: existingEntry.items || []
-        };
-      } else if (hasLegacyDayFormat) {
-        // Try to map legacy day names to this date
-        const dateObj = new Date(dateInfo.date);
-        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+      return {
+        day: dateInfo.date,
+        items: existing?.items || []
+      };
 
-        const legacyEntry = value.find(item => {
-          if (isDayName(item.day)) {
-            return item.day.toLowerCase() === dayName.toLowerCase();
-          }
-          return false;
-        });
-
-        return {
-          day: dateInfo.date,
-          items: legacyEntry?.items || []
-        };
-      } else {
-        // Initialize empty items array for new date
-        return {
-          day: dateInfo.date,
-          items: []
-        };
-      }
     });
 
-    onChange(syncedDayWiseItems);
-  }, [value, onChange, allDateLabels, hasLegacyDayFormat]);
+  onChange(cleanedDayWiseItems);
+
+}, [allDateLabels]);
 
   const handleItemToggle = (dayIndex: number, itemId: string) => {
     const dateInfo = allDateLabels[dayIndex];
@@ -296,7 +266,16 @@ export default function DayWiseItemSelector({
       </Typography>
 
       <Box sx={{ overflowX: 'auto' }}>
-        <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #E0E0E0' }}>
+        <TableContainer
+          component={Paper}
+          sx={{
+            boxShadow: 'none',
+            border: '1px solid #E0E0E0',
+            maxHeight: 500,     // 👈 height set karo
+            overflowY: 'auto'   // 👈 vertical scroll enable
+          }}
+        >
+          
           <Table stickyHeader aria-label="day-wise item assignment table">
             <TableHead>
               <TableRow>
@@ -312,6 +291,7 @@ export default function DayWiseItemSelector({
                 >
                   Food Item
                 </TableCell>
+                
                 {allDateLabels.map((dateInfo, dateIndex) => (
                   <TableCell
                     key={dateInfo.date}
@@ -321,7 +301,8 @@ export default function DayWiseItemSelector({
                       backgroundColor: '#F5F5F5',
                       minWidth: 100,
                     }}
-                  >
+                    >
+                    
                     <Tooltip
                       title={dateInfo.label}
                       arrow
