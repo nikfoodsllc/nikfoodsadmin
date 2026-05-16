@@ -350,7 +350,7 @@ export default function UsersPage() {
               fullWidth
               size="small"
             />
-            <TextField
+            {/* <TextField
               label="Email"
               type="email"
               value={editForm.email}
@@ -358,7 +358,7 @@ export default function UsersPage() {
               fullWidth
               size="small"
               required
-            />
+            /> */}
             <TextField
               label="Phone"
               value={editForm.phone}

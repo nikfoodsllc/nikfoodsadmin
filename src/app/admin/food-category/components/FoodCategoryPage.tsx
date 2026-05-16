@@ -12,6 +12,13 @@ import ItemSequenceDialog from './ItemSequenceDialog';
 import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 
+function categoryHasParent(c: FoodCategory): boolean {
+  const p = c.parentCategoryId;
+  if (p === undefined || p === null) return false;
+  if (typeof p === 'string') return p.trim().length > 0;
+  return true;
+}
+
 export default function FoodCategoryPage() {
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<FoodCategory[]>([]);
@@ -56,6 +63,8 @@ export default function FoodCategoryPage() {
   // Get category counts for display
   const flatCount = categories.filter(cat => cat.listingType === 'flat' || !cat.listingType).length;
   const dayWiseCount = categories.filter(cat => cat.listingType === 'day-wise').length;
+
+  const parentCategoryOptions = categories.filter((c) => !categoryHasParent(c));
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -375,6 +384,7 @@ export default function FoodCategoryPage() {
       <CategoryDialog
         open={dialogOpen}
         category={selectedCategory}
+        parentCategoryOptions={parentCategoryOptions}
         onClose={handleDialogClose}
         onSave={handleSave}
       />

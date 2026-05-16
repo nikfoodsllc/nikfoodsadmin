@@ -48,7 +48,7 @@ export default function OrdersPage() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | ''>('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
-  const itemsPerPage = 10;
+  const itemsPerPage = 100;
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
