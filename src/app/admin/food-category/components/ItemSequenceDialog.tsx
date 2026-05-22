@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { IconGripVertical } from '@tabler/icons-react';
-import { FoodCategory, CategoryListingType } from '@/types/order';
+import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDateWithDay } from '@/utils/days';
 import { safeFormatCurrency } from '@/utils/currency';
@@ -29,7 +29,7 @@ interface FoodItem {
   url?: string;
   price?: number;
   sequence?: number;
-  mappingId?: string; // ID of the category-food-mapping document
+  mappingId?: string;
 }
 
 interface ItemSequenceDialogProps {
@@ -46,19 +46,26 @@ export default function ItemSequenceDialog({
   onSave,
 }: ItemSequenceDialogProps) {
   const { token } = useAuth();
+
   const [selectedDay, setSelectedDay] = useState<string>('');
   const [items, setItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Reset state when dialog opens
   useEffect(() => {
     if (open && category) {
       setError('');
-      if (category.listingType === 'day-wise' && category.dayWiseItems && category.dayWiseItems.length > 0) {
-        // For day-wise, select the first day that has items
-        const firstDayWithItems = category.dayWiseItems.find(d => d.items && d.items.length > 0);
+
+      if (
+        category.listingType === 'day-wise' &&
+        category.dayWiseItems &&
+        category.dayWiseItems.length > 0
+      ) {
+        const firstDayWithItems = category.dayWiseItems.find(
+          (d) => d.items && d.items.length > 0
+        );
+
         if (firstDayWithItems) {
           setSelectedDay(firstDayWithItems.day);
         } else {
@@ -67,11 +74,11 @@ export default function ItemSequenceDialog({
       } else {
         setSelectedDay('');
       }
+
       setItems([]);
     }
   }, [open, category]);
 
-  // Fetch items when category or selected day changes
   useEffect(() => {
     if (open && category && token) {
       fetchItems();
@@ -85,13 +92,11 @@ export default function ItemSequenceDialog({
     setError('');
 
     try {
-      // Build query parameters for the new items endpoint
       const params = new URLSearchParams({
         categoryId: category._id?.toString() || '',
       });
 
       if (category.listingType === 'day-wise') {
-        // For day-wise categories, add mapping type and day filters
         params.append('mappingType', 'DAY_WISE');
 
         if (!selectedDay) {
@@ -101,32 +106,35 @@ export default function ItemSequenceDialog({
         }
 
         params.append('day', selectedDay);
-        console.log('[ItemSequenceDialog] Fetching DAY_WISE items for category:', category.name, 'day:', selectedDay);
       } else {
-        // For flat categories, add FLAT mapping type filter
         params.append('mappingType', 'FLAT');
-        console.log('[ItemSequenceDialog] Fetching FLAT items for category:', category.name);
       }
 
-      // Fetch items with mapping details in a single call
-      const response = await fetch(`/api/admin/category-food-mapping/items?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        `/api/admin/category-food-mapping/items?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch category items');
       }
 
       const data = await response.json();
+
       const fetchedItems: FoodItem[] = data.data?.items || [];
 
-      console.log('[ItemSequenceDialog] Fetched items:', fetchedItems.length);
-
-      // Items are already sorted by sequence from the API
       setItems(fetchedItems);
     } catch (err) {
       console.error('Error fetching items:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch food items');
+
+      setError(
+        err instanceof Error ? err.message : 'Failed to fetch food items'
+      );
+
       setItems([]);
     } finally {
       setLoading(false);
@@ -137,10 +145,11 @@ export default function ItemSequenceDialog({
     if (!result.destination) return;
 
     const newItems = Array.from(items);
+
     const [reorderedItem] = newItems.splice(result.source.index, 1);
+
     newItems.splice(result.destination.index, 0, reorderedItem);
 
-    // Update sequence values
     const updatedItems = newItems.map((item, index) => ({
       ...item,
       sequence: index,
@@ -156,48 +165,45 @@ export default function ItemSequenceDialog({
     setError('');
 
     try {
-      // Prepare batch update payload
       const updates = items.map((item, index) => ({
         mappingId: item.mappingId,
         sequence: index,
       }));
 
-      // Validate all items have mappingId
-      const missingMappingId = items.find(item => !item.mappingId);
+      const missingMappingId = items.find((item) => !item.mappingId);
+
       if (missingMappingId) {
-        throw new Error(`Mapping ID not found for item: ${missingMappingId.name}`);
-      }
-
-      // Call the batch-sequence endpoint
-      const response = await fetch('/api/admin/category-food-mapping/batch-sequence', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ updates }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update sequence');
-      }
-
-      const result = await response.json();
-
-      // Check if all updates succeeded
-      if (!result.success && result.data?.failureCount > 0) {
         throw new Error(
-          `Failed to update ${result.data.failureCount} item(s). Only ${result.data.successCount} succeeded.`
+          `Mapping ID not found for item: ${missingMappingId.name}`
         );
       }
 
-      console.log('[ItemSequenceDialog] Successfully updated', result.data?.successCount, 'mappings');
+      const response = await fetch(
+        '/api/admin/category-food-mapping/batch-sequence',
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ updates }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        throw new Error(errorData.error || 'Failed to update sequence');
+      }
+
       onSave();
       onClose();
     } catch (err) {
       console.error('Error saving sequence:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save sequence');
+
+      setError(
+        err instanceof Error ? err.message : 'Failed to save sequence'
+      );
     } finally {
       setSaving(false);
     }
@@ -211,28 +217,44 @@ export default function ItemSequenceDialog({
 
   const getAvailableDays = () => {
     if (!category?.dayWiseItems) return [];
-    return category.dayWiseItems.filter(d => d.items && d.items.length > 0);
+
+    return category.dayWiseItems.filter(
+      (d) => d.items && d.items.length > 0
+    );
   };
 
   return (
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="sm"
+      maxWidth="xl"
       fullWidth
       PaperProps={{
         sx: {
           borderRadius: 3,
-          maxHeight: '80vh',
+          maxHeight: '90vh',
+          width: '95vw',
         },
       }}
     >
-      <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
+      <DialogTitle
+        sx={{
+          fontWeight: 700,
+          fontSize: '1.4rem',
+        }}
+      >
         Reorder Items - {category?.name || 'Category'}
       </DialogTitle>
 
       <DialogContent sx={{ overflowY: 'auto' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            pt: 2,
+          }}
+        >
           {error && (
             <Alert severity="error" onClose={() => setError('')}>
               {error}
@@ -241,28 +263,24 @@ export default function ItemSequenceDialog({
 
           {category?.listingType === 'day-wise' && (
             <FormControl fullWidth>
-              <InputLabel id="day-select-label">Select Day</InputLabel>
+              <InputLabel id="day-select-label">
+                Select Day
+              </InputLabel>
+
               <Select
                 labelId="day-select-label"
                 value={selectedDay}
                 label="Select Day"
                 onChange={(e) => setSelectedDay(e.target.value)}
                 disabled={loading || saving}
-                sx={{
-                  backgroundColor: '#F6FAFF',
-                  '& .MuiOutlinedInput-root': {
-                    '&:hover fieldset': {
-                      borderColor: '#4F8CFF',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#4F8CFF',
-                    },
-                  },
-                }}
               >
                 {getAvailableDays().map((dayItem) => (
-                  <MenuItem key={dayItem.day} value={dayItem.day}>
-                    {formatDateWithDay(dayItem.day)} ({dayItem.items.length} items)
+                  <MenuItem
+                    key={dayItem.day}
+                    value={dayItem.day}
+                  >
+                    {formatDateWithDay(dayItem.day)} (
+                    {dayItem.items.length} items)
                   </MenuItem>
                 ))}
               </Select>
@@ -270,22 +288,26 @@ export default function ItemSequenceDialog({
           )}
 
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', padding: 4 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                p: 6,
+              }}
+            >
               <CircularProgress />
             </Box>
           ) : items.length === 0 ? (
             <Box
               sx={{
                 textAlign: 'center',
-                padding: 4,
-                backgroundColor: '#f5f5f5',
+                p: 6,
+                backgroundColor: '#F8F9FA',
                 borderRadius: 2,
               }}
             >
-              <Typography variant="body2" sx={{ color: '#666' }}>
-                {category?.listingType === 'day-wise' && !selectedDay
-                  ? 'Please select a day to view items'
-                  : 'No items found for this category'}
+              <Typography>
+                No items found for this category
               </Typography>
             </Box>
           ) : (
@@ -296,13 +318,20 @@ export default function ItemSequenceDialog({
                     {...provided.droppableProps}
                     ref={provided.innerRef}
                     sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1,
-                      backgroundColor: snapshot.isDraggingOver ? '#F6FAFF' : 'transparent',
+                      display: 'grid',
+                      gridTemplateColumns: {
+                        xs: 'repeat(1, 1fr)',
+                        sm: 'repeat(2, 1fr)',
+                        md: 'repeat(3, 1fr)',
+                        lg: 'repeat(4, 1fr)',
+                        xl: 'repeat(6, 1fr)',
+                      },
+                      gap: 2,
+                      backgroundColor: snapshot.isDraggingOver
+                        ? '#F6FAFF'
+                        : 'transparent',
                       borderRadius: 2,
-                      padding: 1,
-                      minHeight: items.length > 0 ? 'auto' : 100,
+                      p: 1,
                     }}
                   >
                     {items.map((item, index) => (
@@ -315,19 +344,27 @@ export default function ItemSequenceDialog({
                           <Box
                             ref={provided.innerRef}
                             {...provided.draggableProps}
+                            {...provided.dragHandleProps}
                             sx={{
                               display: 'flex',
+                              flexDirection: 'column',
                               alignItems: 'center',
-                              gap: 2,
-                              padding: 2,
-                              backgroundColor: snapshot.isDragging ? '#E3F2FD' : '#fff',
-                              border: '1px solid #E0E0E0',
-                              borderRadius: 2,
-                              boxShadow: snapshot.isDragging ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+                              gap: 1.5,
+                              p: 2,
+                              borderRadius: 3,
+                              border: '1px solid #E5E7EB',
+                              backgroundColor: snapshot.isDragging
+                                ? '#E3F2FD'
+                                : '#fff',
+                              boxShadow: snapshot.isDragging
+                                ? '0 8px 20px rgba(0,0,0,0.15)'
+                                : '0 2px 6px rgba(0,0,0,0.05)',
+                              transition: '0.2s',
                               cursor: 'grab',
+                              minHeight: 220,
                               '&:hover': {
-                                backgroundColor: '#F9FAFB',
                                 borderColor: '#4F8CFF',
+                                transform: 'translateY(-2px)',
                               },
                               '&:active': {
                                 cursor: 'grabbing',
@@ -335,52 +372,47 @@ export default function ItemSequenceDialog({
                               ...provided.draggableProps.style,
                             }}
                           >
-                            {/* Drag Handle */}
+                            {/* Top Row */}
                             <Box
-                              {...provided.dragHandleProps}
                               sx={{
+                                width: '100%',
                                 display: 'flex',
+                                justifyContent: 'space-between',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#999',
-                                '&:hover': {
-                                  color: '#4F8CFF',
-                                },
                               }}
                             >
-                              <IconGripVertical size={20} />
+                              <Box
+                                sx={{
+                                  width: 30,
+                                  height: 30,
+                                  borderRadius: '50%',
+                                  backgroundColor: '#4F8CFF',
+                                  color: '#fff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {index + 1}
+                              </Box>
+
+                              <IconGripVertical
+                                size={20}
+                                color="#999"
+                              />
                             </Box>
 
-                            {/* Sequence Number */}
+                            {/* Image */}
                             <Box
                               sx={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: '50%',
-                                backgroundColor: '#4F8CFF',
-                                color: 'white',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 600,
-                                fontSize: '0.875rem',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {index + 1}
-                            </Box>
-
-                            {/* Item Image */}
-                            <Box
-                              sx={{
-                                width: 50,
-                                height: 50,
-                                borderRadius: 1.5,
+                                width: 100,
+                                height: 100,
+                                borderRadius: 3,
                                 overflow: 'hidden',
-                                backgroundColor: '#F3F4F6',
                                 border: '1px solid #E5E7EB',
-                                flexShrink: 0,
-                                position: 'relative',
+                                backgroundColor: '#F3F4F6',
                               }}
                             >
                               {item.url ? (
@@ -402,10 +434,8 @@ export default function ItemSequenceDialog({
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    fontSize: '0.6rem',
+                                    fontSize: '0.75rem',
                                     color: '#999',
-                                    textAlign: 'center',
-                                    padding: 0.5,
                                   }}
                                 >
                                   No Image
@@ -413,36 +443,39 @@ export default function ItemSequenceDialog({
                               )}
                             </Box>
 
-                            {/* Item Name */}
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: 500,
-                                  color: '#333',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {item.name}
-                              </Typography>
-                              {item.price !== undefined && item.price !== null && !Number.isNaN(item.price) && Number.isFinite(item.price) && (
+                            {/* Name */}
+                            <Typography
+                              sx={{
+                                fontWeight: 600,
+                                textAlign: 'center',
+                                fontSize: '0.95rem',
+                                lineHeight: 1.4,
+                                minHeight: 42,
+                              }}
+                            >
+                              {item.name}
+                            </Typography>
+
+                            {/* Price */}
+                            {item.price !== undefined &&
+                              item.price !== null &&
+                              !Number.isNaN(item.price) &&
+                              Number.isFinite(item.price) && (
                                 <Typography
-                                  variant="caption"
                                   sx={{
-                                    color: '#666',
-                                    fontSize: '0.75rem',
+                                    color: '#4F8CFF',
+                                    fontWeight: 700,
+                                    fontSize: '0.9rem',
                                   }}
                                 >
                                   {safeFormatCurrency(item.price)}
                                 </Typography>
                               )}
-                            </Box>
                           </Box>
                         )}
                       </Draggable>
                     ))}
+
                     {provided.placeholder}
                   </Box>
                 )}
@@ -452,7 +485,12 @@ export default function ItemSequenceDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ padding: 3, gap: 1 }}>
+      <DialogActions
+        sx={{
+          p: 3,
+          gap: 1,
+        }}
+      >
         <Button
           onClick={handleClose}
           disabled={saving}
@@ -463,6 +501,7 @@ export default function ItemSequenceDialog({
         >
           Cancel
         </Button>
+
         <Button
           onClick={handleSave}
           disabled={loading || saving || items.length === 0}
@@ -470,13 +509,18 @@ export default function ItemSequenceDialog({
           sx={{
             textTransform: 'none',
             backgroundColor: '#4F8CFF',
-            minWidth: 100,
+            minWidth: 120,
+            borderRadius: 2,
             '&:hover': {
               backgroundColor: '#3B7AE8',
             },
           }}
         >
-          {saving ? <CircularProgress size={20} color="inherit" /> : 'Save'}
+          {saving ? (
+            <CircularProgress size={20} color="inherit" />
+          ) : (
+            'Save'
+          )}
         </Button>
       </DialogActions>
     </Dialog>

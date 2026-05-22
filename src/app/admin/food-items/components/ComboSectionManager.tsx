@@ -24,6 +24,7 @@ interface FoodItem {
   portions?: string[];
   portionPrices?: number[];
   price?: number;
+  available?: boolean;
 }
 
 interface ComboItem {
@@ -193,15 +194,34 @@ export default function ComboSectionManager({
     onChange(newSections);
   };
 
-  const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
-    const newSections = [...sections];
-    const currentValue = newSections[sectionIndex].selectedItems[itemIndex].isAvailable ?? true;
-    newSections[sectionIndex].selectedItems[itemIndex] = {
-      ...newSections[sectionIndex].selectedItems[itemIndex],
-      isAvailable: !currentValue,
-    };
-    onChange(newSections);
+const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
+  const newSections = [...sections];
+
+  const currentValue =
+    newSections[sectionIndex].selectedItems[itemIndex].isAvailable ?? true;
+
+  const updatedAvailability = !currentValue;
+
+  // Update combo item availability
+  newSections[sectionIndex].selectedItems[itemIndex] = {
+    ...newSections[sectionIndex].selectedItems[itemIndex],
+    isAvailable: updatedAvailability,
   };
+
+  // ALSO update original food item availability
+  const itemId =
+    newSections[sectionIndex].selectedItems[itemIndex].item;
+
+  const originalFoodItem = allFoodItems.find(
+    (food) => food._id === itemId
+  );
+
+  if (originalFoodItem) {
+    originalFoodItem.available = updatedAvailability;
+  }
+
+  onChange(newSections);
+};
 
   const handleSectionRequiredToggle = (sectionIndex: number, isRequired: boolean) => {
     const newSections = [...sections];
