@@ -895,6 +895,25 @@ export async function PUT(request: NextRequest) {
         }
       }
       updateData.comboItems = comboItems;
+      // Sync combo item availability with original food items
+if (data.sections) {
+  for (const section of data.sections) {
+    for (const selectedItem of section.selectedItems) {
+
+      await db.updateOne(
+        'fooditems',
+        { _id: new ObjectId(selectedItem.item) },
+        {
+          $set: {
+            available: selectedItem.isAvailable ?? true,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+    }
+  }
+}
     } else {
       // Clear combo fields
       updateData.hasCombo = false;

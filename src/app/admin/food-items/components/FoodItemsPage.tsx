@@ -430,6 +430,9 @@ export default function FoodItemsPage() {
 
       const requestData = buildFoodItemSavePayload(data, imageUrl, publicId);
 
+
+      
+
       const isEdit = !!data._id;
       const url = '/api/admin/food-items';
       const method = isEdit ? 'PUT' : 'POST';

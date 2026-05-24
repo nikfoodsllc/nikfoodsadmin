@@ -27,10 +27,7 @@ export default function OrderTableRow({
   onToggleSelect,
   disableSelection = false,
 }: OrderTableRowProps) {
-  // Process delivery dates to sort and merge duplicates
   const processedDates = processDeliveryDates(order.items || []);
-
-  // Get instruction to driver from address landmark
   const instructionToDriver = order.address.landmark || '-';
 
   // Render a delivery date cell
@@ -43,19 +40,16 @@ export default function OrderTableRow({
       );
     }
 
-    // If multiple days share the same date, show them together
-    const dayLabel = dateEntry.originalDays.length > 1
-      ? `Days ${dateEntry.originalDays.join(', ')}`
-      : `Day ${dateEntry.originalDays[0]}`;
-
     return (
       <Box>
         <Typography sx={{ fontSize: '13px', color: '#111827', fontWeight: 500 }}>
           {dateEntry.date}
         </Typography>
-        <Typography sx={{ fontSize: '11px', color: '#9CA3AF' }}>
-          {dayLabel}
-        </Typography>
+        {dateEntry.clubbedOriginalDate && (
+          <Typography sx={{ fontSize: '11px', color: '#9CA3AF' }}>
+            (Original: {dateEntry.clubbedOriginalDate})
+          </Typography>
+        )}
       </Box>
     );
   };
