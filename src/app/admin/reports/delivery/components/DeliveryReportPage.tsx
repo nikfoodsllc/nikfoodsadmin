@@ -24,8 +24,9 @@ import {
 } from '@mui/material';
 import { IconRefresh, IconChevronDown, IconChevronUp, IconMapPin, IconPhone, IconPackage, IconDownload } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { OrderDayItem, AddressSnapshot } from '@/types/order';
+import { OrderDayItem, AddressSnapshot, OrderDay } from '@/types/order';
 import { formatPSTDate, formatPSTTime } from '@/utils/timezone';
+import { buildDeliveryDateColumns, getMaxUniqueDeliveryDays } from '@/utils/delivery';
 
 interface DeliveryOrder {
   orderId: string;
@@ -36,6 +37,7 @@ interface DeliveryOrder {
     phone: string;
   };
   address: AddressSnapshot;
+  allOrderDays?: OrderDay[];
   items: OrderDayItem[]; // Use full OrderDayItem type
   status: string;
   paymentStatus: string;
@@ -191,6 +193,9 @@ export default function DeliveryReportPage() {
     if (!reportData || !reportData.orders) return;
 
     const MAX_ITEMS = 10;
+    const maxDeliveryDays = getMaxUniqueDeliveryDays(
+      reportData.orders.map(({ allOrderDays }) => ({ allOrderDays }))
+    );
 
     // CSV Headers
     const headers = [
@@ -199,6 +204,13 @@ export default function DeliveryReportPage() {
       'Order Date',
       'Order Time',
       'Delivery Day',
+    ];
+
+    for (let i = 1; i <= maxDeliveryDays; i++) {
+      headers.push(`Delivery Date ${i}`);
+    }
+
+    headers.push(
       'Status',
       'Payment Status',
       'Payment Method',
@@ -215,7 +227,7 @@ export default function DeliveryReportPage() {
       'Gate Code',
       'Delivery Instructions',
       'Landmark',
-    ];
+    );
 
     // Add item columns for each position
     for (let i = 1; i <= MAX_ITEMS; i++) {
@@ -252,7 +264,8 @@ export default function DeliveryReportPage() {
       row.push(order.orderId);
       row.push(formatPSTDate(order.orderDate.toString()));
       row.push(formatPSTTime(order.orderDate));
-      row.push(order.deliveryDay || '');
+      row.push('');
+      row.push(...buildDeliveryDateColumns({ allOrderDays: order.allOrderDays }, maxDeliveryDays));
       row.push(order.status);
       row.push(order.paymentStatus);
       row.push(order.paymentMethod);

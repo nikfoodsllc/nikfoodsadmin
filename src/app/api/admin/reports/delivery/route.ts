@@ -90,6 +90,8 @@ export async function GET(request: NextRequest) {
           'items.deliveryDate': dateFilter,
         },
       },
+      // Preserve full OrderDay[] before unwinding for order-level delivery date columns
+      { $addFields: { allOrderDays: '$items' } },
       // Unwind the items array to process each OrderDay separately
       { $unwind: '$items' },
       // Filter OrderDays that match the date filter
@@ -113,6 +115,7 @@ export async function GET(request: NextRequest) {
           orderDate: '$createdAt',
           deliveryDate: '$items.deliveryDate',
           deliveryDay: '$items.day',
+          allOrderDays: 1,
           items: '$items.items',
           customerInfo: 1,
           address: 1,
@@ -166,7 +169,9 @@ export async function GET(request: NextRequest) {
         orderDate: order.orderDate,
         customerInfo: order.customerInfo,
         address: order.address,
+        allOrderDays: order.allOrderDays,
         items: order.items,
+        deliveryDay: order.deliveryDay,
         status: order.status,
         paymentStatus: order.paymentStatus,
         paymentMethod: order.paymentMethod,

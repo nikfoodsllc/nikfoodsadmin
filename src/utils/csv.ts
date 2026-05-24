@@ -1,6 +1,6 @@
 import { OrderDayItem, DeliveryOrderReport } from '@/types/order';
 import { formatPSTDate } from '@/utils/timezone';
-import { processDeliveryDates, ProcessedDeliveryDate } from '@/utils/delivery';
+import { buildDeliveryDateColumns, getMaxUniqueDeliveryDays } from '@/utils/delivery';
 
 /**
  * Escapes CSV values to handle commas, quotes, and newlines
@@ -15,14 +15,6 @@ function escapeCSVValue(value: string | number | undefined): string {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;
-}
-
-/**
- * Gets the delivery dates for an order, processed and sorted
- */
-function getProcessedDeliveryDates(order: any): ProcessedDeliveryDate[] {
-  if (!order.items || order.items.length === 0) return [];
-  return processDeliveryDates(order.items);
 }
 
 /**
@@ -54,22 +46,7 @@ function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
   const totalPaid = order.totalPaid.toFixed(2);
 
   // Build delivery date columns dynamically using processed dates
-  const processedDates = getProcessedDeliveryDates(order);
-  const deliveryDateColumns: string[] = [];
-  
-  for (let i = 0; i < maxDeliveryDays; i++) {
-    const dateEntry = processedDates[i];
-    if (dateEntry) {
-      // Format: "Mar 05, 2026 (Days 1, 2)" or "Mar 05, 2026 (Day 1)"
-      const dayLabel = dateEntry.originalDays.length > 1
-        ? `Days ${dateEntry.originalDays.join(', ')}`
-        : `Day ${dateEntry.originalDays[0]}`;
-      const cellValue = `${dateEntry.date} (${dayLabel})`;
-      deliveryDateColumns.push(escapeCSVValue(cellValue));
-    } else {
-      deliveryDateColumns.push('');
-    }
-  }
+  const deliveryDateColumns = buildDeliveryDateColumns(order, maxDeliveryDays).map(escapeCSVValue);
 
   // Combine all fields into CSV row
   return [
@@ -100,11 +77,7 @@ function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
  * @returns Complete CSV string with headers and data rows
  */
 export function generateOrdersListingCSV(orders: any[]): string {
-  // Calculate max unique delivery days across all orders
-  const maxDeliveryDays = orders.reduce((max, order) => {
-    const processedDates = getProcessedDeliveryDates(order);
-    return Math.max(max, processedDates.length);
-  }, 0);
+  const maxDeliveryDays = getMaxUniqueDeliveryDays(orders);
 
   // Build static headers
   const staticHeaders = [
