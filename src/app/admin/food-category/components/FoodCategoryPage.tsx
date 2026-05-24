@@ -358,15 +358,42 @@ export default function FoodCategoryPage() {
             </Box>
           )}
 
-          {/* Categories Grid */}
+          {/* Separate Main Categories and Sub Categories */}
+{(() => {
+  const mainCategories = filteredCategories.filter(
+    (cat) => !cat.parentCategoryId
+  );
+
+  const subCategories = filteredCategories.filter(
+    (cat) => cat.parentCategoryId
+  );
+
+  return (
+    <>
+      {/* Main Categories */}
+      {mainCategories.length > 0 && (
+        <>
+          <Typography
+            variant="h6"
+            sx={{
+              mb: 2,
+              mt: 2,
+              fontWeight: 700,
+              color: '#222',
+            }}
+          >
+            Categories
+          </Typography>
+
           <Box
             sx={{
               display: 'flex',
               flexWrap: 'wrap',
               gap: 3,
+              mb: 5,
             }}
           >
-            {filteredCategories.map((category) => (
+            {mainCategories.map((category) => (
               <CategoryCard
                 key={category._id?.toString()}
                 category={category}
@@ -377,6 +404,46 @@ export default function FoodCategoryPage() {
               />
             ))}
           </Box>
+        </>
+      )}
+
+      {/* Sub Categories */}
+      {subCategories.length > 0 && (
+        <>
+          <Typography
+            variant="h6"
+            sx={{
+              mb: 2,
+              fontWeight: 700,
+              color: '#222',
+            }}
+          >
+            Sub Categories
+          </Typography>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 3,
+            }}
+          >
+            {subCategories.map((category) => (
+              <CategoryCard
+                key={category._id?.toString()}
+                category={category}
+                onEdit={handleEditClick}
+                onDelete={handleDeleteClick}
+                onRefresh={fetchCategories}
+                onItemSequence={handleItemSequenceClick}
+              />
+            ))}
+          </Box>
+        </>
+      )}
+    </>
+  );
+})()}
         </Box>
       )}
 
