@@ -1,7 +1,7 @@
 'use client';
 
 import { Box, TableRow as MuiTableRow, TableCell, Typography, Chip, IconButton } from '@mui/material';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconTrash, IconCopy  } from '@tabler/icons-react';
 import Image from 'next/image';
 import TypeBadge from './TypeBadge';
 import { safeFormatCurrency } from '@/utils/currency';
@@ -48,9 +48,10 @@ interface TableRowProps {
   index: number;
   onEdit: (item: FoodItem) => void;
   onDelete: (item: FoodItem) => void;
+    onDuplicate: (item: FoodItem) => void;
 }
 
-export default function TableRow({ item, categories, index, onEdit, onDelete }: TableRowProps) {
+export default function TableRow({ item, categories, index, onEdit, onDelete, onDuplicate }: TableRowProps) {
   // Get category names from IDs
   const getCategoryNames = () => {
     return item.category
@@ -99,6 +100,18 @@ export default function TableRow({ item, categories, index, onEdit, onDelete }: 
           >
             <IconTrash size={18} />
           </IconButton>
+          <IconButton
+  size="small"
+  onClick={() => onDuplicate(item)}
+  sx={{
+    color: '#7C3AED',
+    '&:hover': {
+      backgroundColor: '#F3E8FF',
+    },
+  }}
+>
+  <IconCopy size={18} />
+</IconButton>
         </Box>
       </TableCell>
 

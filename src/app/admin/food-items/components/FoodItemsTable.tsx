@@ -34,6 +34,7 @@ interface FoodItem {
   // Portions
   portions?: string[];
   portionPrices?: number[];
+  
   // Combo
   sections?: Array<{
     title: string;
@@ -54,8 +55,12 @@ interface FoodItemsTableProps {
   items: FoodItem[];
   categories: Category[];
   loading: boolean;
+
   onEdit: (item: FoodItem) => void;
   onDelete: (item: FoodItem) => void;
+
+  // ADD THIS
+  onDuplicate: (item: FoodItem) => void;
 }
 
 export default function FoodItemsTable({
@@ -64,6 +69,7 @@ export default function FoodItemsTable({
   loading,
   onEdit,
   onDelete,
+  onDuplicate,
 }: FoodItemsTableProps) {
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
@@ -133,6 +139,7 @@ export default function FoodItemsTable({
                   index={index}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onDuplicate={onDuplicate}
                 />
               ))
             )}
