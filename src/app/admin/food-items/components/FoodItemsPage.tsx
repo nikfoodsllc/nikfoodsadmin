@@ -67,6 +67,8 @@ interface FoodItem {
   }>;
 }
 
+type EditableFoodItem = Omit<FoodItem, '_id'> & { _id?: string };
+
 interface AllFoodItem {
   _id: string;
   name: string;
@@ -198,7 +200,7 @@ export default function FoodItemsPage() {
 
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<EditableFoodItem | null>(null);
 
   const [itemToDelete, setItemToDelete] = useState<FoodItem | null>(null);
 
@@ -415,17 +417,12 @@ export default function FoodItemsPage() {
   // =========================
 
   const handleDuplicateClick = (item: FoodItem) => {
-    const duplicatedItem = {
-      ...item,
-
-      _id: undefined,
-
+    const { _id, ...rest } = item;
+    setSelectedItem({
+      ...rest,
       name: `${item.name} (Copy)`,
-
       available: false,
-    };
-
-    setSelectedItem(duplicatedItem as FoodItem);
+    });
 
     if (item.itemType === 'simple') {
       setSimpleDialogOpen(true);
