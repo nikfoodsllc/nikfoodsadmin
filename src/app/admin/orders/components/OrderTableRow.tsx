@@ -45,9 +45,9 @@ export default function OrderTableRow({
         <Typography sx={{ fontSize: '13px', color: '#111827', fontWeight: 500 }}>
           {dateEntry.date}
         </Typography>
-        {dateEntry.clubbedOriginalDate && (
+        {dateEntry.clubbedOriginalDates.length > 0 && (
           <Typography sx={{ fontSize: '11px', color: '#9CA3AF' }}>
-            (Original: {dateEntry.clubbedOriginalDate})
+            (Original: {dateEntry.clubbedOriginalDates.join('; ')})
           </Typography>
         )}
       </Box>

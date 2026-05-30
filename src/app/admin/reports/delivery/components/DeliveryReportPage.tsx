@@ -26,7 +26,8 @@ import { IconRefresh, IconChevronDown, IconChevronUp, IconMapPin, IconPhone, Ico
 import { useAuth } from '@/contexts/AuthContext';
 import { OrderDayItem, AddressSnapshot, OrderDay } from '@/types/order';
 import { formatPSTDate, formatPSTTime } from '@/utils/timezone';
-import { buildDeliveryDateColumns, getMaxUniqueDeliveryDays } from '@/utils/delivery';
+import { buildDeliveryDateColumnsBySpec, collectDeliveryDateColumns } from '@/utils/delivery';
+import { escapeCSVValue } from '@/utils/csv';
 
 interface DeliveryOrder {
   orderId: string;
@@ -193,9 +194,8 @@ export default function DeliveryReportPage() {
     if (!reportData || !reportData.orders) return;
 
     const MAX_ITEMS = 10;
-    const maxDeliveryDays = getMaxUniqueDeliveryDays(
-      reportData.orders.map(({ allOrderDays }) => ({ allOrderDays }))
-    );
+    const orderDayRecords = reportData.orders.map(({ allOrderDays }) => ({ allOrderDays }));
+    const deliveryDateColumnSpecs = collectDeliveryDateColumns(orderDayRecords);
 
     // CSV Headers
     const headers = [
@@ -206,8 +206,8 @@ export default function DeliveryReportPage() {
       'Delivery Day',
     ];
 
-    for (let i = 1; i <= maxDeliveryDays; i++) {
-      headers.push(`Delivery Date ${i}`);
+    for (const column of deliveryDateColumnSpecs) {
+      headers.push(column.header);
     }
 
     headers.push(
@@ -265,7 +265,7 @@ export default function DeliveryReportPage() {
       row.push(formatPSTDate(order.orderDate.toString()));
       row.push(formatPSTTime(order.orderDate));
       row.push('');
-      row.push(...buildDeliveryDateColumns({ allOrderDays: order.allOrderDays }, maxDeliveryDays));
+      row.push(...buildDeliveryDateColumnsBySpec({ allOrderDays: order.allOrderDays }, deliveryDateColumnSpecs));
       row.push(order.status);
       row.push(order.paymentStatus);
       row.push(order.paymentMethod);
@@ -350,7 +350,7 @@ export default function DeliveryReportPage() {
 
     // Combine headers and rows
     const csvContent = [
-      headers.join(','),
+      headers.map(escapeCSVValue).join(','),
       ...csvRows
     ].join('\n');
 
