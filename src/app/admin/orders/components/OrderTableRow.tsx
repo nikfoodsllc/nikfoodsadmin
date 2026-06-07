@@ -275,7 +275,8 @@ export default function OrderTableRow({
           }}
           title={instructionToDriver}
         >
-          {instructionToDriver}
+        <TableCell>{order.address?.floor || '-'}</TableCell>
+          {/* {instructionToDriver} */}
         </Typography>
       </TableCell>
 
