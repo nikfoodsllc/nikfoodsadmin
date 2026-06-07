@@ -27,6 +27,8 @@ import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
 import ComboSectionManager from './ComboSectionManager';
 import PriceConfirmationDialog from './PriceConfirmationDialog';
+import SubCategorySelect from './SubCategorySelect';
+import { resolveSubCategoryId, SubCategoryOption } from '../utils/subCategoryUtils';
 import {
   findZeroPricedComboItems,
   updateComboItemPrices,
@@ -48,6 +50,7 @@ interface ComboFoodItem {
   description?: string;
   short_description?: string;
   price: number;
+  category?: string[];
   veg: boolean;
   available: boolean;
   url?: string;
@@ -78,6 +81,7 @@ interface ComboFoodItem {
 interface ComboFoodItemDialogProps {
   open: boolean;
   item: ComboFoodItem | null;
+  subCategories: SubCategoryOption[];
   allFoodItems: AllFoodItem[];
   loading: boolean;
   onClose: () => void;
@@ -112,16 +116,20 @@ const spiceLevels = ['Mild (Kid Friendly)', 'Normal', 'Medium Spice', 'Spicy'];
 export default function ComboFoodItemDialog({
   open,
   item,
+  subCategories,
   allFoodItems,
   loading,
   onClose,
   onSave,
 }: ComboFoodItemDialogProps) {
+  const subCategoryIds = new Set(subCategories.map((c) => c._id));
+
   const getInitialFormData = useCallback((): ComboFoodItem => {
     return item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
   }, [item]);
 
   const [formData, setFormData] = useState<ComboFoodItem>(getInitialFormData);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -142,6 +150,7 @@ export default function ComboFoodItemDialog({
         newFormData = { ...newFormData, sections: sortedSections };
       }
       setFormData(newFormData);
+      setSelectedSubCategoryId(resolveSubCategoryId(item?.category, subCategoryIds));
       setImageFile(null);
       setErrors({});
       // Reset price confirmation state
@@ -149,7 +158,7 @@ export default function ComboFoodItemDialog({
       setZeroPricedItems([]);
       setPendingFormData(null);
     }
-  }, [open, item]);
+  }, [open, item, subCategories]);
 
   const handleChange = (field: keyof ComboFoodItem, value: string | number | boolean | string[] | unknown) => {
     setFormData((prev) => ({
@@ -212,6 +221,10 @@ export default function ComboFoodItemDialog({
       newErrors.image = 'Image is required';
     }
 
+    if (!selectedSubCategoryId) {
+      newErrors.subCategory = 'Sub category is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -226,6 +239,7 @@ export default function ComboFoodItemDialog({
           sequence: index,
         })),
         isDraft: saveAsDraft,
+        category: selectedSubCategoryId ? [selectedSubCategoryId] : [],
       };
 
       // For draft mode, skip price confirmation and save directly
@@ -366,6 +380,23 @@ export default function ComboFoodItemDialog({
                 color: '#4F8CFF',
               },
             }}
+          />
+
+          <SubCategorySelect
+            value={selectedSubCategoryId}
+            options={subCategories}
+            onChange={(value) => {
+              setSelectedSubCategoryId(value);
+              if (errors.subCategory) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.subCategory;
+                  return next;
+                });
+              }
+            }}
+            error={errors.subCategory}
+            disabled={loading}
           />
 
           {/* Description */}

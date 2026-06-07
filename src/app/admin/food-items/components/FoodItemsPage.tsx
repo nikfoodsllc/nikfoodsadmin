@@ -28,10 +28,16 @@ import DeleteConfirmDialog from './DeleteConfirmDialog';
 import TableFilters from './TableFilters';
 import TablePagination from './TablePagination';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import {
+  buildSubCategoryOptions,
+  CategoryLookup,
+  normalizeCategories,
+  RawCategory,
+  SubCategoryOption,
+} from '../utils/subCategoryUtils';
 
-interface Category {
-  _id: string;
-  name: string;
+interface Category extends CategoryLookup {
+  label?: string;
 }
 
 interface FoodItem {
@@ -187,6 +193,7 @@ export default function FoodItemsPage() {
   const [items, setItems] = useState<FoodItem[]>([]);
   const [allFoodItems, setAllFoodItems] = useState<AllFoodItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCategoryOption[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -208,8 +215,6 @@ export default function FoodItemsPage() {
     useState<null | HTMLElement>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-
-  const [selectedCategory, setSelectedCategory] = useState('');
 
   const [vegOnly, setVegOnly] = useState('all');
 
@@ -304,7 +309,12 @@ export default function FoodItemsPage() {
 
       const data = await response.json();
 
-      setCategories(data.data?.categories || []);
+      const raw: RawCategory[] = data.data?.items || [];
+      const allCategories = normalizeCategories(raw);
+      const subs = buildSubCategoryOptions(raw);
+
+      setCategories(allCategories);
+      setSubCategories(subs);
     } catch (error) {
       console.error(error);
     }
@@ -318,10 +328,6 @@ export default function FoodItemsPage() {
 
       if (searchQuery) {
         params.append('search', searchQuery);
-      }
-
-      if (selectedCategory) {
-        params.append('category', selectedCategory);
       }
 
       if (vegOnly === 'true' || vegOnly === 'false') {
@@ -354,7 +360,6 @@ export default function FoodItemsPage() {
   }, [
     token,
     searchQuery,
-    selectedCategory,
     vegOnly,
     currentPage,
   ]);
@@ -622,16 +627,10 @@ export default function FoodItemsPage() {
       {/* FILTERS */}
 
       <TableFilters
-        categories={categories}
         searchValue={searchQuery}
-        selectedCategory={selectedCategory}
         vegOnly={vegOnly}
         onSearchChange={(value) => {
           setSearchQuery(value);
-          setCurrentPage(1);
-        }}
-        onCategoryChange={(value) => {
-          setSelectedCategory(value);
           setCurrentPage(1);
         }}
         onVegChange={(value) => {
@@ -644,7 +643,6 @@ export default function FoodItemsPage() {
 
       <FoodItemsTable
         items={items}
-        categories={categories}
         loading={loading}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
@@ -676,6 +674,7 @@ export default function FoodItemsPage() {
       <SimpleFoodItemDialog
         open={simpleDialogOpen}
         item={selectedItem as SimpleFoodItem | null}
+        subCategories={subCategories}
         loading={dialogLoading}
         onClose={() => setSimpleDialogOpen(false)}
         onSave={handleSave}
@@ -684,6 +683,7 @@ export default function FoodItemsPage() {
       <PortionsFoodItemDialog
         open={portionsDialogOpen}
         item={selectedItem as PortionsFoodItem | null}
+        subCategories={subCategories}
         loading={dialogLoading}
         onClose={() => setPortionsDialogOpen(false)}
         onSave={handleSave}
@@ -692,6 +692,7 @@ export default function FoodItemsPage() {
       <ComboFoodItemDialog
         open={comboDialogOpen}
         item={selectedItem as ComboFoodItem | null}
+        subCategories={subCategories}
         allFoodItems={allFoodItems}
         loading={dialogLoading}
         onClose={() => setComboDialogOpen(false)}

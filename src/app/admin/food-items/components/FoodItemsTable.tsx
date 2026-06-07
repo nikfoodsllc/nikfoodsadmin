@@ -46,14 +46,8 @@ interface FoodItem {
   }>;
 }
 
-interface Category {
-  _id: string;
-  name: string;
-}
-
 interface FoodItemsTableProps {
   items: FoodItem[];
-  categories: Category[];
   loading: boolean;
 
   onEdit: (item: FoodItem) => void;
@@ -65,7 +59,6 @@ interface FoodItemsTableProps {
 
 export default function FoodItemsTable({
   items,
-  categories,
   loading,
   onEdit,
   onDelete,
@@ -109,9 +102,6 @@ export default function FoodItemsTable({
                 Price
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Categories
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Veg
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
@@ -124,7 +114,7 @@ export default function FoodItemsTable({
               <FoodItemSkeleton />
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={8} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No food items found
                   </Typography>
@@ -135,7 +125,6 @@ export default function FoodItemsTable({
                 <TableRowComponent
                   key={item._id}
                   item={item}
-                  categories={categories}
                   index={index}
                   onEdit={onEdit}
                   onDelete={onDelete}

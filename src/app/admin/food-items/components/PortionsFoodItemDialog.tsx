@@ -26,12 +26,15 @@ import {
 import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
 import PortionManager from './PortionManager';
+import SubCategorySelect from './SubCategorySelect';
+import { resolveSubCategoryId, SubCategoryOption } from '../utils/subCategoryUtils';
 
 interface PortionsFoodItem {
   _id?: string;
   name: string;
   description?: string;
   short_description?: string;
+  category?: string[];
   veg: boolean;
   available: boolean;
   url?: string;
@@ -50,6 +53,7 @@ interface PortionsFoodItem {
 interface PortionsFoodItemDialogProps {
   open: boolean;
   item: PortionsFoodItem | null;
+  subCategories: SubCategoryOption[];
   loading: boolean;
   onClose: () => void;
   onSave: (data: PortionsFoodItem, imageFile: File | null) => void;
@@ -85,15 +89,19 @@ function itemToPortionsFormData(item: PortionsFoodItem): PortionsFoodItem {
 export default function PortionsFoodItemDialog({
   open,
   item,
+  subCategories,
   loading,
   onClose,
   onSave,
 }: PortionsFoodItemDialogProps) {
+  const subCategoryIds = new Set(subCategories.map((c) => c._id));
+
   const getInitialFormData = useCallback((): PortionsFoodItem => {
     return item ? itemToPortionsFormData(item) : getDefaultFormData();
   }, [item]);
 
   const [formData, setFormData] = useState<PortionsFoodItem>(getInitialFormData);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -102,10 +110,11 @@ export default function PortionsFoodItemDialog({
     if (open) {
       const newFormData = item ? itemToPortionsFormData(item) : getDefaultFormData();
       setFormData(newFormData);
+      setSelectedSubCategoryId(resolveSubCategoryId(item?.category, subCategoryIds));
       setImageFile(null);
       setErrors({});
     }
-  }, [open, item]);
+  }, [open, item, subCategories]);
 
   const handleChange = (field: keyof PortionsFoodItem, value: string | number | boolean | string[]) => {
     setFormData((prev) => ({
@@ -185,12 +194,20 @@ export default function PortionsFoodItemDialog({
       newErrors.image = 'Image is required';
     }
 
+    if (!selectedSubCategoryId) {
+      newErrors.subCategory = 'Sub category is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (saveAsDraft: boolean = false) => {
-    const submitData = { ...formData, isDraft: saveAsDraft };
+    const submitData = {
+      ...formData,
+      isDraft: saveAsDraft,
+      category: selectedSubCategoryId ? [selectedSubCategoryId] : [],
+    };
     if (validate()) {
       onSave(submitData, imageFile);
     }
@@ -292,6 +309,23 @@ export default function PortionsFoodItemDialog({
                 color: '#4F8CFF',
               },
             }}
+          />
+
+          <SubCategorySelect
+            value={selectedSubCategoryId}
+            options={subCategories}
+            onChange={(value) => {
+              setSelectedSubCategoryId(value);
+              if (errors.subCategory) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.subCategory;
+                  return next;
+                });
+              }
+            }}
+            error={errors.subCategory}
+            disabled={loading}
           />
 
           {/* Description */}
