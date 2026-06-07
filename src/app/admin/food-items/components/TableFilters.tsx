@@ -6,6 +6,7 @@ import { IconSearch } from '@tabler/icons-react';
 interface Category {
   _id: string;
   name: string;
+  label?: string;
 }
 
 interface TableFiltersProps {
@@ -60,17 +61,17 @@ export default function TableFilters({
 
       {/* Category Filter */}
       <FormControl size="small" sx={{ minWidth: 200 }}>
-        <InputLabel>Category</InputLabel>
+        <InputLabel>Sub Category</InputLabel>
         <Select
           value={selectedCategory}
-          label="Category"
+          label="Sub Category"
           onChange={(e) => onCategoryChange(e.target.value)}
           sx={{ backgroundColor: '#fff' }}
         >
-          <MenuItem value="all">All Categories</MenuItem>
+          <MenuItem value="all">All Sub Categories</MenuItem>
           {categories.map((category) => (
             <MenuItem key={category._id?.toString()} value={category._id?.toString()}>
-              {category.name}
+              {category.label ?? category.name}
             </MenuItem>
           ))}
         </Select>

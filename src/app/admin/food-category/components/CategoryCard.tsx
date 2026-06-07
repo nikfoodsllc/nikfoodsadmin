@@ -34,10 +34,18 @@ interface CategoryCardProps {
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400';
 
+function categoryHasParent(category: FoodCategory): boolean {
+  const p = category.parentCategoryId;
+  if (p === undefined || p === null) return false;
+  if (typeof p === 'string') return p.trim().length > 0;
+  return true;
+}
+
 export default function CategoryCard({ category, onEdit, onDelete, onRefresh, onItemSequence }: CategoryCardProps) {
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(anchorEl);
+  const isSubCategory = categoryHasParent(category);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -304,7 +312,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
         )}
 
         {/* Item Count Badge - Top Right (below sequence badge) */}
-        {getItemCount() > 0 && (
+        {!isSubCategory && getItemCount() > 0 && (
           <Chip
             label={`${getItemCount()} ${getItemCount() === 1 ? 'item' : 'items'}`}
             size="small"
@@ -380,18 +388,22 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
           },
         }}
       >
-        <MenuItem onClick={handleManageItems} sx={{ gap: 1.5 }}>
-          <ListItemIcon>
-            <IconListDetails size={18} />
-          </ListItemIcon>
-          Manage Category Items
-        </MenuItem>
-        <MenuItem onClick={handleItemSequence} sx={{ gap: 1.5 }}>
-          <ListItemIcon>
-            <IconSortDescending size={18} />
-          </ListItemIcon>
-          Item Sequence
-        </MenuItem>
+        {!isSubCategory && (
+          <MenuItem onClick={handleManageItems} sx={{ gap: 1.5 }}>
+            <ListItemIcon>
+              <IconListDetails size={18} />
+            </ListItemIcon>
+            Manage Category Items
+          </MenuItem>
+        )}
+        {!isSubCategory && (
+          <MenuItem onClick={handleItemSequence} sx={{ gap: 1.5 }}>
+            <ListItemIcon>
+              <IconSortDescending size={18} />
+            </ListItemIcon>
+            Item Sequence
+          </MenuItem>
+        )}
         <MenuItem onClick={handleEdit} sx={{ gap: 1.5 }}>
           <ListItemIcon>
             <IconEdit size={18} />

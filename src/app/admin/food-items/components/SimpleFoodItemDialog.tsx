@@ -29,6 +29,8 @@ import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
 import { FoodModifier } from '@/types/modifier';
 import { useAuth } from '@/contexts/AuthContext';
+import SubCategorySelect from './SubCategorySelect';
+import { resolveSubCategoryId, SubCategoryOption } from '../utils/subCategoryUtils';
 
 interface SimpleFoodItem {
   _id?: string;
@@ -36,6 +38,7 @@ interface SimpleFoodItem {
   description?: string;
   short_description?: string;
   price: number;
+  category?: string[];
   veg: boolean;
   available: boolean;
   url?: string;
@@ -51,6 +54,7 @@ interface SimpleFoodItem {
 interface SimpleFoodItemDialogProps {
   open: boolean;
   item: SimpleFoodItem | null;
+  subCategories: SubCategoryOption[];
   loading: boolean;
   onClose: () => void;
   onSave: (data: SimpleFoodItem, imageFile: File | null) => void;
@@ -91,17 +95,21 @@ function safeNonNegativePrice(value: unknown): number {
 export default function SimpleFoodItemDialog({
   open,
   item,
+  subCategories,
   loading,
   onClose,
   onSave,
 }: SimpleFoodItemDialogProps) {
   const { token } = useAuth();
 
+  const subCategoryIds = new Set(subCategories.map((c) => c._id));
+
   const getInitialFormData = useCallback((): SimpleFoodItem => {
     return item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
   }, [item]);
 
   const [formData, setFormData] = useState<SimpleFoodItem>(getInitialFormData);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [modifiers, setModifiers] = useState<FoodModifier[]>([]);
@@ -149,11 +157,12 @@ export default function SimpleFoodItemDialog({
     if (open) {
       const newFormData = item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
       setFormData(newFormData);
+      setSelectedSubCategoryId(resolveSubCategoryId(item?.category, subCategoryIds));
       setImageFile(null);
       setErrors({});
       setSelectedModifier(null);
     }
-  }, [open, item]);
+  }, [open, item, subCategories]);
 
   const handleChange = (field: keyof SimpleFoodItem, value: string | number | boolean | string[]) => {
     setFormData((prev) => ({
@@ -233,12 +242,20 @@ export default function SimpleFoodItemDialog({
       newErrors.image = 'Image is required';
     }
 
+    if (!selectedSubCategoryId) {
+      newErrors.subCategory = 'Sub category is required';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (saveAsDraft: boolean = false) => {
-    const submitData = { ...formData, isDraft: saveAsDraft };
+    const submitData = {
+      ...formData,
+      isDraft: saveAsDraft,
+      category: selectedSubCategoryId ? [selectedSubCategoryId] : [],
+    };
     if (validate()) {
       onSave(submitData, imageFile);
     }
@@ -328,6 +345,23 @@ export default function SimpleFoodItemDialog({
                 color: '#4F8CFF',
               },
             }}
+          />
+
+          <SubCategorySelect
+            value={selectedSubCategoryId}
+            options={subCategories}
+            onChange={(value) => {
+              setSelectedSubCategoryId(value);
+              if (errors.subCategory) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.subCategory;
+                  return next;
+                });
+              }
+            }}
+            error={errors.subCategory}
+            disabled={loading}
           />
 
           {/* Description */}
