@@ -3,29 +3,17 @@
 import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
 import { IconSearch } from '@tabler/icons-react';
 
-interface Category {
-  _id: string;
-  name: string;
-  label?: string;
-}
-
 interface TableFiltersProps {
   searchValue: string;
-  selectedCategory: string;
   vegOnly: string;
-  categories: Category[];
   onSearchChange: (value: string) => void;
-  onCategoryChange: (value: string) => void;
   onVegChange: (value: string) => void;
 }
 
 export default function TableFilters({
   searchValue,
-  selectedCategory,
   vegOnly,
-  categories,
   onSearchChange,
-  onCategoryChange,
   onVegChange,
 }: TableFiltersProps) {
   return (
@@ -58,24 +46,6 @@ export default function TableFilters({
           ),
         }}
       />
-
-      {/* Category Filter */}
-      <FormControl size="small" sx={{ minWidth: 200 }}>
-        <InputLabel>Sub Category</InputLabel>
-        <Select
-          value={selectedCategory}
-          label="Sub Category"
-          onChange={(e) => onCategoryChange(e.target.value)}
-          sx={{ backgroundColor: '#fff' }}
-        >
-          <MenuItem value="all">All Sub Categories</MenuItem>
-          {categories.map((category) => (
-            <MenuItem key={category._id?.toString()} value={category._id?.toString()}>
-              {category.label ?? category.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
 
       {/* Veg Filter */}
       <FormControl size="small" sx={{ minWidth: 150 }}>

@@ -72,3 +72,25 @@ export function resolveSubCategoryId(
   const match = categoryIds.find((id) => subCategoryIds.has(id));
   return match ?? '';
 }
+
+/** Resolve unique sub-category display names from a food item's category ID list. */
+export function resolveSubCategoryNames(
+  categoryIds: string[] | undefined,
+  subCategories: SubCategoryOption[]
+): string[] {
+  if (!categoryIds?.length) return [];
+
+  const subNameById = new Map(subCategories.map((sub) => [sub._id, sub.name]));
+  const seen = new Set<string>();
+  const names: string[] = [];
+
+  for (const id of categoryIds) {
+    const name = subNameById.get(id);
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  }
+
+  return names;
+}

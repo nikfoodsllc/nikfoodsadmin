@@ -216,8 +216,6 @@ export default function FoodItemsPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [selectedCategory, setSelectedCategory] = useState('all');
-
   const [vegOnly, setVegOnly] = useState('all');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -332,10 +330,6 @@ export default function FoodItemsPage() {
         params.append('search', searchQuery);
       }
 
-      if (selectedCategory && selectedCategory !== 'all') {
-        params.append('category', selectedCategory);
-      }
-
       if (vegOnly === 'true' || vegOnly === 'false') {
         params.append('vegOnly', vegOnly);
       }
@@ -366,7 +360,6 @@ export default function FoodItemsPage() {
   }, [
     token,
     searchQuery,
-    selectedCategory,
     vegOnly,
     currentPage,
   ]);
@@ -634,20 +627,10 @@ export default function FoodItemsPage() {
       {/* FILTERS */}
 
       <TableFilters
-        categories={subCategories.map((sub) => ({
-          _id: sub._id,
-          name: sub.name,
-          label: sub.label,
-        }))}
         searchValue={searchQuery}
-        selectedCategory={selectedCategory}
         vegOnly={vegOnly}
         onSearchChange={(value) => {
           setSearchQuery(value);
-          setCurrentPage(1);
-        }}
-        onCategoryChange={(value) => {
-          setSelectedCategory(value);
           setCurrentPage(1);
         }}
         onVegChange={(value) => {
@@ -660,12 +643,6 @@ export default function FoodItemsPage() {
 
       <FoodItemsTable
         items={items}
-        categories={[
-          ...categories,
-          ...subCategories.map((sub) => ({ _id: sub._id, name: sub.label })),
-        ].filter(
-          (cat, index, arr) => arr.findIndex((c) => c._id === cat._id) === index
-        )}
         loading={loading}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
