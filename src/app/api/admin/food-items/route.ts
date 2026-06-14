@@ -632,16 +632,40 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
+    // Check duplicate food item
+    const escapedName = data.name
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const existingFoodItem = await db.readOne<FoodItem>('fooditems', {
+      name: {
+        $regex: new RegExp(`^${escapedName}$`, 'i'),
+      },
+    });
+
+    console.log('Checking duplicate create:', data.name);
+    console.log('Duplicate create result:', existingFoodItem);
+
+    if (existingFoodItem.success && existingFoodItem.data) {
+      return NextResponse.json(
+        {
+          error: 'Food item already exists',
+        },
+        { status: 400 }
+      );
+    }
+
     // Set default short description if not provided
     const foodItemData: FoodItem = {
       name: data.name.trim(),
       description: data.description?.trim() || '',
       short_description:
-        data.short_description?.trim() || 'A perfect balance of taste, aroma, and warmth.',
-      category: [], // Will be populated from CategoryFoodMapping
+        data.short_description?.trim() ||
+        'A perfect balance of taste, aroma, and warmth.',
+      category: [],
       veg: data.veg,
       available: data.available,
-      isDraft: data.isDraft ?? false, // Default to false if not provided
+      isDraft: data.isDraft ?? false,
       url: data.url || '',
       public_id: data.public_id || '',
       itemType: data.itemType,
@@ -652,6 +676,8 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+
+
 
     // Add type-specific fields
     if (data.itemType === 'simple' || data.itemType === 'combo') {
@@ -825,25 +851,51 @@ export async function PUT(request: NextRequest) {
     const existingItem = existingResult.data;
     const oldPublicId = existingItem.public_id;
 
-    const data = validationResult.data;
+   const data = validationResult.data;
 
-    // Prepare update data
-    const updateData: Partial<FoodItem> = {
-      name: data.name.trim(),
-      description: data.description?.trim() || '',
-      short_description: data.short_description?.trim() || 'A perfect balance of taste, aroma, and warmth.',
-      veg: data.veg,
-      available: data.available,
-      isDraft: data.isDraft ?? false, // Default to false if not provided
-      url: data.url || '',
-      public_id: data.public_id || '',
-      itemType: data.itemType,
-      isEcoFriendlyContainer: data.isEcoFriendlyContainer,
-      ecoContainerCharge: data.ecoContainerCharge,
-      hasSpiceLevel: data.hasSpiceLevel,
-      spiceLevel: data.spiceLevel || [],
-      updatedAt: new Date(),
-    };
+// Check duplicate food item except current item
+const escapedName = data.name
+  .trim()
+  .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const duplicateFoodItem = await db.readOne<FoodItem>('fooditems', {
+  name: {
+    $regex: new RegExp(`^${escapedName}$`, 'i'),
+  },
+  _id: { $ne: new ObjectId(_id) },
+});
+
+console.log('Checking duplicate update:', data.name);
+console.log('Duplicate update result:', duplicateFoodItem);
+
+if (duplicateFoodItem.success && duplicateFoodItem.data) {
+  return NextResponse.json(
+    {
+      error: 'Food item already exists',
+    },
+    { status: 400 }
+  );
+}
+
+// Prepare update data
+const updateData: Partial<FoodItem> = {
+  name: data.name.trim(),
+  description: data.description?.trim() || '',
+  short_description:
+    data.short_description?.trim() ||
+    'A perfect balance of taste, aroma, and warmth.',
+  veg: data.veg,
+  available: data.available,
+  isDraft: data.isDraft ?? false,
+  url: data.url || '',
+  public_id: data.public_id || '',
+  itemType: data.itemType,
+  isEcoFriendlyContainer: data.isEcoFriendlyContainer,
+  ecoContainerCharge: data.ecoContainerCharge,
+  hasSpiceLevel: data.hasSpiceLevel,
+  spiceLevel: data.spiceLevel || [],
+  updatedAt: new Date(),
+};
 
     // Add type-specific fields
     if (data.itemType === 'simple' || data.itemType === 'combo') {
@@ -895,6 +947,25 @@ export async function PUT(request: NextRequest) {
         }
       }
       updateData.comboItems = comboItems;
+      // Sync combo item availability with original food items
+      if (data.sections) {
+        for (const section of data.sections) {
+          for (const selectedItem of section.selectedItems) {
+
+            await db.updateOne(
+              'fooditems',
+              { _id: new ObjectId(selectedItem.item) },
+              {
+                $set: {
+                  available: selectedItem.isAvailable ?? true,
+                  updatedAt: new Date(),
+                },
+              }
+            );
+
+          }
+        }
+      }
     } else {
       // Clear combo fields
       updateData.hasCombo = false;

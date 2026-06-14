@@ -1,7 +1,7 @@
 'use client';
 
-import { Box, TableRow as MuiTableRow, TableCell, Typography, Chip, IconButton } from '@mui/material';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { Box, TableRow as MuiTableRow, TableCell, Typography, IconButton } from '@mui/material';
+import { IconEdit, IconTrash, IconCopy  } from '@tabler/icons-react';
 import Image from 'next/image';
 import TypeBadge from './TypeBadge';
 import { safeFormatCurrency } from '@/utils/currency';
@@ -37,32 +37,15 @@ interface FoodItem {
   }>;
 }
 
-interface Category {
-  _id: string;
-  name: string;
-}
-
 interface TableRowProps {
   item: FoodItem;
-  categories: Category[];
   index: number;
   onEdit: (item: FoodItem) => void;
   onDelete: (item: FoodItem) => void;
+    onDuplicate: (item: FoodItem) => void;
 }
 
-export default function TableRow({ item, categories, index, onEdit, onDelete }: TableRowProps) {
-  // Get category names from IDs
-  const getCategoryNames = () => {
-    return item.category
-      .map((catId) => {
-        const cat = categories.find((c) => c._id === catId);
-        return cat?.name || '';
-      })
-      .filter((name) => name);
-  };
-
-  const categoryNames = getCategoryNames();
-
+export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }: TableRowProps) {
   return (
     <MuiTableRow
       sx={{
@@ -99,6 +82,18 @@ export default function TableRow({ item, categories, index, onEdit, onDelete }: 
           >
             <IconTrash size={18} />
           </IconButton>
+          <IconButton
+  size="small"
+  onClick={() => onDuplicate(item)}
+  sx={{
+    color: '#7C3AED',
+    '&:hover': {
+      backgroundColor: '#F3E8FF',
+    },
+  }}
+>
+  <IconCopy size={18} />
+</IconButton>
         </Box>
       </TableCell>
 
@@ -215,35 +210,6 @@ export default function TableRow({ item, categories, index, onEdit, onDelete }: 
             {safeFormatCurrency(item.price)}
           </Typography>
         )}
-      </TableCell>
-
-      {/* Categories */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle', maxWidth: 200 }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {categoryNames.length > 0 ? (
-            categoryNames.map((name, index) => (
-              <Chip
-                key={index}
-                label={name}
-                size="small"
-                sx={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  height: 22,
-                  backgroundColor: '#E6F0FF',
-                  color: '#4F8CFF',
-                  '& .MuiChip-label': {
-                    paddingX: 1,
-                  },
-                }}
-              />
-            ))
-          ) : (
-            <Typography variant="caption" color="text.secondary">
-              No categories
-            </Typography>
-          )}
-        </Box>
       </TableCell>
 
       {/* Veg Indicator */}

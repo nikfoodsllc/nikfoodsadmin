@@ -1,12 +1,12 @@
 import { OrderDayItem, DeliveryOrderReport } from '@/types/order';
 import { formatPSTDate } from '@/utils/timezone';
-import { processDeliveryDates, ProcessedDeliveryDate } from '@/utils/delivery';
+import { buildDeliveryDateColumnsBySpec, collectDeliveryDateColumns } from '@/utils/delivery';
 
 /**
  * Escapes CSV values to handle commas, quotes, and newlines
  * Follows RFC 4180 CSV standard
  */
-function escapeCSVValue(value: string | number | undefined): string {
+export function escapeCSVValue(value: string | number | undefined): string {
   if (value === undefined || value === null) return '';
   const stringValue = String(value);
 
@@ -18,17 +18,12 @@ function escapeCSVValue(value: string | number | undefined): string {
 }
 
 /**
- * Gets the delivery dates for an order, processed and sorted
- */
-function getProcessedDeliveryDates(order: any): ProcessedDeliveryDate[] {
-  if (!order.items || order.items.length === 0) return [];
-  return processDeliveryDates(order.items);
-}
-
-/**
  * Converts an Order to a CSV row string for orders listing
  */
-function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
+function orderToListingCSVRow(
+  order: any,
+  deliveryDateColumnSpecs: ReturnType<typeof collectDeliveryDateColumns>
+): string {
   // Format address fields
   const street = escapeCSVValue(order.address.street);
   const apartment = escapeCSVValue(order.address.apartment || order.address.floor || '');
@@ -54,22 +49,9 @@ function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
   const totalPaid = order.totalPaid.toFixed(2);
 
   // Build delivery date columns dynamically using processed dates
-  const processedDates = getProcessedDeliveryDates(order);
-  const deliveryDateColumns: string[] = [];
-  
-  for (let i = 0; i < maxDeliveryDays; i++) {
-    const dateEntry = processedDates[i];
-    if (dateEntry) {
-      // Format: "Mar 05, 2026 (Days 1, 2)" or "Mar 05, 2026 (Day 1)"
-      const dayLabel = dateEntry.originalDays.length > 1
-        ? `Days ${dateEntry.originalDays.join(', ')}`
-        : `Day ${dateEntry.originalDays[0]}`;
-      const cellValue = `${dateEntry.date} (${dayLabel})`;
-      deliveryDateColumns.push(escapeCSVValue(cellValue));
-    } else {
-      deliveryDateColumns.push('');
-    }
-  }
+  const deliveryDateColumns = buildDeliveryDateColumnsBySpec(order, deliveryDateColumnSpecs).map(
+    escapeCSVValue
+  );
 
   // Combine all fields into CSV row
   return [
@@ -87,7 +69,8 @@ function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
     customerPhone,
     street,
     apartment,
-    '', // Gate Code - not available in current data structure
+    escapeCSVValue(order.address.entrance || ''),
+    escapeCSVValue(order.address.floor || ''),
     landmark,
     ...deliveryDateColumns,
   ].join(',');
@@ -99,11 +82,7 @@ function orderToListingCSVRow(order: any, maxDeliveryDays: number): string {
  * @returns Complete CSV string with headers and data rows
  */
 export function generateOrdersListingCSV(orders: any[]): string {
-  // Calculate max unique delivery days across all orders
-  const maxDeliveryDays = orders.reduce((max, order) => {
-    const processedDates = getProcessedDeliveryDates(order);
-    return Math.max(max, processedDates.length);
-  }, 0);
+  const deliveryDateColumnSpecs = collectDeliveryDateColumns(orders);
 
   // Build static headers
   const staticHeaders = [
@@ -122,23 +101,20 @@ export function generateOrdersListingCSV(orders: any[]): string {
     'Address',
     'Apt. No.',
     'Gate Code',
+    'Delivery Instructions',
     'Instruction to Driver',
   ];
 
-  // Build dynamic delivery day headers
-  const deliveryDayHeaders = [];
-  for (let day = 1; day <= maxDeliveryDays; day++) {
-    deliveryDayHeaders.push(`Delivery Date ${day}`);
-  }
+  const deliveryDayHeaders = deliveryDateColumnSpecs.map((column) => column.header);
 
   // Combine all headers
   const headers = [...staticHeaders, ...deliveryDayHeaders];
 
   // Generate rows
-  const rows = orders.map(order => orderToListingCSVRow(order, maxDeliveryDays));
+  const rows = orders.map((order) => orderToListingCSVRow(order, deliveryDateColumnSpecs));
 
   // Combine headers and rows
-  return [headers.join(','), ...rows].join('\n');
+  return [headers.map(escapeCSVValue).join(','), ...rows].join('\n');
 }
 
 /**
@@ -208,10 +184,11 @@ function orderToCSVRow(order: DeliveryOrderReport): string {
   // Format address fields individually
   const street = escapeCSVValue(order.address.street);
   const apartment = escapeCSVValue(order.address.apartment || '');
-  const floor = escapeCSVValue(order.address.floor || '');
   const city = escapeCSVValue(order.address.city);
   const state = escapeCSVValue(order.address.state);
   const zipCode = escapeCSVValue(order.address.zipCode);
+  const gateCode = escapeCSVValue(order.address.entrance || '');
+  const deliveryInstructions = escapeCSVValue(order.address.floor || '');
   const landmark = escapeCSVValue(order.address.landmark || '');
 
   // Format customer info
@@ -248,10 +225,11 @@ function orderToCSVRow(order: DeliveryOrderReport): string {
     customerPhone,
     street,
     apartment,
-    floor,
     city,
     state,
     zipCode,
+    gateCode,
+    deliveryInstructions,
     landmark,
     orderDate,
     deliveryDate,
@@ -282,10 +260,11 @@ export function generateDeliveryCSV(orders: DeliveryOrderReport[]): string {
     'Customer Phone',
     'Street',
     'Apartment',
-    'Floor',
     'City',
     'State',
     'ZIP Code',
+    'Gate Code',
+    'Delivery Instructions',
     'Landmark',
     'Order Date',
     'Delivery Date',
@@ -305,7 +284,7 @@ export function generateDeliveryCSV(orders: DeliveryOrderReport[]): string {
   const rows = orders.map(orderToCSVRow);
 
   // Combine headers and rows
-  return [headers.join(','), ...rows].join('\n');
+  return [headers.map(escapeCSVValue).join(','), ...rows].join('\n');
 }
 
 /**

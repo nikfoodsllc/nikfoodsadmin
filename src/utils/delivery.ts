@@ -1,89 +1,225 @@
 /**
  * Delivery date processing utilities
- * Handles sorting and merging of delivery dates for orders
+ * Handles delivery dates for orders — one column per unique actual delivery date
  */
 import { OrderDay } from '@/types/order';
-import { formatPSTDate } from '@/utils/timezone';
+import { formatInPST, formatPSTDate, formatPSTDateISO } from '@/utils/timezone';
 
 /**
- * Represents a processed delivery date entry
+ * Represents a processed delivery date entry (one per unique actual delivery date)
  */
 export interface ProcessedDeliveryDate {
-  date: string; // Formatted date string (e.g., 'Mar 05, 2026')
-  originalDays: number[]; // Original day numbers that have this date (e.g., [1, 2])
+  dateKey: string; // YYYY-MM-DD for matching columns
+  date: string; // Formatted actual delivery date (e.g., 'Mar 05, 2026')
+  clubbedOriginalDates: string[]; // Original dates when clubbed to a different delivery date
+}
+
+export interface DeliveryDateColumnSpec {
+  dateKey: string;
+  header: string;
+}
+
+function isClubbedOrderDay(orderDay: OrderDay): boolean {
+  return Boolean(
+    orderDay.actualDeliveryDate &&
+      String(orderDay.actualDeliveryDate) !== String(orderDay.deliveryDate)
+  );
 }
 
 /**
- * Processes delivery dates from order items to sort and merge duplicates
- * @param items - OrderDay array from order.items
- * @returns Array of processed delivery dates sorted chronologically with duplicates merged
+ * Processes delivery dates from order items — one entry per unique actual date
  */
 export function processDeliveryDates(items: OrderDay[]): ProcessedDeliveryDate[] {
   if (!items || items.length === 0) return [];
 
-  // Create array of date entries with their original day numbers
   const dateEntries: Array<{
     dateObj: Date;
-    formattedDate: string;
-    originalDay: number;
+    dateKey: string;
+    formattedActualDate: string;
+    clubbedOriginalDate: string | null;
   }> = [];
 
-  items.forEach((item, index) => {
-    const date = item.actualDeliveryDate || item.deliveryDate;
-    if (date) {
-      const dateObj = new Date(date);
-      if (!isNaN(dateObj.getTime())) {
-        dateEntries.push({
-          dateObj,
-          formattedDate: formatPSTDate(date),
-          originalDay: index + 1, // Day numbers are 1-indexed
-        });
-      }
-    }
+  items.forEach((item) => {
+    const actualDate = item.actualDeliveryDate || item.deliveryDate;
+    if (!actualDate) return;
+
+    const dateObj = new Date(actualDate);
+    if (isNaN(dateObj.getTime())) return;
+
+    const dateKey = formatPSTDateISO(actualDate);
+    if (!dateKey) return;
+
+    dateEntries.push({
+      dateObj,
+      dateKey,
+      formattedActualDate: formatPSTDate(actualDate),
+      clubbedOriginalDate: isClubbedOrderDay(item)
+        ? formatPSTDate(item.deliveryDate)
+        : null,
+    });
   });
 
-  // Sort by date chronologically
   dateEntries.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
-  // Merge duplicate dates
-  const mergedDates: ProcessedDeliveryDate[] = [];
+  const uniqueDates: ProcessedDeliveryDate[] = [];
   let currentEntry: ProcessedDeliveryDate | null = null;
 
   dateEntries.forEach((entry) => {
-    if (currentEntry && currentEntry.date === entry.formattedDate) {
-      // Same date as previous, add to originalDays
-      currentEntry.originalDays.push(entry.originalDay);
+    if (currentEntry && currentEntry.dateKey === entry.dateKey) {
+      if (
+        entry.clubbedOriginalDate &&
+        !currentEntry.clubbedOriginalDates.includes(entry.clubbedOriginalDate)
+      ) {
+        currentEntry.clubbedOriginalDates.push(entry.clubbedOriginalDate);
+      }
     } else {
-      // New date, create new entry
       if (currentEntry) {
-        mergedDates.push(currentEntry);
+        uniqueDates.push(currentEntry);
       }
       currentEntry = {
-        date: entry.formattedDate,
-        originalDays: [entry.originalDay],
+        dateKey: entry.dateKey,
+        date: entry.formattedActualDate,
+        clubbedOriginalDates: entry.clubbedOriginalDate ? [entry.clubbedOriginalDate] : [],
       };
     }
   });
 
-  // Don't forget the last entry
   if (currentEntry) {
-    mergedDates.push(currentEntry);
+    uniqueDates.push(currentEntry);
   }
 
-  return mergedDates;
+  return uniqueDates;
 }
 
 /**
- * Gets the maximum number of unique delivery days across all orders
- * This is used to determine how many delivery date columns to display
- * @param orders - Array of orders
- * @returns Maximum number of unique delivery dates
+ * Formats a processed delivery date for CSV/table display
  */
-export function getMaxUniqueDeliveryDays(orders: any[]): number {
-  if (!orders || orders.length === 0) return 0;
-  
-  return orders.reduce((max, order) => {
-    const processedDates = processDeliveryDates(order.items || []);
-    return Math.max(max, processedDates.length);
-  }, 0);
+export function formatDeliveryDateCell(entry: ProcessedDeliveryDate): string {
+  if (entry.clubbedOriginalDates.length > 0) {
+    return `${entry.date} (Original: ${entry.clubbedOriginalDates.join('; ')})`;
+  }
+  return entry.date;
+}
+
+function getOrderDaysFromRecord(order: {
+  items?: OrderDay[];
+  allOrderDays?: OrderDay[];
+}): OrderDay[] {
+  return order.allOrderDays || order.items || [];
+}
+
+function getDayLabel(orderDay: OrderDay): string {
+  const day = orderDay.day?.trim();
+  if (day && !/^\d{4}-\d{2}-\d{2}/.test(day)) {
+    return day;
+  }
+
+  const dateSource = orderDay.actualDeliveryDate || orderDay.deliveryDate || day;
+  const weekday = formatInPST(dateSource, 'EEEE');
+  return weekday || 'Day';
+}
+
+function findDayLabelForProcessedDate(
+  orderDays: OrderDay[],
+  processedEntry: ProcessedDeliveryDate
+): string {
+  for (const orderDay of orderDays) {
+    const actualKey = formatPSTDateISO(orderDay.actualDeliveryDate || orderDay.deliveryDate);
+    if (actualKey === processedEntry.dateKey) {
+      return getDayLabel(orderDay);
+    }
+  }
+  return 'Day';
+}
+
+/**
+ * Formats a delivery date column header, e.g. "Tuesday (May 05, 2026)"
+ */
+export function formatDeliveryDateColumnHeader(
+  dayLabel: string,
+  formattedDate: string
+): string {
+  return `${dayLabel} (${formattedDate})`;
+}
+
+/**
+ * Collects unique delivery dates across all orders for export columns (sorted chronologically)
+ */
+export function collectDeliveryDateColumns(
+  orders: Array<{ items?: OrderDay[]; allOrderDays?: OrderDay[] }>
+): DeliveryDateColumnSpec[] {
+  const dateByKey = new Map<string, string>();
+
+  for (const order of orders) {
+    for (const entry of processDeliveryDates(getOrderDaysFromRecord(order))) {
+      if (!dateByKey.has(entry.dateKey)) {
+        dateByKey.set(entry.dateKey, entry.date);
+      }
+    }
+  }
+
+  const sortedKeys = [...dateByKey.keys()].sort();
+
+  return sortedKeys.map((dateKey) => {
+    const formattedDate = dateByKey.get(dateKey)!;
+    let dayLabel = 'Day';
+
+    for (const order of orders) {
+      const orderDays = getOrderDaysFromRecord(order);
+      const entry = processDeliveryDates(orderDays).find((e) => e.dateKey === dateKey);
+      if (entry) {
+        dayLabel = findDayLabelForProcessedDate(orderDays, entry);
+        break;
+      }
+    }
+
+    return {
+      dateKey,
+      header: formatDeliveryDateColumnHeader(dayLabel, formattedDate),
+    };
+  });
+}
+
+/**
+ * Gets the maximum number of unique delivery dates across all orders
+ */
+export function getMaxUniqueDeliveryDays(
+  orders: Array<{ items?: OrderDay[]; allOrderDays?: OrderDay[] }>
+): number {
+  return collectDeliveryDateColumns(orders).length;
+}
+
+/**
+ * Builds delivery date column values keyed by date — blank when order has no delivery on that date
+ */
+export function buildDeliveryDateColumnsBySpec(
+  order: { items?: OrderDay[]; allOrderDays?: OrderDay[] },
+  columnSpecs: DeliveryDateColumnSpec[]
+): string[] {
+  const processedByKey = new Map(
+    processDeliveryDates(getOrderDaysFromRecord(order)).map((entry) => [entry.dateKey, entry])
+  );
+
+  return columnSpecs.map((spec) => {
+    const entry = processedByKey.get(spec.dateKey);
+    return entry ? formatDeliveryDateCell(entry) : '';
+  });
+}
+
+/**
+ * Builds positional delivery date columns (for UI tables keyed by column index)
+ */
+export function buildDeliveryDateColumns(
+  order: { items?: OrderDay[]; allOrderDays?: OrderDay[] },
+  maxDeliveryDays: number
+): string[] {
+  const processedDates = processDeliveryDates(getOrderDaysFromRecord(order));
+  const columns: string[] = [];
+
+  for (let i = 0; i < maxDeliveryDays; i++) {
+    const dateEntry = processedDates[i];
+    columns.push(dateEntry ? formatDeliveryDateCell(dateEntry) : '');
+  }
+
+  return columns;
 }

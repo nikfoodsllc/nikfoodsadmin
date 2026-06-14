@@ -12,6 +12,13 @@ import ItemSequenceDialog from './ItemSequenceDialog';
 import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 
+function categoryHasParent(c: FoodCategory): boolean {
+  const p = c.parentCategoryId;
+  if (p === undefined || p === null) return false;
+  if (typeof p === 'string') return p.trim().length > 0;
+  return true;
+}
+
 export default function FoodCategoryPage() {
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<FoodCategory[]>([]);
@@ -56,6 +63,8 @@ export default function FoodCategoryPage() {
   // Get category counts for display
   const flatCount = categories.filter(cat => cat.listingType === 'flat' || !cat.listingType).length;
   const dayWiseCount = categories.filter(cat => cat.listingType === 'day-wise').length;
+
+  const parentCategoryOptions = categories.filter((c) => !categoryHasParent(c));
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -349,15 +358,42 @@ export default function FoodCategoryPage() {
             </Box>
           )}
 
-          {/* Categories Grid */}
+          {/* Separate Main Categories and Sub Categories */}
+{(() => {
+  const mainCategories = filteredCategories.filter(
+    (cat) => !cat.parentCategoryId
+  );
+
+  const subCategories = filteredCategories.filter(
+    (cat) => cat.parentCategoryId
+  );
+
+  return (
+    <>
+      {/* Main Categories */}
+      {mainCategories.length > 0 && (
+        <>
+          <Typography
+            variant="h6"
+            sx={{
+              mb: 2,
+              mt: 2,
+              fontWeight: 700,
+              color: '#222',
+            }}
+          >
+            Categories
+          </Typography>
+
           <Box
             sx={{
               display: 'flex',
               flexWrap: 'wrap',
               gap: 3,
+              mb: 5,
             }}
           >
-            {filteredCategories.map((category) => (
+            {mainCategories.map((category) => (
               <CategoryCard
                 key={category._id?.toString()}
                 category={category}
@@ -368,6 +404,46 @@ export default function FoodCategoryPage() {
               />
             ))}
           </Box>
+        </>
+      )}
+
+      {/* Sub Categories */}
+      {subCategories.length > 0 && (
+        <>
+          <Typography
+            variant="h6"
+            sx={{
+              mb: 2,
+              fontWeight: 700,
+              color: '#222',
+            }}
+          >
+            Sub Categories
+          </Typography>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 3,
+            }}
+          >
+            {subCategories.map((category) => (
+              <CategoryCard
+                key={category._id?.toString()}
+                category={category}
+                onEdit={handleEditClick}
+                onDelete={handleDeleteClick}
+                onRefresh={fetchCategories}
+                onItemSequence={handleItemSequenceClick}
+              />
+            ))}
+          </Box>
+        </>
+      )}
+    </>
+  );
+})()}
         </Box>
       )}
 
@@ -375,6 +451,7 @@ export default function FoodCategoryPage() {
       <CategoryDialog
         open={dialogOpen}
         category={selectedCategory}
+        parentCategoryOptions={parentCategoryOptions}
         onClose={handleDialogClose}
         onSave={handleSave}
       />

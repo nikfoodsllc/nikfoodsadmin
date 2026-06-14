@@ -24,8 +24,10 @@ import {
 } from '@mui/material';
 import { IconRefresh, IconChevronDown, IconChevronUp, IconMapPin, IconPhone, IconPackage, IconDownload } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { OrderDayItem, AddressSnapshot } from '@/types/order';
+import { OrderDayItem, AddressSnapshot, OrderDay } from '@/types/order';
 import { formatPSTDate, formatPSTTime } from '@/utils/timezone';
+import { buildDeliveryDateColumnsBySpec, collectDeliveryDateColumns } from '@/utils/delivery';
+import { escapeCSVValue } from '@/utils/csv';
 
 interface DeliveryOrder {
   orderId: string;
@@ -36,6 +38,7 @@ interface DeliveryOrder {
     phone: string;
   };
   address: AddressSnapshot;
+  allOrderDays?: OrderDay[];
   items: OrderDayItem[]; // Use full OrderDayItem type
   status: string;
   paymentStatus: string;
@@ -191,6 +194,8 @@ export default function DeliveryReportPage() {
     if (!reportData || !reportData.orders) return;
 
     const MAX_ITEMS = 10;
+    const orderDayRecords = reportData.orders.map(({ allOrderDays }) => ({ allOrderDays }));
+    const deliveryDateColumnSpecs = collectDeliveryDateColumns(orderDayRecords);
 
     // CSV Headers
     const headers = [
@@ -199,6 +204,13 @@ export default function DeliveryReportPage() {
       'Order Date',
       'Order Time',
       'Delivery Day',
+    ];
+
+    for (const column of deliveryDateColumnSpecs) {
+      headers.push(column.header);
+    }
+
+    headers.push(
       'Status',
       'Payment Status',
       'Payment Method',
@@ -209,13 +221,13 @@ export default function DeliveryReportPage() {
       // Address
       'Street',
       'Apartment',
-      'Floor',
       'City',
       'State',
       'Zip Code',
       'Gate Code',
+      'Delivery Instructions',
       'Landmark',
-    ];
+    );
 
     // Add item columns for each position
     for (let i = 1; i <= MAX_ITEMS; i++) {
@@ -252,7 +264,8 @@ export default function DeliveryReportPage() {
       row.push(order.orderId);
       row.push(formatPSTDate(order.orderDate.toString()));
       row.push(formatPSTTime(order.orderDate));
-      row.push(order.deliveryDay || '');
+      row.push('');
+      row.push(...buildDeliveryDateColumnsBySpec({ allOrderDays: order.allOrderDays }, deliveryDateColumnSpecs));
       row.push(order.status);
       row.push(order.paymentStatus);
       row.push(order.paymentMethod);
@@ -265,11 +278,11 @@ export default function DeliveryReportPage() {
       // Address
       row.push(order.address.street);
       row.push(order.address.apartment || '');
-      row.push(order.address.floor || '');
       row.push(order.address.city);
       row.push(order.address.state);
       row.push(order.address.zipCode);
       row.push(order.address.entrance || '');
+      row.push(order.address.floor || '');
       row.push(order.address.landmark || '');
 
       // Items - fill up to MAX_ITEMS
@@ -337,7 +350,7 @@ export default function DeliveryReportPage() {
 
     // Combine headers and rows
     const csvContent = [
-      headers.join(','),
+      headers.map(escapeCSVValue).join(','),
       ...csvRows
     ].join('\n');
 
@@ -380,7 +393,6 @@ export default function DeliveryReportPage() {
           <Typography variant="body2" sx={{ color: '#374151', fontSize: '13px' }}>
             {address.street}
             {address.apartment && `, ${address.apartment}`}
-            {address.floor && `, Floor: ${address.floor}`}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
@@ -392,6 +404,13 @@ export default function DeliveryReportPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
               Gate Code: {address.entrance}
+            </Typography>
+          </Box>
+        )}
+        {address.floor && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2.5, mb: 0.5 }}>
+            <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+              Delivery instructions: {address.floor}
             </Typography>
           </Box>
         )}
