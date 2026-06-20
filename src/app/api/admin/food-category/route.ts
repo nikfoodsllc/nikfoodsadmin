@@ -749,6 +749,7 @@ export async function PUT(request: NextRequest) {
       dayWiseItems: inputDayWiseItems,
       isImageUpdated,
       parentCategoryId: parentCategoryIdRaw,
+      dayWiseLockedItemIds: inputDayWiseLockedItemIds,
     } = body;
 
     // Validate required fields
@@ -840,6 +841,23 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    if (inputDayWiseLockedItemIds !== undefined) {
+      if (!Array.isArray(inputDayWiseLockedItemIds)) {
+        return NextResponse.json(
+          { error: 'dayWiseLockedItemIds must be an array of food item ID strings' },
+          { status: 400 }
+        );
+      }
+      for (const itemId of inputDayWiseLockedItemIds) {
+        if (typeof itemId !== 'string' || !ObjectId.isValid(itemId)) {
+          return NextResponse.json(
+            { error: 'dayWiseLockedItemIds must contain valid food item ID strings' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Prepare update data
     const updateData: Partial<FoodCategory> = {
       updatedAt: new Date(),
@@ -853,6 +871,9 @@ export async function PUT(request: NextRequest) {
     if (isDraft !== undefined) updateData.isDraft = isDraft;
     if (listingType !== undefined) updateData.listingType = listingType;
     if (inputDayWiseItems !== undefined) updateData.dayWiseItems = inputDayWiseItems;
+    if (inputDayWiseLockedItemIds !== undefined) {
+      updateData.dayWiseLockedItemIds = inputDayWiseLockedItemIds;
+    }
 
     let unsetParentCategoryId = false;
     if ('parentCategoryId' in body) {

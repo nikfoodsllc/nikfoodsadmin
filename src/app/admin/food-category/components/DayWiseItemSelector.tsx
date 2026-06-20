@@ -41,6 +41,8 @@ interface FoodItem {
 interface DayWiseItemSelectorProps {
   value: CategoryDayWiseItem[];
   onChange: (dayWiseItems: CategoryDayWiseItem[]) => void;
+  lockedItemIds: string[];
+  onLockedItemIdsChange: (lockedItemIds: string[]) => void;
   disabled?: boolean;
   categoryId?: string;
   categoryName?: string;
@@ -49,6 +51,8 @@ interface DayWiseItemSelectorProps {
 export default function DayWiseItemSelector({
   value,
   onChange,
+  lockedItemIds,
+  onLockedItemIdsChange,
   disabled = false,
   categoryId = '',
   categoryName = '',
@@ -60,8 +64,7 @@ export default function DayWiseItemSelector({
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  /** Food item IDs protected from "Clear All" (session-only, not saved to API). */
-  const [lockedItemIds, setLockedItemIds] = useState<Set<string>>(() => new Set());
+  const lockedItemIdSet = useMemo(() => new Set(lockedItemIds), [lockedItemIds]);
 
   // Fetch food items on component mount (dates are handled by useAvailableDates hook)
   useEffect(() => {
@@ -175,19 +178,18 @@ useEffect(() => {
 
   const toggleRowLock = (itemId: string) => {
     if (disabled) return;
-    setLockedItemIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
+    if (lockedItemIdSet.has(itemId)) {
+      onLockedItemIdsChange(lockedItemIds.filter((id) => id !== itemId));
+    } else {
+      onLockedItemIdsChange([...lockedItemIds, itemId]);
+    }
   };
 
   const handleClearAll = () => {
     const clearedDayWiseItems: CategoryDayWiseItem[] = allDateLabels.map((dateInfo) => {
       const dayEntry = value.find((item) => item.day === dateInfo.date);
       const existingItems = dayEntry?.items || [];
-      const preserved = existingItems.filter((id) => lockedItemIds.has(id));
+      const preserved = existingItems.filter((id) => lockedItemIdSet.has(id));
       return {
         day: dateInfo.date,
         items: preserved,
@@ -393,7 +395,7 @@ useEffect(() => {
                           <FormControlLabel
                             control={
                               <Checkbox
-                                checked={lockedItemIds.has(item._id)}
+                                checked={lockedItemIdSet.has(item._id)}
                                 onChange={() => toggleRowLock(item._id)}
                                 disabled={disabled}
                                 size="small"

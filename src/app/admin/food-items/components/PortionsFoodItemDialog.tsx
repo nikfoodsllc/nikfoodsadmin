@@ -27,7 +27,7 @@ import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
 import PortionManager from './PortionManager';
 import SubCategorySelect from './SubCategorySelect';
-import { resolveSubCategoryId, SubCategoryOption } from '../utils/subCategoryUtils';
+import { mergeCategoryIdsForSave, resolveSubCategoryIds, SubCategoryOption } from '../utils/subCategoryUtils';
 
 interface PortionsFoodItem {
   _id?: string;
@@ -101,7 +101,7 @@ export default function PortionsFoodItemDialog({
   }, [item]);
 
   const [formData, setFormData] = useState<PortionsFoodItem>(getInitialFormData);
-  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
+  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -110,7 +110,7 @@ export default function PortionsFoodItemDialog({
     if (open) {
       const newFormData = item ? itemToPortionsFormData(item) : getDefaultFormData();
       setFormData(newFormData);
-      setSelectedSubCategoryId(resolveSubCategoryId(item?.category, subCategoryIds));
+      setSelectedSubCategoryIds(resolveSubCategoryIds(item?.category, subCategoryIds));
       setImageFile(null);
       setErrors({});
     }
@@ -194,8 +194,8 @@ export default function PortionsFoodItemDialog({
       newErrors.image = 'Image is required';
     }
 
-    if (!selectedSubCategoryId) {
-      newErrors.subCategory = 'Sub category is required';
+    if (selectedSubCategoryIds.length === 0) {
+      newErrors.subCategory = 'At least one sub category is required';
     }
 
     setErrors(newErrors);
@@ -206,7 +206,7 @@ export default function PortionsFoodItemDialog({
     const submitData = {
       ...formData,
       isDraft: saveAsDraft,
-      category: selectedSubCategoryId ? [selectedSubCategoryId] : [],
+      category: mergeCategoryIdsForSave(selectedSubCategoryIds, item?.category, subCategoryIds),
     };
     if (validate()) {
       onSave(submitData, imageFile);
@@ -312,10 +312,10 @@ export default function PortionsFoodItemDialog({
           />
 
           <SubCategorySelect
-            value={selectedSubCategoryId}
+            value={selectedSubCategoryIds}
             options={subCategories}
             onChange={(value) => {
-              setSelectedSubCategoryId(value);
+              setSelectedSubCategoryIds(value);
               if (errors.subCategory) {
                 setErrors((prev) => {
                   const next = { ...prev };
