@@ -222,6 +222,8 @@ export interface FoodCategory {
   isDraft?: boolean;
   listingType?: CategoryListingType; // 'flat' | 'day-wise'
   dayWiseItems?: CategoryDayWiseItem[]; // For day-wise categories
+  /** Food item IDs whose day-wise rows stay checked when using Clear All */
+  dayWiseLockedItemIds?: string[];
   itemCount?: number; // Total items assigned to the category
   createdAt?: Date | string;
   updatedAt?: Date | string;

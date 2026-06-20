@@ -47,6 +47,7 @@ export default function CategoryItemsPage() {
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [dayWiseItems, setDayWiseItems] = useState<CategoryDayWiseItem[]>([]);
+  const [lockedItemIds, setLockedItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -92,6 +93,11 @@ export default function CategoryItemsPage() {
       }
 
       setCategory(foundCategory);
+      setLockedItemIds(
+        Array.isArray(foundCategory.dayWiseLockedItemIds)
+          ? foundCategory.dayWiseLockedItemIds
+          : []
+      );
 
       // Initialize state based on category type
       if (foundCategory.listingType === 'day-wise') {
@@ -286,7 +292,26 @@ export default function CategoryItemsPage() {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Failed to update day-wise items');
           }
+        }
 
+        const lockResponse = await fetch('/api/admin/food-category', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            _id: categoryId,
+            dayWiseLockedItemIds: lockedItemIds,
+          }),
+        });
+
+        if (!lockResponse.ok) {
+          const errorData = await lockResponse.json();
+          throw new Error(errorData.error || 'Failed to save locked rows');
+        }
+
+        if (mappings.length > 0) {
           showSnackbar('Day-wise items updated successfully');
         } else {
           showSnackbar('Day-wise items cleared successfully');
@@ -531,6 +556,8 @@ export default function CategoryItemsPage() {
             <DayWiseItemSelector
               value={dayWiseItems}
               onChange={setDayWiseItems}
+              lockedItemIds={lockedItemIds}
+              onLockedItemIdsChange={setLockedItemIds}
               disabled={saving}
               categoryId={categoryId}
               categoryName={category.name}
