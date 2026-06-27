@@ -69,17 +69,37 @@ export function resolveSubCategoryIds(
   subCategoryIds: Set<string>
 ): string[] {
   if (!categoryIds?.length) return [];
-  return categoryIds.filter((id) => subCategoryIds.has(id));
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const id of categoryIds) {
+    if (subCategoryIds.has(id) && !seen.has(id)) {
+      seen.add(id);
+      result.push(id);
+    }
+  }
+
+  return result;
 }
 
-/** Preserve parent / day-wise category IDs; replace sub-category FLAT mappings with the new selection. */
+/** Save only the selected sub-category FLAT mappings (deduped). DAY_WISE rows are managed separately. */
 export function mergeCategoryIdsForSave(
   selectedSubCategoryIds: string[],
-  existingCategoryIds: string[] | undefined,
+  _existingCategoryIds: string[] | undefined,
   subCategoryIds: Set<string>
 ): string[] {
-  const preserved = (existingCategoryIds ?? []).filter((id) => !subCategoryIds.has(id));
-  return [...preserved, ...selectedSubCategoryIds];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const id of selectedSubCategoryIds) {
+    if (subCategoryIds.has(id) && !seen.has(id)) {
+      seen.add(id);
+      result.push(id);
+    }
+  }
+
+  return result;
 }
 
 /** Resolve unique sub-category display names from a food item's category ID list. */
