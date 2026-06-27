@@ -199,7 +199,7 @@ export default function CategoryItemsPage() {
       }
 
       const data = await response.json();
-      const allItems = data.data?.items || [];
+      const allItems: FoodItem[] = data.data?.items || [];
 
       // For flat categories, fetch items using the new category-food-mapping API
       // to get the current mappings for this category
