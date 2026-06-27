@@ -316,27 +316,104 @@ async function resolveParentCategoryObjectId(
 }
 
 /**
- * Calculate item count for a category using CategoryFoodMapping
- * Now uses mapping collection for both flat and day-wise categories
+ * Calculate item count for a category using CategoryFoodMapping.
+ * Flat categories: unique FLAT-assigned food items (parent + sub-categories for top-level).
+ * Day-wise categories: total DAY_WISE assignment rows (item × date).
  */
+async function fetchSubCategoryIds(parentCategoryId: ObjectId): Promise<ObjectId[]> {
+  const result = await db.read<FoodCategory>('foodcategories', {
+    parentCategoryId,
+    isDraft: { $ne: true },
+  });
+
+  if (!result.success || !result.data) {
+    return [];
+  }
+
+  return result.data
+    .filter((category) => category._id)
+    .map((category) => category._id as ObjectId);
+}
+
+async function countExistingFlatFoodItems(
+  mappings: CategoryFoodMapping[]
+): Promise<number> {
+  const uniqueFoodItemIds = new Set<string>();
+
+  for (const mapping of mappings) {
+    if (mapping.mappingType !== 'FLAT') {
+      continue;
+    }
+
+    uniqueFoodItemIds.add(mapping.foodItemId.toString());
+  }
+
+  if (uniqueFoodItemIds.size === 0) {
+    return 0;
+  }
+
+  const foodItemsResult = await db.read<{ _id: ObjectId }>('fooditems', {
+    _id: { $in: Array.from(uniqueFoodItemIds).map((id) => new ObjectId(id)) },
+  });
+
+  if (!foodItemsResult.success || !foodItemsResult.data) {
+    return uniqueFoodItemIds.size;
+  }
+
+  return foodItemsResult.data.length;
+}
+
 async function calculateItemCount(category: FoodCategory): Promise<number> {
   try {
     if (!category._id) {
       return 0;
     }
 
-    // For both flat and day-wise categories, count from mapping collection
-    const mappingResult = await db.read<CategoryFoodMapping>('categoryfoodmapping', {
-      categoryId: category._id as ObjectId
-    });
+    const categoryId = category._id as ObjectId;
+    const listingType = category.listingType ?? 'flat';
+
+    if (listingType === 'day-wise') {
+      const mappingResult = await db.read<CategoryFoodMapping>('categoryfoodmapping', {
+        categoryId,
+        mappingType: 'DAY_WISE',
+      });
+
+      if (mappingResult.success && mappingResult.data) {
+        return mappingResult.data.length;
+      }
+
+      if (category.dayWiseItems) {
+        return category.dayWiseItems.reduce(
+          (total, dayItem) => total + dayItem.items.length,
+          0
+        );
+      }
+
+      return 0;
+    }
+
+    const categoryIds = [categoryId];
+    if (!category.parentCategoryId) {
+      const subCategoryIds = await fetchSubCategoryIds(categoryId);
+      categoryIds.push(...subCategoryIds);
+    }
+
+    const mappingFilter =
+      categoryIds.length === 1
+        ? { categoryId: categoryIds[0], mappingType: 'FLAT' as const }
+        : { categoryId: { $in: categoryIds }, mappingType: 'FLAT' as const };
+
+    const mappingResult = await db.read<CategoryFoodMapping>(
+      'categoryfoodmapping',
+      mappingFilter
+    );
 
     if (mappingResult.success && mappingResult.data) {
-      return mappingResult.data.length;
+      return countExistingFlatFoodItems(mappingResult.data);
     }
   } catch (error) {
     console.warn(`Failed to count items for category ${category._id}:`, error);
 
-    // Fallback to embedded dayWiseItems for backward compatibility
     if (category.listingType === 'day-wise' && category.dayWiseItems) {
       return category.dayWiseItems.reduce((total, dayItem) => total + dayItem.items.length, 0);
     }

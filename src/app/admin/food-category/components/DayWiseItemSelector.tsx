@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Table,
@@ -18,9 +18,10 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import { CategoryDayWiseItem } from '@/types/order';
+import { CategoryDayWiseItem, FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvailableDates } from '@/hooks/useAvailableDates';
+import { categoryHasParent, toIdString } from '@/app/admin/food-items/utils/subCategoryUtils';
 import {
   formatDateLabel,
   formatDateShort,
@@ -36,6 +37,14 @@ interface FoodItem {
   description?: string;
   veg: boolean;
   price: number;
+  category?: string[];
+}
+
+interface ItemGroup {
+  categoryId: string;
+  categoryName: string;
+  isSubCategory: boolean;
+  items: FoodItem[];
 }
 
 interface DayWiseItemSelectorProps {
@@ -62,11 +71,12 @@ export default function DayWiseItemSelector({
     dayWiseCategoryEnabledOnly: true
   });
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [subCategories, setSubCategories] = useState<FoodCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const lockedItemIdSet = useMemo(() => new Set(lockedItemIds), [lockedItemIds]);
 
-  // Fetch food items on component mount (dates are handled by useAvailableDates hook)
+  // Fetch food items and sub-categories on component mount
   useEffect(() => {
     const fetchFoodItems = async () => {
       try {
@@ -75,11 +85,20 @@ export default function DayWiseItemSelector({
           return;
         }
 
-        const foodItemsResponse = await fetch('/api/admin/food-items?excludeDrafts=true&limit=10000', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        const [foodItemsResponse, categoriesResponse] = await Promise.all([
+          fetch('/api/admin/food-items?excludeDrafts=true&limit=10000', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          categoryId
+            ? fetch('/api/admin/food-category', {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+            : Promise.resolve(null),
+        ]);
 
         if (!foodItemsResponse.ok) {
           throw new Error('Failed to fetch food items');
@@ -87,6 +106,23 @@ export default function DayWiseItemSelector({
 
         const foodItemsData = await foodItemsResponse.json();
         setFoodItems(foodItemsData.data?.items || []);
+
+        if (categoriesResponse?.ok) {
+          const categoriesData = await categoriesResponse.json();
+          const categories: FoodCategory[] = categoriesData.data?.items || [];
+          const subs = categories
+            .filter(
+              (cat) =>
+                !cat.isDraft &&
+                categoryHasParent(cat) &&
+                toIdString(cat.parentCategoryId) === categoryId
+            )
+            .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+          setSubCategories(subs);
+        } else {
+          setSubCategories([]);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load food items');
       } finally {
@@ -95,7 +131,7 @@ export default function DayWiseItemSelector({
     };
 
     fetchFoodItems();
-  }, [token, isAuthenticated]);
+  }, [token, isAuthenticated, categoryId]);
 
   // Create date labels array for display
 const allDateLabels = useMemo(() => {
@@ -214,6 +250,280 @@ useEffect(() => {
     return dayEntry?.items?.length || 0;
   };
 
+  const assignedItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const dayEntry of value) {
+      for (const itemId of dayEntry.items) {
+        ids.add(itemId);
+      }
+    }
+    return ids;
+  }, [value]);
+
+  const subCategoryIds = useMemo(
+    () => new Set(subCategories.map((sub) => toIdString(sub._id))),
+    [subCategories]
+  );
+
+  const showSubCategoryGroups = subCategories.length > 0;
+
+  const displayFoodItems = useMemo(() => {
+    if (!showSubCategoryGroups) {
+      return foodItems;
+    }
+
+    return foodItems.filter((item) => {
+      if (assignedItemIds.has(item._id)) {
+        return true;
+      }
+
+      const categoryIds = item.category || [];
+      if (categoryIds.includes(categoryId)) {
+        return true;
+      }
+
+      return categoryIds.some((id) => subCategoryIds.has(id));
+    });
+  }, [
+    foodItems,
+    showSubCategoryGroups,
+    assignedItemIds,
+    categoryId,
+    subCategoryIds,
+  ]);
+
+  const itemGroups = useMemo((): ItemGroup[] => {
+    if (!showSubCategoryGroups) {
+      return [
+        {
+          categoryId,
+          categoryName: categoryName || 'Items',
+          isSubCategory: false,
+          items: displayFoodItems,
+        },
+      ];
+    }
+
+    const itemsBySub = new Map<string, FoodItem[]>();
+    for (const sub of subCategories) {
+      itemsBySub.set(toIdString(sub._id), []);
+    }
+
+    const parentItems: FoodItem[] = [];
+    const otherItems: FoodItem[] = [];
+
+    for (const item of displayFoodItems) {
+      const categoryIds = item.category || [];
+      const matchingSub = subCategories.find((sub) =>
+        categoryIds.includes(toIdString(sub._id))
+      );
+
+      if (matchingSub) {
+        itemsBySub.get(toIdString(matchingSub._id))!.push(item);
+      } else if (categoryIds.includes(categoryId) || assignedItemIds.has(item._id)) {
+        parentItems.push(item);
+      } else {
+        otherItems.push(item);
+      }
+    }
+
+    const groups: ItemGroup[] = [];
+
+    if (parentItems.length > 0) {
+      groups.push({
+        categoryId,
+        categoryName: categoryName || 'Main Category',
+        isSubCategory: false,
+        items: parentItems,
+      });
+    }
+
+    for (const sub of subCategories) {
+      const subId = toIdString(sub._id);
+      const items = itemsBySub.get(subId) || [];
+
+      if (items.length > 0) {
+        groups.push({
+          categoryId: subId,
+          categoryName: sub.name,
+          isSubCategory: true,
+          items,
+        });
+      }
+    }
+
+    if (otherItems.length > 0) {
+      groups.push({
+        categoryId: 'other',
+        categoryName: 'Other Assigned Items',
+        isSubCategory: false,
+        items: otherItems,
+      });
+    }
+
+    return groups;
+  }, [
+    showSubCategoryGroups,
+    displayFoodItems,
+    subCategories,
+    categoryId,
+    categoryName,
+    assignedItemIds,
+  ]);
+
+  const totalDisplayItems = itemGroups.reduce(
+    (count, group) => count + group.items.length,
+    0
+  );
+
+  const renderItemRow = (item: FoodItem) => (
+    <TableRow
+      key={item._id}
+      sx={{
+        '&:hover': {
+          backgroundColor: 'rgba(79, 140, 255, 0.04)',
+        },
+      }}
+    >
+      <TableCell
+        sx={{
+          position: 'sticky',
+          left: 0,
+          backgroundColor: 'inherit',
+          zIndex: 1,
+          borderRight: '1px solid #E0E0E0',
+          verticalAlign: 'top',
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+          <Tooltip title="When enabled, Clear All will not remove this item from any date">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={lockedItemIdSet.has(item._id)}
+                  onChange={() => toggleRowLock(item._id)}
+                  disabled={disabled}
+                  size="small"
+                  sx={{ py: 0 }}
+                />
+              }
+              label={
+                <Typography component="span" variant="caption" sx={{ color: '#555' }}>
+                  Lock row
+                </Typography>
+              }
+              sx={{
+                m: 0,
+                mr: 0,
+                alignItems: 'center',
+                gap: 0.5,
+              }}
+            />
+          </Tooltip>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: item.veg ? '#4CAF50' : '#F44336',
+                flexShrink: 0,
+              }}
+            />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: '#333', lineHeight: 1.2 }}>
+                {item.name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                {safeFormatCurrency(item.price)}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </TableCell>
+      {allDateLabels.map((dateInfo, dateIndex) => (
+        <TableCell
+          key={`${item._id}-${dateInfo.date}`}
+          align="center"
+          sx={{
+            padding: '8px 16px',
+            minWidth: 100,
+            zIndex: 2,
+          }}
+        >
+          <Tooltip title={`Toggle item for ${dateInfo.label}`} arrow>
+            <Checkbox
+              checked={isItemSelectedForDay(dateIndex, item._id)}
+              onChange={() => handleItemToggle(dateIndex, item._id)}
+              disabled={disabled}
+              size="small"
+              sx={{
+                color: '#4F8CFF',
+                '&.Mui-checked': {
+                  color: '#4F8CFF',
+                },
+              }}
+            />
+          </Tooltip>
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+
+  const renderGroupHeader = (group: ItemGroup) => (
+    <TableRow key={`header-${group.categoryId}`}>
+      <TableCell
+        colSpan={allDateLabels.length + 1}
+        sx={{
+          py: 1.25,
+          px: 2,
+          borderBottom: '1px solid #E0E0E0',
+          backgroundColor: group.isSubCategory
+            ? 'rgba(139, 92, 246, 0.08)'
+            : 'rgba(79, 140, 255, 0.08)',
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            pl: 1,
+            borderLeft: '4px solid',
+            borderColor: group.isSubCategory ? '#8B5CF6' : '#4F8CFF',
+          }}
+        >
+          <Typography
+            component="span"
+            sx={{
+              fontWeight: 600,
+              color: '#1E3A5F',
+              fontSize: { xs: '0.9rem', sm: '0.95rem' },
+            }}
+          >
+            {group.categoryName}
+          </Typography>
+          {group.isSubCategory && (
+            <Chip
+              label="Sub-category"
+              size="small"
+              sx={{
+                height: 22,
+                backgroundColor: '#8B5CF6',
+                color: 'white',
+                fontWeight: 500,
+                fontSize: '0.7rem',
+              }}
+            />
+          )}
+          <Typography component="span" sx={{ color: '#666', fontSize: '0.85rem' }}>
+            ({group.items.length} {group.items.length === 1 ? 'item' : 'items'})
+          </Typography>
+        </Box>
+      </TableCell>
+    </TableRow>
+  );
+
   if (!token || !isAuthenticated) {
     return (
       <Alert severity="error" sx={{ marginBottom: 2 }}>
@@ -291,6 +601,12 @@ useEffect(() => {
         Select items that will be available for each configured date. Items will only appear in the category on their assigned dates.
         Only dates with "Day-wise Category" enabled in the Availability Calendar are shown.
         Use <strong>Lock</strong> on a row to keep its date selections when you click Clear All.
+        {showSubCategoryGroups && (
+          <>
+            {' '}
+            Items are grouped by sub-category based on their Food Items assignments.
+          </>
+        )}
       </Typography>
 
       <Box sx={{ overflowX: 'auto' }}>
@@ -362,110 +678,22 @@ useEffect(() => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {foodItems.length === 0 ? (
+              {totalDisplayItems === 0 ? (
                 <TableRow>
                   <TableCell colSpan={allDateLabels.length + 1} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" sx={{ color: '#666' }}>
-                      No food items available
+                      {showSubCategoryGroups
+                        ? 'No food items are assigned to this category or its sub-categories yet'
+                        : 'No food items available'}
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                foodItems.map((item) => (
-                  <TableRow
-                    key={item._id}
-                    sx={{
-                      '&:hover': {
-                        backgroundColor: 'rgba(79, 140, 255, 0.04)',
-                      }
-                    }}
-                  >
-                    <TableCell
-                      sx={{
-                        position: 'sticky',
-                        left: 0,
-                        backgroundColor: 'inherit',
-                        zIndex: 1,
-                        borderRight: '1px solid #E0E0E0',
-                        verticalAlign: 'top',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-                        <Tooltip title="When enabled, Clear All will not remove this item from any date">
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={lockedItemIdSet.has(item._id)}
-                                onChange={() => toggleRowLock(item._id)}
-                                disabled={disabled}
-                                size="small"
-                                sx={{ py: 0 }}
-                              />
-                            }
-                            label={
-                              <Typography component="span" variant="caption" sx={{ color: '#555' }}>
-                                Lock row
-                              </Typography>
-                            }
-                            sx={{
-                              m: 0,
-                              mr: 0,
-                              alignItems: 'center',
-                              gap: 0.5,
-                            }}
-                          />
-                        </Tooltip>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              backgroundColor: item.veg ? '#4CAF50' : '#F44336',
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#333', lineHeight: 1.2 }}>
-                              {item.name}
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
-                              {safeFormatCurrency(item.price)}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    {allDateLabels.map((dateInfo, dateIndex) => (
-                      <TableCell
-                        key={`${item._id}-${dateInfo.date}`}
-                        align="center"
-                        sx={{
-                          padding: '8px 16px',
-                          minWidth: 100,
-                          zIndex: 2,
-                        }}
-                      >
-                        <Tooltip
-                          title={`Toggle item for ${dateInfo.label}`}
-                          arrow
-                        >
-                          <Checkbox
-                            checked={isItemSelectedForDay(dateIndex, item._id)}
-                            onChange={() => handleItemToggle(dateIndex, item._id)}
-                            disabled={disabled}
-                            size="small"
-                            sx={{
-                              color: '#4F8CFF',
-                              '&.Mui-checked': {
-                                color: '#4F8CFF',
-                              },
-                            }}
-                          />
-                        </Tooltip>
-                      </TableCell>
-                    ))}
-                  </TableRow>
+                itemGroups.map((group) => (
+                  <Fragment key={group.categoryId}>
+                    {showSubCategoryGroups && renderGroupHeader(group)}
+                    {group.items.map((item) => renderItemRow(item))}
+                  </Fragment>
                 ))
               )}
             </TableBody>
