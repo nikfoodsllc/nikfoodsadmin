@@ -64,13 +64,42 @@ export function buildSubCategoryOptions(raw: RawCategory[]): SubCategoryOption[]
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-export function resolveSubCategoryId(
+export function resolveSubCategoryIds(
   categoryIds: string[] | undefined,
   subCategoryIds: Set<string>
-): string {
-  if (!categoryIds?.length) return '';
-  const match = categoryIds.find((id) => subCategoryIds.has(id));
-  return match ?? '';
+): string[] {
+  if (!categoryIds?.length) return [];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const id of categoryIds) {
+    if (subCategoryIds.has(id) && !seen.has(id)) {
+      seen.add(id);
+      result.push(id);
+    }
+  }
+
+  return result;
+}
+
+/** Save only the selected sub-category FLAT mappings (deduped). DAY_WISE rows are managed separately. */
+export function mergeCategoryIdsForSave(
+  selectedSubCategoryIds: string[],
+  _existingCategoryIds: string[] | undefined,
+  subCategoryIds: Set<string>
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const id of selectedSubCategoryIds) {
+    if (subCategoryIds.has(id) && !seen.has(id)) {
+      seen.add(id);
+      result.push(id);
+    }
+  }
+
+  return result;
 }
 
 /** Resolve unique sub-category display names from a food item's category ID list. */

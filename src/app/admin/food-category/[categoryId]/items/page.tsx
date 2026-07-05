@@ -32,6 +32,32 @@ interface FoodItem {
   portionPrices?: number[];
 }
 
+interface AssignedItem {
+  _id: string;
+  name: string;
+  description?: string;
+  veg: boolean;
+  price?: number;
+  itemType?: 'simple' | 'portions' | 'combo';
+  portions?: string[];
+  portionPrices?: number[];
+  mappingCategoryId: string;
+}
+
+interface ItemGroup {
+  categoryId: string;
+  categoryName: string;
+  isSubCategory: boolean;
+  items: AssignedItem[];
+}
+
+function categoryHasParent(category: FoodCategory): boolean {
+  const parent = category.parentCategoryId;
+  if (parent === undefined || parent === null) return false;
+  if (typeof parent === 'string') return parent.trim().length > 0;
+  return true;
+}
+
 export default function CategoryItemsPage() {
   const params = useParams();
   const router = useRouter();
@@ -44,9 +70,10 @@ export default function CategoryItemsPage() {
   });
 
   const [category, setCategory] = useState<FoodCategory | null>(null);
-  const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [dayWiseItems, setDayWiseItems] = useState<CategoryDayWiseItem[]>([]);
+  const [lockedItemIds, setLockedItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -92,6 +119,11 @@ export default function CategoryItemsPage() {
       }
 
       setCategory(foundCategory);
+      setLockedItemIds(
+        Array.isArray(foundCategory.dayWiseLockedItemIds)
+          ? foundCategory.dayWiseLockedItemIds
+          : []
+      );
 
       // Initialize state based on category type
       if (foundCategory.listingType === 'day-wise') {
@@ -139,8 +171,7 @@ export default function CategoryItemsPage() {
           setDayWiseItems([]);
         }
       } else {
-        // For flat categories, we'll need to fetch items differently
-        // For now, initialize with empty array
+        setItemGroups([]);
         setSelectedItemIds([]);
       }
     } catch (err) {
@@ -168,8 +199,7 @@ export default function CategoryItemsPage() {
       }
 
       const data = await response.json();
-      const allItems = data.data?.items || [];
-      setFoodItems(allItems);
+      const allItems: FoodItem[] = data.data?.items || [];
 
       // For flat categories, fetch items using the new category-food-mapping API
       // to get the current mappings for this category
@@ -185,9 +215,18 @@ export default function CategoryItemsPage() {
         const foundCategory = categories.find((cat: FoodCategory) => cat._id?.toString() === categoryId);
 
         if (foundCategory && foundCategory.listingType === 'flat') {
-          // Use the new category-food-mapping API to get FLAT mappings
+          const includeSubCategories = !categoryHasParent(foundCategory);
+          const params = new URLSearchParams({
+            categoryId,
+            mappingType: 'FLAT',
+          });
+
+          if (includeSubCategories) {
+            params.append('includeSubCategories', 'true');
+          }
+
           const mappingsResponse = await fetch(
-            `/api/admin/category-food-mapping?categoryId=${categoryId}&mappingType=FLAT`,
+            `/api/admin/category-food-mapping/items?${params.toString()}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -197,9 +236,80 @@ export default function CategoryItemsPage() {
 
           if (mappingsResponse.ok) {
             const mappingsData = await mappingsResponse.json();
-            const mappings = mappingsData.data?.flatMappings || [];
-            const foodItemIds = mappings.map((mapping: any) => mapping.foodItemId?.toString());
-            setSelectedItemIds(foodItemIds);
+            const foodItemMap = new Map(allItems.map((item) => [item._id, item]));
+
+            const enrichItem = (
+              item: {
+                _id: string;
+                name: string;
+                description?: string;
+                price?: number;
+                mappingCategoryId?: string;
+              },
+              mappingCategoryId: string
+            ): AssignedItem => {
+              const details = foodItemMap.get(item._id);
+
+              return {
+                _id: item._id,
+                name: item.name,
+                description: item.description ?? details?.description,
+                veg: details?.veg ?? true,
+                price: item.price ?? details?.price,
+                itemType: details?.itemType,
+                portions: details?.portions,
+                portionPrices: details?.portionPrices,
+                mappingCategoryId,
+              };
+            };
+
+            if (includeSubCategories && mappingsData.data?.groups?.length) {
+              const groups: ItemGroup[] = mappingsData.data.groups.map(
+                (group: {
+                  categoryId: string;
+                  categoryName: string;
+                  isSubCategory: boolean;
+                  items: Array<{
+                    _id: string;
+                    name: string;
+                    description?: string;
+                    price?: number;
+                    mappingCategoryId?: string;
+                  }>;
+                }) => ({
+                  categoryId: group.categoryId,
+                  categoryName: group.categoryName,
+                  isSubCategory: group.isSubCategory,
+                  items: group.items.map((item) =>
+                    enrichItem(item, item.mappingCategoryId || group.categoryId)
+                  ),
+                })
+              );
+
+              setItemGroups(groups);
+              setSelectedItemIds(groups.flatMap((group) => group.items.map((item) => item._id)));
+            } else {
+              const items = mappingsData.data?.items || [];
+              const assignedItems = items.map(
+                (item: {
+                  _id: string;
+                  name: string;
+                  description?: string;
+                  price?: number;
+                  mappingCategoryId?: string;
+                }) => enrichItem(item, item.mappingCategoryId || categoryId)
+              );
+
+              setItemGroups([
+                {
+                  categoryId,
+                  categoryName: foundCategory.name,
+                  isSubCategory: false,
+                  items: assignedItems,
+                },
+              ]);
+              setSelectedItemIds(assignedItems.map((item: AssignedItem) => item._id));
+            }
           }
         }
       }
@@ -286,7 +396,26 @@ export default function CategoryItemsPage() {
             const errorData = await response.json();
             throw new Error(errorData.error || 'Failed to update day-wise items');
           }
+        }
 
+        const lockResponse = await fetch('/api/admin/food-category', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            _id: categoryId,
+            dayWiseLockedItemIds: lockedItemIds,
+          }),
+        });
+
+        if (!lockResponse.ok) {
+          const errorData = await lockResponse.json();
+          throw new Error(errorData.error || 'Failed to save locked rows');
+        }
+
+        if (mappings.length > 0) {
           showSnackbar('Day-wise items updated successfully');
         } else {
           showSnackbar('Day-wise items cleared successfully');
@@ -318,7 +447,7 @@ export default function CategoryItemsPage() {
   };
 
   // Handle removing an item from the category
-  const handleRemoveItem = async (itemId: string) => {
+  const handleRemoveItem = async (itemId: string, mappingCategoryId: string) => {
     if (!token || !isAuthenticated) {
       showSnackbar('Authentication required', 'error');
       return;
@@ -327,7 +456,7 @@ export default function CategoryItemsPage() {
     try {
       // Use the new category-food-mapping API to delete the FLAT mapping
       const deleteResponse = await fetch(
-        `/api/admin/category-food-mapping?foodItemId=${itemId}&categoryId=${categoryId}&mappingType=FLAT`,
+        `/api/admin/category-food-mapping?foodItemId=${itemId}&categoryId=${mappingCategoryId}&mappingType=FLAT`,
         {
           method: 'DELETE',
           headers: {
@@ -400,6 +529,97 @@ export default function CategoryItemsPage() {
   }
 
   const isDayWise = category.listingType === 'day-wise';
+  const totalAssignedItems = itemGroups.reduce((count, group) => count + group.items.length, 0);
+  const showSubCategoryGroups =
+    !isDayWise && !categoryHasParent(category) && itemGroups.some((group) => group.isSubCategory);
+
+  const renderAssignedItem = (item: AssignedItem) => (
+    <Box
+      key={`${item.mappingCategoryId}-${item._id}`}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: 2,
+        borderRadius: 1,
+        border: '1px solid #E0E0E0',
+        backgroundColor: '#FAFAFA',
+        transition: 'all 0.2s',
+        '&:hover': {
+          borderColor: '#4F8CFF',
+          backgroundColor: 'rgba(79, 140, 255, 0.04)',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: 12,
+          height: 12,
+          borderRadius: '50%',
+          backgroundColor: item.veg ? '#4CAF50' : '#F44336',
+          mr: 2,
+          flexShrink: 0,
+        }}
+      />
+
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="body2" sx={{ fontWeight: 500, color: '#333' }}>
+          {item.name}
+        </Typography>
+        {item.description && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#666',
+              display: 'block',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.description}
+          </Typography>
+        )}
+      </Box>
+
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 600,
+          color: '#4F8CFF',
+          mr: 2,
+          flexShrink: 0,
+        }}
+      >
+        {item.itemType === 'portions' &&
+        item.portionPrices &&
+        item.portionPrices.length > 0 ? (
+          <>
+            {safeFormatCurrency(Math.min(...item.portionPrices))} -{' '}
+            {safeFormatCurrency(Math.max(...item.portionPrices))}
+          </>
+        ) : item.price !== undefined && item.price !== null ? (
+          safeFormatCurrency(item.price)
+        ) : (
+          'N/A'
+        )}
+      </Typography>
+
+      <IconButton
+        onClick={() => handleRemoveItem(item._id, item.mappingCategoryId)}
+        size="small"
+        sx={{
+          color: '#F44336',
+          flexShrink: 0,
+          '&:hover': {
+            backgroundColor: 'rgba(244, 67, 54, 0.08)',
+          },
+        }}
+        title="Remove item from category"
+      >
+        <IconTrash size={18} />
+      </IconButton>
+    </Box>
+  );
 
   return (
     <Box
@@ -531,6 +751,8 @@ export default function CategoryItemsPage() {
             <DayWiseItemSelector
               value={dayWiseItems}
               onChange={setDayWiseItems}
+              lockedItemIds={lockedItemIds}
+              onLockedItemIdsChange={setLockedItemIds}
               disabled={saving}
               categoryId={categoryId}
               categoryName={category.name}
@@ -541,9 +763,9 @@ export default function CategoryItemsPage() {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
                   Currently Assigned Items
-                  {selectedItemIds.length > 0 && (
+                  {totalAssignedItems > 0 && (
                     <Chip
-                      label={`${selectedItemIds.length}`}
+                      label={`${totalAssignedItems}`}
                       size="small"
                       sx={{
                         ml: 2,
@@ -572,7 +794,7 @@ export default function CategoryItemsPage() {
                 </Button>
               </Box>
 
-              {selectedItemIds.length === 0 ? (
+              {totalAssignedItems === 0 ? (
                 <Box sx={{ textAlign: 'center', padding: 4, backgroundColor: '#FAFAFA', borderRadius: 1 }}>
                   <Typography variant="body2" sx={{ color: '#666', marginBottom: 2 }}>
                     No items are currently assigned to this category
@@ -594,91 +816,76 @@ export default function CategoryItemsPage() {
                     Add First Item
                   </Button>
                 </Box>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {foodItems
-                    .filter((item) => selectedItemIds.includes(item._id))
-                    .map((item) => (
-                      <Box
-                        key={item._id}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: 2,
-                          borderRadius: 1,
-                          border: '1px solid #E0E0E0',
-                          backgroundColor: '#FAFAFA',
-                          transition: 'all 0.2s',
-                          '&:hover': {
-                            borderColor: '#4F8CFF',
-                            backgroundColor: 'rgba(79, 140, 255, 0.04)',
-                          },
-                        }}
-                      >
+              ) : showSubCategoryGroups ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {itemGroups.map((group) => {
+                    if (group.items.length === 0) {
+                      return null;
+                    }
+
+                    return (
+                      <Box key={group.categoryId}>
                         <Box
                           sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            backgroundColor: item.veg ? '#4CAF50' : '#F44336',
-                            mr: 2,
-                            flexShrink: 0,
+                            mb: 1.5,
+                            pl: 2,
+                            py: 1,
+                            borderLeft: '4px solid',
+                            borderColor: group.isSubCategory ? '#8B5CF6' : '#4F8CFF',
+                            borderRadius: '0 10px 10px 0',
+                            backgroundColor: group.isSubCategory
+                              ? 'rgba(139, 92, 246, 0.06)'
+                              : 'rgba(79, 140, 255, 0.06)',
                           }}
-                        />
-
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#333' }}>
-                            {item.name}
-                          </Typography>
-                          {item.description && (
+                        >
+                          <Typography
+                            component="h3"
+                            sx={{
+                              fontWeight: 600,
+                              color: '#1E3A5F',
+                              fontSize: { xs: '0.95rem', sm: '1.05rem' },
+                            }}
+                          >
+                            {group.categoryName}
+                            {group.isSubCategory && (
+                              <Chip
+                                label="Sub-category"
+                                size="small"
+                                sx={{
+                                  ml: 1.5,
+                                  height: 22,
+                                  backgroundColor: '#8B5CF6',
+                                  color: 'white',
+                                  fontWeight: 500,
+                                  fontSize: '0.7rem',
+                                }}
+                              />
+                            )}
                             <Typography
-                              variant="caption"
-                              sx={{ color: '#666', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              component="span"
+                              sx={{
+                                ml: 1,
+                                fontWeight: 500,
+                                color: '#666',
+                                fontSize: '0.85rem',
+                              }}
                             >
-                              {item.description}
+                              ({group.items.length}{' '}
+                              {group.items.length === 1 ? 'item' : 'items'})
                             </Typography>
-                          )}
+                          </Typography>
                         </Box>
 
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: 600,
-                            color: '#4F8CFF',
-                            mr: 2,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {item.itemType === 'portions' &&
-                          item.portionPrices &&
-                          item.portionPrices.length > 0 ? (
-                            <>
-                              {safeFormatCurrency(Math.min(...item.portionPrices))} -{' '}
-                              {safeFormatCurrency(Math.max(...item.portionPrices))}
-                            </>
-                          ) : item.price !== undefined && item.price !== null ? (
-                            safeFormatCurrency(item.price)
-                          ) : (
-                            'N/A'
-                          )}
-                        </Typography>
-
-                        <IconButton
-                          onClick={() => handleRemoveItem(item._id)}
-                          size="small"
-                          sx={{
-                            color: '#F44336',
-                            flexShrink: 0,
-                            '&:hover': {
-                              backgroundColor: 'rgba(244, 67, 54, 0.08)',
-                            },
-                          }}
-                          title="Remove item from category"
-                        >
-                          <IconTrash size={18} />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {group.items.map((item) => renderAssignedItem(item))}
+                        </Box>
                       </Box>
-                    ))}
+                    );
+                  })}
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {itemGroups.flatMap((group) => group.items).map((item) => renderAssignedItem(item))}
                 </Box>
               )}
             </Box>
