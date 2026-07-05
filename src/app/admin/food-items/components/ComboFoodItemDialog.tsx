@@ -28,7 +28,7 @@ import ImageUpload from '../../food-category/components/ImageUpload';
 import ComboSectionManager from './ComboSectionManager';
 import PriceConfirmationDialog from './PriceConfirmationDialog';
 import SubCategorySelect from './SubCategorySelect';
-import { mergeCategoryIdsForSave, resolveSubCategoryIds, SubCategoryOption } from '../utils/subCategoryUtils';
+import { resolveSubCategoryId, SubCategoryOption } from '../utils/subCategoryUtils';
 import {
   findZeroPricedComboItems,
   updateComboItemPrices,
@@ -129,7 +129,7 @@ export default function ComboFoodItemDialog({
   }, [item]);
 
   const [formData, setFormData] = useState<ComboFoodItem>(getInitialFormData);
-  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -150,7 +150,7 @@ export default function ComboFoodItemDialog({
         newFormData = { ...newFormData, sections: sortedSections };
       }
       setFormData(newFormData);
-      setSelectedSubCategoryIds(resolveSubCategoryIds(item?.category, subCategoryIds));
+      setSelectedSubCategoryId(resolveSubCategoryId(item?.category, subCategoryIds));
       setImageFile(null);
       setErrors({});
       // Reset price confirmation state
@@ -221,8 +221,8 @@ export default function ComboFoodItemDialog({
       newErrors.image = 'Image is required';
     }
 
-    if (selectedSubCategoryIds.length === 0) {
-      newErrors.subCategory = 'At least one sub category is required';
+    if (!selectedSubCategoryId) {
+      newErrors.subCategory = 'Sub category is required';
     }
 
     setErrors(newErrors);
@@ -239,7 +239,7 @@ export default function ComboFoodItemDialog({
           sequence: index,
         })),
         isDraft: saveAsDraft,
-        category: mergeCategoryIdsForSave(selectedSubCategoryIds, item?.category, subCategoryIds),
+        category: selectedSubCategoryId ? [selectedSubCategoryId] : [],
       };
 
       // For draft mode, skip price confirmation and save directly
@@ -383,10 +383,10 @@ export default function ComboFoodItemDialog({
           />
 
           <SubCategorySelect
-            value={selectedSubCategoryIds}
+            value={selectedSubCategoryId}
             options={subCategories}
             onChange={(value) => {
-              setSelectedSubCategoryIds(value);
+              setSelectedSubCategoryId(value);
               if (errors.subCategory) {
                 setErrors((prev) => {
                   const next = { ...prev };

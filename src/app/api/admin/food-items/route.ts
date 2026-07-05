@@ -339,37 +339,6 @@ interface FoodItem {
 /**
  * Verify JWT token and check admin role
  */
-function dedupeCategoryIds(categoryIds: string[] | undefined): string[] {
-  if (!categoryIds?.length) return [];
-
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const id of categoryIds) {
-    if (id && !seen.has(id)) {
-      seen.add(id);
-      result.push(id);
-    }
-  }
-
-  return result;
-}
-
-function dedupeMappingCategoryIds(mappings: CategoryFoodMapping[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const mapping of mappings) {
-    const categoryId = mapping.categoryId.toString();
-    if (!seen.has(categoryId)) {
-      seen.add(categoryId);
-      result.push(categoryId);
-    }
-  }
-
-  return result;
-}
-
 function verifyAuth(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -438,7 +407,7 @@ export async function GET(request: NextRequest) {
         const itemWithCategories = {
           ...itemResult.data,
           category: mappingResult.success && mappingResult.data
-            ? dedupeMappingCategoryIds(mappingResult.data)
+            ? mappingResult.data.map(m => m.categoryId.toString())
             : []
         };
 
@@ -557,11 +526,7 @@ export async function GET(request: NextRequest) {
           if (!categoryMap.has(foodItemIdStr)) {
             categoryMap.set(foodItemIdStr, []);
           }
-          const categoryIds = categoryMap.get(foodItemIdStr)!;
-          const categoryId = mapping.categoryId.toString();
-          if (!categoryIds.includes(categoryId)) {
-            categoryIds.push(categoryId);
-          }
+          categoryMap.get(foodItemIdStr)!.push(mapping.categoryId.toString());
         }
       }
 
@@ -766,13 +731,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create CategoryFoodMapping entries for each category
-    const uniqueCategoryIds = dedupeCategoryIds(data.category);
-    if (result.id && uniqueCategoryIds.length > 0) {
+    if (result.id && data.category && data.category.length > 0) {
       const foodItemId = new ObjectId(result.id);
       const mappingDocuments: CategoryFoodMapping[] = [];
 
-      for (let i = 0; i < uniqueCategoryIds.length; i++) {
-        const categoryIdStr = uniqueCategoryIds[i];
+      for (let i = 0; i < data.category.length; i++) {
+        const categoryIdStr = data.category[i];
         try {
           const categoryId = new ObjectId(categoryIdStr);
           mappingDocuments.push({
@@ -824,7 +788,7 @@ export async function POST(request: NextRequest) {
       itemWithCategories = {
         ...createdItem.data,
         category: mappingResult.success && mappingResult.data
-          ? dedupeMappingCategoryIds(mappingResult.data)
+          ? mappingResult.data.map(m => m.categoryId.toString())
           : []
       };
     }
@@ -1042,10 +1006,9 @@ const updateData: Partial<FoodItem> = {
       if (data.category && data.category.length > 0) {
         const foodItemId = new ObjectId(_id);
         const mappingDocuments: CategoryFoodMapping[] = [];
-        const uniqueCategoryIds = dedupeCategoryIds(data.category);
 
-        for (let i = 0; i < uniqueCategoryIds.length; i++) {
-          const categoryIdStr = uniqueCategoryIds[i];
+        for (let i = 0; i < data.category.length; i++) {
+          const categoryIdStr = data.category[i];
           try {
             const categoryId = new ObjectId(categoryIdStr);
             mappingDocuments.push({
@@ -1098,7 +1061,7 @@ const updateData: Partial<FoodItem> = {
     const itemWithCategories = {
       ...updatedItem.data,
       category: mappingResult.success && mappingResult.data
-        ? dedupeMappingCategoryIds(mappingResult.data)
+        ? mappingResult.data.map(m => m.categoryId.toString())
         : []
     };
 

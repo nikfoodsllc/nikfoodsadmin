@@ -37,14 +37,6 @@ interface FoodItem {
   price?: number;
   sequence?: number;
   mappingId?: string;
-  mappingCategoryId?: string;
-}
-
-interface ItemGroup {
-  categoryId: string;
-  categoryName: string;
-  isSubCategory: boolean;
-  items: FoodItem[];
 }
 
 interface ItemSequenceDialogProps {
@@ -61,13 +53,6 @@ const GRID_COLUMNS = {
   lg: 4,
   xl: 6,
 } as const;
-
-function categoryHasParent(category: FoodCategory): boolean {
-  const p = category.parentCategoryId;
-  if (p === undefined || p === null) return false;
-  if (typeof p === 'string') return p.trim().length > 0;
-  return true;
-}
 
 function getGridColumnCount(
   isXl: boolean,
@@ -121,58 +106,8 @@ function reorderFlatItems(
   }));
 }
 
-function parseDroppableId(droppableId: string): {
-  groupIndex: number;
-  rowIndex: number;
-} {
-  const match = droppableId.match(/^group-(\d+)-row-(\d+)$/);
-  return {
-    groupIndex: match ? Number.parseInt(match[1], 10) : 0,
-    rowIndex: match ? Number.parseInt(match[2], 10) : 0,
-  };
-}
-
-function buildSequenceUpdates(
-  groups: ItemGroup[]
-): { mappingId: string; sequence: number }[] {
-  const updates: { mappingId: string; sequence: number }[] = [];
-  const scopeCounters = new Map<string, number>();
-
-  for (const group of groups) {
-    for (const item of group.items) {
-      const scopeKey = item.mappingCategoryId || group.categoryId;
-      const sequence = scopeCounters.get(scopeKey) ?? 0;
-
-      updates.push({
-        mappingId: item.mappingId || '',
-        sequence,
-      });
-
-      scopeCounters.set(scopeKey, sequence + 1);
-    }
-  }
-
-  return updates;
-}
-
-function getTotalItemCount(groups: ItemGroup[]): number {
-  return groups.reduce((total, group) => total + group.items.length, 0);
-}
-
-function getGlobalItemIndex(
-  groups: ItemGroup[],
-  groupIndex: number,
-  gridColumns: number,
-  rowIndex: number,
-  columnIndex: number
-): number {
-  let offset = 0;
-
-  for (let i = 0; i < groupIndex; i++) {
-    offset += groups[i].items.length;
-  }
-
-  return offset + rowIndex * gridColumns + columnIndex;
+function parseRowId(droppableId: string): number {
+  return Number.parseInt(droppableId.replace('row-', ''), 10);
 }
 
 export default function ItemSequenceDialog({
@@ -190,13 +125,10 @@ export default function ItemSequenceDialog({
   const gridColumns = getGridColumnCount(isXl, isLg, isMd, isSm);
 
   const [selectedDay, setSelectedDay] = useState<string>('');
-  const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
+  const [items, setItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  const includeSubCategories = category ? !categoryHasParent(category) : false;
-  const totalItems = getTotalItemCount(itemGroups);
 
   useEffect(() => {
     if (open && category) {
@@ -220,7 +152,7 @@ export default function ItemSequenceDialog({
         setSelectedDay('');
       }
 
-      setItemGroups([]);
+      setItems([]);
     }
   }, [open, category]);
 
@@ -245,7 +177,7 @@ export default function ItemSequenceDialog({
         params.append('mappingType', 'DAY_WISE');
 
         if (!selectedDay) {
-          setItemGroups([]);
+          setItems([]);
           setLoading(false);
           return;
         }
@@ -253,10 +185,6 @@ export default function ItemSequenceDialog({
         params.append('day', selectedDay);
       } else {
         params.append('mappingType', 'FLAT');
-      }
-
-      if (includeSubCategories) {
-        params.append('includeSubCategories', 'true');
       }
 
       const response = await fetch(
@@ -274,20 +202,9 @@ export default function ItemSequenceDialog({
 
       const data = await response.json();
 
-      if (includeSubCategories && data.data?.groups?.length) {
-        setItemGroups(data.data.groups);
-      } else {
-        const fetchedItems: FoodItem[] = data.data?.items || [];
+      const fetchedItems: FoodItem[] = data.data?.items || [];
 
-        setItemGroups([
-          {
-            categoryId: category._id?.toString() || '',
-            categoryName: category.name,
-            isSubCategory: false,
-            items: fetchedItems,
-          },
-        ]);
-      }
+      setItems(fetchedItems);
     } catch (err) {
       console.error('Error fetching items:', err);
 
@@ -295,7 +212,7 @@ export default function ItemSequenceDialog({
         err instanceof Error ? err.message : 'Failed to fetch food items'
       );
 
-      setItemGroups([]);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -304,16 +221,8 @@ export default function ItemSequenceDialog({
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
 
-    const { groupIndex: sourceGroupIndex, rowIndex: sourceRowIndex } =
-      parseDroppableId(result.source.droppableId);
-    const {
-      groupIndex: destinationGroupIndex,
-      rowIndex: destinationRowIndex,
-    } = parseDroppableId(result.destination.droppableId);
-
-    if (sourceGroupIndex !== destinationGroupIndex) {
-      return;
-    }
+    const sourceRowIndex = parseRowId(result.source.droppableId);
+    const destinationRowIndex = parseRowId(result.destination.droppableId);
 
     if (
       sourceRowIndex === destinationRowIndex &&
@@ -322,26 +231,15 @@ export default function ItemSequenceDialog({
       return;
     }
 
-    const destinationIndex = result.destination.index;
-
-    setItemGroups((prevGroups) =>
-      prevGroups.map((group, index) => {
-        if (index !== sourceGroupIndex) {
-          return group;
-        }
-
-        return {
-          ...group,
-          items: reorderFlatItems(
-            group.items,
-            sourceRowIndex,
-            result.source.index,
-            destinationRowIndex,
-            destinationIndex,
-            gridColumns
-          ),
-        };
-      })
+    setItems(
+      reorderFlatItems(
+        items,
+        sourceRowIndex,
+        result.source.index,
+        destinationRowIndex,
+        result.destination.index,
+        gridColumns
+      )
     );
   };
 
@@ -352,11 +250,17 @@ export default function ItemSequenceDialog({
     setError('');
 
     try {
-      const updates = buildSequenceUpdates(itemGroups);
-      const missingMappingId = updates.find((update) => !update.mappingId);
+      const updates = items.map((item, index) => ({
+        mappingId: item.mappingId,
+        sequence: index,
+      }));
+
+      const missingMappingId = items.find((item) => !item.mappingId);
 
       if (missingMappingId) {
-        throw new Error('Mapping ID not found for one or more items');
+        throw new Error(
+          `Mapping ID not found for item: ${missingMappingId.name}`
+        );
       }
 
       const response = await fetch(
@@ -403,6 +307,8 @@ export default function ItemSequenceDialog({
       (d) => d.items && d.items.length > 0
     );
   };
+
+  const itemRows = chunkIntoRows(items, gridColumns);
 
   return (
     <Dialog
@@ -478,7 +384,7 @@ export default function ItemSequenceDialog({
             >
               <CircularProgress />
             </Box>
-          ) : totalItems === 0 ? (
+          ) : items.length === 0 ? (
             <Box
               sx={{
                 textAlign: 'center',
@@ -495,7 +401,7 @@ export default function ItemSequenceDialog({
             <>
               <Typography variant="body2" color="text.secondary">
                 Drag items left or right within a row, or drag up/down to move
-                them into another row. Items are grouped by category.
+                them into another row.
               </Typography>
 
               <DragDropContext onDragEnd={handleDragEnd}>
@@ -503,259 +409,198 @@ export default function ItemSequenceDialog({
                   sx={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 4,
+                    gap: 2,
                   }}
                 >
-                  {itemGroups.map((group, groupIndex) => {
-                    const itemRows = chunkIntoRows(group.items, gridColumns);
-
-                    if (group.items.length === 0) {
-                      return null;
-                    }
-
-                    return (
-                      <Box key={group.categoryId}>
+                  {itemRows.map((rowItems, rowIndex) => (
+                    <Droppable
+                      key={`row-${rowIndex}`}
+                      droppableId={`row-${rowIndex}`}
+                      direction="horizontal"
+                    >
+                      {(provided, snapshot) => (
                         <Box
-                          sx={{
-                            mb: 2,
-                            pl: 2,
-                            py: 1,
-                            borderLeft: '4px solid #4F8CFF',
-                            borderRadius: '0 10px 10px 0',
-                          }}
-                        >
-                          <Typography
-                            component="h3"
-                            sx={{
-                              fontWeight: 600,
-                              color: '#1E3A5F',
-                              fontSize: { xs: '0.95rem', sm: '1.05rem' },
-                            }}
-                          >
-                            {group.categoryName}
-                            <Typography
-                              component="span"
-                              sx={{
-                                ml: 1,
-                                fontWeight: 500,
-                                color: '#666',
-                                fontSize: '0.85rem',
-                              }}
-                            >
-                              ({group.items.length}{' '}
-                              {group.items.length === 1 ? 'item' : 'items'})
-                            </Typography>
-                          </Typography>
-                        </Box>
-
-                        <Box
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
                           sx={{
                             display: 'flex',
-                            flexDirection: 'column',
+                            flexDirection: 'row',
+                            alignItems: 'stretch',
                             gap: 2,
+                            minHeight: 240,
+                            p: 1.5,
+                            borderRadius: 2,
+                            border: '1px dashed #CBD5E1',
+                            backgroundColor: snapshot.isDraggingOver
+                              ? '#E3F2FD'
+                              : '#FAFBFC',
+                            transition: 'background-color 0.2s',
                           }}
                         >
-                          {itemRows.map((rowItems, rowIndex) => (
-                            <Droppable
-                              key={`group-${groupIndex}-row-${rowIndex}`}
-                              droppableId={`group-${groupIndex}-row-${rowIndex}`}
-                              direction="horizontal"
-                            >
-                              {(provided, snapshot) => (
-                                <Box
-                                  ref={provided.innerRef}
-                                  {...provided.droppableProps}
-                                  sx={{
-                                    display: 'flex',
-                                    flexDirection: 'row',
-                                    alignItems: 'stretch',
-                                    gap: 2,
-                                    minHeight: 240,
-                                    p: 1.5,
-                                    borderRadius: 2,
-                                    border: '1px dashed #CBD5E1',
-                                    backgroundColor: snapshot.isDraggingOver
-                                      ? '#E3F2FD'
-                                      : '#FAFBFC',
-                                    transition: 'background-color 0.2s',
-                                  }}
-                                >
-                                  {rowItems.map((item, columnIndex) => {
-                                    const globalIndex = getGlobalItemIndex(
-                                      itemGroups,
-                                      groupIndex,
-                                      gridColumns,
-                                      rowIndex,
-                                      columnIndex
-                                    );
+                          {rowItems.map((item, columnIndex) => {
+                            const globalIndex =
+                              rowIndex * gridColumns + columnIndex;
 
-                                    return (
-                                      <Draggable
-                                        key={`${group.categoryId}-${item._id}`}
-                                        draggableId={`${group.categoryId}-${item._id}`}
-                                        index={columnIndex}
-                                      >
-                                        {(provided, snapshot) => (
-                                          <Box
-                                            ref={provided.innerRef}
-                                            {...provided.draggableProps}
-                                            {...provided.dragHandleProps}
-                                            sx={{
-                                              flex: '1 1 0',
-                                              minWidth: 0,
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              alignItems: 'center',
-                                              gap: 1.5,
-                                              p: 2,
-                                              borderRadius: 3,
-                                              border: '1px solid #E5E7EB',
-                                              backgroundColor: snapshot.isDragging
-                                                ? '#E3F2FD'
-                                                : '#fff',
-                                              boxShadow: snapshot.isDragging
-                                                ? '0 8px 20px rgba(0,0,0,0.15)'
-                                                : '0 2px 6px rgba(0,0,0,0.05)',
-                                              transition: '0.2s',
-                                              cursor: 'grab',
-                                              minHeight: 220,
-                                              '&:hover': {
-                                                borderColor: '#4F8CFF',
-                                                transform: 'translateY(-2px)',
-                                              },
-                                              '&:active': {
-                                                cursor: 'grabbing',
-                                              },
-                                              ...provided.draggableProps.style,
-                                            }}
-                                          >
-                                            <Box
-                                              sx={{
-                                                width: '100%',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                              }}
-                                            >
-                                              <Box
-                                                sx={{
-                                                  width: 30,
-                                                  height: 30,
-                                                  borderRadius: '50%',
-                                                  backgroundColor: '#4F8CFF',
-                                                  color: '#fff',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  fontSize: '0.85rem',
-                                                  fontWeight: 700,
-                                                }}
-                                              >
-                                                {globalIndex + 1}
-                                              </Box>
-
-                                              <IconGripVertical
-                                                size={20}
-                                                color="#999"
-                                              />
-                                            </Box>
-
-                                            <Box
-                                              sx={{
-                                                width: 100,
-                                                height: 100,
-                                                borderRadius: 3,
-                                                overflow: 'hidden',
-                                                border: '1px solid #E5E7EB',
-                                                backgroundColor: '#F3F4F6',
-                                              }}
-                                            >
-                                              {item.url ? (
-                                                <Box
-                                                  component="img"
-                                                  src={item.url}
-                                                  alt={item.name}
-                                                  sx={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                  }}
-                                                />
-                                              ) : (
-                                                <Box
-                                                  sx={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: '0.75rem',
-                                                    color: '#999',
-                                                  }}
-                                                >
-                                                  No Image
-                                                </Box>
-                                              )}
-                                            </Box>
-
-                                            <Typography
-                                              sx={{
-                                                fontWeight: 600,
-                                                textAlign: 'center',
-                                                fontSize: '0.95rem',
-                                                lineHeight: 1.4,
-                                                minHeight: 42,
-                                              }}
-                                            >
-                                              {item.name}
-                                            </Typography>
-
-                                            {item.price !== undefined &&
-                                              item.price !== null &&
-                                              !Number.isNaN(item.price) &&
-                                              Number.isFinite(item.price) && (
-                                                <Typography
-                                                  sx={{
-                                                    color: '#4F8CFF',
-                                                    fontWeight: 700,
-                                                    fontSize: '0.9rem',
-                                                  }}
-                                                >
-                                                  {safeFormatCurrency(item.price)}
-                                                </Typography>
-                                              )}
-                                          </Box>
-                                        )}
-                                      </Draggable>
-                                    );
-                                  })}
-
-                                  {provided.placeholder}
-
-                                  {Array.from({
-                                    length: Math.max(
-                                      0,
-                                      gridColumns - rowItems.length
-                                    ),
-                                  }).map((_, spacerIndex) => (
+                            return (
+                              <Draggable
+                                key={item._id}
+                                draggableId={item._id}
+                                index={columnIndex}
+                              >
+                                {(provided, snapshot) => (
+                                  <Box
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    sx={{
+                                      flex: '1 1 0',
+                                      minWidth: 0,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      gap: 1.5,
+                                      p: 2,
+                                      borderRadius: 3,
+                                      border: '1px solid #E5E7EB',
+                                      backgroundColor: snapshot.isDragging
+                                        ? '#E3F2FD'
+                                        : '#fff',
+                                      boxShadow: snapshot.isDragging
+                                        ? '0 8px 20px rgba(0,0,0,0.15)'
+                                        : '0 2px 6px rgba(0,0,0,0.05)',
+                                      transition: '0.2s',
+                                      cursor: 'grab',
+                                      minHeight: 220,
+                                      '&:hover': {
+                                        borderColor: '#4F8CFF',
+                                        transform: 'translateY(-2px)',
+                                      },
+                                      '&:active': {
+                                        cursor: 'grabbing',
+                                      },
+                                      ...provided.draggableProps.style,
+                                    }}
+                                  >
                                     <Box
-                                      key={`spacer-${groupIndex}-${rowIndex}-${spacerIndex}`}
                                       sx={{
-                                        flex: '1 1 0',
-                                        minWidth: 0,
-                                        minHeight: 220,
-                                        pointerEvents: 'none',
+                                        width: '100%',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
                                       }}
-                                    />
-                                  ))}
-                                </Box>
-                              )}
-                            </Droppable>
+                                    >
+                                      <Box
+                                        sx={{
+                                          width: 30,
+                                          height: 30,
+                                          borderRadius: '50%',
+                                          backgroundColor: '#4F8CFF',
+                                          color: '#fff',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '0.85rem',
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {globalIndex + 1}
+                                      </Box>
+
+                                      <IconGripVertical
+                                        size={20}
+                                        color="#999"
+                                      />
+                                    </Box>
+
+                                    <Box
+                                      sx={{
+                                        width: 100,
+                                        height: 100,
+                                        borderRadius: 3,
+                                        overflow: 'hidden',
+                                        border: '1px solid #E5E7EB',
+                                        backgroundColor: '#F3F4F6',
+                                      }}
+                                    >
+                                      {item.url ? (
+                                        <Box
+                                          component="img"
+                                          src={item.url}
+                                          alt={item.name}
+                                          sx={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                          }}
+                                        />
+                                      ) : (
+                                        <Box
+                                          sx={{
+                                            width: '100%',
+                                            height: '100%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '0.75rem',
+                                            color: '#999',
+                                          }}
+                                        >
+                                          No Image
+                                        </Box>
+                                      )}
+                                    </Box>
+
+                                    <Typography
+                                      sx={{
+                                        fontWeight: 600,
+                                        textAlign: 'center',
+                                        fontSize: '0.95rem',
+                                        lineHeight: 1.4,
+                                        minHeight: 42,
+                                      }}
+                                    >
+                                      {item.name}
+                                    </Typography>
+
+                                    {item.price !== undefined &&
+                                      item.price !== null &&
+                                      !Number.isNaN(item.price) &&
+                                      Number.isFinite(item.price) && (
+                                        <Typography
+                                          sx={{
+                                            color: '#4F8CFF',
+                                            fontWeight: 700,
+                                            fontSize: '0.9rem',
+                                          }}
+                                        >
+                                          {safeFormatCurrency(item.price)}
+                                        </Typography>
+                                      )}
+                                  </Box>
+                                )}
+                              </Draggable>
+                            );
+                          })}
+
+                          {provided.placeholder}
+
+                          {Array.from({
+                            length: Math.max(0, gridColumns - rowItems.length),
+                          }).map((_, spacerIndex) => (
+                            <Box
+                              key={`spacer-${rowIndex}-${spacerIndex}`}
+                              sx={{
+                                flex: '1 1 0',
+                                minWidth: 0,
+                                minHeight: 220,
+                                pointerEvents: 'none',
+                              }}
+                            />
                           ))}
                         </Box>
-                      </Box>
-                    );
-                  })}
+                      )}
+                    </Droppable>
+                  ))}
                 </Box>
               </DragDropContext>
             </>
@@ -782,7 +627,7 @@ export default function ItemSequenceDialog({
 
         <Button
           onClick={handleSave}
-          disabled={loading || saving || totalItems === 0}
+          disabled={loading || saving || items.length === 0}
           variant="contained"
           sx={{
             textTransform: 'none',

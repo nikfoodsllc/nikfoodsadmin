@@ -30,7 +30,7 @@ import ImageUpload from '../../food-category/components/ImageUpload';
 import { FoodModifier } from '@/types/modifier';
 import { useAuth } from '@/contexts/AuthContext';
 import SubCategorySelect from './SubCategorySelect';
-import { mergeCategoryIdsForSave, resolveSubCategoryIds, SubCategoryOption } from '../utils/subCategoryUtils';
+import { resolveSubCategoryId, SubCategoryOption } from '../utils/subCategoryUtils';
 
 interface SimpleFoodItem {
   _id?: string;
@@ -109,7 +109,7 @@ export default function SimpleFoodItemDialog({
   }, [item]);
 
   const [formData, setFormData] = useState<SimpleFoodItem>(getInitialFormData);
-  const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [modifiers, setModifiers] = useState<FoodModifier[]>([]);
@@ -157,7 +157,7 @@ export default function SimpleFoodItemDialog({
     if (open) {
       const newFormData = item ? { ...item, price: safeNonNegativePrice(item.price) } : getDefaultFormData();
       setFormData(newFormData);
-      setSelectedSubCategoryIds(resolveSubCategoryIds(item?.category, subCategoryIds));
+      setSelectedSubCategoryId(resolveSubCategoryId(item?.category, subCategoryIds));
       setImageFile(null);
       setErrors({});
       setSelectedModifier(null);
@@ -242,8 +242,8 @@ export default function SimpleFoodItemDialog({
       newErrors.image = 'Image is required';
     }
 
-    if (selectedSubCategoryIds.length === 0) {
-      newErrors.subCategory = 'At least one sub category is required';
+    if (!selectedSubCategoryId) {
+      newErrors.subCategory = 'Sub category is required';
     }
 
     setErrors(newErrors);
@@ -254,7 +254,7 @@ export default function SimpleFoodItemDialog({
     const submitData = {
       ...formData,
       isDraft: saveAsDraft,
-      category: mergeCategoryIdsForSave(selectedSubCategoryIds, item?.category, subCategoryIds),
+      category: selectedSubCategoryId ? [selectedSubCategoryId] : [],
     };
     if (validate()) {
       onSave(submitData, imageFile);
@@ -348,10 +348,10 @@ export default function SimpleFoodItemDialog({
           />
 
           <SubCategorySelect
-            value={selectedSubCategoryIds}
+            value={selectedSubCategoryId}
             options={subCategories}
             onChange={(value) => {
-              setSelectedSubCategoryIds(value);
+              setSelectedSubCategoryId(value);
               if (errors.subCategory) {
                 setErrors((prev) => {
                   const next = { ...prev };
