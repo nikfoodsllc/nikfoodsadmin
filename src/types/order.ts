@@ -200,7 +200,8 @@ export interface Order {
   stripePaymentIntentId?: string; // Only for card payments
   deliveryMessages?: string[]; // Cart clubbing messages
   hasReview?: boolean; // Whether this order has been reviewed
-  emailStatus?: EmailStatusInfo; // Track email sending status
+  emailStatus?: EmailStatusInfo; // Track order confirmation email status
+  paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -222,6 +223,8 @@ export interface FoodCategory {
   isDraft?: boolean;
   listingType?: CategoryListingType; // 'flat' | 'day-wise'
   dayWiseItems?: CategoryDayWiseItem[]; // For day-wise categories
+  /** Food item IDs whose day-wise rows stay checked when using Clear All */
+  dayWiseLockedItemIds?: string[];
   itemCount?: number; // Total items assigned to the category
   createdAt?: Date | string;
   updatedAt?: Date | string;
