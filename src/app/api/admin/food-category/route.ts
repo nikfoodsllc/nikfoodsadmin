@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { ObjectId, UpdateFilter } from 'mongodb';
 import { FoodCategory, CategoryListingType, CategoryDayWiseItem, CategoryFoodMapping } from '@/types/order';
+import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 /**
  * Validate listing type
@@ -790,6 +791,7 @@ export async function POST(request: NextRequest) {
       itemCount,
     };
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json(responseCategory, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/admin/food-category:', error);
@@ -1037,6 +1039,7 @@ export async function PUT(request: NextRequest) {
       itemCount,
     };
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json(responseCategory);
   } catch (error) {
     console.error('Error in PUT /api/admin/food-category:', error);
@@ -1113,6 +1116,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json({ success: true, message: 'Category deleted successfully' });
   } catch (error) {
     console.error('Error in DELETE /api/admin/food-category:', error);
