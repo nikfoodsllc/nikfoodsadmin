@@ -4,6 +4,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { ObjectId, type Filter } from 'mongodb';
+import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 // Interface for available days
 interface AvailableDay {
@@ -829,6 +830,7 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json(itemWithCategories, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/admin/food-items:', error);
@@ -1102,6 +1104,7 @@ const updateData: Partial<FoodItem> = {
         : []
     };
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json(itemWithCategories);
   } catch (error) {
     console.error('Error in PUT /api/admin/food-items:', error);
@@ -1173,6 +1176,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json({ success: true, message: 'Food item deleted successfully' });
   } catch (error) {
     console.error('Error in DELETE /api/admin/food-items:', error);

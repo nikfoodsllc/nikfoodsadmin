@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { CategoryFoodMapping } from '@/types/order';
+import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 /**
  * Interface for sequence update item
@@ -212,6 +213,10 @@ export async function PUT(request: NextRequest) {
 
     // Determine overall success
     const allSuccessful = failureCount === 0;
+
+    if (successCount > 0) {
+      invalidateLivesiteHomeMenuCache();
+    }
 
     return NextResponse.json(
       {
