@@ -8,6 +8,7 @@ import {
   MappingType
 } from '@/types/order';
 import { validateBulkMapping, sanitizeMappingData } from '@/lib/validators/categoryFoodMapping';
+import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 /**
  * Verify JWT token and check admin role
@@ -276,6 +277,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       data: {
@@ -391,6 +393,7 @@ export async function DELETE(request: NextRequest) {
       deletedCount = deleteResult.deletedCount || 0;
     }
 
+    invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       data: {
