@@ -14,7 +14,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "NikFoods Admin - Admin Dashboard",
   description: "Manage your NikFoods business with ease",
-  icons: "/favicon.ico",
+  icons: "/favicon.ico?v=2",
 };
 
 export default function RootLayout({
