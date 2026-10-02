@@ -791,7 +791,7 @@ export async function POST(request: NextRequest) {
       itemCount,
     };
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json(responseCategory, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/admin/food-category:', error);
@@ -1039,7 +1039,7 @@ export async function PUT(request: NextRequest) {
       itemCount,
     };
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json(responseCategory);
   } catch (error) {
     console.error('Error in PUT /api/admin/food-category:', error);
@@ -1116,7 +1116,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({ success: true, message: 'Category deleted successfully' });
   } catch (error) {
     console.error('Error in DELETE /api/admin/food-category:', error);

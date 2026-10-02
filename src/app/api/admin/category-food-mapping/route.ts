@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      invalidateLivesiteHomeMenuCache();
+      await invalidateLivesiteHomeMenuCache();
       return NextResponse.json({
         success: true,
         data: {
@@ -411,7 +411,7 @@ export async function POST(request: NextRequest) {
         throw new Error(result.error || 'Failed to create category mapping');
       }
 
-      invalidateLivesiteHomeMenuCache();
+      await invalidateLivesiteHomeMenuCache();
       return NextResponse.json({
         success: true,
         data: {
@@ -531,7 +531,7 @@ export async function PUT(request: NextRequest) {
       throw new Error(updateResult.error || 'Failed to update mapping');
     }
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       message: 'Mapping updated successfully',
@@ -671,7 +671,7 @@ export async function DELETE(request: NextRequest) {
       deletedCount = deleteResult.deletedCount || 0;
     }
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       data: {

@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { AvailableDate } from '@/types/order';
+import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 interface CreateUpdateRequest {
   date: string;
@@ -253,6 +254,7 @@ export async function POST(request: NextRequest) {
         throw new Error('Failed to fetch created date data');
       }
 
+      await invalidateLivesiteHomeMenuCache();
       return NextResponse.json({
         data: {
           id: createdDate.data._id?.toString(),
@@ -288,6 +290,7 @@ export async function POST(request: NextRequest) {
       _id: existingResult.data._id
     });
 
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       data: {
         id: updatedDate.data?._id?.toString(),
@@ -409,6 +412,7 @@ export async function PUT(request: NextRequest) {
       updatedAt: date.updatedAt
     })) || [];
 
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       data: {
         updated: responseData,
@@ -470,6 +474,7 @@ export async function DELETE(request: NextRequest) {
       throw new Error(deleteResult.error || 'Failed to delete dates');
     }
 
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       data: {
         deletedCount: deleteResult.deletedCount || 0,
