@@ -3,7 +3,6 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { CategoryFoodMapping } from '@/types/order';
-import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 /**
  * Verify JWT token and check admin role
@@ -113,7 +112,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       message: 'Item sequences updated successfully',
