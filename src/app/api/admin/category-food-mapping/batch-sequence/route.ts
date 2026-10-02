@@ -215,7 +215,7 @@ export async function PUT(request: NextRequest) {
     const allSuccessful = failureCount === 0;
 
     if (successCount > 0) {
-      await invalidateLivesiteHomeMenuCache();
+      invalidateLivesiteHomeMenuCache();
     }
 
     return NextResponse.json(
