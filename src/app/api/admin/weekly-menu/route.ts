@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { IWeeklyMenu, IWeeklyMenuPopulated, IPopulatedFoodItem } from '@/types/weeklyMenu';
+import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 
 // AvailableDay interface for type safety
 interface AvailableDay {
@@ -420,6 +421,8 @@ export async function PUT(req: NextRequest) {
     if (validation.errors.length > 0) {
       responseMessage += ` (Note: ${validation.errors.length} day(s) were filtered due to being disabled)`;
     }
+
+    await invalidateLivesiteHomeMenuCache();
 
     return NextResponse.json({
       data: filteredMenu,

@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       data: {
@@ -393,7 +393,7 @@ export async function DELETE(request: NextRequest) {
       deletedCount = deleteResult.deletedCount || 0;
     }
 
-    invalidateLivesiteHomeMenuCache();
+    await invalidateLivesiteHomeMenuCache();
     return NextResponse.json({
       success: true,
       data: {
