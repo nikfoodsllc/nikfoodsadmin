@@ -709,7 +709,11 @@ export default function DeliveryReportPage() {
                     Payment Method
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#111827', fontSize: '13px' }}>
-                    {order.paymentMethod === 'Credit Card' ? 'Card' : 'Cash on Delivery'}
+                    {order.paymentMethod === 'Credit Card'
+                      ? 'Card'
+                      : order.paymentMethod === 'Cash on Delivery'
+                        ? 'Cash on Delivery'
+                        : order.paymentMethod}
                   </Typography>
                 </Box>
                 <Box>

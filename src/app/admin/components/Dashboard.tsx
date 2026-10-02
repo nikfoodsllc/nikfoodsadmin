@@ -14,6 +14,7 @@ import {
   IconUsers,
   IconCreditCard,
   IconCash,
+  IconWallet,
 } from '@tabler/icons-react';
 import StatCard from './StatCard';
 import DateRangeSelector, { defaultDateRange } from './DateRangeSelector';
@@ -46,6 +47,10 @@ interface PaymentMethodBreakdown {
     revenue: number;
   };
   cashOnDelivery: {
+    count: number;
+    revenue: number;
+  };
+  walletsAndBank: {
     count: number;
     revenue: number;
   };
@@ -514,6 +519,40 @@ export default function Dashboard() {
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#999' }}>
               {stats.paymentMethodBreakdown.creditCard.count} orders
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              border: '1px solid #e0e0e0',
+              borderRadius: '8px',
+              padding: '20px',
+              backgroundColor: '#fff',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, marginBottom: 2 }}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#F3EBFF',
+                }}
+              >
+                <IconWallet size={20} color="#8B5CF6" />
+              </Box>
+              <Typography sx={{ fontSize: '14px', fontWeight: 500, color: '#666' }}>
+                Apple Pay, Google Pay &amp; Bank
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: '24px', fontWeight: 700, color: '#333', marginBottom: 0.5 }}>
+              {formatCurrency(stats.paymentMethodBreakdown.walletsAndBank?.revenue ?? 0)}
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: '#999' }}>
+              {stats.paymentMethodBreakdown.walletsAndBank?.count ?? 0} orders
             </Typography>
           </Box>
 

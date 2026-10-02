@@ -1,6 +1,16 @@
 import { ObjectId } from 'mongodb';
 
-export type PaymentMethod = 'Credit Card' | 'Cash on Delivery';
+// 'Credit Card' is a plain card payment. The Stripe webhook on the live site records the real
+// method for wallet/bank payments ('Apple Pay', 'Google Pay', 'Bank', 'Link', 'Klarna').
+export type PaymentMethod =
+  | 'Credit Card'
+  | 'Cash on Delivery'
+  | 'Apple Pay'
+  | 'Google Pay'
+  | 'Bank'
+  | 'Link'
+  | 'Klarna'
+  | 'Other';
 
 export type CategoryListingType = 'flat' | 'day-wise';
 

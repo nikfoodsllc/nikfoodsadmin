@@ -44,7 +44,7 @@ function verifyAuth(request: NextRequest) {
  *   - search (order ID, customer name, email)
  *   - status (order status or 'all')
  *   - paymentStatus ('paid', 'unpaid', 'failed', 'refunded', or 'all')
- *   - paymentMethod ('Credit Card', 'Cash on Delivery', or 'all')
+ *   - paymentMethod ('Credit Card', 'Apple Pay', 'Google Pay', 'Bank', 'Link', 'Klarna', 'Other', 'Cash on Delivery', or 'all')
  *   - startDate (filter from date)
  *   - endDate (filter to date)
  *   - sortBy (date_desc, date_asc, amount_desc, amount_asc)
