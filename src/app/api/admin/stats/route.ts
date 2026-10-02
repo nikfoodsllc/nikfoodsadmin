@@ -106,6 +106,11 @@ interface PaymentMethodBreakdown {
     count: number;
     revenue: number;
   };
+  // Apple Pay, Google Pay, Bank, Link, Klarna and any other online method
+  walletsAndBank: {
+    count: number;
+    revenue: number;
+  };
 }
 
 interface AdminStats {
@@ -509,6 +514,7 @@ export async function GET(request: NextRequest) {
       const paymentMethodBreakdown: PaymentMethodBreakdown = {
         creditCard: { count: 0, revenue: 0 },
         cashOnDelivery: { count: 0, revenue: 0 },
+        walletsAndBank: { count: 0, revenue: 0 },
       };
 
       if (paymentMethodAggResult.success && paymentMethodAggResult.data) {
@@ -523,6 +529,11 @@ export async function GET(request: NextRequest) {
               count: item.count,
               revenue: item.revenue,
             };
+          } else {
+            // Apple Pay, Google Pay, Bank, Link, Klarna, Other (and any unknown value) so no order
+            // drops out of the breakdown
+            paymentMethodBreakdown.walletsAndBank.count += item.count;
+            paymentMethodBreakdown.walletsAndBank.revenue += item.revenue;
           }
         });
       }
