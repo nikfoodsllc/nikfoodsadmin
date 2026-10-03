@@ -141,6 +141,7 @@ export default function OrderFilters({
             <MenuItem value="paid">Paid</MenuItem>
             <MenuItem value="unpaid">Unpaid</MenuItem>
             <MenuItem value="failed">Failed</MenuItem>
+            <MenuItem value="partially_refunded">Partially refunded</MenuItem>
             <MenuItem value="refunded">Refunded</MenuItem>
           </Select>
         </FormControl>
