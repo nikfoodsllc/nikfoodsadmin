@@ -156,6 +156,12 @@ export default function OrderFilters({
           >
             <MenuItem value="all">All Methods</MenuItem>
             <MenuItem value="Credit Card">Credit Card</MenuItem>
+            <MenuItem value="Apple Pay">Apple Pay</MenuItem>
+            <MenuItem value="Google Pay">Google Pay</MenuItem>
+            <MenuItem value="Bank">Bank</MenuItem>
+            <MenuItem value="Link">Link</MenuItem>
+            <MenuItem value="Klarna">Klarna</MenuItem>
+            <MenuItem value="Other">Other</MenuItem>
             <MenuItem value="Cash on Delivery">Cash on Delivery</MenuItem>
           </Select>
         </FormControl>
