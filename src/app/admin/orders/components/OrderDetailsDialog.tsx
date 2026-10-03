@@ -27,7 +27,7 @@ import {
 import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
-import { getDisplayPaymentStatus } from '@/utils/refunds';
+import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { Order, OrderStatus } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
@@ -495,6 +495,25 @@ export default function OrderDetailsDialog({
                 {safeFormatCurrency(order.totalPaid)}
               </Typography>
             </Box>
+            {getRefundedAmount(order) > 0 && (
+              <>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" sx={{ color: '#B91C1C' }}>
+                    {order.paymentStatus === 'refunded' ? 'Refunded (in full)' : 'Refunded (partial)'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#B91C1C' }}>
+                    -{safeFormatCurrency(getRefundedAmount(order))}
+                  </Typography>
+                </Box>
+                <Divider sx={{ marginY: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>Total after refund</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827' }}>
+                    {safeFormatCurrency(getNetTotal(order))}
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
 
@@ -518,13 +537,13 @@ export default function OrderDetailsDialog({
                 </Typography>
               </Box>
             )}
-            {typeof order.refundedAmount === 'number' && order.refundedAmount > 0 && (
+            {getRefundedAmount(order) > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" sx={{ color: '#6B7280' }}>
                   {order.paymentStatus === 'refunded' ? 'Refunded (in full)' : 'Partially refunded'}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  ${order.refundedAmount.toFixed(2)} of ${order.totalPaid.toFixed(2)}
+                  {safeFormatCurrency(getRefundedAmount(order))} of {safeFormatCurrency(order.totalPaid)}
                 </Typography>
               </Box>
             )}
