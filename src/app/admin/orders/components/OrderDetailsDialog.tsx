@@ -517,6 +517,16 @@ export default function OrderDetailsDialog({
                 </Typography>
               </Box>
             )}
+            {typeof order.refundedAmount === 'number' && order.refundedAmount > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" sx={{ color: '#6B7280' }}>
+                  {order.paymentStatus === 'refunded' ? 'Refunded (in full)' : 'Partially refunded'}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  ${order.refundedAmount.toFixed(2)} of ${order.totalPaid.toFixed(2)}
+                </Typography>
+              </Box>
+            )}
             {typeof order.paymentAttempts === 'number' && order.paymentAttempts > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" sx={{ color: '#6B7280' }}>Failed attempts</Typography>
