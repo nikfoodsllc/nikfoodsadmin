@@ -122,6 +122,10 @@ export default function DateRangeSelector({ value, onChange }: DateRangeSelector
         }}
       >
         <Stack spacing={0.5} sx={{ padding: 1 }}>
+          <MenuItem onClick={handleCustomOpen} selected={isCustom} sx={{ borderRadius: 1, fontSize: '14px', fontWeight: 600 }}>
+            Custom range…
+          </MenuItem>
+          <Divider sx={{ marginY: 0.5 }} />
           <MenuItem onClick={() => handlePresetSelect('today')} selected={value.preset === 'today'} sx={{ borderRadius: 1, fontSize: '14px' }}>
             Today
           </MenuItem>
@@ -145,10 +149,6 @@ export default function DateRangeSelector({ value, onChange }: DateRangeSelector
           <Divider sx={{ marginY: 0.5 }} />
           <MenuItem onClick={() => handlePresetSelect('thisYear')} selected={value.preset === 'thisYear'} sx={{ borderRadius: 1, fontSize: '14px' }}>
             This Year
-          </MenuItem>
-          <Divider sx={{ marginY: 0.5 }} />
-          <MenuItem onClick={handleCustomOpen} selected={isCustom} sx={{ borderRadius: 1, fontSize: '14px', fontWeight: 600 }}>
-            Custom range…
           </MenuItem>
         </Stack>
       </Menu>
