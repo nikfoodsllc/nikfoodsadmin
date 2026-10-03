@@ -517,6 +517,46 @@ export default function OrderDetailsDialog({
                 </Typography>
               </Box>
             )}
+            {typeof order.paymentAttempts === 'number' && order.paymentAttempts > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" sx={{ color: '#6B7280' }}>Failed attempts</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>{order.paymentAttempts}</Typography>
+              </Box>
+            )}
+            {order.paymentError && (
+              <Box sx={{ backgroundColor: '#FEF2F2', borderRadius: 1, padding: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#991B1B' }}>
+                  {order.paymentStatus === 'paid' ? 'Earlier payment problem' : 'Payment problem'}:{' '}
+                  {order.paymentError.code}
+                  {order.paymentError.declineCode ? ` / ${order.paymentError.declineCode}` : ''}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#7F1D1D' }}>{order.paymentError.message}</Typography>
+                <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                  {new Date(order.paymentError.at).toLocaleString()}
+                  {order.paymentError.paymentMethodType ? ` · ${order.paymentError.paymentMethodType}` : ''}
+                </Typography>
+              </Box>
+            )}
+            {order.paymentActionRequiredAt && order.paymentStatus !== 'paid' && (
+              <Typography variant="caption" sx={{ color: '#92400E' }}>
+                Customer was asked to authenticate (e.g. 3D Secure) at{' '}
+                {new Date(order.paymentActionRequiredAt).toLocaleString()}
+              </Typography>
+            )}
+            {order.clientPaymentErrors && order.clientPaymentErrors.length > 0 && (
+              <Box>
+                <Typography variant="body2" sx={{ color: '#6B7280', marginBottom: 0.5 }}>
+                  Errors shown to the customer at checkout
+                </Typography>
+                {order.clientPaymentErrors.map((e, i) => (
+                  <Typography key={i} variant="caption" sx={{ display: 'block', color: '#374151' }}>
+                    {new Date(e.at).toLocaleTimeString()} · {e.stage}
+                    {e.code ? ` · ${e.code}` : ''}
+                    {e.declineCode ? ` / ${e.declineCode}` : ''}: {e.message}
+                  </Typography>
+                ))}
+              </Box>
+            )}
           </Box>
         </Box>
 

@@ -188,6 +188,25 @@ export interface DiscountInfo {
   code: string;
 }
 
+export interface PaymentErrorInfo {
+  code: string; // Stripe error code, e.g. 'card_declined', or 'canceled_*'
+  declineCode?: string; // e.g. 'insufficient_funds'
+  type?: string; // e.g. 'card_error'
+  message: string;
+  paymentMethodType?: string;
+  at: Date | string;
+}
+
+export interface ClientPaymentError {
+  stage: string; // where in the checkout it happened
+  code?: string;
+  declineCode?: string;
+  type?: string;
+  message: string;
+  paymentIntentId?: string;
+  at: Date | string;
+}
+
 export interface Order {
   _id?: string;
   orderId: string; // e.g., "#ORD-1234567890123"
@@ -208,6 +227,10 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   stripePaymentIntentId?: string; // Only for card payments
+  paymentError?: PaymentErrorInfo; // Latest failure/cancellation reported by Stripe
+  paymentAttempts?: number; // Failed Stripe attempts (webhook count)
+  clientPaymentErrors?: ClientPaymentError[]; // Last errors the checkout page reported (max 10)
+  paymentActionRequiredAt?: Date | string; // Stripe asked for extra authentication (e.g. 3D Secure)
   deliveryMessages?: string[]; // Cart clubbing messages
   hasReview?: boolean; // Whether this order has been reviewed
   emailStatus?: EmailStatusInfo; // Track order confirmation email status
