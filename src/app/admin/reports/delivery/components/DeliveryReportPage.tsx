@@ -28,6 +28,8 @@ import { OrderDayItem, AddressSnapshot, OrderDay } from '@/types/order';
 import { formatPSTDate, formatPSTTime } from '@/utils/timezone';
 import { buildDeliveryDateColumnsBySpec, collectDeliveryDateColumns } from '@/utils/delivery';
 import { escapeCSVValue } from '@/utils/csv';
+import { getDisplayPaymentStatus } from '@/utils/refunds';
+import type { PaymentStatus } from '@/types/order';
 
 interface DeliveryOrder {
   orderId: string;
@@ -47,6 +49,7 @@ interface DeliveryOrder {
   deliveryFee: number;
   tip: number;
   totalPaid: number;
+  refundedAmount?: number;
   deliveryMessages?: string[];
   deliveryDay?: string;
 }
@@ -720,17 +723,32 @@ export default function DeliveryReportPage() {
                   <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
                     Payment Status
                   </Typography>
-                  <Chip
-                    label={order.paymentStatus}
-                    size="small"
-                    sx={{
-                      height: 20,
-                      fontSize: '11px',
-                      backgroundColor: order.paymentStatus === 'paid' ? '#D1FAE5' : '#FEE2E2',
-                      color: order.paymentStatus === 'paid' ? '#065F46' : '#991B1B',
-                      fontWeight: 600,
-                    }}
-                  />
+                  {(() => {
+                    const displayStatus = getDisplayPaymentStatus({
+                      paymentStatus: order.paymentStatus as PaymentStatus,
+                      totalPaid: order.totalPaid,
+                      refundedAmount: order.refundedAmount,
+                    });
+                    const palette =
+                      displayStatus === 'paid'
+                        ? { bg: '#D1FAE5', fg: '#065F46' }
+                        : displayStatus === 'partially_refunded'
+                          ? { bg: '#E0F2FE', fg: '#0369A1' }
+                          : { bg: '#FEE2E2', fg: '#991B1B' };
+                    return (
+                      <Chip
+                        label={displayStatus.replace(/_/g, ' ')}
+                        size="small"
+                        sx={{
+                          height: 20,
+                          fontSize: '11px',
+                          backgroundColor: palette.bg,
+                          color: palette.fg,
+                          fontWeight: 600,
+                        }}
+                      />
+                    );
+                  })()}
                 </Box>
               </Box>
             </Box>

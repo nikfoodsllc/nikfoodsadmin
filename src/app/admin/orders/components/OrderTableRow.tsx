@@ -5,6 +5,7 @@ import { IconEye } from '@tabler/icons-react';
 import StatusBadge from './StatusBadge';
 import { Order } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
+import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { formatPSTDate } from '@/utils/timezone';
 import { processDeliveryDates, ProcessedDeliveryDate } from '@/utils/delivery';
 
@@ -28,6 +29,7 @@ export default function OrderTableRow({
   disableSelection = false,
 }: OrderTableRowProps) {
   const processedDates = processDeliveryDates(order.items || []);
+  const refundedAmount = getRefundedAmount(order);
   const instructionToDriver = order.address.landmark || '-';
 
   // Render a delivery date cell
@@ -142,7 +144,7 @@ export default function OrderTableRow({
 
       {/* Payment Status */}
       <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
-        <StatusBadge status={order.paymentStatus} type="payment" />
+        <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
       </TableCell>
 
       {/* Sub Total */}
@@ -197,7 +199,20 @@ export default function OrderTableRow({
         </Typography>
       </TableCell>
 
-      {/* Grand Total */}
+      {/* Refunded Amt (negative) */}
+      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+        <Typography
+          sx={{
+            fontSize: '14px',
+            fontWeight: refundedAmount > 0 ? 600 : 400,
+            color: refundedAmount > 0 ? '#B91C1C' : '#9CA3AF',
+          }}
+        >
+          {refundedAmount > 0 ? `-${safeFormatCurrency(refundedAmount)}` : '-'}
+        </Typography>
+      </TableCell>
+
+      {/* Grand Total (after refunds) */}
       <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
@@ -206,7 +221,7 @@ export default function OrderTableRow({
             color: '#111827',
           }}
         >
-          {safeFormatCurrency(order.totalPaid)}
+          {safeFormatCurrency(getNetTotal(order))}
         </Typography>
       </TableCell>
 

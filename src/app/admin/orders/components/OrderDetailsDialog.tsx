@@ -27,6 +27,7 @@ import {
 import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
+import { getDisplayPaymentStatus } from '@/utils/refunds';
 import { Order, OrderStatus } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
@@ -167,7 +168,7 @@ export default function OrderDetailsDialog({
               <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', display: 'block', marginBottom: 0.5 }}>
                 Payment Status
               </Typography>
-              <StatusBadge status={order.paymentStatus} type="payment" />
+              <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
             </Box>
             {order.minOrderValue !== undefined && order.minOrderValue > 0 && (
               <Box>

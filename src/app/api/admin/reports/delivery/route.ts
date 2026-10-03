@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
           paymentStatus: 1,
           paymentMethod: 1,
           totalPaid: 1,
+          refundedAmount: 1,
           subtotal: 1,
           deliveryFee: 1,
           tip: 1,
@@ -179,6 +180,7 @@ export async function GET(request: NextRequest) {
         deliveryFee: order.deliveryFee,
         tip: order.tip,
         totalPaid: order.totalPaid,
+        refundedAmount: order.refundedAmount,
         deliveryMessages: order.deliveryMessages,
       });
 

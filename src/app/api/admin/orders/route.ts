@@ -43,7 +43,7 @@ function verifyAuth(request: NextRequest) {
  * Query params:
  *   - search (order ID, customer name, email)
  *   - status (order status or 'all')
- *   - paymentStatus ('paid', 'unpaid', 'failed', 'refunded', or 'all')
+ *   - paymentStatus ('paid', 'unpaid', 'failed', 'refunded', 'partially_refunded', or 'all')
  *   - paymentMethod ('Credit Card', 'Apple Pay', 'Google Pay', 'Bank', 'Link', 'Klarna', 'Other', 'Cash on Delivery', or 'all')
  *   - startDate (filter from date)
  *   - endDate (filter to date)
@@ -91,7 +91,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by payment status
-    if (paymentStatus && paymentStatus !== 'all') {
+    if (paymentStatus === 'partially_refunded') {
+      // Not a stored status: a paid order with part of its total refunded
+      filter.paymentStatus = 'paid';
+      filter.refundedAmount = { $gt: 0 };
+    } else if (paymentStatus && paymentStatus !== 'all') {
       filter.paymentStatus = paymentStatus;
     }
 
