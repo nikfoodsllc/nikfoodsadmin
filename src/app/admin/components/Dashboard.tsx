@@ -18,6 +18,7 @@ import {
 } from '@tabler/icons-react';
 import StatCard from './StatCard';
 import DateRangeSelector, { defaultDateRange } from './DateRangeSelector';
+import { loadStoredDateRange, saveStoredDateRange } from '@/utils/dateRanges';
 import DashboardSkeleton from './DashboardSkeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { safeFormatCurrency } from '@/utils/currency';
@@ -99,6 +100,14 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dateRange, setDateRange] = useState(defaultDateRange);
+  // The saved range is read once on arrival; stats are not fetched until it is, so the page does not
+  // load This Month first and then jump to the remembered range.
+  const [rangeRestored, setRangeRestored] = useState(false);
+  useEffect(() => {
+    const stored = loadStoredDateRange();
+    if (stored) setDateRange(stored);
+    setRangeRestored(true);
+  }, []);
 
   // Handle authentication loading and redirects
   if (authLoading) {
@@ -122,6 +131,9 @@ export default function Dashboard() {
   }
 
   const fetchStats = useCallback(async () => {
+    // Wait for the remembered range (see above); stay in the loading state meanwhile
+    if (!rangeRestored) return;
+
     try {
       if (!token) {
         throw new Error('No authentication token found');
@@ -160,7 +172,7 @@ export default function Dashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dateRange, token]);
+  }, [dateRange, token, rangeRestored]);
 
   useEffect(() => {
     fetchStats();
@@ -180,6 +192,7 @@ export default function Dashboard() {
 
     // Direct state update without startTransition/unstable_batchedUpdates
     setDateRange(newRange);
+    saveStoredDateRange(newRange);
     setLoading(true);
   };
 
