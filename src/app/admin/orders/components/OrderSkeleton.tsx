@@ -47,6 +47,10 @@ export default function OrderSkeleton() {
           <TableCell>
             <Skeleton variant="text" width={70} />
           </TableCell>
+          {/* Refunded Amt */}
+          <TableCell>
+            <Skeleton variant="text" width={70} />
+          </TableCell>
           {/* Grand Total */}
           <TableCell>
             <Skeleton variant="text" width={70} />

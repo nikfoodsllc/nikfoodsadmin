@@ -1,10 +1,11 @@
 'use client';
 
 import { Chip } from '@mui/material';
-import { OrderStatus, PaymentStatus } from '@/types/order';
+import { OrderStatus } from '@/types/order';
+import type { DisplayPaymentStatus } from '@/utils/refunds';
 
 interface StatusBadgeProps {
-  status: OrderStatus | PaymentStatus;
+  status: OrderStatus | DisplayPaymentStatus;
   type: 'order' | 'payment';
 }
 
@@ -18,17 +19,18 @@ const orderStatusConfig: Record<OrderStatus, { label: string; color: string; bgC
   cancelled: { label: 'Cancelled', color: '#EF4444', bgColor: '#FEE2E2' },
 };
 
-const paymentStatusConfig: Record<PaymentStatus, { label: string; color: string; bgColor: string }> = {
+const paymentStatusConfig: Record<DisplayPaymentStatus, { label: string; color: string; bgColor: string }> = {
   paid: { label: 'Paid', color: '#10B981', bgColor: '#D1FAE5' },
   unpaid: { label: 'Unpaid', color: '#F59E0B', bgColor: '#FEF3C7' },
   failed: { label: 'Failed', color: '#EF4444', bgColor: '#FEE2E2' },
   refunded: { label: 'Refunded', color: '#8B5CF6', bgColor: '#EDE9FE' },
+  partially_refunded: { label: 'Partially refunded', color: '#0369A1', bgColor: '#E0F2FE' },
 };
 
 export default function StatusBadge({ status, type }: StatusBadgeProps) {
   const config = type === 'order'
     ? orderStatusConfig[status as OrderStatus]
-    : paymentStatusConfig[status as PaymentStatus];
+    : paymentStatusConfig[status as DisplayPaymentStatus];
 
   if (!config) return null;
 
