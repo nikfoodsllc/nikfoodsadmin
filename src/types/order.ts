@@ -231,6 +231,8 @@ export interface Order {
   paymentAttempts?: number; // Failed Stripe attempts (webhook count)
   clientPaymentErrors?: ClientPaymentError[]; // Last errors the checkout page reported (max 10)
   paymentActionRequiredAt?: Date | string; // Stripe asked for extra authentication (e.g. 3D Secure)
+  refundedAmount?: number; // Total refunded so far, in dollars (a partial refund keeps the order active)
+  refundedAt?: Date | string; // When the latest refund was recorded
   deliveryMessages?: string[]; // Cart clubbing messages
   hasReview?: boolean; // Whether this order has been reviewed
   emailStatus?: EmailStatusInfo; // Track order confirmation email status
