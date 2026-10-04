@@ -21,6 +21,9 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext';
 import FoodItemsTable from './FoodItemsTable';
+import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
+import { FOOD_ITEMS_COLUMNS, FOOD_ITEMS_COLUMNS_STORAGE_KEY } from './foodItemsColumns';
+import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import SimpleFoodItemDialog from './SimpleFoodItemDialog';
 import PortionsFoodItemDialog from './PortionsFoodItemDialog';
 import ComboFoodItemDialog from './ComboFoodItemDialog';
@@ -223,6 +226,9 @@ export default function FoodItemsPage() {
   const [totalItems, setTotalItems] = useState(0);
 
   const itemsPerPage = 7;
+
+  // Column widths / hidden columns, remembered in this browser
+  const columnPrefs = useColumnPreferences(FOOD_ITEMS_COLUMNS_STORAGE_KEY, FOOD_ITEMS_COLUMNS);
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -596,14 +602,23 @@ export default function FoodItemsPage() {
           Food Items
         </Typography>
 
-        <Button
-          variant="contained"
-          startIcon={<IconPlus size={18} />}
-          endIcon={<IconChevronDown size={16} />}
-          onClick={handleAddMenuClick}
-        >
-          Add Food Item
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <ColumnVisibilityMenu
+            columns={FOOD_ITEMS_COLUMNS}
+            hiddenKeys={columnPrefs.hiddenKeys}
+            onToggle={columnPrefs.toggleColumn}
+            onShowAll={columnPrefs.showAll}
+            onReset={columnPrefs.reset}
+          />
+          <Button
+            variant="contained"
+            startIcon={<IconPlus size={18} />}
+            endIcon={<IconChevronDown size={16} />}
+            onClick={handleAddMenuClick}
+          >
+            Add Food Item
+          </Button>
+        </Box>
 
         <Menu
           anchorEl={addMenuAnchor}
@@ -644,6 +659,11 @@ export default function FoodItemsPage() {
       <FoodItemsTable
         items={items}
         loading={loading}
+        columns={columnPrefs.columns}
+        widths={columnPrefs.widths}
+        totalWidth={columnPrefs.totalWidth}
+        onColumnResize={columnPrefs.setWidth}
+        onColumnReset={columnPrefs.resetWidth}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
 

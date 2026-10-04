@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useRef } from 'react';
 import {
   Box,
   Table,
@@ -14,14 +15,21 @@ import {
 } from '@mui/material';
 import OrderTableRow from './OrderTableRow';
 import OrderSkeleton from './OrderSkeleton';
+import ResizableHeaderCell from '@/components/table/ResizableHeaderCell';
+import { OrdersColumnDef } from './ordersColumns';
 import { Order } from '@/types/order';
-import { getMaxUniqueDeliveryDays } from '@/utils/delivery';
+import { useLiveColumnResize } from '@/hooks/useLiveColumnResize';
 
 interface OrdersTableProps {
   orders: Order[];
   loading: boolean;
   onViewDetails: (order: Order) => void;
-  maxDeliveryDays: number;
+  /** Columns to show, in order (hidden ones already removed). */
+  columns: OrdersColumnDef[];
+  widths: Record<string, number>;
+  totalWidth: number;
+  onColumnResize: (key: string, width: number) => void;
+  onColumnReset: (key: string) => void;
   selectedOrderIds: Set<string>;
   onSelectAll: () => void;
   onSelectOrder: (orderId: string) => void;
@@ -34,7 +42,11 @@ export default function OrdersTable({
   orders,
   loading,
   onViewDetails,
-  maxDeliveryDays,
+  columns,
+  widths,
+  totalWidth,
+  onColumnResize,
+  onColumnReset,
   selectedOrderIds,
   onSelectAll,
   onSelectOrder,
@@ -42,113 +54,98 @@ export default function OrdersTable({
   isIndeterminate,
   disableSelection = false,
 }: OrdersTableProps) {
+  const tableRef = useRef<HTMLTableElement>(null);
+  const visibleKeys = useMemo(() => new Set(columns.map((c) => c.key)), [columns]);
+
+  const handleLiveResize = useLiveColumnResize(tableRef, widths, totalWidth);
+
+  const plainHeaderSx = { padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' } as const;
+
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
       <TableContainer
         component={Paper}
         elevation={0}
         sx={{
-          minWidth: 2640,
+          width: 'max-content',
           borderRadius: 3,
           border: '1px solid #E5E7EB',
           overflow: 'hidden',
         }}
       >
-        <Table>
+        <Table
+          ref={tableRef}
+          style={{ width: totalWidth }}
+          sx={{
+            tableLayout: 'fixed',
+            '& .MuiTableCell-root': { overflow: 'hidden', textOverflow: 'ellipsis' },
+            '& tbody .MuiTableCell-root': { whiteSpace: 'nowrap' },
+            '& tbody .MuiTableCell-root .MuiTypography-root': {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            },
+          }}
+        >
+          <colgroup>
+            {columns.map((c) => (
+              <col key={c.key} data-col={c.key} style={{ width: widths[c.key] ?? c.defaultWidth }} />
+            ))}
+          </colgroup>
           <TableHead>
             <TableRow
               sx={{
                 backgroundColor: '#F9FAFB',
               }}
             >
-              <TableCell sx={{ width: 56, padding: '12px 8px' }}>
-                <Checkbox
-                  checked={isAllSelected}
-                  indeterminate={isIndeterminate}
-                  onChange={onSelectAll}
-                  disabled={loading || orders.length === 0 || disableSelection}
-                  sx={{
-                    color: '#9CA3AF',
-                    '&.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                    '&.MuiCheckbox-indeterminate': {
-                      color: '#4F8CFF',
-                    },
-                  }}
-                />
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Order Date
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Order ID
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Customer Name
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Email
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Order Status
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Payment Status
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Payment Method
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Sub Total
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Service Fee
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Tax
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Tip
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Refunded Amt
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Grand Total
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Phone
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Address
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Apt. No.
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Gate Code
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Instruction to Driver
-              </TableCell>
-              {/* Dynamic delivery day columns - now based on unique sorted dates */}
-              {Array.from({ length: maxDeliveryDays }, (_, i) => (
-                <TableCell key={`delivery-day-${i}`} sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                  Delivery Date {i + 1}
-                </TableCell>
-              ))}
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Actions
-              </TableCell>
+              {columns.map((c) => {
+                if (c.key === 'select') {
+                  return (
+                    <TableCell key={c.key} sx={{ padding: '12px 8px' }}>
+                      <Checkbox
+                        checked={isAllSelected}
+                        indeterminate={isIndeterminate}
+                        onChange={onSelectAll}
+                        disabled={loading || orders.length === 0 || disableSelection}
+                        sx={{
+                          color: '#9CA3AF',
+                          '&.Mui-checked': {
+                            color: '#4F8CFF',
+                          },
+                          '&.MuiCheckbox-indeterminate': {
+                            color: '#4F8CFF',
+                          },
+                        }}
+                      />
+                    </TableCell>
+                  );
+                }
+                if (c.locked) {
+                  return (
+                    <TableCell key={c.key} sx={plainHeaderSx}>
+                      {c.label}
+                    </TableCell>
+                  );
+                }
+                return (
+                  <ResizableHeaderCell
+                    key={c.key}
+                    column={c}
+                    width={widths[c.key] ?? c.defaultWidth}
+                    onLiveResize={handleLiveResize}
+                    onResizeEnd={onColumnResize}
+                    onReset={onColumnReset}
+                  />
+                );
+              })}
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
-              <OrderSkeleton />
+              <OrderSkeleton columns={columns} />
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={20 + maxDeliveryDays} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={columns.length} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No orders found
                   </Typography>
@@ -161,7 +158,7 @@ export default function OrdersTable({
                   order={order}
                   index={index}
                   onViewDetails={onViewDetails}
-                  maxDeliveryDays={maxDeliveryDays}
+                  visible={visibleKeys}
                   selected={Boolean(order._id && selectedOrderIds.has(order._id))}
                   onToggleSelect={onSelectOrder}
                   disableSelection={disableSelection || !order._id}

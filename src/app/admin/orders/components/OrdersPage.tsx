@@ -17,13 +17,15 @@ import {
 } from '@mui/material';
 import OrdersTable from './OrdersTable';
 import OrderFilters from './OrderFilters';
+import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
+import { ORDERS_COLUMNS, ORDERS_COLUMNS_STORAGE_KEY } from './ordersColumns';
+import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ExportToCsvDialog from './ExportToCsvDialog';
 import { IconDownload } from '@tabler/icons-react';
 import TablePagination from '../../food-items/components/TablePagination';
 import { Order, OrderStatus } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMaxUniqueDeliveryDays } from '@/utils/delivery';
 
 export default function OrdersPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
@@ -49,6 +51,9 @@ export default function OrdersPage() {
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | ''>('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const itemsPerPage = 100;
+
+  // Column widths / hidden columns, remembered in this browser
+  const columnPrefs = useColumnPreferences(ORDERS_COLUMNS_STORAGE_KEY, ORDERS_COLUMNS);
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -361,7 +366,6 @@ export default function OrdersPage() {
   };
 
   // Calculate maximum unique delivery days across all orders using new utility
-  const maxDeliveryDays = getMaxUniqueDeliveryDays(orders);
 
   const totalPages = Math.ceil(totalOrders / itemsPerPage);
 
@@ -451,6 +455,14 @@ export default function OrdersPage() {
               </Button>
             </>
           )}
+          <ColumnVisibilityMenu
+            columns={ORDERS_COLUMNS}
+            hiddenKeys={columnPrefs.hiddenKeys}
+            onToggle={columnPrefs.toggleColumn}
+            onShowAll={columnPrefs.showAll}
+            onReset={columnPrefs.reset}
+            disabled={bulkUpdating}
+          />
           <Button
             variant="outlined"
             startIcon={<IconDownload size={18} />}
@@ -503,7 +515,11 @@ export default function OrdersPage() {
           orders={orders}
           loading={loading}
           onViewDetails={handleViewDetails}
-          maxDeliveryDays={maxDeliveryDays}
+          columns={columnPrefs.columns}
+          widths={columnPrefs.widths}
+          totalWidth={columnPrefs.totalWidth}
+          onColumnResize={columnPrefs.setWidth}
+          onColumnReset={columnPrefs.resetWidth}
           selectedOrderIds={selectedOrderIds}
           onSelectAll={handleToggleSelectAllOrders}
           onSelectOrder={handleToggleOrderSelection}

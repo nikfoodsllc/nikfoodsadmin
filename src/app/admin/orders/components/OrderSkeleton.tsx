@@ -1,92 +1,26 @@
 'use client';
 
-import { Box, TableCell, TableRow, Skeleton } from '@mui/material';
+import { TableCell, TableRow, Skeleton } from '@mui/material';
+import { OrdersColumnDef } from './ordersColumns';
 
-export default function OrderSkeleton() {
+export default function OrderSkeleton({ columns }: { columns: OrdersColumnDef[] }) {
   return (
     <>
       {[...Array(10)].map((_, index) => (
         <TableRow key={index}>
-          {/* Order Date */}
-          <TableCell>
-            <Skeleton variant="text" width={100} />
-          </TableCell>
-          {/* Order ID */}
-          <TableCell>
-            <Skeleton variant="text" width={140} />
-          </TableCell>
-          {/* Customer Name */}
-          <TableCell>
-            <Skeleton variant="text" width={120} />
-          </TableCell>
-          {/* Email */}
-          <TableCell>
-            <Skeleton variant="text" width={180} />
-          </TableCell>
-          {/* Order Status */}
-          <TableCell>
-            <Skeleton variant="rounded" width={100} height={28} />
-          </TableCell>
-          {/* Payment Status */}
-          <TableCell>
-            <Skeleton variant="rounded" width={90} height={28} />
-          </TableCell>
-          {/* Payment Method */}
-          <TableCell>
-            <Skeleton variant="text" width={90} />
-          </TableCell>
-          {/* Sub Total */}
-          <TableCell>
-            <Skeleton variant="text" width={70} />
-          </TableCell>
-          {/* Service Fee */}
-          <TableCell>
-            <Skeleton variant="text" width={70} />
-          </TableCell>
-          {/* Tax */}
-          <TableCell>
-            <Skeleton variant="text" width={70} />
-          </TableCell>
-          {/* Tip */}
-          <TableCell>
-            <Skeleton variant="text" width={70} />
-          </TableCell>
-          {/* Refunded Amt */}
-          <TableCell>
-            <Skeleton variant="text" width={70} />
-          </TableCell>
-          {/* Grand Total */}
-          <TableCell>
-            <Skeleton variant="text" width={70} />
-          </TableCell>
-          {/* Phone */}
-          <TableCell>
-            <Skeleton variant="text" width={100} />
-          </TableCell>
-          {/* Address */}
-          <TableCell>
-            <Skeleton variant="text" width={150} />
-          </TableCell>
-          {/* Apt. No. */}
-          <TableCell>
-            <Skeleton variant="text" width={60} />
-          </TableCell>
-          {/* Gate Code */}
-          <TableCell>
-            <Skeleton variant="text" width={60} />
-          </TableCell>
-          {/* Instruction to Driver */}
-          <TableCell>
-            <Skeleton variant="text" width={120} />
-          </TableCell>
-          {/* Deliver On */}
-          <TableCell>
-            <Skeleton variant="text" width={150} />
-          </TableCell>
-          {/* Actions */}
-          <TableCell>
-            <Skeleton variant="rounded" width={100} height={32} />
-          </TableCell>
+          {columns.map((c) => (
+            <TableCell key={c.key}>
+              {c.skeleton === 'checkbox' ? (
+                <Skeleton variant="rounded" width={20} height={20} />
+              ) : c.skeleton === 'pill' ? (
+                <Skeleton variant="rounded" width={c.skeletonWidth ?? 80} height={28} />
+              ) : c.skeleton === 'button' ? (
+                <Skeleton variant="rounded" width={c.skeletonWidth ?? 100} height={32} />
+              ) : (
+                <Skeleton variant="text" width={c.skeletonWidth ?? 80} />
+              )}
+            </TableCell>
+          ))}
         </TableRow>
       ))}
     </>
