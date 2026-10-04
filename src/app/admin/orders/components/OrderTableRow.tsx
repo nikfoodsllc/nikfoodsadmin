@@ -147,6 +147,13 @@ export default function OrderTableRow({
         <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
       </TableCell>
 
+      {/* Payment Method (Credit Card, Apple Pay, Google Pay, Link, Bank, ...) */}
+      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+        <Typography variant="body2" sx={{ fontSize: '13px', color: order.paymentMethod ? '#111827' : '#9CA3AF', whiteSpace: 'nowrap' }}>
+          {order.paymentMethod || '-'}
+        </Typography>
+      </TableCell>
+
       {/* Sub Total */}
       <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
