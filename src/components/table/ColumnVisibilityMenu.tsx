@@ -2,23 +2,41 @@
 
 import { useState } from 'react';
 import { Box, Button, Checkbox, Divider, FormControlLabel, Popover, Typography } from '@mui/material';
-import { IconColumns3 } from '@tabler/icons-react';
+import { IconColumns3, IconGripVertical } from '@tabler/icons-react';
+import { DragDropContext, Draggable, Droppable, DropResult } from '@hello-pangea/dnd';
 import { ColumnDef } from '@/utils/columnPreferences';
+import type { ColumnSyncStatus } from '@/hooks/useColumnPreferences';
 
 interface ColumnVisibilityMenuProps {
+  /** Every column in its current order (hidden ones included). Locked columns are not listed. */
   columns: ColumnDef[];
   hiddenKeys: Set<string>;
   onToggle: (key: string) => void;
+  /** Move a column to a position among the listed (unlocked) columns. */
+  onMove: (key: string, toIndex: number) => void;
   onShowAll: () => void;
-  /** Back to the original widths and all columns shown. */
+  /** Back to the original order and widths, with all columns shown. */
   onReset: () => void;
+  syncStatus?: ColumnSyncStatus;
   disabled?: boolean;
 }
 
-export default function ColumnVisibilityMenu({ columns, hiddenKeys, onToggle, onShowAll, onReset, disabled }: ColumnVisibilityMenuProps) {
+const STATUS_TEXT: Record<ColumnSyncStatus, string> = {
+  idle: '',
+  saving: 'Saving to your account…',
+  saved: 'Saved to your account',
+  error: "Couldn't reach your account, so this is saved on this computer only",
+};
+
+export default function ColumnVisibilityMenu({ columns, hiddenKeys, onToggle, onMove, onShowAll, onReset, syncStatus = 'idle', disabled }: ColumnVisibilityMenuProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const toggleable = columns.filter((c) => !c.locked);
-  const hiddenCount = toggleable.filter((c) => hiddenKeys.has(c.key)).length;
+  const listed = columns.filter((c) => !c.locked);
+  const hiddenCount = listed.filter((c) => hiddenKeys.has(c.key)).length;
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination || result.destination.index === result.source.index) return;
+    onMove(result.draggableId, result.destination.index);
+  };
 
   return (
     <>
@@ -44,27 +62,68 @@ export default function ColumnVisibilityMenu({ columns, hiddenKeys, onToggle, on
         onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { borderRadius: 2, mt: 0.5, minWidth: 260, maxHeight: 520 } } }}
+        slotProps={{ paper: { sx: { borderRadius: 2, mt: 0.5, width: 300, maxHeight: 'calc(100vh - 100px)' } } }}
       >
         <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-          <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Show columns</Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Columns</Typography>
           <Typography sx={{ fontSize: '12px', color: '#6B7280', mt: 0.25 }}>
-            Drag the edge of a column header to resize it. Double-click the edge to reset that column.
+            Tick to show or hide. Drag a row by its handle to change the order the table shows. You can also resize a column by dragging the edge of its header.
           </Typography>
         </Box>
         <Divider />
-        <Box sx={{ display: 'flex', flexDirection: 'column', px: 2, py: 0.5, maxHeight: 340, overflowY: 'auto' }}>
-          {toggleable.map((c) => (
-            <FormControlLabel
-              key={c.key}
-              label={c.label}
-              control={<Checkbox size="small" checked={!hiddenKeys.has(c.key)} onChange={() => onToggle(c.key)} />}
-              sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '13px', color: '#374151' } }}
-            />
-          ))}
-        </Box>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="table-columns">
+            {(dropProvided) => (
+              <Box
+                ref={dropProvided.innerRef}
+                {...dropProvided.droppableProps}
+                sx={{ display: 'flex', flexDirection: 'column', px: 1, py: 0.5, maxHeight: 'min(560px, calc(100vh - 330px))', overflowY: 'auto' }}
+              >
+                {listed.map((c, index) => (
+                  <Draggable key={c.key} draggableId={c.key} index={index}>
+                    {(provided, snapshot) => (
+                      <Box
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          borderRadius: 1,
+                          backgroundColor: snapshot.isDragging ? '#EEF4FF' : 'transparent',
+                          boxShadow: snapshot.isDragging ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                        }}
+                      >
+                        <Box
+                          {...provided.dragHandleProps}
+                          aria-label={`Move ${c.label}. Press space, then the arrow keys, then space.`}
+                          sx={{ display: 'flex', alignItems: 'center', color: '#9CA3AF', cursor: 'grab', px: 0.5, py: 1, '&:hover, &:focus-visible': { color: '#4F8CFF' } }}
+                        >
+                          <IconGripVertical size={18} />
+                        </Box>
+                        <FormControlLabel
+                          label={c.label}
+                          control={<Checkbox size="small" checked={!hiddenKeys.has(c.key)} onChange={() => onToggle(c.key)} />}
+                          sx={{ m: 0, flex: 1, '& .MuiFormControlLabel-label': { fontSize: '13px', color: '#374151' } }}
+                        />
+                      </Box>
+                    )}
+                  </Draggable>
+                ))}
+                {dropProvided.placeholder}
+              </Box>
+            )}
+          </Droppable>
+        </DragDropContext>
         <Divider />
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 1.5, py: 1 }}>
+        <Box sx={{ px: 2, pt: 0.75, minHeight: 22 }}>
+          <Typography
+            role="status"
+            sx={{ fontSize: '11px', color: syncStatus === 'error' ? '#B45309' : '#6B7280' }}
+          >
+            {STATUS_TEXT[syncStatus]}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 1.5, pb: 1 }}>
           <Button size="small" onClick={onShowAll} disabled={hiddenCount === 0} sx={{ textTransform: 'none' }}>
             Show all
           </Button>
