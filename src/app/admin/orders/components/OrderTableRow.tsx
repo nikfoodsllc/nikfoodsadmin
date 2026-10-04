@@ -12,6 +12,8 @@ interface OrderTableRowProps {
   order: Order;
   index: number;
   onViewDetails: (order: Order) => void;
+  /** Keys of the columns currently shown. */
+  visible: Set<string>;
   selected: boolean;
   onToggleSelect: (orderId: string) => void;
   disableSelection?: boolean;
@@ -21,6 +23,7 @@ export default function OrderTableRow({
   order,
   index,
   onViewDetails,
+  visible,
   selected,
   onToggleSelect,
   disableSelection = false,
@@ -60,239 +63,269 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Order Date */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-          }}
-        >
-          {formatPSTDate(order.createdAt)}
-        </Typography>
-      </TableCell>
+      {visible.has('orderDate') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+            }}
+          >
+            {formatPSTDate(order.createdAt)}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Order ID */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#4F8CFF',
-          }}
-        >
-          {order.orderId}
-        </Typography>
-      </TableCell>
+      {visible.has('orderId') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#4F8CFF',
+            }}
+          >
+            {order.orderId}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Customer Name */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: '#111827',
-            maxWidth: 170,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={order.customerInfo.name}
-        >
-          {order.customerInfo.name}
-        </Typography>
-      </TableCell>
+      {visible.has('customerName') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#111827',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={order.customerInfo.name}
+          >
+            {order.customerInfo.name}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Order Status */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <StatusBadge status={order.status} type="order" />
-      </TableCell>
+      {visible.has('orderStatus') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <StatusBadge status={order.status} type="order" />
+        </TableCell>
+      )}
 
       {/* Payment Status */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
-      </TableCell>
+      {visible.has('paymentStatus') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
+        </TableCell>
+      )}
 
       {/* Instruction to Driver */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            maxWidth: 150,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={instructionToDriver}
-        >
-          {instructionToDriver}
-        </Typography>
-      </TableCell>
+      {visible.has('instruction') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={instructionToDriver}
+          >
+            {instructionToDriver}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Payment Method (Credit Card, Apple Pay, Google Pay, Link, Bank, ...) */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography variant="body2" sx={{ fontSize: '13px', color: order.paymentMethod ? '#111827' : '#9CA3AF', whiteSpace: 'nowrap' }}>
-          {order.paymentMethod || '-'}
-        </Typography>
-      </TableCell>
+      {visible.has('paymentMethod') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography variant="body2" sx={{ fontSize: '13px', color: order.paymentMethod ? '#111827' : '#9CA3AF', whiteSpace: 'nowrap' }}>
+            {order.paymentMethod || '-'}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Sub Total */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: '#111827',
-          }}
-        >
-          {safeFormatCurrency(order.subtotal)}
-        </Typography>
-      </TableCell>
+      {visible.has('subtotal') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#111827',
+            }}
+          >
+            {safeFormatCurrency(order.subtotal)}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Service Fee (Platform Fee) */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: '#111827',
-          }}
-        >
-          {safeFormatCurrency(order.platformFee)}
-        </Typography>
-      </TableCell>
+      {visible.has('serviceFee') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#111827',
+            }}
+          >
+            {safeFormatCurrency(order.platformFee)}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Tax */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: '#111827',
-          }}
-        >
-          {safeFormatCurrency(order.taxes)}
-        </Typography>
-      </TableCell>
+      {visible.has('tax') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#111827',
+            }}
+          >
+            {safeFormatCurrency(order.taxes)}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Tip */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: '#111827',
-          }}
-        >
-          {safeFormatCurrency(order.tip)}
-        </Typography>
-      </TableCell>
+      {visible.has('tip') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#111827',
+            }}
+          >
+            {safeFormatCurrency(order.tip)}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Refunded Amt (negative) */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: refundedAmount > 0 ? 600 : 400,
-            color: refundedAmount > 0 ? '#B91C1C' : '#9CA3AF',
-          }}
-        >
-          {refundedAmount > 0 ? `-${safeFormatCurrency(refundedAmount)}` : '-'}
-        </Typography>
-      </TableCell>
+      {visible.has('refunded') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: refundedAmount > 0 ? 600 : 400,
+              color: refundedAmount > 0 ? '#B91C1C' : '#9CA3AF',
+            }}
+          >
+            {refundedAmount > 0 ? `-${safeFormatCurrency(refundedAmount)}` : '-'}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Grand Total (after refunds) */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
-        <Typography
-          sx={{
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#111827',
-          }}
-        >
-          {safeFormatCurrency(getNetTotal(order))}
-        </Typography>
-      </TableCell>
+      {visible.has('grandTotal') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+          <Typography
+            sx={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#111827',
+            }}
+          >
+            {safeFormatCurrency(getNetTotal(order))}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Phone */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-          }}
-        >
-          {order.customerInfo.phone}
-        </Typography>
-      </TableCell>
+      {visible.has('phone') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+            }}
+          >
+            {order.customerInfo.phone}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Email */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            maxWidth: 200,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={order.customerInfo.email}
-        >
-          {order.customerInfo.email}
-        </Typography>
-      </TableCell>
+      {visible.has('email') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={order.customerInfo.email}
+          >
+            {order.customerInfo.email}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Address */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            maxWidth: 180,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={order.address.street}
-        >
-          {order.address.street}
-        </Typography>
-      </TableCell>
+      {visible.has('address') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={order.address.street}
+          >
+            {order.address.street}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Apt. No. */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            maxWidth: 120,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={order.address.apartment || order.address.floor || ''}
-        >
-          {order.address.apartment || order.address.floor || '-'}
-        </Typography>
-      </TableCell>
+      {visible.has('apartment') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={order.address.apartment || order.address.floor || ''}
+          >
+            {order.address.apartment || order.address.floor || '-'}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Gate Code */}
-      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            maxWidth: 100,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={order.address.entrance || ''}
-        >
-          {order.address.entrance || '-'}
-        </Typography>
-      </TableCell>
+      {visible.has('gateCode') && (
+        <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              color: '#6B7280',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={order.address.entrance || ''}
+          >
+            {order.address.entrance || '-'}
+          </Typography>
+        </TableCell>
+      )}
 
       {/* Actions */}
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
