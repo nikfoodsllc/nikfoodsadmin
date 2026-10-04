@@ -23,7 +23,6 @@ import { IconDownload } from '@tabler/icons-react';
 import TablePagination from '../../food-items/components/TablePagination';
 import { Order, OrderStatus } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMaxUniqueDeliveryDays } from '@/utils/delivery';
 
 export default function OrdersPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
@@ -361,7 +360,6 @@ export default function OrdersPage() {
   };
 
   // Calculate maximum unique delivery days across all orders using new utility
-  const maxDeliveryDays = getMaxUniqueDeliveryDays(orders);
 
   const totalPages = Math.ceil(totalOrders / itemsPerPage);
 
@@ -503,7 +501,6 @@ export default function OrdersPage() {
           orders={orders}
           loading={loading}
           onViewDetails={handleViewDetails}
-          maxDeliveryDays={maxDeliveryDays}
           selectedOrderIds={selectedOrderIds}
           onSelectAll={handleToggleSelectAllOrders}
           onSelectOrder={handleToggleOrderSelection}

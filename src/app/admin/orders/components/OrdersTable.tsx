@@ -15,13 +15,11 @@ import {
 import OrderTableRow from './OrderTableRow';
 import OrderSkeleton from './OrderSkeleton';
 import { Order } from '@/types/order';
-import { getMaxUniqueDeliveryDays } from '@/utils/delivery';
 
 interface OrdersTableProps {
   orders: Order[];
   loading: boolean;
   onViewDetails: (order: Order) => void;
-  maxDeliveryDays: number;
   selectedOrderIds: Set<string>;
   onSelectAll: () => void;
   onSelectOrder: (orderId: string) => void;
@@ -34,7 +32,6 @@ export default function OrdersTable({
   orders,
   loading,
   onViewDetails,
-  maxDeliveryDays,
   selectedOrderIds,
   onSelectAll,
   onSelectOrder,
@@ -48,7 +45,7 @@ export default function OrdersTable({
         component={Paper}
         elevation={0}
         sx={{
-          minWidth: 2640,
+          width: 'max-content',
           borderRadius: 3,
           border: '1px solid #E5E7EB',
           overflow: 'hidden',
@@ -78,67 +75,61 @@ export default function OrdersTable({
                   }}
                 />
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Order Date
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Order ID
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Customer Name
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Email
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Order Status
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Payment Status
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Payment Method
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Sub Total
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Service Fee
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Tax
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Tip
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Refunded Amt
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
-                Grand Total
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Phone
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Address
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Apt. No.
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Gate Code
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Instruction to Driver
               </TableCell>
-              {/* Dynamic delivery day columns - now based on unique sorted dates */}
-              {Array.from({ length: maxDeliveryDays }, (_, i) => (
-                <TableCell key={`delivery-day-${i}`} sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                  Delivery Date {i + 1}
-                </TableCell>
-              ))}
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Payment Method
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
+                Sub Total
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
+                Service Fee
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
+                Tax
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
+                Tip
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
+                Refunded Amt
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
+                Grand Total
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Phone
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Email
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Address
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Apt. No.
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Gate Code
+              </TableCell>
+              <TableCell sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Actions
               </TableCell>
             </TableRow>
@@ -148,7 +139,7 @@ export default function OrdersTable({
               <OrderSkeleton />
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={20 + maxDeliveryDays} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={20} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No orders found
                   </Typography>
@@ -161,7 +152,6 @@ export default function OrdersTable({
                   order={order}
                   index={index}
                   onViewDetails={onViewDetails}
-                  maxDeliveryDays={maxDeliveryDays}
                   selected={Boolean(order._id && selectedOrderIds.has(order._id))}
                   onToggleSelect={onSelectOrder}
                   disableSelection={disableSelection || !order._id}
