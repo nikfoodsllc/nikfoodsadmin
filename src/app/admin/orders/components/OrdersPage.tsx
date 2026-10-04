@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import OrdersTable from './OrdersTable';
 import OrderFilters from './OrderFilters';
-import ColumnVisibilityMenu from './ColumnVisibilityMenu';
+import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
 import { ORDERS_COLUMNS, ORDERS_COLUMNS_STORAGE_KEY } from './ordersColumns';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import OrderDetailsDialog from './OrderDetailsDialog';

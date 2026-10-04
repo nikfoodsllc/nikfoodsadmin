@@ -15,9 +15,10 @@ import {
 } from '@mui/material';
 import OrderTableRow from './OrderTableRow';
 import OrderSkeleton from './OrderSkeleton';
-import ResizableHeaderCell from './ResizableHeaderCell';
+import ResizableHeaderCell from '@/components/table/ResizableHeaderCell';
 import { OrdersColumnDef } from './ordersColumns';
 import { Order } from '@/types/order';
+import { useLiveColumnResize } from '@/hooks/useLiveColumnResize';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -56,15 +57,7 @@ export default function OrdersTable({
   const tableRef = useRef<HTMLTableElement>(null);
   const visibleKeys = useMemo(() => new Set(columns.map((c) => c.key)), [columns]);
 
-  // While a column edge is being dragged, change the <col> and the table width directly instead of
-  // re-rendering ~2000 cells on every mouse move; the final width is committed once on release.
-  const handleLiveResize = (key: string, width: number) => {
-    const table = tableRef.current;
-    if (!table) return;
-    const col = table.querySelector<HTMLElement>(`col[data-col="${key}"]`);
-    if (col) col.style.width = `${width}px`;
-    table.style.width = `${totalWidth - (widths[key] ?? width) + width}px`;
-  };
+  const handleLiveResize = useLiveColumnResize(tableRef, widths, totalWidth);
 
   const plainHeaderSx = { padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' } as const;
 
