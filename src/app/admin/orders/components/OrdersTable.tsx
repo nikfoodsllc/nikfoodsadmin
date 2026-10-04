@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import {
   Box,
   Table,
@@ -55,7 +55,6 @@ export default function OrdersTable({
   disableSelection = false,
 }: OrdersTableProps) {
   const tableRef = useRef<HTMLTableElement>(null);
-  const visibleKeys = useMemo(() => new Set(columns.map((c) => c.key)), [columns]);
 
   const handleLiveResize = useLiveColumnResize(tableRef, widths, totalWidth);
 
@@ -158,7 +157,7 @@ export default function OrdersTable({
                   order={order}
                   index={index}
                   onViewDetails={onViewDetails}
-                  visible={visibleKeys}
+                  columns={columns}
                   selected={Boolean(order._id && selectedOrderIds.has(order._id))}
                   onToggleSelect={onSelectOrder}
                   disableSelection={disableSelection || !order._id}

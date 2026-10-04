@@ -227,8 +227,8 @@ export default function FoodItemsPage() {
 
   const itemsPerPage = 7;
 
-  // Column widths / hidden columns, remembered in this browser
-  const columnPrefs = useColumnPreferences(FOOD_ITEMS_COLUMNS_STORAGE_KEY, FOOD_ITEMS_COLUMNS);
+  // Column order, widths and hidden columns, saved to this admin's account
+  const columnPrefs = useColumnPreferences(FOOD_ITEMS_COLUMNS_STORAGE_KEY, FOOD_ITEMS_COLUMNS, 'food-items');
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -604,9 +604,11 @@ export default function FoodItemsPage() {
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <ColumnVisibilityMenu
-            columns={FOOD_ITEMS_COLUMNS}
+            columns={columnPrefs.allColumns}
             hiddenKeys={columnPrefs.hiddenKeys}
             onToggle={columnPrefs.toggleColumn}
+            onMove={columnPrefs.moveColumn}
+            syncStatus={columnPrefs.syncStatus}
             onShowAll={columnPrefs.showAll}
             onReset={columnPrefs.reset}
           />

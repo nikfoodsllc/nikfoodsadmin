@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import {
   Box,
   Table,
@@ -81,7 +81,6 @@ export default function FoodItemsTable({
   onDuplicate,
 }: FoodItemsTableProps) {
   const tableRef = useRef<HTMLTableElement>(null);
-  const visibleKeys = useMemo(() => new Set(columns.map((c) => c.key)), [columns]);
   const handleLiveResize = useLiveColumnResize(tableRef, widths, totalWidth);
 
   return (
@@ -154,7 +153,7 @@ export default function FoodItemsTable({
                   key={item._id}
                   item={item}
                   index={index}
-                  visible={visibleKeys}
+                  columns={columns}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onDuplicate={onDuplicate}

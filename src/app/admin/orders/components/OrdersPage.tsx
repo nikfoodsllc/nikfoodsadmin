@@ -52,8 +52,8 @@ export default function OrdersPage() {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const itemsPerPage = 100;
 
-  // Column widths / hidden columns, remembered in this browser
-  const columnPrefs = useColumnPreferences(ORDERS_COLUMNS_STORAGE_KEY, ORDERS_COLUMNS);
+  // Column order, widths and hidden columns, saved to this admin's account
+  const columnPrefs = useColumnPreferences(ORDERS_COLUMNS_STORAGE_KEY, ORDERS_COLUMNS, 'orders');
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -456,9 +456,11 @@ export default function OrdersPage() {
             </>
           )}
           <ColumnVisibilityMenu
-            columns={ORDERS_COLUMNS}
+            columns={columnPrefs.allColumns}
             hiddenKeys={columnPrefs.hiddenKeys}
             onToggle={columnPrefs.toggleColumn}
+            onMove={columnPrefs.moveColumn}
+            syncStatus={columnPrefs.syncStatus}
             onShowAll={columnPrefs.showAll}
             onReset={columnPrefs.reset}
             disabled={bulkUpdating}
