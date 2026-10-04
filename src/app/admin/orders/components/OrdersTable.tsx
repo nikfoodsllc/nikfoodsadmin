@@ -48,7 +48,7 @@ export default function OrdersTable({
         component={Paper}
         elevation={0}
         sx={{
-          minWidth: 2500,
+          minWidth: 2640,
           borderRadius: 3,
           border: '1px solid #E5E7EB',
           overflow: 'hidden',
@@ -95,6 +95,9 @@ export default function OrdersTable({
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Payment Status
+              </TableCell>
+              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Payment Method
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px', textAlign: 'right' }}>
                 Sub Total
@@ -145,7 +148,7 @@ export default function OrdersTable({
               <OrderSkeleton />
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={19 + maxDeliveryDays} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={20 + maxDeliveryDays} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No orders found
                   </Typography>
