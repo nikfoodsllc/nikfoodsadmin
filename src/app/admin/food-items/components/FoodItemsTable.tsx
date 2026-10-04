@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo, useRef } from 'react';
 import {
   Box,
   Table,
@@ -13,6 +14,9 @@ import {
 } from '@mui/material';
 import TableRowComponent from './TableRow';
 import FoodItemSkeleton from './FoodItemSkeleton';
+import ResizableHeaderCell from '@/components/table/ResizableHeaderCell';
+import { useLiveColumnResize } from '@/hooks/useLiveColumnResize';
+import { FoodItemsColumnDef } from './foodItemsColumns';
 
 interface FoodItem {
   _id: string;
@@ -34,7 +38,7 @@ interface FoodItem {
   // Portions
   portions?: string[];
   portionPrices?: number[];
-  
+
   // Combo
   sections?: Array<{
     title: string;
@@ -50,6 +54,13 @@ interface FoodItemsTableProps {
   items: FoodItem[];
   loading: boolean;
 
+  /** Columns to show, in order (hidden ones already removed). */
+  columns: FoodItemsColumnDef[];
+  widths: Record<string, number>;
+  totalWidth: number;
+  onColumnResize: (key: string, width: number) => void;
+  onColumnReset: (key: string) => void;
+
   onEdit: (item: FoodItem) => void;
   onDelete: (item: FoodItem) => void;
 
@@ -60,10 +71,19 @@ interface FoodItemsTableProps {
 export default function FoodItemsTable({
   items,
   loading,
+  columns,
+  widths,
+  totalWidth,
+  onColumnResize,
+  onColumnReset,
   onEdit,
   onDelete,
   onDuplicate,
 }: FoodItemsTableProps) {
+  const tableRef = useRef<HTMLTableElement>(null);
+  const visibleKeys = useMemo(() => new Set(columns.map((c) => c.key)), [columns]);
+  const handleLiveResize = useLiveColumnResize(tableRef, widths, totalWidth);
+
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
       <TableContainer
@@ -76,45 +96,53 @@ export default function FoodItemsTable({
           overflow: 'hidden',
         }}
       >
-        <Table>
+        <Table
+          ref={tableRef}
+          style={{ width: totalWidth }}
+          sx={{
+            tableLayout: 'fixed',
+            // text that does not fit is cut; names and descriptions wrap / clamp inside their own cells
+            '& .MuiTableCell-root': { overflow: 'hidden', textOverflow: 'ellipsis' },
+          }}
+        >
+          <colgroup>
+            {columns.map((c) => (
+              <col key={c.key} data-col={c.key} style={{ width: widths[c.key] ?? c.defaultWidth }} />
+            ))}
+          </colgroup>
           <TableHead>
             <TableRow
               sx={{
                 backgroundColor: '#F9FAFB',
               }}
             >
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Actions
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Available
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Image
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Name
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Price
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Veg/Non-Veg
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Type
-              </TableCell>
-              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                Description
-              </TableCell>
+              {columns.map((c) =>
+                c.locked ? (
+                  <TableCell
+                    key={c.key}
+                    sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}
+                  >
+                    {c.label}
+                  </TableCell>
+                ) : (
+                  <ResizableHeaderCell
+                    key={c.key}
+                    column={c}
+                    width={widths[c.key] ?? c.defaultWidth}
+                    onLiveResize={handleLiveResize}
+                    onResizeEnd={onColumnResize}
+                    onReset={onColumnReset}
+                  />
+                )
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
-              <FoodItemSkeleton />
+              <FoodItemSkeleton columns={columns} />
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={columns.length} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No food items found
                   </Typography>
@@ -126,6 +154,7 @@ export default function FoodItemsTable({
                   key={item._id}
                   item={item}
                   index={index}
+                  visible={visibleKeys}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onDuplicate={onDuplicate}
