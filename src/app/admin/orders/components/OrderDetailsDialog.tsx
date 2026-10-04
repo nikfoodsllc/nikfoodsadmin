@@ -28,6 +28,7 @@ import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useState } from 'react';
 import StatusBadge from './StatusBadge';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
+import { getItemPortionLabel } from '@/utils/portions';
 import { Order, OrderStatus } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
@@ -358,9 +359,9 @@ export default function OrderDetailsDialog({
                                   Spice: {item.spiceLevel}
                                 </Typography>
                               )}
-                              {(item.selectedPortion || item.portions !== undefined) && (
+                              {getItemPortionLabel(item) && (
                                 <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                                  Portion: {item.selectedPortion || (item.food.portions?.[item.portions || 0]) || `#${item.portions}`}
+                                  Portion: {getItemPortionLabel(item)}
                                 </Typography>
                               )}
                               {item.isEcoFriendlyContainer && (

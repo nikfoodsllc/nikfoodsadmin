@@ -29,6 +29,7 @@ import { formatPSTDate, formatPSTTime } from '@/utils/timezone';
 import { buildDeliveryDateColumnsBySpec, collectDeliveryDateColumns } from '@/utils/delivery';
 import { escapeCSVValue } from '@/utils/csv';
 import { getDisplayPaymentStatus } from '@/utils/refunds';
+import { getItemPortionLabel } from '@/utils/portions';
 import type { PaymentStatus } from '@/types/order';
 
 interface DeliveryOrder {
@@ -500,9 +501,9 @@ export default function DeliveryReportPage() {
                       Spice: {item.spiceLevel}
                     </Typography>
                   )}
-                  {(item.selectedPortion || item.portions !== undefined) && (
+                  {getItemPortionLabel(item) && (
                     <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                      Portion: {item.selectedPortion || (item.food.portions?.[item.portions || 0]) || `#${item.portions}`}
+                      Portion: {getItemPortionLabel(item)}
                     </Typography>
                   )}
                   {item.isEcoFriendlyContainer && item.ecoContainerCharge && (
