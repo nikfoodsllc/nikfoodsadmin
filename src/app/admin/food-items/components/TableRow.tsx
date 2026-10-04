@@ -56,7 +56,7 @@ export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }:
       }}
     >
       {/* Actions */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle' }}>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
           <IconButton
             size="small"
@@ -97,8 +97,42 @@ export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }:
         </Box>
       </TableCell>
 
+      {/* Available */}
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+        <Box
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            paddingX: 1.5,
+            paddingY: 0.5,
+            borderRadius: 1.5,
+            backgroundColor: item.available ? '#ECFDF5' : '#FEF3F2',
+          }}
+        >
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: item.available ? '#10B981' : '#F97316',
+            }}
+          />
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: item.available ? '#10B981' : '#F97316',
+            }}
+          >
+            {item.available ? 'Available' : 'Unavailable'}
+          </Typography>
+        </Box>
+      </TableCell>
+
       {/* Image */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle' }}>
         <Box
           sx={{
             width: 80,
@@ -131,7 +165,7 @@ export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }:
       </TableCell>
 
       {/* Name */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle', maxWidth: 240 }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -144,31 +178,8 @@ export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }:
         </Typography>
       </TableCell>
 
-      {/* Type Badge */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
-        <TypeBadge type={item.itemType} />
-      </TableCell>
-
-      {/* Description */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle', maxWidth: 250 }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            lineHeight: 1.5,
-          }}
-        >
-          {item.description || 'No description'}
-        </Typography>
-      </TableCell>
-
       {/* Price */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
         {item.itemType === 'portions' && item.portionPrices && item.portionPrices.length > 0 ? (
           <Box>
             <Typography
@@ -213,7 +224,7 @@ export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }:
       </TableCell>
 
       {/* Veg Indicator */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
         <Box
           sx={{
             display: 'inline-flex',
@@ -246,38 +257,27 @@ export default function TableRow({ item, index, onEdit, onDelete, onDuplicate }:
         </Box>
       </TableCell>
 
-      {/* Available */}
-      <TableCell sx={{ padding: '12px', verticalAlign: 'middle' }}>
-        <Box
+      {/* Type Badge */}
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle' }}>
+        <TypeBadge type={item.itemType} />
+      </TableCell>
+
+      {/* Description */}
+      <TableCell sx={{ padding: '8px 10px', verticalAlign: 'middle', maxWidth: 220 }}>
+        <Typography
           sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 0.75,
-            paddingX: 1.5,
-            paddingY: 0.5,
-            borderRadius: 1.5,
-            backgroundColor: item.available ? '#ECFDF5' : '#FEF3F2',
+            fontSize: '13px',
+            color: '#6B7280',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: 1.5,
           }}
         >
-          <Box
-            sx={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: item.available ? '#10B981' : '#F97316',
-            }}
-          />
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: item.available ? '#10B981' : '#F97316',
-            }}
-          >
-            {item.available ? 'Available' : 'Unavailable'}
-          </Typography>
-        </Box>
+          {item.description || 'No description'}
+        </Typography>
       </TableCell>
     </MuiTableRow>
   );

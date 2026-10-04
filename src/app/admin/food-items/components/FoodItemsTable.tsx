@@ -70,7 +70,7 @@ export default function FoodItemsTable({
         component={Paper}
         elevation={0}
         sx={{
-          minWidth: 1790,
+          width: 'max-content',
           borderRadius: 3,
           border: '1px solid #E5E7EB',
           overflow: 'hidden',
@@ -83,29 +83,29 @@ export default function FoodItemsTable({
                 backgroundColor: '#F9FAFB',
               }}
             >
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
                 Actions
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                Available
+              </TableCell>
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
                 Image
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
                 Name
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Type
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Description
-              </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
                 Price
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Veg
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                Veg/Non-Veg
               </TableCell>
-              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
-                Available
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                Type
+              </TableCell>
+              <TableCell sx={{ padding: '8px 10px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                Description
               </TableCell>
             </TableRow>
           </TableHead>
