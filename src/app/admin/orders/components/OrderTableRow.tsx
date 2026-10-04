@@ -1,19 +1,17 @@
 'use client';
 
-import { TableRow as MuiTableRow, TableCell, Typography, Box, Button, Checkbox } from '@mui/material';
+import { TableRow as MuiTableRow, TableCell, Typography, Button, Checkbox } from '@mui/material';
 import { IconEye } from '@tabler/icons-react';
 import StatusBadge from './StatusBadge';
 import { Order } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { formatPSTDate } from '@/utils/timezone';
-import { processDeliveryDates, ProcessedDeliveryDate } from '@/utils/delivery';
 
 interface OrderTableRowProps {
   order: Order;
   index: number;
   onViewDetails: (order: Order) => void;
-  maxDeliveryDays: number;
   selected: boolean;
   onToggleSelect: (orderId: string) => void;
   disableSelection?: boolean;
@@ -23,38 +21,12 @@ export default function OrderTableRow({
   order,
   index,
   onViewDetails,
-  maxDeliveryDays,
   selected,
   onToggleSelect,
   disableSelection = false,
 }: OrderTableRowProps) {
-  const processedDates = processDeliveryDates(order.items || []);
   const refundedAmount = getRefundedAmount(order);
-  const instructionToDriver = order.address.landmark || '-';
-
-  // Render a delivery date cell
-  const renderDeliveryDateCell = (dateEntry: ProcessedDeliveryDate | null) => {
-    if (!dateEntry) {
-      return (
-        <Typography sx={{ fontSize: '13px', color: '#6B7280' }}>
-          -
-        </Typography>
-      );
-    }
-
-    return (
-      <Box>
-        <Typography sx={{ fontSize: '13px', color: '#111827', fontWeight: 500 }}>
-          {dateEntry.date}
-        </Typography>
-        {dateEntry.clubbedOriginalDates.length > 0 && (
-          <Typography sx={{ fontSize: '11px', color: '#9CA3AF' }}>
-            (Original: {dateEntry.clubbedOriginalDates.join('; ')})
-          </Typography>
-        )}
-      </Box>
-    );
-  };
+  const instructionToDriver = order.address?.floor || '-';
 
   return (
     <MuiTableRow
@@ -88,7 +60,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Order Date */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '13px',
@@ -100,7 +72,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Order ID */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -113,49 +85,59 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Customer Name */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '14px',
             fontWeight: 500,
             color: '#111827',
+            maxWidth: 170,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
+          title={order.customerInfo.name}
         >
           {order.customerInfo.name}
         </Typography>
       </TableCell>
 
-      {/* Email */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-          }}
-        >
-          {order.customerInfo.email}
-        </Typography>
-      </TableCell>
-
       {/* Order Status */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <StatusBadge status={order.status} type="order" />
       </TableCell>
 
       {/* Payment Status */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
       </TableCell>
 
+      {/* Instruction to Driver */}
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Typography
+          sx={{
+            fontSize: '13px',
+            color: '#6B7280',
+            maxWidth: 150,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={instructionToDriver}
+        >
+          {instructionToDriver}
+        </Typography>
+      </TableCell>
+
       {/* Payment Method (Credit Card, Apple Pay, Google Pay, Link, Bank, ...) */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography variant="body2" sx={{ fontSize: '13px', color: order.paymentMethod ? '#111827' : '#9CA3AF', whiteSpace: 'nowrap' }}>
           {order.paymentMethod || '-'}
         </Typography>
       </TableCell>
 
       {/* Sub Total */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -168,7 +150,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Service Fee (Platform Fee) */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -181,7 +163,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Tax */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -194,7 +176,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Tip */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -207,7 +189,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Refunded Amt (negative) */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -220,7 +202,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Grand Total (after refunds) */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle', textAlign: 'right' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography
           sx={{
             fontSize: '14px',
@@ -233,7 +215,7 @@ export default function OrderTableRow({
       </TableCell>
 
       {/* Phone */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '13px',
@@ -244,8 +226,8 @@ export default function OrderTableRow({
         </Typography>
       </TableCell>
 
-      {/* Address */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      {/* Email */}
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '13px',
@@ -255,62 +237,65 @@ export default function OrderTableRow({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}
+          title={order.customerInfo.email}
+        >
+          {order.customerInfo.email}
+        </Typography>
+      </TableCell>
+
+      {/* Address */}
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Typography
+          sx={{
+            fontSize: '13px',
+            color: '#6B7280',
+            maxWidth: 180,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={order.address.street}
         >
           {order.address.street}
         </Typography>
       </TableCell>
 
       {/* Apt. No. */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '13px',
             color: '#6B7280',
+            maxWidth: 120,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
+          title={order.address.apartment || order.address.floor || ''}
         >
           {order.address.apartment || order.address.floor || '-'}
         </Typography>
       </TableCell>
 
       {/* Gate Code */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Typography
           sx={{
             fontSize: '13px',
             color: '#6B7280',
+            maxWidth: 100,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
+          title={order.address.entrance || ''}
         >
           {order.address.entrance || '-'}
         </Typography>
       </TableCell>
 
-      {/* Instruction to Driver */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
-        <Typography
-          sx={{
-            fontSize: '13px',
-            color: '#6B7280',
-            maxWidth: 150,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={instructionToDriver}
-        >
-        <TableCell>{order.address?.floor || '-'}</TableCell>
-          {/* {instructionToDriver} */}
-        </Typography>
-      </TableCell>
-
-      {/* Dynamic delivery day cells - now using processed dates */}
-      {Array.from({ length: maxDeliveryDays }, (_, i) => (
-        <TableCell key={`delivery-day-${i}`} sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
-          {renderDeliveryDateCell(processedDates[i] || null)}
-        </TableCell>
-      ))}
-
       {/* Actions */}
-      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Button
           variant="outlined"
           size="small"
