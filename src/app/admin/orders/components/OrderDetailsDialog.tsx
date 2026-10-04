@@ -346,11 +346,6 @@ export default function OrderDetailsDialog({
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {item.food.name}
                                 </Typography>
-                                {item.food.description && (
-                                  <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', fontStyle: 'italic' }}>
-                                    {item.food.description}
-                                  </Typography>
-                                )}
                               </Box>
                             </Box>
 
