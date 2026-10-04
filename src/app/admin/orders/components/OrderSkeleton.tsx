@@ -31,6 +31,10 @@ export default function OrderSkeleton() {
           <TableCell>
             <Skeleton variant="rounded" width={90} height={28} />
           </TableCell>
+          {/* Payment Method */}
+          <TableCell>
+            <Skeleton variant="text" width={90} />
+          </TableCell>
           {/* Sub Total */}
           <TableCell>
             <Skeleton variant="text" width={70} />
