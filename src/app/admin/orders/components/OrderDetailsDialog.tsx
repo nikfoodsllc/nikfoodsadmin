@@ -104,6 +104,8 @@ export default function OrderDetailsDialog({
         sx: {
           borderRadius: 3,
           maxHeight: '90vh',
+          // phone only: small margins so the items table (about 260px wide) has room
+          '@media (max-width:599.95px)': { margin: '12px', maxWidth: 'calc(100% - 24px)' },
         },
       }}
     >
@@ -112,7 +114,7 @@ export default function OrderDetailsDialog({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingX: 3,
+          paddingX: { xs: 2, sm: 3 },
           paddingY: 2,
           borderBottom: '1px solid #E5E7EB',
         }}
@@ -135,7 +137,7 @@ export default function OrderDetailsDialog({
         </Button>
       </DialogTitle>
 
-      <DialogContent sx={{ paddingX: 3, paddingY: 3 }}>
+      <DialogContent sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 3 }}>
         {/* Order Header Info */}
         <Box sx={{ marginBottom: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
@@ -310,11 +312,11 @@ export default function OrderDetailsDialog({
                 )}
               </Box>
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E5E7EB', marginBottom: 1 }}>
-                <Table size="small">
+                <Table size="small" sx={{ '& .MuiTableCell-root': { px: { xs: 0.75, sm: 2 } } }}>
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#F9FAFB' }}>
                       <TableCell sx={{ fontWeight: 600, fontSize: '12px' }}>Item</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 600, fontSize: '12px' }}>Quantity</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 600, fontSize: '12px' }}><Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Quantity</Box><Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Qty</Box></TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px' }}>Price</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px' }}>Total</TableCell>
                     </TableRow>
@@ -662,7 +664,7 @@ export default function OrderDetailsDialog({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ paddingX: 3, paddingY: 2, borderTop: '1px solid #E5E7EB' }}>
+      <DialogActions sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 2, borderTop: '1px solid #E5E7EB' }}>
         <Button
           onClick={onClose}
           disabled={updating}
