@@ -192,6 +192,20 @@ export default function OrderTableRow({
         </Typography>
       </TableCell>
     ),
+    // Stripe Fee: what Stripe charged us for this payment (only orders paid after it was added have it)
+    stripeFee: (
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
+        <Typography
+          sx={{
+            fontSize: '14px',
+            fontWeight: typeof order.stripeFee === 'number' ? 500 : 400,
+            color: typeof order.stripeFee === 'number' ? '#111827' : '#9CA3AF',
+          }}
+        >
+          {typeof order.stripeFee === 'number' ? safeFormatCurrency(order.stripeFee) : '-'}
+        </Typography>
+      </TableCell>
+    ),
     // Refunded Amt (negative)
     refunded: (
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>

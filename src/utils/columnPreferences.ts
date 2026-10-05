@@ -49,8 +49,8 @@ export function clampWidth(width: number, def?: Pick<ColumnDef, 'minWidth'>): nu
 
 /**
  * Every column in display order (hidden ones included). Locked columns keep their own slot; the
- * unlocked ones follow the saved order, and any not mentioned (e.g. added in a later release) come
- * after the saved ones in their default order.
+ * unlocked ones follow the saved order, and any not mentioned (e.g. added in a later release) are
+ * placed next to the column that precedes them in the default order.
  */
 export function orderedColumns<T extends ColumnDef>(defs: T[], prefs: Pick<ColumnPrefs, 'order'>): T[] {
   const unlocked = defs.filter((d) => !d.locked);
@@ -64,7 +64,21 @@ export function orderedColumns<T extends ColumnDef>(defs: T[], prefs: Pick<Colum
       sequence.push(def);
     }
   }
-  for (const def of unlocked) if (!seen.has(def.key)) sequence.push(def);
+  // A column missing from the saved order (e.g. added in a later release) goes right after the column
+  // that comes before it in the default order, so it shows up next to its neighbour instead of at the end.
+  unlocked.forEach((def, i) => {
+    if (seen.has(def.key)) return;
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const idx = sequence.findIndex((s) => s.key === unlocked[j].key);
+      if (idx >= 0) {
+        at = idx + 1;
+        break;
+      }
+    }
+    sequence.splice(at, 0, def);
+    seen.add(def.key);
+  });
   let next = 0;
   return defs.map((d) => (d.locked ? d : sequence[next++]));
 }
