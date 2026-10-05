@@ -48,11 +48,21 @@ describe('orderedColumns', () => {
   it('follows the saved order and keeps locked columns in their slots', () => {
     expect(keys(orderedColumns(defs, prefs({ order: ['d', 'b', 'a', 'c'] })))).toEqual(['select', 'd', 'b', 'a', 'c', 'actions']);
   });
-  it('puts columns missing from the saved order after the saved ones, in default order', () => {
-    expect(keys(orderedColumns(defs, prefs({ order: ['c'] })))).toEqual(['select', 'c', 'a', 'b', 'd', 'actions']);
+  it('puts columns missing from the saved order next to their neighbour in the default order', () => {
+    expect(keys(orderedColumns(defs, prefs({ order: ['c'] })))).toEqual(['select', 'a', 'b', 'c', 'd', 'actions']);
+  });
+  it('shows a newly added column next to its default neighbour even when the saved order is full', () => {
+    // a later release adds 'new' right after 'b'; the admin saved an order without it
+    const withNew: ColumnDef[] = [defs[0], defs[1], defs[2], { key: 'new', label: 'New', defaultWidth: 100 }, defs[3], defs[4], defs[5]];
+    expect(keys(orderedColumns(withNew, prefs({ order: ['d', 'b', 'a', 'c'] })))).toEqual(['select', 'd', 'b', 'new', 'a', 'c', 'actions']);
+    // nothing saved: the default order
+    expect(keys(orderedColumns(withNew, prefs()))).toEqual(['select', 'a', 'b', 'new', 'c', 'd', 'actions']);
+    // the neighbour is the first column: the new one goes first
+    const first: ColumnDef[] = [defs[0], { key: 'new', label: 'New', defaultWidth: 100 }, defs[1], defs[2], defs[3], defs[4], defs[5]];
+    expect(keys(orderedColumns(first, prefs({ order: ['d', 'c', 'b', 'a'] })))).toEqual(['select', 'new', 'd', 'c', 'b', 'a', 'actions']);
   });
   it('ignores unknown, locked and repeated keys in the saved order', () => {
-    expect(keys(orderedColumns(defs, prefs({ order: ['ghost', 'select', 'b', 'b', 'actions'] })))).toEqual(['select', 'b', 'a', 'c', 'd', 'actions']);
+    expect(keys(orderedColumns(defs, prefs({ order: ['ghost', 'select', 'b', 'b', 'actions'] })))).toEqual(['select', 'a', 'b', 'c', 'd', 'actions']);
   });
 });
 
@@ -104,7 +114,7 @@ describe('sanitizeColumnPrefs', () => {
     );
     expect(out.widths).toEqual({ a: 140 });
     expect(out.hidden).toEqual(['c']);
-    expect(out.order).toEqual(['c', 'a', 'b', 'd']);
+    expect(out.order).toEqual(['c', 'd', 'a', 'b']);
   });
   it('clamps saved widths and respects each column minimum', () => {
     const out = sanitizeColumnPrefs({ widths: { a: 5, b: 50, c: 99999 } }, defs);
