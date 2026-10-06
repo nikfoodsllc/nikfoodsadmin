@@ -5,7 +5,7 @@ const verifyToken = vi.fn();
 vi.mock('@/lib/jwt', () => ({ jwtHandler: { verifyToken: (t: string) => verifyToken(t) } }));
 
 const invalidate = vi.fn();
-vi.mock('@/lib/invalidateHomeMenuCache', () => ({ invalidateLivesiteHomeMenuCache: () => invalidate() }));
+vi.mock('@/lib/invalidateHomeMenuCache', () => ({ invalidateLivesiteHomeMenuCacheAndWait: () => invalidate() }));
 
 const find = vi.fn();
 const bulkWrite = vi.fn();
@@ -49,6 +49,7 @@ beforeEach(() => {
     { _id: C, sequence: 3 },
   ]);
   bulkWrite.mockResolvedValue({});
+  invalidate.mockResolvedValue(true);
 });
 
 describe('PATCH /api/admin/food-category/reorder', () => {
@@ -70,7 +71,9 @@ describe('PATCH /api/admin/food-category/reorder', () => {
   it('renumbers only the categories whose rank changes, in one write, and clears the livesite menu cache', async () => {
     const res = await PATCH(req({ body: { parentId: null, orderedIds: [B, A, C] } }));
     expect(res.status).toBe(200);
-    expect((await res.json()).data.changed).toBe(2);
+    const body = await res.json();
+    expect(body.data.changed).toBe(2);
+    expect(body.data.livesiteNotified).toBe(true);
     const ops = bulkWrite.mock.calls[0][0] as Array<{
       updateOne: { filter: { _id: { toString(): string } }; update: { $set: { sequence: number } } };
     }>;
@@ -79,6 +82,13 @@ describe('PATCH /api/admin/food-category/reorder', () => {
       [A, 2],
     ]);
     expect(invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('still answers 200 (and says so) when the livesite could not be told', async () => {
+    invalidate.mockResolvedValue(false);
+    const res = await PATCH(req({ body: { parentId: null, orderedIds: [B, A, C] } }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.livesiteNotified).toBe(false);
   });
 
   it('writes nothing and keeps the cache when the order is unchanged', async () => {

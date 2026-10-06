@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties, ReactNode, useRef, useState } from 'react';
+import { CSSProperties, ReactNode, TransitionEventHandler, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Box, Chip, IconButton, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
 import {
@@ -25,7 +25,7 @@ import {
 import { FoodCategory } from '@/types/order';
 import { CategoryGroup } from '@/utils/categoryTree';
 import { moveItem } from '@/utils/categoryReorder';
-import { DragAxis, constrainTransform } from '@/utils/dragConstraint';
+import { DragAxis, constrainTransform, nudgeTransform } from '@/utils/dragConstraint';
 import { useVerticalWheelPassthrough } from '@/hooks/useVerticalWheelPassthrough';
 
 interface CategoryTableProps {
@@ -351,7 +351,26 @@ function dragStyle(
     { left: style.left, top: style.top, width: style.width, height: style.height },
     box ? { left: Math.max(box.left, limit), top: box.top, right: box.right, bottom: box.bottom } : null,
   );
-  return { ...style, transform };
+  return { ...style, transform: nudgeTransform(transform, axis) };
+}
+
+/**
+ * Safety net for the drop animation: the drag library finishes a drop only when the browser reports that
+ * the item's transform transition ended, and a browser sometimes never does (Safari, interrupted layout).
+ * The item would then stay stuck mid-drag. If a drop is still animating after a moment, finish it ourselves.
+ */
+function DropSafetyNet({ dropping, onTransitionEnd }: { dropping: boolean; onTransitionEnd?: TransitionEventHandler<HTMLElement> }) {
+  const finish = useRef(onTransitionEnd);
+  finish.current = onTransitionEnd;
+  useEffect(() => {
+    if (!dropping) return;
+    const timer = setTimeout(
+      () => finish.current?.({ propertyName: 'transform' } as unknown as Parameters<TransitionEventHandler<HTMLElement>>[0]),
+      700,
+    );
+    return () => clearTimeout(timer);
+  }, [dropping]);
+  return null;
 }
 
 const labelCellSx = {
@@ -431,79 +450,79 @@ export default function CategoryTable({
       >
         <Box sx={{ width: 'max-content', minWidth: '100%' }}>
           {/* Row 1: the categories (drag sideways) */}
-          <Box sx={{ display: 'flex', borderBottom: '2px solid #111827' }}>
-            <Box ref={labelCell} sx={labelCellSx}>
-              Categories
-            </Box>
-            <Droppable droppableId="categories" direction="horizontal" type="CATEGORY">
-              {(drop) => (
-                <Box
-                  ref={(el: HTMLDivElement | null) => {
-                    drop.innerRef(el);
-                    dropAreas.current.categories = el;
-                  }}
-                  {...drop.droppableProps}
-                  sx={{ display: 'flex' }}
-                >
-                  {groups.map((group, index) => (
-                    <Draggable
-                      key={group.parentId}
-                      draggableId={`cat-${group.parentId}`}
-                      index={index}
-                      isDragDisabled={dragDisabled || !group.parent}
-                    >
-                      {(drag, snapshot) => (
-                        <Box
-                          ref={drag.innerRef}
-                          {...drag.draggableProps}
-                          style={dragStyle(drag.draggableProps.style, snapshot, 'x', dropAreas.current.categories, labelCell.current)}
-                          sx={{
-                            width: COLUMN_WIDTH,
-                            flexShrink: 0,
-                            boxSizing: 'border-box',
-                            p: 1.5,
-                            borderRight: BORDER,
-                            bgcolor: snapshot.isDragging ? '#EEF4FF' : '#fff',
-                            boxShadow: snapshot.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : 'none',
-                          }}
-                        >
-                          {group.parent ? (
-                            <CategoryEntry
-                              category={group.parent}
-                              isTop
-                              handle={
-                                <DragHandle
-                                  handleProps={drag.dragHandleProps}
-                                  label={`Drag to re-rank ${group.parent.name} (left or right)`}
-                                  horizontal
-                                  disabled={dragDisabled}
-                                />
-                              }
-                              onEdit={onEdit}
-                              onDelete={onDelete}
-                              onItemSequence={onItemSequence}
-                            />
-                          ) : (
-                            <Typography
-                              sx={{
-                                fontSize: 13,
-                                color: '#6B7280',
-                                fontStyle: 'italic',
-                              }}
-                              {...(drag.dragHandleProps ?? {})}
-                            >
-                              {group.parentName ? `${group.parentName} (hidden by the filter)` : 'Parent not found'}
-                            </Typography>
-                          )}
-                        </Box>
-                      )}
-                    </Draggable>
-                  ))}
-                  {drop.placeholder}
+          {/* The whole row, label included, is the drop zone, so releasing over the label (easy to do on a phone) still drops at the start */}
+          <Droppable droppableId="categories" direction="horizontal" type="CATEGORY">
+            {(drop) => (
+              <Box
+                ref={(el: HTMLDivElement | null) => {
+                  drop.innerRef(el);
+                  dropAreas.current.categories = el;
+                }}
+                {...drop.droppableProps}
+                sx={{ display: 'flex', borderBottom: '2px solid #111827' }}
+              >
+                <Box ref={labelCell} sx={labelCellSx}>
+                  Categories
                 </Box>
-              )}
-            </Droppable>
-          </Box>
+                {groups.map((group, index) => (
+                  <Draggable
+                    key={group.parentId}
+                    draggableId={`cat-${group.parentId}`}
+                    index={index}
+                    isDragDisabled={dragDisabled || !group.parent}
+                  >
+                    {(drag, snapshot) => (
+                      <Box
+                        ref={drag.innerRef}
+                        {...drag.draggableProps}
+                        style={dragStyle(drag.draggableProps.style, snapshot, 'x', dropAreas.current.categories, labelCell.current)}
+                        sx={{
+                          width: COLUMN_WIDTH,
+                          flexShrink: 0,
+                          boxSizing: 'border-box',
+                          p: 1.5,
+                          borderRight: BORDER,
+                          bgcolor: snapshot.isDragging ? '#EEF4FF' : '#fff',
+                          boxShadow: snapshot.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : 'none',
+                        }}
+                      >
+                        <DropSafetyNet dropping={snapshot.isDropAnimating} onTransitionEnd={drag.draggableProps.onTransitionEnd} />
+                        {group.parent ? (
+                          <CategoryEntry
+                            category={group.parent}
+                            isTop
+                            handle={
+                              <DragHandle
+                                handleProps={drag.dragHandleProps}
+                                label={`Drag to re-rank ${group.parent.name} (left or right)`}
+                                horizontal
+                                disabled={dragDisabled}
+                              />
+                            }
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                            onItemSequence={onItemSequence}
+                          />
+                        ) : (
+                          <Typography
+                            sx={{
+                              fontSize: 13,
+                              color: '#6B7280',
+                              fontStyle: 'italic',
+                            }}
+                            {...(drag.dragHandleProps ?? {})}
+                          >
+                            {group.parentName ? `${group.parentName} (hidden by the filter)` : 'Parent not found'}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </Draggable>
+                ))}
+                {drop.placeholder}
+              </Box>
+            )}
+          </Droppable>
 
           {/* Row 2: each category's sub-categories (drag up or down inside their own column) */}
           <Box sx={{ display: 'flex' }}>
@@ -544,6 +563,7 @@ export default function CategoryTable({
                                 overflow: 'hidden',
                               }}
                             >
+                              <DropSafetyNet dropping={snapshot.isDropAnimating} onTransitionEnd={drag.draggableProps.onTransitionEnd} />
                               <CategoryEntry
                                 category={sub}
                                 isTop={false}

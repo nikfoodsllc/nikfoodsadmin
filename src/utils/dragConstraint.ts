@@ -50,3 +50,21 @@ export function constrainTransform(
   }
   return `translate(${Math.round(x * 100) / 100}px, ${Math.round(y * 100) / 100}px)`;
 }
+
+/** How far (px) the shown drag position is kept away from the exact drop target; see `nudgeTransform`. */
+export const DROP_NUDGE_PX = 1;
+
+/**
+ * Moves a translate() transform by `px` along `axis`. The drag library ends a drop only when the browser
+ * finishes a CSS transform transition, and the browser runs no transition (so the drop never finishes and
+ * the item stays "stuck" mid-drag) when the new transform equals the one already shown. Because the
+ * shown position is clamped and aligned, it can land exactly on the drop target; a 1px offset while
+ * dragging guarantees the final move is a real change. Values that are not a plain translate are returned as-is.
+ */
+export function nudgeTransform(transform: string | undefined, axis: DragAxis, px: number = DROP_NUDGE_PX): string | undefined {
+  const match = transform ? TRANSLATE.exec(transform.trim()) : null;
+  if (!match) return transform;
+  const x = Number(match[1]) + (axis === 'x' ? px : 0);
+  const y = Number(match[2]) + (axis === 'y' ? px : 0);
+  return `translate(${Math.round(x * 100) / 100}px, ${Math.round(y * 100) / 100}px)`;
+}

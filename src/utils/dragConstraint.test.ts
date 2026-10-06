@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { constrainTransform } from './dragConstraint';
+import { constrainTransform, nudgeTransform } from './dragConstraint';
 
 const item = { left: 300, top: 100, width: 250, height: 96 };
 const row = { left: 100, top: 90, right: 1100, bottom: 200 };
@@ -44,5 +44,17 @@ describe('constrainTransform', () => {
     expect(constrainTransform('translate(80px, 0px)', 'x', item, { left: 300, top: 100, right: 400, bottom: 110 })).toBe(
       'translate(0px, 0px)',
     );
+  });
+});
+
+describe('nudgeTransform', () => {
+  it('moves the main axis by 1px so the shown position never equals the drop target exactly', () => {
+    expect(nudgeTransform('translate(-200px, -10px)', 'x')).toBe('translate(-199px, -10px)');
+    expect(nudgeTransform('translate(0px, 96px)', 'y')).toBe('translate(0px, 97px)');
+    expect(nudgeTransform('translate(0px, 0px)', 'y', 2)).toBe('translate(0px, 2px)');
+  });
+  it('leaves values it does not understand alone', () => {
+    expect(nudgeTransform(undefined, 'x')).toBeUndefined();
+    expect(nudgeTransform('none', 'y')).toBe('none');
   });
 });
