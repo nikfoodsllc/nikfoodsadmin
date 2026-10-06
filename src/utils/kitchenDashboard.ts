@@ -40,16 +40,19 @@ export function weekdayName(day: string): string {
   return WEEKDAYS[toUtc(day).getUTCDay()];
 }
 
-/** The Monday of the week that contains `day` (weeks run Monday to Sunday). */
-export function mondayOf(day: string): string {
-  const dow = toUtc(day).getUTCDay(); // 0 = Sunday
-  return addDays(day, -((dow + 6) % 7));
+/**
+ * The Saturday that starts the week containing `day`. A kitchen week runs Saturday to Friday: the new menu
+ * goes out on Friday night and deliveries run through the Friday of the following week.
+ */
+export function weekStartOf(day: string): string {
+  const dow = toUtc(day).getUTCDay(); // 0 = Sunday ... 6 = Saturday
+  return addDays(day, -((dow + 1) % 7));
 }
 
-/** Monday..Sunday of the week `weeksAgo` weeks before the week containing `today`. */
+/** Saturday..Friday of the week `weeksAgo` weeks before the week containing `today`. */
 export function getWeekRange(today: string, weeksAgo = 0): DayRange {
-  const monday = addDays(mondayOf(today), -7 * weeksAgo);
-  return { startDate: monday, endDate: addDays(monday, 6) };
+  const start = addDays(weekStartOf(today), -7 * weeksAgo);
+  return { startDate: start, endDate: addDays(start, 6) };
 }
 
 export function getPresetRange(preset: Exclude<WeekPreset, 'custom'>, today: string): DayRange {

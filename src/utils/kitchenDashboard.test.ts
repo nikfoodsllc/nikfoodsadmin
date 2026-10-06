@@ -11,52 +11,66 @@ import {
   getPresetRange,
   getWeekRange,
   isDayString,
-  mondayOf,
+  weekStartOf,
   toDayString,
   validateRange,
   weekdayName,
   type KitchenRow,
 } from './kitchenDashboard';
 
-describe('week math (weeks run Monday to Sunday)', () => {
+describe('week math (weeks run Saturday to Friday)', () => {
   it('knows the weekday of a day', () => {
     expect(weekdayName('2026-10-05')).toBe('Monday');
-    expect(weekdayName('2026-10-11')).toBe('Sunday');
+    expect(weekdayName('2026-10-09')).toBe('Friday');
+    expect(weekdayName('2026-10-10')).toBe('Saturday');
   });
 
-  it('finds the Monday of any day in the week', () => {
-    expect(mondayOf('2026-10-05')).toBe('2026-10-05'); // Monday
-    expect(mondayOf('2026-10-07')).toBe('2026-10-05'); // Wednesday
-    expect(mondayOf('2026-10-11')).toBe('2026-10-05'); // Sunday belongs to the week that started on Monday
+  it('finds the Saturday that starts the week of any day', () => {
+    expect(weekStartOf('2026-10-03')).toBe('2026-10-03'); // Saturday
+    expect(weekStartOf('2026-10-04')).toBe('2026-10-03'); // Sunday
+    expect(weekStartOf('2026-10-07')).toBe('2026-10-03'); // Wednesday
+    expect(weekStartOf('2026-10-09')).toBe('2026-10-03'); // Friday is the LAST day of the week
+    expect(weekStartOf('2026-10-10')).toBe('2026-10-10'); // the next Saturday starts a new week
   });
 
   it('crosses month and year boundaries', () => {
     expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
-    expect(mondayOf('2027-01-01')).toBe('2026-12-28');
-    expect(getWeekRange('2026-03-01', 0)).toEqual({ startDate: '2026-02-23', endDate: '2026-03-01' });
+    expect(weekStartOf('2027-01-01')).toBe('2026-12-26'); // Friday Jan 1
+    expect(getWeekRange('2026-03-01', 0)).toEqual({ startDate: '2026-02-28', endDate: '2026-03-06' });
   });
 
   it('gives this week, last week and the week before last', () => {
     // today is Wednesday Oct 7, 2026
-    expect(getPresetRange('thisWeek', '2026-10-07')).toEqual({ startDate: '2026-10-05', endDate: '2026-10-11' });
-    expect(getPresetRange('lastWeek', '2026-10-07')).toEqual({ startDate: '2026-09-28', endDate: '2026-10-04' });
-    expect(getPresetRange('weekBeforeLast', '2026-10-07')).toEqual({ startDate: '2026-09-21', endDate: '2026-09-27' });
+    expect(getPresetRange('thisWeek', '2026-10-07')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+    expect(getPresetRange('lastWeek', '2026-10-07')).toEqual({ startDate: '2026-09-26', endDate: '2026-10-02' });
+    expect(getPresetRange('weekBeforeLast', '2026-10-07')).toEqual({ startDate: '2026-09-19', endDate: '2026-09-25' });
   });
 
-  it('on a Sunday "this week" still ends that Sunday', () => {
-    expect(getPresetRange('thisWeek', '2026-10-11')).toEqual({ startDate: '2026-10-05', endDate: '2026-10-11' });
+  it('on a Friday "this week" still ends that Friday, and on the Saturday a new week begins', () => {
+    expect(getPresetRange('thisWeek', '2026-10-09')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+    expect(getPresetRange('thisWeek', '2026-10-10')).toEqual({ startDate: '2026-10-10', endDate: '2026-10-16' });
+    expect(getPresetRange('lastWeek', '2026-10-10')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+  });
+
+  it('every week is seven days from a Saturday to a Friday', () => {
+    for (const today of ['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09']) {
+      const r = getWeekRange(today, 0);
+      expect(weekdayName(r.startDate)).toBe('Saturday');
+      expect(weekdayName(r.endDate)).toBe('Friday');
+      expect(enumerateDays(r)).toHaveLength(7);
+    }
   });
 
   it('lists every day of a range', () => {
-    expect(enumerateDays({ startDate: '2026-10-05', endDate: '2026-10-11' })).toHaveLength(7);
+    expect(enumerateDays({ startDate: '2026-10-03', endDate: '2026-10-09' })).toHaveLength(7);
     expect(enumerateDays({ startDate: '2026-10-05', endDate: '2026-10-05' })).toEqual(['2026-10-05']);
     expect(enumerateDays({ startDate: '2026-10-11', endDate: '2026-10-05' })).toEqual([]);
     expect(enumerateDays({ startDate: 'x', endDate: '2026-10-05' })).toEqual([]);
   });
 
   it('validates a custom range', () => {
-    expect(validateRange({ startDate: '2026-10-05', endDate: '2026-10-11' })).toBeNull();
+    expect(validateRange({ startDate: '2026-10-03', endDate: '2026-10-09' })).toBeNull();
     expect(validateRange({ startDate: '', endDate: '2026-10-11' })).toMatch(/start and an end/);
     expect(validateRange({ startDate: '2026-10-11', endDate: '2026-10-05' })).toMatch(/not be after/);
     expect(validateRange({ startDate: '2026-01-01', endDate: '2026-12-31' })).toMatch(/at most/);
@@ -70,7 +84,7 @@ describe('week math (weeks run Monday to Sunday)', () => {
 
   it('formats labels', () => {
     expect(formatDayShort('2026-10-07')).toBe('Wed, Oct 7');
-    expect(formatRangeLabel({ startDate: '2026-10-05', endDate: '2026-10-11' })).toBe('Oct 5 – Oct 11, 2026');
+    expect(formatRangeLabel({ startDate: '2026-10-03', endDate: '2026-10-09' })).toBe('Oct 3 – Oct 9, 2026');
     expect(formatRangeLabel({ startDate: '2026-12-28', endDate: '2027-01-03' })).toBe('Dec 28, 2026 – Jan 3, 2027');
   });
 
