@@ -6,6 +6,7 @@ import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { ObjectId, type Filter } from 'mongodb';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 import { isPreparationType } from '@/utils/preparationType';
+import { foodItemListFilters } from './listFilters';
 
 // Interface for available days
 interface AvailableDay {
@@ -414,7 +415,6 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const categoryId = searchParams.get('category') || '';
     const vegOnly = searchParams.get('vegOnly') === 'true';
-    const preparationFilter = searchParams.get('preparationType') || '';
     const draftOnly = searchParams.get('draftOnly') === 'true';
     const excludeDrafts = searchParams.get('excludeDrafts') === 'true';
     const day = searchParams.get('day');
@@ -521,12 +521,9 @@ export async function GET(request: NextRequest) {
       filter.veg = true;
     }
 
-    // Filter by how the item is prepared ('not_set' = not classified yet)
-    if (preparationFilter === 'cooked' || preparationFilter === 'ready_to_eat') {
-      filter.preparationType = preparationFilter;
-    } else if (preparationFilter === 'not_set') {
-      filter.preparationType = { $nin: ['cooked', 'ready_to_eat'] };
-    }
+    // Column filters of the Food Items table: veg, available, type, preparation type
+    // (applied after vegOnly, so a `veg` filter wins when both are sent)
+    Object.assign(filter, foodItemListFilters(searchParams));
 
     // Filter by draft status
     if (draftOnly) {

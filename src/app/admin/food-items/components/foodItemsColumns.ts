@@ -20,7 +20,7 @@ export const FOOD_ITEMS_COLUMNS: FoodItemsColumnDef[] = [
   { key: 'available', label: 'Available', defaultWidth: 125, skeleton: 'pill', skeletonWidth: 90 },
   { key: 'image', label: 'Image', defaultWidth: 100, skeleton: 'image' },
   { key: 'name', label: 'Name', defaultWidth: 240, skeleton: 'text', skeletonWidth: 140 },
-  { key: 'preparation', label: 'Preparation', defaultWidth: 150, skeleton: 'pill', skeletonWidth: 90 },
+  { key: 'preparation', label: 'Preparation Type', defaultWidth: 170, skeleton: 'pill', skeletonWidth: 90 },
   { key: 'price', label: 'Price', defaultWidth: 140, skeleton: 'text', skeletonWidth: 70 },
   { key: 'veg', label: 'Veg/Non-Veg', defaultWidth: 130, skeleton: 'pill', skeletonWidth: 70 },
   { key: 'type', label: 'Type', defaultWidth: 110, skeleton: 'pill', skeletonWidth: 70 },

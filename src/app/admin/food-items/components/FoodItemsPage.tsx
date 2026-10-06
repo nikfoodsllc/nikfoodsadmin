@@ -29,7 +29,8 @@ import PortionsFoodItemDialog from './PortionsFoodItemDialog';
 import ComboFoodItemDialog from './ComboFoodItemDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import TableFilters from './TableFilters';
-import { PreparationFilter, PreparationType } from '@/utils/preparationType';
+import { PreparationType } from '@/utils/preparationType';
+import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, foodItemFilterParams } from './foodItemFilters';
 import TablePagination from './TablePagination';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import {
@@ -221,10 +222,8 @@ export default function FoodItemsPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [vegOnly, setVegOnly] = useState('all');
-
-  // Preparation filter + the rows ticked for the bulk update
-  const [prepFilter, setPrepFilter] = useState<PreparationFilter>('all');
+  // Column filters (veg, available, type, preparation type) + the rows ticked for the bulk update
+  const [filters, setFilters] = useState<FoodItemFilters>(DEFAULT_FOOD_ITEM_FILTERS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
@@ -343,12 +342,8 @@ export default function FoodItemsPage() {
         params.append('search', searchQuery);
       }
 
-      if (vegOnly === 'true' || vegOnly === 'false') {
-        params.append('vegOnly', vegOnly);
-      }
-
-      if (prepFilter !== 'all') {
-        params.append('preparationType', prepFilter);
+      for (const [key, value] of foodItemFilterParams(filters)) {
+        params.append(key, value);
       }
 
       params.append('page', currentPage.toString());
@@ -377,8 +372,7 @@ export default function FoodItemsPage() {
   }, [
     token,
     searchQuery,
-    vegOnly,
-    prepFilter,
+    filters,
     currentPage,
   ]);
 
@@ -422,8 +416,7 @@ export default function FoodItemsPage() {
       setBulkLoading(true);
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      if (vegOnly === 'true' || vegOnly === 'false') params.append('vegOnly', vegOnly);
-      if (prepFilter !== 'all') params.append('preparationType', prepFilter);
+      for (const [key, value] of foodItemFilterParams(filters)) params.append(key, value);
       params.append('page', '1');
       params.append('limit', '1000');
       const response = await fetch(`/api/admin/food-items?${params.toString()}`, {
@@ -732,18 +725,13 @@ export default function FoodItemsPage() {
 
       <TableFilters
         searchValue={searchQuery}
-        vegOnly={vegOnly}
         onSearchChange={(value) => {
           setSearchQuery(value);
           setCurrentPage(1);
         }}
-        onVegChange={(value) => {
-          setVegOnly(value);
-          setCurrentPage(1);
-        }}
-        preparation={prepFilter}
-        onPreparationChange={(value) => {
-          setPrepFilter(value);
+        filters={filters}
+        onFilterChange={(key, value) => {
+          setFilters((prev) => ({ ...prev, [key]: value }));
           setCurrentPage(1);
         }}
       />
