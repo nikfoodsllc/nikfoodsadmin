@@ -131,6 +131,10 @@ export interface KitchenItem {
   inCombos: number;
   portions: CountLine[];
   spice: CountLine[];
+  /** Total amount to cook where the sizes are known, as text ('84 oz (5 lb 4 oz)'); '' when no size is known. */
+  totalText: string;
+  /** Units of this item that carry no readable size, so they are not in `totalText`. */
+  unsized: number;
 }
 
 export interface KitchenCombo {
@@ -147,6 +151,76 @@ export interface KitchenDay {
   items: KitchenItem[];
   combos: KitchenCombo[];
   totals: { units: number; orders: number; ecoContainers: number };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sizes: the amount written in a portion label ("8Oz", "1/2Lb", "100gms", "6Pcs")
+// ---------------------------------------------------------------------------------------------
+
+/** An amount of food. Weights in ounces and grams are kept apart, and so are pieces. */
+export interface Amount {
+  oz: number;
+  grams: number;
+  pieces: number;
+}
+
+export const emptyAmount = (): Amount => ({ oz: 0, grams: 0, pieces: 0 });
+
+const SIZE_RE = /^\s*(?:(\d+)\s+)?(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+))?\s*(oz|ounces?|lbs?|pounds?|kgs?|gms?|grams?|g|pcs?|pieces?)\b/i;
+
+/**
+ * What one serving of a portion label holds. "12Oz" is 12 ounces, "1/2Lb" is 8 ounces, "1Lb" is 16,
+ * "100gms" is 100 grams, "6Pcs" is 6 pieces. Labels without a size ("Full", "Serves 4") give null.
+ */
+export function parsePortionAmount(label: string | null | undefined): Amount | null {
+  const match = typeof label === 'string' ? SIZE_RE.exec(label) : null;
+  if (!match) return null;
+  const whole = match[1] ? Number(match[1]) : 0;
+  let value = Number(match[2]);
+  if (match[3]) {
+    const denominator = Number(match[3]);
+    if (!denominator) return null;
+    value = whole + value / denominator;
+  } else if (whole) {
+    return null; // "1 2Oz" is not a size
+  }
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const unit = match[4].toLowerCase();
+  const out = emptyAmount();
+  if (unit.startsWith('oz') || unit.startsWith('ounce')) out.oz = value;
+  else if (unit.startsWith('lb') || unit.startsWith('pound')) out.oz = value * 16;
+  else if (unit.startsWith('kg')) out.grams = value * 1000;
+  else if (unit.startsWith('g')) out.grams = value;
+  else out.pieces = value;
+  return out;
+}
+
+export function addAmount(into: Amount, add: Amount, times = 1): void {
+  into.oz += add.oz * times;
+  into.grams += add.grams * times;
+  into.pieces += add.pieces * times;
+}
+
+const trim2 = (n: number): string => String(Math.round(n * 100) / 100);
+
+/** '36 oz (2 lb 4 oz)', '8 oz', '300 g', '12 pcs', or '' when there is nothing. Mixed units are joined with ' + '. */
+export function formatAmount(amount: Amount): string {
+  const parts: string[] = [];
+  if (amount.oz > 0) {
+    const oz = Math.round(amount.oz * 100) / 100;
+    if (oz >= 16) {
+      const pounds = Math.floor(oz / 16);
+      const rest = Math.round((oz - pounds * 16) * 100) / 100;
+      parts.push(`${trim2(oz)} oz (${pounds} lb${rest > 0 ? ` ${trim2(rest)} oz` : ''})`);
+    } else {
+      parts.push(`${trim2(oz)} oz`);
+    }
+  }
+  if (amount.grams > 0) {
+    parts.push(amount.grams >= 1000 ? `${trim2(amount.grams)} g (${trim2(amount.grams / 1000)} kg)` : `${trim2(amount.grams)} g`);
+  }
+  if (amount.pieces > 0) parts.push(`${trim2(amount.pieces)} pcs`);
+  return parts.join(' + ');
 }
 
 const clean = (v: string | null | undefined): string => (typeof v === 'string' ? v.trim() : '');
@@ -182,6 +256,8 @@ interface ItemAcc {
   inCombos: number;
   portions: Map<string, number>;
   spice: Map<string, number>;
+  amount: Amount;
+  sized: number;
 }
 
 /**
@@ -207,7 +283,7 @@ export function buildKitchenDays(rows: KitchenRow[], days: string[]): KitchenDay
     const itemAcc = (name: string): ItemAcc => {
       let acc = items.get(name);
       if (!acc) {
-        acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map() };
+        acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), amount: emptyAmount(), sized: 0 };
         items.set(name, acc);
       }
       return acc;
@@ -239,6 +315,11 @@ export function buildKitchenDays(rows: KitchenRow[], days: string[]): KitchenDay
           acc.total += row.quantity;
           acc.inCombos += row.quantity;
           bump(acc.portions, part.portion ?? 'No size', row.quantity);
+          const partSize = parsePortionAmount(part.portion);
+          if (partSize) {
+            addAmount(acc.amount, partSize, row.quantity);
+            acc.sized += row.quantity;
+          }
         }
       } else {
         const acc = itemAcc(name);
@@ -246,6 +327,11 @@ export function buildKitchenDays(rows: KitchenRow[], days: string[]): KitchenDay
         const portion = clean(row.portion);
         bump(acc.portions, portion || 'No size', row.quantity);
         if (spice) bump(acc.spice, spice, row.quantity);
+        const size = parsePortionAmount(portion);
+        if (size) {
+          addAmount(acc.amount, size, row.quantity);
+          acc.sized += row.quantity;
+        }
       }
     }
 
@@ -260,6 +346,8 @@ export function buildKitchenDays(rows: KitchenRow[], days: string[]): KitchenDay
           inCombos: acc.inCombos,
           portions: showPortions ? portions : [],
           spice: toLines(acc.spice),
+          totalText: formatAmount(acc.amount),
+          unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
         };
       })
       .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));

@@ -69,6 +69,17 @@ function ItemRow({ item }: { item: KitchenItem }) {
         <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
           {item.name}
         </Typography>
+        {item.totalText && (
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', mt: 0.25 }}>
+            Total: {item.totalText}
+            {item.unsized > 0 && (
+              <Typography component="span" sx={{ fontSize: 12, fontWeight: 400, color: '#6B7280' }}>
+                {' '}
+                (+{item.unsized} without a size)
+              </Typography>
+            )}
+          </Typography>
+        )}
         <CountChips lines={item.portions} />
         {item.spice.length > 0 && (
           <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
