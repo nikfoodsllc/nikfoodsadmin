@@ -3,58 +3,74 @@ import {
   addDays,
   buildKitchenDays,
   comboParts,
+  formatAmount,
+  parsePortionAmount,
   enumerateDays,
   formatDayShort,
   formatRangeLabel,
   getPresetRange,
   getWeekRange,
   isDayString,
-  mondayOf,
+  weekStartOf,
   toDayString,
   validateRange,
   weekdayName,
   type KitchenRow,
 } from './kitchenDashboard';
 
-describe('week math (weeks run Monday to Sunday)', () => {
+describe('week math (weeks run Saturday to Friday)', () => {
   it('knows the weekday of a day', () => {
     expect(weekdayName('2026-10-05')).toBe('Monday');
-    expect(weekdayName('2026-10-11')).toBe('Sunday');
+    expect(weekdayName('2026-10-09')).toBe('Friday');
+    expect(weekdayName('2026-10-10')).toBe('Saturday');
   });
 
-  it('finds the Monday of any day in the week', () => {
-    expect(mondayOf('2026-10-05')).toBe('2026-10-05'); // Monday
-    expect(mondayOf('2026-10-07')).toBe('2026-10-05'); // Wednesday
-    expect(mondayOf('2026-10-11')).toBe('2026-10-05'); // Sunday belongs to the week that started on Monday
+  it('finds the Saturday that starts the week of any day', () => {
+    expect(weekStartOf('2026-10-03')).toBe('2026-10-03'); // Saturday
+    expect(weekStartOf('2026-10-04')).toBe('2026-10-03'); // Sunday
+    expect(weekStartOf('2026-10-07')).toBe('2026-10-03'); // Wednesday
+    expect(weekStartOf('2026-10-09')).toBe('2026-10-03'); // Friday is the LAST day of the week
+    expect(weekStartOf('2026-10-10')).toBe('2026-10-10'); // the next Saturday starts a new week
   });
 
   it('crosses month and year boundaries', () => {
     expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
-    expect(mondayOf('2027-01-01')).toBe('2026-12-28');
-    expect(getWeekRange('2026-03-01', 0)).toEqual({ startDate: '2026-02-23', endDate: '2026-03-01' });
+    expect(weekStartOf('2027-01-01')).toBe('2026-12-26'); // Friday Jan 1
+    expect(getWeekRange('2026-03-01', 0)).toEqual({ startDate: '2026-02-28', endDate: '2026-03-06' });
   });
 
   it('gives this week, last week and the week before last', () => {
     // today is Wednesday Oct 7, 2026
-    expect(getPresetRange('thisWeek', '2026-10-07')).toEqual({ startDate: '2026-10-05', endDate: '2026-10-11' });
-    expect(getPresetRange('lastWeek', '2026-10-07')).toEqual({ startDate: '2026-09-28', endDate: '2026-10-04' });
-    expect(getPresetRange('weekBeforeLast', '2026-10-07')).toEqual({ startDate: '2026-09-21', endDate: '2026-09-27' });
+    expect(getPresetRange('thisWeek', '2026-10-07')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+    expect(getPresetRange('lastWeek', '2026-10-07')).toEqual({ startDate: '2026-09-26', endDate: '2026-10-02' });
+    expect(getPresetRange('weekBeforeLast', '2026-10-07')).toEqual({ startDate: '2026-09-19', endDate: '2026-09-25' });
   });
 
-  it('on a Sunday "this week" still ends that Sunday', () => {
-    expect(getPresetRange('thisWeek', '2026-10-11')).toEqual({ startDate: '2026-10-05', endDate: '2026-10-11' });
+  it('on a Friday "this week" still ends that Friday, and on the Saturday a new week begins', () => {
+    expect(getPresetRange('thisWeek', '2026-10-09')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+    expect(getPresetRange('thisWeek', '2026-10-10')).toEqual({ startDate: '2026-10-10', endDate: '2026-10-16' });
+    expect(getPresetRange('lastWeek', '2026-10-10')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+  });
+
+  it('every week is seven days from a Saturday to a Friday', () => {
+    for (const today of ['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09']) {
+      const r = getWeekRange(today, 0);
+      expect(weekdayName(r.startDate)).toBe('Saturday');
+      expect(weekdayName(r.endDate)).toBe('Friday');
+      expect(enumerateDays(r)).toHaveLength(7);
+    }
   });
 
   it('lists every day of a range', () => {
-    expect(enumerateDays({ startDate: '2026-10-05', endDate: '2026-10-11' })).toHaveLength(7);
+    expect(enumerateDays({ startDate: '2026-10-03', endDate: '2026-10-09' })).toHaveLength(7);
     expect(enumerateDays({ startDate: '2026-10-05', endDate: '2026-10-05' })).toEqual(['2026-10-05']);
     expect(enumerateDays({ startDate: '2026-10-11', endDate: '2026-10-05' })).toEqual([]);
     expect(enumerateDays({ startDate: 'x', endDate: '2026-10-05' })).toEqual([]);
   });
 
   it('validates a custom range', () => {
-    expect(validateRange({ startDate: '2026-10-05', endDate: '2026-10-11' })).toBeNull();
+    expect(validateRange({ startDate: '2026-10-03', endDate: '2026-10-09' })).toBeNull();
     expect(validateRange({ startDate: '', endDate: '2026-10-11' })).toMatch(/start and an end/);
     expect(validateRange({ startDate: '2026-10-11', endDate: '2026-10-05' })).toMatch(/not be after/);
     expect(validateRange({ startDate: '2026-01-01', endDate: '2026-12-31' })).toMatch(/at most/);
@@ -68,7 +84,7 @@ describe('week math (weeks run Monday to Sunday)', () => {
 
   it('formats labels', () => {
     expect(formatDayShort('2026-10-07')).toBe('Wed, Oct 7');
-    expect(formatRangeLabel({ startDate: '2026-10-05', endDate: '2026-10-11' })).toBe('Oct 5 – Oct 11, 2026');
+    expect(formatRangeLabel({ startDate: '2026-10-03', endDate: '2026-10-09' })).toBe('Oct 3 – Oct 9, 2026');
     expect(formatRangeLabel({ startDate: '2026-12-28', endDate: '2027-01-03' })).toBe('Dec 28, 2026 – Jan 3, 2027');
   });
 
@@ -203,5 +219,90 @@ describe('buildKitchenDays', () => {
   it('sorts the biggest production first', () => {
     const out = buildKitchenDays([row({ name: 'A', quantity: 1 }), row({ name: 'B', quantity: 5 }), row({ name: 'C', quantity: 5 })], days);
     expect(out[2].items.map((i) => i.name)).toEqual(['B', 'C', 'A']);
+  });
+});
+
+describe('parsePortionAmount (sizes in portion labels)', () => {
+  it('reads ounces and pounds', () => {
+    expect(parsePortionAmount('8Oz')).toEqual({ oz: 8, grams: 0, pieces: 0 });
+    expect(parsePortionAmount('12 oz')).toEqual({ oz: 12, grams: 0, pieces: 0 });
+    expect(parsePortionAmount('1Lb')).toEqual({ oz: 16, grams: 0, pieces: 0 });
+    expect(parsePortionAmount('1/2Lb')).toEqual({ oz: 8, grams: 0, pieces: 0 });
+    expect(parsePortionAmount('1/2 Lb')).toEqual({ oz: 8, grams: 0, pieces: 0 });
+    expect(parsePortionAmount('1 1/2 lb')).toEqual({ oz: 24, grams: 0, pieces: 0 });
+  });
+  it('reads grams, kilograms and pieces', () => {
+    expect(parsePortionAmount('100gms')).toEqual({ oz: 0, grams: 100, pieces: 0 });
+    expect(parsePortionAmount('250 g')).toEqual({ oz: 0, grams: 250, pieces: 0 });
+    expect(parsePortionAmount('1kg')).toEqual({ oz: 0, grams: 1000, pieces: 0 });
+    expect(parsePortionAmount('6Pcs')).toEqual({ oz: 0, grams: 0, pieces: 6 });
+  });
+  it('gives null when there is no size', () => {
+    expect(parsePortionAmount('Full')).toBeNull();
+    expect(parsePortionAmount('Serves 4')).toBeNull();
+    expect(parsePortionAmount('')).toBeNull();
+    expect(parsePortionAmount(null)).toBeNull();
+    expect(parsePortionAmount(undefined)).toBeNull();
+    expect(parsePortionAmount('0Oz')).toBeNull();
+    expect(parsePortionAmount('1/0Lb')).toBeNull();
+  });
+});
+
+describe('formatAmount', () => {
+  it('shows ounces, and pounds once there are 16 ounces or more', () => {
+    expect(formatAmount({ oz: 8, grams: 0, pieces: 0 })).toBe('8 oz');
+    expect(formatAmount({ oz: 16, grams: 0, pieces: 0 })).toBe('16 oz (1 lb)');
+    expect(formatAmount({ oz: 36, grams: 0, pieces: 0 })).toBe('36 oz (2 lb 4 oz)');
+    expect(formatAmount({ oz: 96, grams: 0, pieces: 0 })).toBe('96 oz (6 lb)');
+  });
+  it('shows grams and pieces and joins mixed units', () => {
+    expect(formatAmount({ oz: 0, grams: 300, pieces: 0 })).toBe('300 g');
+    expect(formatAmount({ oz: 0, grams: 1500, pieces: 0 })).toBe('1500 g (1.5 kg)');
+    expect(formatAmount({ oz: 0, grams: 0, pieces: 12 })).toBe('12 pcs');
+    expect(formatAmount({ oz: 8, grams: 0, pieces: 6 })).toBe('8 oz + 6 pcs');
+    expect(formatAmount({ oz: 0, grams: 0, pieces: 0 })).toBe('');
+  });
+});
+
+describe('total amount per item', () => {
+  const days = ['2026-10-07'];
+
+  it('multiplies each size by its quantity and adds them up', () => {
+    const out = buildKitchenDays(
+      [row({ quantity: 3, portion: '8Oz' }), row({ orderId: 'B', quantity: 2, portion: '16Oz' })],
+      days
+    );
+    expect(out[0].items[0]).toMatchObject({ quantity: 5, totalText: '56 oz (3 lb 8 oz)', unsized: 0 });
+  });
+
+  it('handles pound sizes', () => {
+    const out = buildKitchenDays([row({ name: 'Kaju Katli', quantity: 3, portion: '1/2Lb' }), row({ orderId: 'B', name: 'Kaju Katli', quantity: 1, portion: '1Lb' })], days);
+    expect(out[0].items[0].totalText).toBe('40 oz (2 lb 8 oz)');
+  });
+
+  it('adds the sizes of combo parts to the same item', () => {
+    const out = buildKitchenDays(
+      [
+        row({ orderId: 'A', name: 'Veg Combo', quantity: 3, comboSelections: { s1: ['a1'], s2: ['b1'], s3: ['c2'] }, ...combo }),
+        row({ orderId: 'B', name: 'Kale Chane', quantity: 4, portion: '12Oz' }),
+      ],
+      days
+    );
+    const kale = out[0].items.find((i) => i.name === 'Kale Chane')!;
+    expect(kale.totalText).toBe('84 oz (5 lb 4 oz)'); // 3 in combos + 4 on their own, 12 oz each
+    expect(kale.unsized).toBe(0);
+    // Chapati has no size: no total, and nothing to flag because no part of it is sized
+    const chapati = out[0].items.find((i) => i.name === 'Chapati')!;
+    expect(chapati).toMatchObject({ totalText: '', unsized: 0, quantity: 3 });
+  });
+
+  it('flags units that have no size when some do', () => {
+    const out = buildKitchenDays([row({ quantity: 2, portion: '8Oz' }), row({ orderId: 'B', quantity: 3, portion: null })], days);
+    expect(out[0].items[0]).toMatchObject({ quantity: 5, totalText: '16 oz (1 lb)', unsized: 3 });
+  });
+
+  it('items without any size show no total', () => {
+    const out = buildKitchenDays([row({ name: 'Samosa Pav', quantity: 4, portion: null })], days);
+    expect(out[0].items[0]).toMatchObject({ totalText: '', unsized: 0 });
   });
 });
