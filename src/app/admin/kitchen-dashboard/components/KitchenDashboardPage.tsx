@@ -11,12 +11,15 @@ import {
   IconButton,
   Paper,
   Skeleton,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import { IconRefresh } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
+import ItemOrdersDialog from './ItemOrdersDialog';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
 import { KITCHEN_DAY_DEFS, arrangeKitchenDays } from '@/utils/kitchenDayLayout';
@@ -27,6 +30,8 @@ import {
   getPresetRange,
   validateRange,
   type DayRange,
+  type KitchenBlock,
+  type KitchenCombo,
   type KitchenDay,
   type KitchenItem,
   type WeekPreset,
@@ -55,10 +60,26 @@ function CountChips({ lines }: { lines: Array<{ label: string; quantity: number 
   );
 }
 
-function ItemRow({ item }: { item: KitchenItem }) {
+function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void }) {
   return (
     <Box
+      {...(onSelect
+        ? {
+            role: 'button',
+            tabIndex: 0,
+            'aria-label': `Who ordered ${item.name}`,
+            onClick: onSelect,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect();
+              }
+            },
+          }
+        : {})}
       sx={{
+        cursor: onSelect ? 'pointer' : 'default',
+        '&:hover': onSelect ? { backgroundColor: '#F9FAFB' } : {},
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
@@ -103,60 +124,52 @@ function ItemRow({ item }: { item: KitchenItem }) {
   );
 }
 
-function DayCard({ day, isToday }: { day: KitchenDay; isToday: boolean }) {
-  const empty = day.items.length === 0 && day.combos.length === 0;
+/** The items and the combos to pack of one day or of the whole range. Tapping an item or combo traces it to the orders. */
+function BlockBody({
+  items,
+  combos,
+  emptyText,
+  onSelectItem,
+}: {
+  items: KitchenItem[];
+  combos: KitchenCombo[];
+  emptyText: string;
+  onSelectItem: (name: string) => void;
+}) {
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: '1px solid',
-        borderColor: isToday ? 'primary.main' : '#E5E7EB',
-        borderRadius: 2,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        bgcolor: empty ? '#FAFAFA' : '#fff',
-      }}
-    >
-      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #E5E7EB', bgcolor: isToday ? 'rgba(93,135,255,0.08)' : '#F9FAFB' }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 17, color: '#111827' }}>
-            {day.weekday}
-            {isToday && (
-              <Chip size="small" color="primary" label="Today" sx={{ ml: 1, height: 20, fontSize: 11 }} />
-            )}
-          </Typography>
-          <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{formatDayShort(day.day)}</Typography>
-        </Box>
-        {!empty && (
-          <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.5 }}>
-            {day.totals.units} {day.totals.units === 1 ? 'unit' : 'units'} · {day.totals.orders}{' '}
-            {day.totals.orders === 1 ? 'order' : 'orders'}
-            {day.totals.ecoContainers > 0 ? ` · ♻️ ${day.totals.ecoContainers} eco` : ''}
-          </Typography>
-        )}
-      </Box>
-
+    <>
       <Box sx={{ px: 2, py: 0.5 }}>
-        {empty ? (
-          <Typography sx={{ color: '#9CA3AF', fontSize: 14, py: 2 }}>Nothing ordered for this day.</Typography>
+        {items.length === 0 && combos.length === 0 ? (
+          <Typography sx={{ color: '#9CA3AF', fontSize: 14, py: 2 }}>{emptyText}</Typography>
         ) : (
           <>
-            {day.items.map((item) => (
-              <ItemRow key={item.name} item={item} />
+            {items.map((item) => (
+              <ItemRow key={item.name} item={item} onSelect={() => onSelectItem(item.name)} />
             ))}
           </>
         )}
       </Box>
 
-      {day.combos.length > 0 && (
+      {combos.length > 0 && (
         <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid #E5E7EB', bgcolor: '#FFFBEB' }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mb: 0.5 }}>
             Combos to pack
           </Typography>
-          {day.combos.map((combo) => (
+          {combos.map((combo) => (
             <Box key={combo.name} sx={{ py: 0.75 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5 }}>
+              <Box
+                role="button"
+                tabIndex={0}
+                aria-label={`Who ordered ${combo.name}`}
+                onClick={() => onSelectItem(combo.name)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectItem(combo.name);
+                  }
+                }}
+                sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, cursor: 'pointer', '&:hover': { backgroundColor: '#FEF3C7' } }}
+              >
                 <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{combo.name}</Typography>
                 <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#111827', flexShrink: 0 }}>{combo.quantity}</Typography>
               </Box>
@@ -176,6 +189,68 @@ function DayCard({ day, isToday }: { day: KitchenDay; isToday: boolean }) {
           ))}
         </Box>
       )}
+    </>
+  );
+}
+
+function DayCard({ day, isToday, onSelectItem }: { day: KitchenDay; isToday: boolean; onSelectItem: (name: string) => void }) {
+  const empty = day.items.length === 0 && day.combos.length === 0;
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        border: '1px solid',
+        borderColor: isToday ? 'primary.main' : '#E5E7EB',
+        borderRadius: 2,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: empty ? '#FAFAFA' : '#fff',
+      }}
+    >
+      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #E5E7EB', bgcolor: isToday ? 'rgba(93,135,255,0.08)' : '#F9FAFB' }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+          {/* a div, not a paragraph: the Today chip inside it is a div */}
+          <Typography component="div" sx={{ fontWeight: 700, fontSize: 17, color: '#111827' }}>
+            {day.weekday}
+            {isToday && (
+              <Chip size="small" color="primary" label="Today" sx={{ ml: 1, height: 20, fontSize: 11 }} />
+            )}
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{formatDayShort(day.day)}</Typography>
+        </Box>
+        {!empty && (
+          <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.5 }}>
+            {day.totals.units} {day.totals.units === 1 ? 'unit' : 'units'} · {day.totals.orders}{' '}
+            {day.totals.orders === 1 ? 'order' : 'orders'}
+            {day.totals.ecoContainers > 0 ? ` · ♻️ ${day.totals.ecoContainers} eco` : ''}
+          </Typography>
+        )}
+      </Box>
+
+      <BlockBody items={day.items} combos={day.combos} emptyText="Nothing ordered for this day." onSelectItem={onSelectItem} />
+    </Paper>
+  );
+}
+
+/** The whole date range added up: every item once, whatever its menu day or delivery day. */
+function WeekCard({ block, title, subtitle, onSelectItem }: { block: KitchenBlock; title: string; subtitle: string; onSelectItem: (name: string) => void }) {
+  const empty = block.items.length === 0 && block.combos.length === 0;
+  return (
+    <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', bgcolor: empty ? '#FAFAFA' : '#fff', maxWidth: 760 }}>
+      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #E5E7EB', bgcolor: '#F9FAFB' }}>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 17, color: '#111827' }}>{title}</Typography>
+          <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{subtitle}</Typography>
+        </Box>
+        {!empty && (
+          <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.5 }}>
+            {block.totals.units} {block.totals.units === 1 ? 'unit' : 'units'} · {block.totals.orders} {block.totals.orders === 1 ? 'order' : 'orders'}
+            {block.totals.ecoContainers > 0 ? ` · ♻️ ${block.totals.ecoContainers} eco` : ''}
+          </Typography>
+        )}
+      </Box>
+      <BlockBody items={block.items} combos={block.combos} emptyText="Nothing ordered in these dates." onSelectItem={onSelectItem} />
     </Paper>
   );
 }
@@ -191,6 +266,11 @@ export default function KitchenDashboardPage() {
   const [customError, setCustomError] = useState<string | null>(null);
 
   const [allDays, setAllDays] = useState<KitchenDay[]>([]);
+  const [week, setWeek] = useState<KitchenBlock | null>(null);
+  // 'days' = one card per day, 'week' = the whole range added up
+  const [tab, setTab] = useState<'days' | 'week'>('days');
+  // the item whose orders are shown (day null = every day of the range)
+  const [trace, setTrace] = useState<{ item: string; day: string | null } | null>(null);
   // which weekdays to show and in what order; saved per admin (same mechanism as the table columns)
   const dayLayout = useColumnPreferences('admin_kitchen_days', KITCHEN_DAY_DEFS, 'kitchen-days');
   const [loading, setLoading] = useState(true);
@@ -217,8 +297,10 @@ export default function KitchenDashboardPage() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Could not load the kitchen dashboard');
       setAllDays(body.data?.days ?? []);
+      setWeek(body.data?.week ?? null);
     } catch (e) {
       setAllDays([]);
+      setWeek(null);
       setError(e instanceof Error ? e.message : 'Could not load the kitchen dashboard');
     } finally {
       setLoading(false);
@@ -340,6 +422,19 @@ export default function KitchenDashboardPage() {
         )}
       </Paper>
 
+      {range && (
+        <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 1.5, minHeight: 40 }}>
+          <Tab value="days" label="By day" sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40 }} />
+          <Tab value="week" label={preset === 'custom' ? 'Total for these dates' : 'Week total'} sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40 }} />
+        </Tabs>
+      )}
+      {range && !loading && !error && (
+        <Typography sx={{ fontSize: 13, color: '#6B7280', mb: 1.5 }}>
+          Tap an item to see who ordered it.
+          {tab === 'week' && hiddenDays > 0 ? ' Days you hide under “By day” are still counted here.' : ''}
+        </Typography>
+      )}
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -350,11 +445,36 @@ export default function KitchenDashboardPage() {
         <Typography sx={{ color: '#6B7280' }}>Pick a start and an end date, then press Show.</Typography>
       )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: 2, alignItems: 'start' }}>
-        {loading
-          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="rounded" height={220} />)
-          : days.map((day) => <DayCard key={day.day} day={day} isToday={day.day === today} />)}
-      </Box>
+      {tab === 'week' && range ? (
+        loading ? (
+          <Skeleton variant="rounded" height={320} sx={{ maxWidth: 760 }} />
+        ) : week ? (
+          <WeekCard
+            block={week}
+            title={preset === 'custom' ? 'Total for these dates' : 'Week total'}
+            subtitle={formatRangeLabel(range)}
+            onSelectItem={(name) => setTrace({ item: name, day: null })}
+          />
+        ) : null
+      ) : (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: 2, alignItems: 'start' }}>
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="rounded" height={220} />)
+            : days.map((day) => (
+                <DayCard key={day.day} day={day} isToday={day.day === today} onSelectItem={(name) => setTrace({ item: name, day: day.day })} />
+              ))}
+        </Box>
+      )}
+
+      <ItemOrdersDialog
+        open={trace !== null}
+        onClose={() => setTrace(null)}
+        token={token}
+        range={range}
+        item={trace?.item ?? null}
+        day={trace?.day ?? null}
+        rangeLabel={range ? formatRangeLabel(range) : ''}
+      />
     </Box>
   );
 }

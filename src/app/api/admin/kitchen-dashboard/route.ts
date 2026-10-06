@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
-import { db } from '@/lib/db';
-import {
-  buildKitchenDays,
-  enumerateDays,
-  validateRange,
-  toDayString,
-  type KitchenRow,
-} from '@/utils/kitchenDashboard';
+import { fetchKitchenRows } from '@/lib/kitchenRows';
+import { buildKitchenDays, buildKitchenWeek, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
 
 /**
  * Verify JWT token and check admin role
@@ -58,64 +52,15 @@ export async function GET(request: NextRequest) {
     }
     const days = enumerateDays(range);
 
-    const pipeline = [
-      {
-        $match: {
-          status: { $ne: 'cancelled' },
-          $or: [
-            { paymentStatus: 'paid' },
-            // handled by hand (for example paid in person): already being prepared or delivered
-            { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
-          ],
-          'items.deliveryDate': { $gte: range.startDate, $lte: `${range.endDate}￿` },
-        },
-      },
-      { $unwind: '$items' },
-      { $match: { 'items.deliveryDate': { $gte: range.startDate, $lte: `${range.endDate}￿` } } },
-      { $unwind: '$items.items' },
-      {
-        $project: {
-          _id: 0,
-          orderId: 1,
-          day: '$items.deliveryDate',
-          name: '$items.items.food.name',
-          quantity: '$items.items.quantity',
-          portion: '$items.items.selectedPortion',
-          spiceLevel: '$items.items.spiceLevel',
-          isEco: '$items.items.isEcoFriendlyContainer',
-          sections: '$items.items.food.sections',
-          comboSelections: '$items.items.comboSelections',
-        },
-      },
-    ];
-
-    const result = await db.aggregate('orders', pipeline);
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to read orders');
-    }
-
-    const rows: KitchenRow[] = [];
-    for (const raw of result.data ?? []) {
-      const day = toDayString(raw.day);
-      if (!day) continue;
-      rows.push({
-        orderId: String(raw.orderId ?? ''),
-        day,
-        name: String(raw.name ?? ''),
-        quantity: Number(raw.quantity),
-        portion: raw.portion ?? null,
-        spiceLevel: raw.spiceLevel ?? null,
-        isEco: Boolean(raw.isEco),
-        sections: Array.isArray(raw.sections) ? raw.sections : null,
-        comboSelections: raw.comboSelections && typeof raw.comboSelections === 'object' ? raw.comboSelections : null,
-      });
-    }
+    const rows = await fetchKitchenRows(range);
 
     return NextResponse.json({
       data: {
         startDate: range.startDate,
         endDate: range.endDate,
         days: buildKitchenDays(rows, days),
+        // the whole range as one block, whatever the menu day or delivery day of each line
+        week: buildKitchenWeek(rows),
       },
       message: 'Kitchen dashboard generated successfully',
     });
