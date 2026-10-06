@@ -119,6 +119,11 @@ export interface KitchenRow {
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
+  /** Only filled when tracing an item back to the people who ordered it. */
+  customerName?: string | null;
+  /** The day the items are finally delivered (it can differ from `day` when a day was combined into another). */
+  deliveredOn?: string | null;
+  orderStatus?: string | null;
 }
 
 export interface CountLine {
@@ -134,6 +139,8 @@ export interface KitchenItem {
   inCombos: number;
   portions: CountLine[];
   spice: CountLine[];
+  /** How many of the units ordered on their own come in an eco container (parts inside a combo count on the combo). */
+  eco: number;
   /** Total amount to cook where the sizes are known, as text ('84 oz (5.25 lb)'); '' when no size is known. */
   totalText: string;
   /** Units of this item that carry no readable size, so they are not in `totalText`. */
@@ -144,6 +151,8 @@ export interface KitchenCombo {
   name: string;
   quantity: number;
   spice: CountLine[];
+  /** How many of these combos come in an eco container. */
+  eco: number;
   /** What the customers picked inside this combo (one part per combo ordered). */
   parts: Array<{ name: string; portion: string | null; quantity: number }>;
 }
@@ -258,6 +267,7 @@ interface ItemAcc {
   inCombos: number;
   portions: Map<string, number>;
   spice: Map<string, number>;
+  eco: number;
   amount: Amount;
   sized: number;
 }
@@ -276,105 +286,187 @@ export function buildKitchenDays(rows: KitchenRow[], days: string[]): KitchenDay
   }
 
   return days.map((day) => {
-    const dayRows = byDay.get(day) ?? [];
-    const items = new Map<string, ItemAcc>();
-    const combos = new Map<string, { quantity: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }> }>();
-    const orderIds = new Set<string>();
-    let ecoContainers = 0;
+    const block = buildKitchenBlock(byDay.get(day) ?? []);
+    return { day, weekday: weekdayName(day), ...block };
+  });
+}
 
-    const itemAcc = (name: string): ItemAcc => {
-      let acc = items.get(name);
-      if (!acc) {
-        acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), amount: emptyAmount(), sized: 0 };
-        items.set(name, acc);
+/** Everything the kitchen has to make for a set of lines, whatever their days: the same counting as one day. */
+export interface KitchenBlock {
+  items: KitchenItem[];
+  combos: KitchenCombo[];
+  totals: { units: number; orders: number; ecoContainers: number };
+}
+
+/**
+ * The totals for the whole date range as one block, ignoring which menu day or delivery day each line
+ * belongs to (the "week total"). Uses exactly the counting of a single day, so a week's quantity of an
+ * item is the sum of its daily quantities.
+ */
+export function buildKitchenWeek(rows: KitchenRow[]): KitchenBlock {
+  return buildKitchenBlock(rows.filter((row) => Number.isFinite(row.quantity) && row.quantity > 0 && clean(row.name)));
+}
+
+function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
+  const items = new Map<string, ItemAcc>();
+  const combos = new Map<string, { quantity: number; eco: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }> }>();
+  const orderIds = new Set<string>();
+  let ecoContainers = 0;
+
+  const itemAcc = (name: string): ItemAcc => {
+    let acc = items.get(name);
+    if (!acc) {
+      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), eco: 0, amount: emptyAmount(), sized: 0 };
+      items.set(name, acc);
+    }
+    return acc;
+  };
+
+  for (const row of dayRows) {
+    orderIds.add(row.orderId);
+    if (row.isEco) ecoContainers += row.quantity;
+    const name = clean(row.name);
+    const spice = clean(row.spiceLevel);
+    const parts = comboParts(row);
+
+    if (parts.length > 0) {
+      // a combo: counted as a combo, and each chosen part is also something to cook
+      let combo = combos.get(name);
+      if (!combo) {
+        combo = { quantity: 0, eco: 0, spice: new Map(), parts: new Map() };
+        combos.set(name, combo);
       }
-      return acc;
-    };
+      combo.quantity += row.quantity;
+      if (row.isEco) combo.eco += row.quantity;
+      if (spice) bump(combo.spice, spice, row.quantity);
+      for (const part of parts) {
+        const key = `${part.name}\u0000${part.portion ?? ''}`;
+        const existing = combo.parts.get(key);
+        if (existing) existing.quantity += row.quantity;
+        else combo.parts.set(key, { name: part.name, portion: part.portion, quantity: row.quantity });
 
-    for (const row of dayRows) {
-      orderIds.add(row.orderId);
-      if (row.isEco) ecoContainers += row.quantity;
-      const name = clean(row.name);
-      const spice = clean(row.spiceLevel);
-      const parts = comboParts(row);
-
-      if (parts.length > 0) {
-        // a combo: counted as a combo, and each chosen part is also something to cook
-        let combo = combos.get(name);
-        if (!combo) {
-          combo = { quantity: 0, spice: new Map(), parts: new Map() };
-          combos.set(name, combo);
-        }
-        combo.quantity += row.quantity;
-        if (spice) bump(combo.spice, spice, row.quantity);
-        for (const part of parts) {
-          const key = `${part.name}\u0000${part.portion ?? ''}`;
-          const existing = combo.parts.get(key);
-          if (existing) existing.quantity += row.quantity;
-          else combo.parts.set(key, { name: part.name, portion: part.portion, quantity: row.quantity });
-
-          const acc = itemAcc(part.name);
-          acc.total += row.quantity;
-          acc.inCombos += row.quantity;
-          bump(acc.portions, part.portion ?? 'No size', row.quantity);
-          const partSize = parsePortionAmount(part.portion);
-          if (partSize) {
-            addAmount(acc.amount, partSize, row.quantity);
-            acc.sized += row.quantity;
-          }
-        }
-      } else {
-        const acc = itemAcc(name);
+        const acc = itemAcc(part.name);
         acc.total += row.quantity;
-        const portion = clean(row.portion);
-        bump(acc.portions, portion || 'No size', row.quantity);
-        if (spice) bump(acc.spice, spice, row.quantity);
-        const size = parsePortionAmount(portion);
-        if (size) {
-          addAmount(acc.amount, size, row.quantity);
+        acc.inCombos += row.quantity;
+        bump(acc.portions, part.portion ?? 'No size', row.quantity);
+        const partSize = parsePortionAmount(part.portion);
+        if (partSize) {
+          addAmount(acc.amount, partSize, row.quantity);
           acc.sized += row.quantity;
         }
       }
+    } else {
+      const acc = itemAcc(name);
+      acc.total += row.quantity;
+      const portion = clean(row.portion);
+      bump(acc.portions, portion || 'No size', row.quantity);
+      if (spice) bump(acc.spice, spice, row.quantity);
+      if (row.isEco) acc.eco += row.quantity;
+      const size = parsePortionAmount(portion);
+      if (size) {
+        addAmount(acc.amount, size, row.quantity);
+        acc.sized += row.quantity;
+      }
     }
+  }
 
-    const itemList: KitchenItem[] = [...items.entries()]
-      .map(([name, acc]) => {
-        const portions = toLines(acc.portions);
-        // a single "No size" line adds nothing to the total, so it is left out
-        const showPortions = portions.length > 1 || (portions.length === 1 && portions[0].label !== 'No size');
-        return {
-          name,
-          quantity: acc.total,
-          inCombos: acc.inCombos,
-          portions: showPortions ? portions : [],
-          spice: toLines(acc.spice),
-          totalText: formatAmount(acc.amount),
-          unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
-        };
-      })
-      .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
-
-    const comboList: KitchenCombo[] = [...combos.entries()]
-      .map(([name, c]) => ({
+  const itemList: KitchenItem[] = [...items.entries()]
+    .map(([name, acc]) => {
+      const portions = toLines(acc.portions);
+      // a single "No size" line adds nothing to the total, so it is left out
+      const showPortions = portions.length > 1 || (portions.length === 1 && portions[0].label !== 'No size');
+      return {
         name,
-        quantity: c.quantity,
-        spice: toLines(c.spice),
-        parts: [...c.parts.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)),
-      }))
-      .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+        quantity: acc.total,
+        inCombos: acc.inCombos,
+        portions: showPortions ? portions : [],
+        spice: toLines(acc.spice),
+        eco: acc.eco,
+        totalText: formatAmount(acc.amount),
+        unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
+      };
+    })
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
 
-    return {
-      day,
-      weekday: weekdayName(day),
-      items: itemList,
-      combos: comboList,
-      totals: {
-        units: itemList.reduce((sum, i) => sum + i.quantity, 0) - itemList.reduce((s, i) => s + i.inCombos, 0) + comboList.reduce((s, c) => s + c.quantity, 0),
-        orders: orderIds.size,
-        ecoContainers,
-      },
+  const comboList: KitchenCombo[] = [...combos.entries()]
+    .map(([name, c]) => ({
+      name,
+      quantity: c.quantity,
+      spice: toLines(c.spice),
+      eco: c.eco,
+      parts: [...c.parts.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+
+  return {
+    items: itemList,
+    combos: comboList,
+    totals: {
+      units: itemList.reduce((sum, i) => sum + i.quantity, 0) - itemList.reduce((s, i) => s + i.inCombos, 0) + comboList.reduce((s, c) => s + c.quantity, 0),
+      orders: orderIds.size,
+      ecoContainers,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tracing an item back to the people who ordered it
+// ---------------------------------------------------------------------------------------------
+
+export interface ItemOrderLine {
+  orderId: string;
+  customerName: string;
+  /** The menu day the item was picked for. */
+  day: string;
+  /** The day it is finally delivered (the same as `day` unless that day was combined into another). */
+  deliveredOn: string | null;
+  quantity: number;
+  /** The size of this item in this order, when it has one. */
+  portion: string | null;
+  spice: string | null;
+  isEco: boolean;
+  /** Set when the item is a chosen part of this combo rather than ordered on its own. */
+  viaCombo: string | null;
+  orderStatus: string | null;
+}
+
+/**
+ * The order lines behind the number of one item: orders that contain it on its own, and orders where it
+ * is a chosen part of a combo. A combo itself can be traced the same way (by the combo's name). Optionally
+ * only one menu day. The quantities add up to the item's quantity in the kitchen counts.
+ */
+export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: string): ItemOrderLine[] {
+  const wanted = clean(itemName);
+  if (!wanted) return [];
+  const lines: ItemOrderLine[] = [];
+  for (const row of rows) {
+    if (!Number.isFinite(row.quantity) || row.quantity <= 0 || !clean(row.name)) continue;
+    if (day && row.day !== day) continue;
+    const base = {
+      orderId: row.orderId,
+      customerName: clean(row.customerName) || 'Unknown customer',
+      day: row.day,
+      deliveredOn: row.deliveredOn ?? null,
+      isEco: Boolean(row.isEco),
+      orderStatus: row.orderStatus ?? null,
     };
-  });
+    const parts = comboParts(row);
+    if (parts.length > 0) {
+      if (clean(row.name) === wanted) {
+        lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null });
+      }
+      for (const part of parts) {
+        if (part.name === wanted) {
+          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: null, viaCombo: clean(row.name) });
+        }
+      }
+    } else if (clean(row.name) === wanted) {
+      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null });
+    }
+  }
+  return lines.sort(
+    (a, b) => a.day.localeCompare(b.day) || a.customerName.localeCompare(b.customerName) || a.orderId.localeCompare(b.orderId)
+  );
 }
 
 /** Normalise an order-day date (string or Date) to 'YYYY-MM-DD'; null when unusable. */

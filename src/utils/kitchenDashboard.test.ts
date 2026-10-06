@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   addDays,
+  buildItemOrders,
   buildKitchenDays,
+  buildKitchenWeek,
   comboParts,
   formatAmount,
   parsePortionAmount,
@@ -307,5 +309,134 @@ describe('total amount per item', () => {
   it('items without any size show no total', () => {
     const out = buildKitchenDays([row({ name: 'Samosa Pav', quantity: 4, portion: null })], days);
     expect(out[0].items[0]).toMatchObject({ totalText: '', unsized: 0 });
+  });
+});
+
+describe('buildKitchenWeek (the whole range as one block)', () => {
+  const days = ['2026-10-06', '2026-10-07', '2026-10-08'];
+  const rows: KitchenRow[] = [
+    row({ orderId: 'A', day: '2026-10-06', name: 'Dosa Batter', quantity: 2, portion: '32Oz' }),
+    row({ orderId: 'B', day: '2026-10-07', name: 'Dosa Batter', quantity: 3, portion: '32Oz' }),
+    row({ orderId: 'C', day: '2026-10-08', name: 'Dosa Batter', quantity: 1, portion: '16Oz' }),
+    row({ orderId: 'C', day: '2026-10-08', name: 'Rajma', quantity: 4, spiceLevel: 'Hot', isEco: true }),
+    row({ orderId: 'D', day: '2026-10-07', name: 'Veg Combo', quantity: 2, spiceLevel: 'Medium', ...combo, comboSelections: { s1: ['a1'], s2: ['b1'], s3: ['c2'] } }),
+    row({ orderId: 'E', day: '2026-10-06', name: 'Kale Chane', quantity: 1, portion: '12Oz' }),
+  ];
+
+  it('adds an item up across all days, whatever its menu day', () => {
+    const week = buildKitchenWeek(rows);
+    const dosa = week.items.find((i) => i.name === 'Dosa Batter')!;
+    expect(dosa.quantity).toBe(6);
+    expect(dosa.portions).toEqual([
+      { label: '32Oz', quantity: 5 },
+      { label: '16Oz', quantity: 1 },
+    ]);
+    expect(dosa.totalText).toBe('176 oz (11 lb)'); // 5 x 32 + 1 x 16
+  });
+
+  it('equals the sum of the days for every item, its sizes, spice and total amount', () => {
+    const week = buildKitchenWeek(rows);
+    const perDay = buildKitchenDays(rows, days);
+    for (const item of week.items) {
+      const daily = perDay.flatMap((d) => d.items.filter((i) => i.name === item.name));
+      expect(daily.reduce((s, i) => s + i.quantity, 0)).toBe(item.quantity);
+      expect(daily.reduce((s, i) => s + i.inCombos, 0)).toBe(item.inCombos);
+    }
+    expect(week.totals.units).toBe(perDay.reduce((s, d) => s + d.totals.units, 0));
+    expect(week.totals.ecoContainers).toBe(perDay.reduce((s, d) => s + d.totals.ecoContainers, 0));
+  });
+
+  it('counts combos and their parts like a day does, and counts an order once even when it spans days', () => {
+    const week = buildKitchenWeek(rows);
+    expect(week.combos.map((c) => [c.name, c.quantity])).toEqual([['Veg Combo', 2]]);
+    const kale = week.items.find((i) => i.name === 'Kale Chane')!;
+    expect(kale.quantity).toBe(3); // 1 on its own + 2 inside the combos
+    expect(kale.inCombos).toBe(2);
+    expect(week.totals.orders).toBe(5); // A, B, C, D, E (C has two lines but is one order)
+  });
+
+  it('skips unusable lines and gives an empty block for no lines', () => {
+    expect(buildKitchenWeek([])).toEqual({ items: [], combos: [], totals: { units: 0, orders: 0, ecoContainers: 0 } });
+    expect(buildKitchenWeek([row({ quantity: 0 }), row({ name: '  ' }), row({ quantity: NaN })]).items).toEqual([]);
+  });
+});
+
+describe('buildItemOrders (who ordered an item)', () => {
+  const traced = (over: Partial<KitchenRow>) => row({ customerName: 'Asha', deliveredOn: '2026-10-09', orderStatus: 'confirmed', ...over });
+  const rows: KitchenRow[] = [
+    traced({ orderId: 'ORD-2', day: '2026-10-07', name: 'Rajma', quantity: 2, portion: '8Oz', spiceLevel: 'Hot', isEco: true, customerName: 'Ben' }),
+    traced({ orderId: 'ORD-1', day: '2026-10-07', name: 'Rajma', quantity: 1, portion: '12Oz' }),
+    traced({ orderId: 'ORD-3', day: '2026-10-08', name: 'Rajma', quantity: 3, portion: '8Oz', customerName: 'Asha' }),
+    traced({ orderId: 'ORD-4', day: '2026-10-08', name: 'Veg Combo', quantity: 2, spiceLevel: 'Medium', customerName: 'Cara', ...combo, comboSelections: { s1: ['a1'], s2: ['b1'], s3: ['c2'] } }),
+    traced({ orderId: 'ORD-5', day: '2026-10-08', name: 'Kale Chane', quantity: 1, portion: '12Oz', customerName: 'Dev' }),
+  ];
+
+  it('lists every order that contains the item, with its size, spice and eco container', () => {
+    const lines = buildItemOrders(rows, 'Rajma');
+    expect(lines.map((l) => [l.orderId, l.customerName, l.day, l.quantity, l.portion, l.spice, l.isEco])).toEqual([
+      ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false],
+      ['ORD-2', 'Ben', '2026-10-07', 2, '8Oz', 'Hot', true],
+      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
+    ]);
+  });
+
+  it('only one menu day when a day is given (an item listed under a specific day)', () => {
+    expect(buildItemOrders(rows, 'Rajma', '2026-10-07').map((l) => l.orderId)).toEqual(['ORD-1', 'ORD-2']);
+    expect(buildItemOrders(rows, 'Rajma', '2026-10-08').map((l) => l.orderId)).toEqual(['ORD-3']);
+    expect(buildItemOrders(rows, 'Rajma', '2026-10-09')).toEqual([]);
+  });
+
+  it('finds an item that was chosen as a part of a combo, and says which combo', () => {
+    const lines = buildItemOrders(rows, 'Kale Chane');
+    expect(lines.map((l) => [l.orderId, l.quantity, l.portion, l.viaCombo])).toEqual([
+      ['ORD-4', 2, '12Oz', 'Veg Combo'],
+      ['ORD-5', 1, '12Oz', null],
+    ]);
+  });
+
+  it('traces a combo itself', () => {
+    const lines = buildItemOrders(rows, 'Veg Combo');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ orderId: 'ORD-4', customerName: 'Cara', quantity: 2, spice: 'Medium', viaCombo: null });
+  });
+
+  it('adds up to the quantity the kitchen counts show, per day and for the week', () => {
+    const week = buildKitchenWeek(rows);
+    for (const item of week.items) {
+      expect(buildItemOrders(rows, item.name).reduce((s, l) => s + l.quantity, 0)).toBe(item.quantity);
+    }
+    const day = buildKitchenDays(rows, ['2026-10-07', '2026-10-08']);
+    for (const d of day) {
+      for (const item of d.items) {
+        expect(buildItemOrders(rows, item.name, d.day).reduce((s, l) => s + l.quantity, 0)).toBe(item.quantity);
+      }
+    }
+  });
+
+  it('keeps the delivery day and status, falls back for a missing customer name, and ignores unusable input', () => {
+    const lines = buildItemOrders([traced({ orderId: 'ORD-9', customerName: null, deliveredOn: '2026-10-09', orderStatus: 'preparing' })], 'Rajma');
+    expect(lines[0]).toMatchObject({ customerName: 'Unknown customer', deliveredOn: '2026-10-09', orderStatus: 'preparing' });
+    expect(buildItemOrders(rows, '')).toEqual([]);
+    expect(buildItemOrders(rows, 'Nothing like this')).toEqual([]);
+    expect(buildItemOrders([row({ quantity: 0 })], 'Rajma')).toEqual([]);
+  });
+});
+
+describe('eco containers per item', () => {
+  const days = ['2026-10-07'];
+  it('counts the eco units of an item next to its spice, and none when no one asked', () => {
+    const out = buildKitchenDays(
+      [
+        row({ orderId: 'A', name: 'Rajma', quantity: 2, spiceLevel: 'Medium', isEco: true }),
+        row({ orderId: 'B', name: 'Rajma', quantity: 3, spiceLevel: 'Normal' }),
+        row({ orderId: 'C', name: 'Samosa Pav', quantity: 4 }),
+      ],
+      days
+    );
+    const items = Object.fromEntries(out[0].items.map((i) => [i.name, i]));
+    expect(items['Rajma'].eco).toBe(2);
+    expect(items['Rajma'].quantity).toBe(5);
+    expect(items['Samosa Pav'].eco).toBe(0);
+    expect(out[0].totals.ecoContainers).toBe(2);
   });
 });
