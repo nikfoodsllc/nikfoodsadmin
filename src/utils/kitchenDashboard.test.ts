@@ -421,3 +421,22 @@ describe('buildItemOrders (who ordered an item)', () => {
     expect(buildItemOrders([row({ quantity: 0 })], 'Rajma')).toEqual([]);
   });
 });
+
+describe('eco containers per item', () => {
+  const days = ['2026-10-07'];
+  it('counts the eco units of an item next to its spice, and none when no one asked', () => {
+    const out = buildKitchenDays(
+      [
+        row({ orderId: 'A', name: 'Rajma', quantity: 2, spiceLevel: 'Medium', isEco: true }),
+        row({ orderId: 'B', name: 'Rajma', quantity: 3, spiceLevel: 'Normal' }),
+        row({ orderId: 'C', name: 'Samosa Pav', quantity: 4 }),
+      ],
+      days
+    );
+    const items = Object.fromEntries(out[0].items.map((i) => [i.name, i]));
+    expect(items['Rajma'].eco).toBe(2);
+    expect(items['Rajma'].quantity).toBe(5);
+    expect(items['Samosa Pav'].eco).toBe(0);
+    expect(out[0].totals.ecoContainers).toBe(2);
+  });
+});

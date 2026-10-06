@@ -139,6 +139,8 @@ export interface KitchenItem {
   inCombos: number;
   portions: CountLine[];
   spice: CountLine[];
+  /** How many of the units ordered on their own come in an eco container (parts inside a combo count on the combo). */
+  eco: number;
   /** Total amount to cook where the sizes are known, as text ('84 oz (5.25 lb)'); '' when no size is known. */
   totalText: string;
   /** Units of this item that carry no readable size, so they are not in `totalText`. */
@@ -149,6 +151,8 @@ export interface KitchenCombo {
   name: string;
   quantity: number;
   spice: CountLine[];
+  /** How many of these combos come in an eco container. */
+  eco: number;
   /** What the customers picked inside this combo (one part per combo ordered). */
   parts: Array<{ name: string; portion: string | null; quantity: number }>;
 }
@@ -263,6 +267,7 @@ interface ItemAcc {
   inCombos: number;
   portions: Map<string, number>;
   spice: Map<string, number>;
+  eco: number;
   amount: Amount;
   sized: number;
 }
@@ -304,14 +309,14 @@ export function buildKitchenWeek(rows: KitchenRow[]): KitchenBlock {
 
 function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
   const items = new Map<string, ItemAcc>();
-  const combos = new Map<string, { quantity: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }> }>();
+  const combos = new Map<string, { quantity: number; eco: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }> }>();
   const orderIds = new Set<string>();
   let ecoContainers = 0;
 
   const itemAcc = (name: string): ItemAcc => {
     let acc = items.get(name);
     if (!acc) {
-      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), amount: emptyAmount(), sized: 0 };
+      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), eco: 0, amount: emptyAmount(), sized: 0 };
       items.set(name, acc);
     }
     return acc;
@@ -328,10 +333,11 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
       // a combo: counted as a combo, and each chosen part is also something to cook
       let combo = combos.get(name);
       if (!combo) {
-        combo = { quantity: 0, spice: new Map(), parts: new Map() };
+        combo = { quantity: 0, eco: 0, spice: new Map(), parts: new Map() };
         combos.set(name, combo);
       }
       combo.quantity += row.quantity;
+      if (row.isEco) combo.eco += row.quantity;
       if (spice) bump(combo.spice, spice, row.quantity);
       for (const part of parts) {
         const key = `${part.name}\u0000${part.portion ?? ''}`;
@@ -355,6 +361,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
       const portion = clean(row.portion);
       bump(acc.portions, portion || 'No size', row.quantity);
       if (spice) bump(acc.spice, spice, row.quantity);
+      if (row.isEco) acc.eco += row.quantity;
       const size = parsePortionAmount(portion);
       if (size) {
         addAmount(acc.amount, size, row.quantity);
@@ -374,6 +381,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         inCombos: acc.inCombos,
         portions: showPortions ? portions : [],
         spice: toLines(acc.spice),
+        eco: acc.eco,
         totalText: formatAmount(acc.amount),
         unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
       };
@@ -385,6 +393,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
       name,
       quantity: c.quantity,
       spice: toLines(c.spice),
+      eco: c.eco,
       parts: [...c.parts.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)),
     }))
     .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
