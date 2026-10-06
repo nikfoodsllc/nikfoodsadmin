@@ -74,3 +74,8 @@ a {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite linear;
 }
+
+/* Dialogs lock the body, but this page scrolls on <html>: lock it too so the background cannot move behind an open dialog */
+html:has(body[style*="overflow: hidden"]) {
+  overflow-y: hidden;
+}
