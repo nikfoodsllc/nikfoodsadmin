@@ -30,6 +30,7 @@ import {
   IconChevronRight,
   IconX,
   IconTemplate,
+  IconChefHat,
 } from '@tabler/icons-react';
 import Image from 'next/image';
 
@@ -45,6 +46,11 @@ const navItems: NavItem[] = [
     title: 'Dashboard',
     href: '/admin',
     icon: IconLayoutDashboard,
+  },
+  {
+    title: 'Kitchen Dashboard (Beta)',
+    href: '/admin/kitchen-dashboard',
+    icon: IconChefHat,
   },
   {
     title: 'Food Items',
