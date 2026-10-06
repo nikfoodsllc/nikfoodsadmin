@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { CSSProperties, ReactNode, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Box, Chip, IconButton, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
 import {
@@ -12,10 +12,20 @@ import {
   IconSortDescending,
   IconTrash,
 } from '@tabler/icons-react';
-import { DragDropContext, Draggable, Droppable, DropResult, DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
+import {
+  DragDropContext,
+  Draggable,
+  Droppable,
+  DropResult,
+  DraggableProvidedDragHandleProps,
+  DraggableStateSnapshot,
+  DraggingStyle,
+  NotDraggingStyle,
+} from '@hello-pangea/dnd';
 import { FoodCategory } from '@/types/order';
 import { CategoryGroup } from '@/utils/categoryTree';
 import { moveItem } from '@/utils/categoryReorder';
+import { DragAxis, constrainTransform } from '@/utils/dragConstraint';
 
 interface CategoryTableProps {
   groups: CategoryGroup<FoodCategory>[];
@@ -319,6 +329,30 @@ function CategoryEntry({
   );
 }
 
+/**
+ * Style for the item being dragged: locked to one axis and held inside `container` (the row or column it
+ * belongs to). `leftLimit` is a further left edge the item may not cross (the sticky label column, which
+ * lies over the row when the table is scrolled sideways).
+ */
+function dragStyle(
+  style: DraggingStyle | NotDraggingStyle | undefined,
+  snapshot: DraggableStateSnapshot,
+  axis: DragAxis,
+  container: HTMLElement | null,
+  leftLimit?: HTMLElement | null,
+): CSSProperties | undefined {
+  if (!style || !snapshot.isDragging || snapshot.isDropAnimating || !('left' in style)) return style;
+  const box = container?.getBoundingClientRect();
+  const limit = leftLimit?.getBoundingClientRect().right ?? -Infinity;
+  const transform = constrainTransform(
+    style.transform ?? undefined,
+    axis,
+    { left: style.left, top: style.top, width: style.width, height: style.height },
+    box ? { left: Math.max(box.left, limit), top: box.top, right: box.right, bottom: box.bottom } : null,
+  );
+  return { ...style, transform };
+}
+
 const labelCellSx = {
   position: 'sticky',
   left: 0,
@@ -350,6 +384,9 @@ export default function CategoryTable({
   onReorderSubCategories,
   dragDisabled,
 }: CategoryTableProps) {
+  // the row / columns managed by the drag library and the sticky label cell: a dragged item is held inside its own area
+  const dropAreas = useRef<Record<string, HTMLElement | null>>({});
+  const labelCell = useRef<HTMLDivElement | null>(null);
   const handleDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     const droppableId = source.droppableId;
@@ -382,10 +419,19 @@ export default function CategoryTable({
         <Box sx={{ width: 'max-content', minWidth: '100%' }}>
           {/* Row 1: the categories (drag sideways) */}
           <Box sx={{ display: 'flex', borderBottom: '2px solid #111827' }}>
-            <Box sx={labelCellSx}>Categories</Box>
+            <Box ref={labelCell} sx={labelCellSx}>
+              Categories
+            </Box>
             <Droppable droppableId="categories" direction="horizontal" type="CATEGORY">
               {(drop) => (
-                <Box ref={drop.innerRef} {...drop.droppableProps} sx={{ display: 'flex' }}>
+                <Box
+                  ref={(el: HTMLDivElement | null) => {
+                    drop.innerRef(el);
+                    dropAreas.current.categories = el;
+                  }}
+                  {...drop.droppableProps}
+                  sx={{ display: 'flex' }}
+                >
                   {groups.map((group, index) => (
                     <Draggable
                       key={group.parentId}
@@ -397,6 +443,7 @@ export default function CategoryTable({
                         <Box
                           ref={drag.innerRef}
                           {...drag.draggableProps}
+                          style={dragStyle(drag.draggableProps.style, snapshot, 'x', dropAreas.current.categories, labelCell.current)}
                           sx={{
                             width: COLUMN_WIDTH,
                             flexShrink: 0,
@@ -453,7 +500,10 @@ export default function CategoryTable({
                 <Droppable key={group.parentId} droppableId={`subs-${group.parentId}`} type={`SUB-${group.parentId}`}>
                   {(drop) => (
                     <Box
-                      ref={drop.innerRef}
+                      ref={(el: HTMLDivElement | null) => {
+                        drop.innerRef(el);
+                        dropAreas.current[`subs-${group.parentId}`] = el;
+                      }}
                       {...drop.droppableProps}
                       sx={{
                         width: COLUMN_WIDTH,
@@ -469,6 +519,7 @@ export default function CategoryTable({
                             <Box
                               ref={drag.innerRef}
                               {...drag.draggableProps}
+                              style={dragStyle(drag.draggableProps.style, snapshot, 'y', dropAreas.current[`subs-${group.parentId}`])}
                               sx={{
                                 height: ROW_HEIGHT,
                                 boxSizing: 'border-box',
