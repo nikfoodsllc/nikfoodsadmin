@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { isPreparationType } from '@/utils/preparationType';
 
 /** Most items one request may change (the whole menu is a few hundred items). */
-export const MAX_BULK_ITEMS = 1000;
+const MAX_BULK_ITEMS = 1000; // not exported: a Next.js route file may only export HTTP handlers
 
 /**
  * Verify JWT token and check admin role

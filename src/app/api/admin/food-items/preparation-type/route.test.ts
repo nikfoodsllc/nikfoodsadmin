@@ -8,7 +8,9 @@ vi.mock('@/lib/jwt', () => ({ jwtHandler: { verifyToken: (t: string) => verifyTo
 const update = vi.fn();
 vi.mock('@/lib/db', () => ({ db: { update: (...a: unknown[]) => update(...a) } }));
 
-import { PATCH, MAX_BULK_ITEMS } from './route';
+import { PATCH } from './route';
+
+const MAX_BULK_ITEMS = 1000; // keep in step with route.ts
 
 const URL_BASE = 'http://localhost/api/admin/food-items/preparation-type';
 const A = '64b7f0c2a1b2c3d4e5f60001';
