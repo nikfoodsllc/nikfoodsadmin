@@ -69,21 +69,15 @@ function ItemRow({ item }: { item: KitchenItem }) {
         <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
           {item.name}
         </Typography>
-        {item.totalText && (
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', mt: 0.25 }}>
-            Total: {item.totalText}
-            {item.unsized > 0 && (
-              <Typography component="span" sx={{ fontSize: 12, fontWeight: 400, color: '#6B7280' }}>
-                {' '}
-                (+{item.unsized} without a size)
-              </Typography>
-            )}
-          </Typography>
-        )}
         <CountChips lines={item.portions} />
         {item.spice.length > 0 && (
           <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
             Spice: {item.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}
+          </Typography>
+        )}
+        {item.totalText && item.unsized > 0 && (
+          <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
+            {item.unsized} without a size, not in the total
           </Typography>
         )}
         {item.inCombos > 0 && (
@@ -92,9 +86,16 @@ function ItemRow({ item }: { item: KitchenItem }) {
           </Typography>
         )}
       </Box>
-      <Typography sx={{ fontWeight: 700, fontSize: 22, color: '#111827', lineHeight: 1.1, flexShrink: 0 }}>
-        {item.quantity}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0 }}>
+        {item.totalText && (
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap' }}>
+            {item.totalText}
+          </Typography>
+        )}
+        <Typography sx={{ fontWeight: 700, fontSize: 22, color: '#111827', lineHeight: 1.1, minWidth: 24, textAlign: 'right' }}>
+          {item.quantity}
+        </Typography>
+      </Box>
     </Box>
   );
 }
