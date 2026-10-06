@@ -20,6 +20,7 @@ import {
   DialogActions,
   ToggleButton,
   ToggleButtonGroup,
+  TextField,
 } from '@mui/material';
 import { Grid } from '@mui/material';
 import {
@@ -28,6 +29,7 @@ import {
   IconCalendar,
   IconCheck,
   IconX,
+  IconClock,
 } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AvailableDate } from '@/types/order';
@@ -44,6 +46,17 @@ import {
   parseISO,
 } from 'date-fns';
 import { formatInPST } from '@/utils/timezone';
+import {
+  allowedCutoffRange,
+  cutoffStatus,
+  describeCutoff,
+  extendCutoff,
+  formatCutoff,
+  inputValueToInstant,
+  instantToInputValue,
+  parseCutoff,
+  validateCutoff,
+} from '@/utils/orderCutoff';
 
 interface DateCellData {
   date: string; // YYYY-MM-DD
@@ -76,6 +89,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // the cutoff time typed in the dialog, as a Pacific-time datetime-local value
+  const [cutoffInput, setCutoffInput] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' = 'success') => {
@@ -157,11 +172,20 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
     }
   };
 
+  // Show the cutoff in effect for the selected date (custom or standard) when the dialog opens or the data is saved
+  useEffect(() => {
+    if (!dialogOpen || !selectedDate) return;
+    setCutoffInput(instantToInputValue(cutoffStatus(selectedDate, datesData[selectedDate]?.cutoffAt).closesAt));
+  }, [dialogOpen, selectedDate, datesData]);
+
   // Update single date availability
   const updateDateAvailability = async (
     date: string,
     flatCategoryEnabled: boolean,
-    dayWiseCategoryEnabled: boolean
+    dayWiseCategoryEnabled: boolean,
+    /** undefined = leave the custom order cutoff as it is, null = back to the standard cutoff, string = set it (ISO) */
+    cutoffAt?: string | null,
+    successMessage = 'Availability updated successfully'
   ) => {
     if (!token || !isAuthenticated) return;
 
@@ -178,6 +202,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
           date,
           flatCategoryEnabled,
           dayWiseCategoryEnabled,
+          ...(cutoffAt !== undefined ? { cutoffAt } : {}),
         }),
       });
 
@@ -194,7 +219,12 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
         [date]: result.data,
       }));
 
-      showSnackbar('Availability updated successfully');
+      showSnackbar(
+        result.livesiteNotified === false
+          ? `${successMessage}. The customer menu may take up to 5 minutes to follow.`
+          : successMessage,
+        result.livesiteNotified === false ? 'warning' : 'success'
+      );
     } catch (err) {
       console.error('Error updating date:', err);
       showSnackbar(err instanceof Error ? err.message : 'Failed to update availability', 'error');
@@ -656,6 +686,21 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                             },
                           }}
                         />
+                        {parseCutoff(dateData.availability?.cutoffAt) && (
+                          <Chip
+                            icon={<IconClock size={12} />}
+                            label="Custom cutoff"
+                            size="small"
+                            sx={{
+                              height: 20,
+                              backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                              color: '#92400E',
+                              border: '1px solid #F59E0B',
+                              '& .MuiChip-label': { fontSize: '10px', fontWeight: 500, px: 0.75 },
+                              '& .MuiChip-icon': { ml: 0.5, color: '#92400E' },
+                            }}
+                          />
+                        )}
                       </Box>
                     )}
 
@@ -802,6 +847,118 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                   </ToggleButton>
                 </ToggleButtonGroup>
               </Box>
+
+              {selectedDate && (() => {
+                const availability = datesData[selectedDate];
+                const status = cutoffStatus(selectedDate, availability?.cutoffAt);
+                const typed = inputValueToInstant(cutoffInput);
+                const problem = typed ? validateCutoff(selectedDate, typed) : 'Pick a date and time';
+                const unchanged =
+                  !!typed && Math.abs(typed.getTime() - status.closesAt.getTime()) < 60 * 1000 && status.overridden;
+                const range = allowedCutoffRange(selectedDate);
+                const busy = !!saving[selectedDate];
+                const saveCutoff = (cutoffAt: string | null, message: string) =>
+                  updateDateAvailability(
+                    selectedDate,
+                    availability?.flatCategoryEnabled ?? false,
+                    availability?.dayWiseCategoryEnabled ?? false,
+                    cutoffAt,
+                    message
+                  );
+                return (
+                  <Box sx={{ p: 2, backgroundColor: '#F9FAFB', borderRadius: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          Order cutoff
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                          When customers can no longer order for this date. The standard time is 1:00 PM the day before.
+                        </Typography>
+                      </Box>
+                      <Chip
+                        size="small"
+                        label={status.isOpen ? 'Open for orders' : 'Closed for orders'}
+                        sx={{
+                          fontWeight: 600,
+                          backgroundColor: status.isOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: status.isOpen ? '#065F46' : '#991B1B',
+                        }}
+                      />
+                    </Box>
+
+                    <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 500 }}>
+                      {describeCutoff(selectedDate, availability?.cutoffAt)}
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={busy}
+                        onClick={() =>
+                          saveCutoff(extendCutoff(selectedDate, availability?.cutoffAt, 1).toISOString(), 'Cutoff extended by 1 hour')
+                        }
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Extend 1 hour
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={busy}
+                        onClick={() =>
+                          saveCutoff(extendCutoff(selectedDate, availability?.cutoffAt, 2).toISOString(), 'Cutoff extended by 2 hours')
+                        }
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Extend 2 hours
+                      </Button>
+                      {status.overridden && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          disabled={busy}
+                          onClick={() => saveCutoff(null, 'Back to the standard cutoff')}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Back to standard
+                        </Button>
+                      )}
+                    </Box>
+                    <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', mt: 0.75 }}>
+                      Extending counts from now if the cutoff has already passed, so a closed day reopens right away.
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', gap: 1, mt: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <TextField
+                        type="datetime-local"
+                        size="small"
+                        label="Close ordering at (Pacific time)"
+                        value={cutoffInput}
+                        onChange={(e) => setCutoffInput(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        error={!!cutoffInput && !!problem}
+                        helperText={
+                          cutoffInput && problem
+                            ? problem
+                            : `Between ${formatCutoff(range.min)} and ${formatCutoff(range.max)}`
+                        }
+                        sx={{ flex: '1 1 220px', minWidth: 220 }}
+                      />
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        disabled={busy || !!problem || unchanged}
+                        onClick={() => typed && saveCutoff(typed.toISOString(), 'Cutoff saved')}
+                        sx={{ textTransform: 'none', height: 40 }}
+                      >
+                        Save cutoff
+                      </Button>
+                    </Box>
+                  </Box>
+                );
+              })()}
             </Box>
           </Box>
         </DialogContent>

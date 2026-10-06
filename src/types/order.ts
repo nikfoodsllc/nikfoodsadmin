@@ -276,6 +276,11 @@ export interface AvailableDate {
   date: string; // YYYY-MM-DD format
   flatCategoryEnabled: boolean; // Enable flat category listing for this date
   dayWiseCategoryEnabled: boolean; // Enable day-wise category listing for this date
+  /**
+   * Custom order cutoff for this date (an absolute moment). Missing/null = the standard cutoff,
+   * 1 PM Pacific the day before. Set by an admin to extend, reopen or close a date early.
+   */
+  cutoffAt?: Date | string | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
