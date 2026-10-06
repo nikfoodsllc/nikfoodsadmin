@@ -56,6 +56,10 @@ describe('GET', () => {
     expect((await GET(req('GET', { query: '?table=users' }))).status).toBe(400);
     expect((await GET(req('GET'))).status).toBe(400);
   });
+  it('knows the kitchen dashboard days layout', async () => {
+    expect((await GET(req('GET', { query: '?table=kitchen-days' }))).status).toBe(200);
+    expect(readOne).toHaveBeenCalledWith('adminTablePreferences', { userId: 'admin-1', table: 'kitchen-days' });
+  });
   it('returns null when the admin has no saved layout', async () => {
     const res = await GET(req('GET', { query: '?table=orders' }));
     expect(await res.json()).toEqual({ data: null });

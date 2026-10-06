@@ -11,6 +11,7 @@ import CategorySkeleton from './CategorySkeleton';
 import ItemSequenceDialog from './ItemSequenceDialog';
 import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
+import { groupCategoriesByParent } from '@/utils/categoryTree';
 
 function categoryHasParent(c: FoodCategory): boolean {
   const p = c.parentCategoryId;
@@ -358,92 +359,43 @@ export default function FoodCategoryPage() {
             </Box>
           )}
 
-          {/* Separate Main Categories and Sub Categories */}
-{(() => {
-  const mainCategories = filteredCategories.filter(
-    (cat) => !cat.parentCategoryId
-  );
+          {/* Each category followed by its own sub-categories, both in rank order */}
+          {groupCategoriesByParent(filteredCategories, categories).map((group) => (
+            <Box key={group.parentId} sx={{ mb: 5 }}>
+              {group.parent ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: group.children.length > 0 ? 2 : 0 }}>
+                  <CategoryCard
+                    key={group.parent._id?.toString()}
+                    category={group.parent}
+                    onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
+                    onRefresh={fetchCategories}
+                    onItemSequence={handleItemSequenceClick}
+                  />
+                </Box>
+              ) : null}
 
-  const subCategories = filteredCategories.filter(
-    (cat) => cat.parentCategoryId
-  );
-
-  return (
-    <>
-      {/* Main Categories */}
-      {mainCategories.length > 0 && (
-        <>
-          <Typography
-            variant="h6"
-            sx={{
-              mb: 2,
-              mt: 2,
-              fontWeight: 700,
-              color: '#222',
-            }}
-          >
-            Categories
-          </Typography>
-
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 3,
-              mb: 5,
-            }}
-          >
-            {mainCategories.map((category) => (
-              <CategoryCard
-                key={category._id?.toString()}
-                category={category}
-                onEdit={handleEditClick}
-                onDelete={handleDeleteClick}
-                onRefresh={fetchCategories}
-                onItemSequence={handleItemSequenceClick}
-              />
-            ))}
-          </Box>
-        </>
-      )}
-
-      {/* Sub Categories */}
-      {subCategories.length > 0 && (
-        <>
-          <Typography
-            variant="h6"
-            sx={{
-              mb: 2,
-              fontWeight: 700,
-              color: '#222',
-            }}
-          >
-            Sub Categories
-          </Typography>
-
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 3,
-            }}
-          >
-            {subCategories.map((category) => (
-              <CategoryCard
-                key={category._id?.toString()}
-                category={category}
-                onEdit={handleEditClick}
-                onDelete={handleDeleteClick}
-                onRefresh={fetchCategories}
-                onItemSequence={handleItemSequenceClick}
-              />
-            ))}
-          </Box>
-        </>
-      )}
-    </>
-  );
-})()}
+              {group.children.length > 0 && (
+                <Box sx={{ pl: { xs: 1.5, sm: 3 }, borderLeft: '3px solid #E5E7EB', ml: { xs: 0.5, sm: 1 } }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: '#6B7280' }}>
+                    {group.parentName ? `Sub categories of ${group.parentName}` : 'Sub categories'} ({group.children.length})
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {group.children.map((category) => (
+                      <CategoryCard
+                        key={category._id?.toString()}
+                        category={category}
+                        onEdit={handleEditClick}
+                        onDelete={handleDeleteClick}
+                        onRefresh={fetchCategories}
+                        onItemSequence={handleItemSequenceClick}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          ))}
         </Box>
       )}
 
