@@ -1,0 +1,207 @@
+import { describe, it, expect } from 'vitest';
+import {
+  addDays,
+  buildKitchenDays,
+  comboParts,
+  enumerateDays,
+  formatDayShort,
+  formatRangeLabel,
+  getPresetRange,
+  getWeekRange,
+  isDayString,
+  mondayOf,
+  toDayString,
+  validateRange,
+  weekdayName,
+  type KitchenRow,
+} from './kitchenDashboard';
+
+describe('week math (weeks run Monday to Sunday)', () => {
+  it('knows the weekday of a day', () => {
+    expect(weekdayName('2026-10-05')).toBe('Monday');
+    expect(weekdayName('2026-10-11')).toBe('Sunday');
+  });
+
+  it('finds the Monday of any day in the week', () => {
+    expect(mondayOf('2026-10-05')).toBe('2026-10-05'); // Monday
+    expect(mondayOf('2026-10-07')).toBe('2026-10-05'); // Wednesday
+    expect(mondayOf('2026-10-11')).toBe('2026-10-05'); // Sunday belongs to the week that started on Monday
+  });
+
+  it('crosses month and year boundaries', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(mondayOf('2027-01-01')).toBe('2026-12-28');
+    expect(getWeekRange('2026-03-01', 0)).toEqual({ startDate: '2026-02-23', endDate: '2026-03-01' });
+  });
+
+  it('gives this week, last week and the week before last', () => {
+    // today is Wednesday Oct 7, 2026
+    expect(getPresetRange('thisWeek', '2026-10-07')).toEqual({ startDate: '2026-10-05', endDate: '2026-10-11' });
+    expect(getPresetRange('lastWeek', '2026-10-07')).toEqual({ startDate: '2026-09-28', endDate: '2026-10-04' });
+    expect(getPresetRange('weekBeforeLast', '2026-10-07')).toEqual({ startDate: '2026-09-21', endDate: '2026-09-27' });
+  });
+
+  it('on a Sunday "this week" still ends that Sunday', () => {
+    expect(getPresetRange('thisWeek', '2026-10-11')).toEqual({ startDate: '2026-10-05', endDate: '2026-10-11' });
+  });
+
+  it('lists every day of a range', () => {
+    expect(enumerateDays({ startDate: '2026-10-05', endDate: '2026-10-11' })).toHaveLength(7);
+    expect(enumerateDays({ startDate: '2026-10-05', endDate: '2026-10-05' })).toEqual(['2026-10-05']);
+    expect(enumerateDays({ startDate: '2026-10-11', endDate: '2026-10-05' })).toEqual([]);
+    expect(enumerateDays({ startDate: 'x', endDate: '2026-10-05' })).toEqual([]);
+  });
+
+  it('validates a custom range', () => {
+    expect(validateRange({ startDate: '2026-10-05', endDate: '2026-10-11' })).toBeNull();
+    expect(validateRange({ startDate: '', endDate: '2026-10-11' })).toMatch(/start and an end/);
+    expect(validateRange({ startDate: '2026-10-11', endDate: '2026-10-05' })).toMatch(/not be after/);
+    expect(validateRange({ startDate: '2026-01-01', endDate: '2026-12-31' })).toMatch(/at most/);
+  });
+
+  it('rejects impossible dates', () => {
+    expect(isDayString('2026-02-30')).toBe(false);
+    expect(isDayString('2026-10-05')).toBe(true);
+    expect(isDayString('10/05/2026')).toBe(false);
+  });
+
+  it('formats labels', () => {
+    expect(formatDayShort('2026-10-07')).toBe('Wed, Oct 7');
+    expect(formatRangeLabel({ startDate: '2026-10-05', endDate: '2026-10-11' })).toBe('Oct 5 – Oct 11, 2026');
+    expect(formatRangeLabel({ startDate: '2026-12-28', endDate: '2027-01-03' })).toBe('Dec 28, 2026 – Jan 3, 2027');
+  });
+
+  it('turns stored dates into day strings', () => {
+    expect(toDayString('2026-10-07')).toBe('2026-10-07');
+    expect(toDayString('2026-10-07T00:00:00.000Z')).toBe('2026-10-07');
+    expect(toDayString(new Date('2026-10-07T00:00:00Z'))).toBe('2026-10-07');
+    expect(toDayString('garbage')).toBeNull();
+    expect(toDayString(undefined)).toBeNull();
+  });
+});
+
+const combo = {
+  sections: [
+    { _id: 's1', selectedItems: [{ _id: 'a1', portion: '12Oz', item: { name: 'Kale Chane' } }] },
+    { _id: 's2', selectedItems: [{ _id: 'b1', portion: '8Oz', item: { name: 'Palak Paneer' } }, { _id: 'b2', portion: '8Oz', item: { name: 'Punjabi Kathal' } }] },
+    { _id: 's3', selectedItems: [{ _id: 'c1', portion: '16Oz', item: { name: 'Jeera Rice' } }, { _id: 'c2', portion: '', item: { name: 'Chapati' } }] },
+  ],
+};
+
+const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-07', name: 'Rajma', quantity: 1, ...over });
+
+describe('comboParts', () => {
+  it('lists the picked options with their sizes', () => {
+    expect(comboParts({ ...combo, comboSelections: { s1: ['a1'], s2: ['b2'], s3: ['c2'] } })).toEqual([
+      { name: 'Kale Chane', portion: '12Oz' },
+      { name: 'Punjabi Kathal', portion: '8Oz' },
+      { name: 'Chapati', portion: null },
+    ]);
+  });
+
+  it('skips unknown ids and handles missing data', () => {
+    expect(comboParts({ ...combo, comboSelections: { s1: ['nope'] } })).toEqual([]);
+    expect(comboParts({ sections: null, comboSelections: null })).toEqual([]);
+    expect(comboParts({ ...combo, comboSelections: null })).toEqual([]);
+  });
+});
+
+describe('buildKitchenDays', () => {
+  const days = ['2026-10-05', '2026-10-06', '2026-10-07'];
+
+  it('returns a block for every day, empty ones included', () => {
+    const out = buildKitchenDays([], days);
+    expect(out.map((d) => d.weekday)).toEqual(['Monday', 'Tuesday', 'Wednesday']);
+    expect(out.every((d) => d.items.length === 0 && d.combos.length === 0 && d.totals.units === 0)).toBe(true);
+  });
+
+  it('adds up the same item across orders and splits it by size and spice', () => {
+    const out = buildKitchenDays(
+      [
+        row({ orderId: 'A', quantity: 2, portion: '8Oz', spiceLevel: 'Medium Spice' }),
+        row({ orderId: 'B', quantity: 1, portion: '8Oz', spiceLevel: 'Hot' }),
+        row({ orderId: 'C', quantity: 3, portion: '16Oz', spiceLevel: 'Hot' }),
+      ],
+      days
+    );
+    const wed = out[2];
+    expect(wed.items).toHaveLength(1);
+    expect(wed.items[0]).toMatchObject({ name: 'Rajma', quantity: 6, inCombos: 0 });
+    expect(wed.items[0].portions).toEqual([
+      { label: '8Oz', quantity: 3 },
+      { label: '16Oz', quantity: 3 },
+    ].sort((a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label)));
+    expect(wed.items[0].spice).toEqual([
+      { label: 'Hot', quantity: 4 },
+      { label: 'Medium Spice', quantity: 2 },
+    ]);
+    expect(wed.totals).toMatchObject({ units: 6, orders: 3 });
+  });
+
+  it('keeps items on the day they belong to', () => {
+    const out = buildKitchenDays([row({ day: '2026-10-05', name: 'Samosa Pav' }), row({ day: '2026-10-07', name: 'Rajma' })], days);
+    expect(out[0].items.map((i) => i.name)).toEqual(['Samosa Pav']);
+    expect(out[1].items).toEqual([]);
+    expect(out[2].items.map((i) => i.name)).toEqual(['Rajma']);
+  });
+
+  it('ignores days outside the list, empty names and zero quantities', () => {
+    const out = buildKitchenDays(
+      [row({ day: '2026-11-01' }), row({ name: '   ' }), row({ quantity: 0 }), row({ quantity: -2 }), row({ quantity: Number.NaN })],
+      days
+    );
+    expect(out.every((d) => d.items.length === 0)).toBe(true);
+  });
+
+  it('a line with no size shows no size breakdown', () => {
+    const out = buildKitchenDays([row({ name: 'Samosa Pav', quantity: 4, portion: null })], days);
+    expect(out[2].items[0]).toMatchObject({ name: 'Samosa Pav', quantity: 4, portions: [] });
+  });
+
+  it('expands combos into their parts and adds them to the same items', () => {
+    const out = buildKitchenDays(
+      [
+        // two combos: Kale Chane + Palak Paneer + Jeera Rice, and Kale Chane + Punjabi Kathal + Chapati
+        row({ orderId: 'A', name: 'Veg Combo', quantity: 1, spiceLevel: 'Medium Spice', comboSelections: { s1: ['a1'], s2: ['b1'], s3: ['c1'] }, ...combo }),
+        row({ orderId: 'B', name: 'Veg Combo', quantity: 2, spiceLevel: 'Hot', comboSelections: { s1: ['a1'], s2: ['b2'], s3: ['c2'] }, ...combo }),
+        // plus Kale Chane ordered on its own
+        row({ orderId: 'C', name: 'Kale Chane', quantity: 4, portion: '12Oz', spiceLevel: 'Hot' }),
+      ],
+      days
+    );
+    const wed = out[2];
+    const kale = wed.items.find((i) => i.name === 'Kale Chane')!;
+    expect(kale.quantity).toBe(7); // 4 on its own + 3 inside combos
+    expect(kale.inCombos).toBe(3);
+    expect(kale.portions).toEqual([{ label: '12Oz', quantity: 7 }]);
+    expect(wed.items.find((i) => i.name === 'Chapati')).toMatchObject({ quantity: 2, inCombos: 2, portions: [] });
+    expect(wed.items.find((i) => i.name === 'Punjabi Kathal')?.quantity).toBe(2);
+    expect(wed.combos).toHaveLength(1);
+    expect(wed.combos[0]).toMatchObject({ name: 'Veg Combo', quantity: 3 });
+    expect(wed.combos[0].spice).toEqual([
+      { label: 'Hot', quantity: 2 },
+      { label: 'Medium Spice', quantity: 1 },
+    ]);
+    expect(wed.combos[0].parts.find((p) => p.name === 'Kale Chane')).toMatchObject({ quantity: 3, portion: '12Oz' });
+    // units = what was ordered: 3 combos + 4 Kale Chane (combo parts are not counted twice)
+    expect(wed.totals.units).toBe(7);
+    expect(wed.totals.orders).toBe(3);
+  });
+
+  it('a combo whose choices cannot be read is counted as a plain item', () => {
+    const out = buildKitchenDays([row({ name: 'Veg Combo', quantity: 2, comboSelections: { s1: ['gone'] }, ...combo })], days);
+    expect(out[2].items[0]).toMatchObject({ name: 'Veg Combo', quantity: 2 });
+    expect(out[2].combos).toEqual([]);
+  });
+
+  it('counts eco containers by quantity', () => {
+    const out = buildKitchenDays([row({ quantity: 2, isEco: true }), row({ quantity: 3, isEco: false }), row({ quantity: 1, isEco: true, name: 'Dal' })], days);
+    expect(out[2].totals.ecoContainers).toBe(3);
+  });
+
+  it('sorts the biggest production first', () => {
+    const out = buildKitchenDays([row({ name: 'A', quantity: 1 }), row({ name: 'B', quantity: 5 }), row({ name: 'C', quantity: 5 })], days);
+    expect(out[2].items.map((i) => i.name)).toEqual(['B', 'C', 'A']);
+  });
+});
