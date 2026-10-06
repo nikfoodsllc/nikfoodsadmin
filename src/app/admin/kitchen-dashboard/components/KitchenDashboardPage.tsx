@@ -94,9 +94,14 @@ function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void 
           {item.name}
         </Typography>
         <CountChips lines={item.portions} />
-        {item.spice.length > 0 && (
+        {(item.spice.length > 0 || item.eco > 0) && (
           <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-            Spice: {item.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}
+            {[
+              item.spice.length > 0 ? `Spice: ${item.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}` : '',
+              item.eco > 0 ? `♻️ Eco × ${item.eco}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </Typography>
         )}
         {item.totalText && item.unsized > 0 && (
@@ -173,9 +178,14 @@ function BlockBody({
                 <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{combo.name}</Typography>
                 <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#111827', flexShrink: 0 }}>{combo.quantity}</Typography>
               </Box>
-              {combo.spice.length > 0 && (
+              {(combo.spice.length > 0 || combo.eco > 0) && (
                 <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
-                  Spice: {combo.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}
+                  {[
+                    combo.spice.length > 0 ? `Spice: ${combo.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}` : '',
+                    combo.eco > 0 ? `♻️ Eco × ${combo.eco}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </Typography>
               )}
               {combo.parts.length > 0 && (
