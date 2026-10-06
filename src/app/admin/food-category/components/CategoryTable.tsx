@@ -26,6 +26,7 @@ import { FoodCategory } from '@/types/order';
 import { CategoryGroup } from '@/utils/categoryTree';
 import { moveItem } from '@/utils/categoryReorder';
 import { DragAxis, constrainTransform } from '@/utils/dragConstraint';
+import { useVerticalWheelPassthrough } from '@/hooks/useVerticalWheelPassthrough';
 
 interface CategoryTableProps {
   groups: CategoryGroup<FoodCategory>[];
@@ -387,6 +388,9 @@ export default function CategoryTable({
   // the row / columns managed by the drag library and the sticky label cell: a dragged item is held inside its own area
   const dropAreas = useRef<Record<string, HTMLElement | null>>({});
   const labelCell = useRef<HTMLDivElement | null>(null);
+  // the table scrolls sideways, which must not swallow vertical scrolling of the page; paused while dragging
+  const dragging = useRef(false);
+  const scrollArea = useVerticalWheelPassthrough<HTMLDivElement>(() => dragging.current);
   const handleDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     const droppableId = source.droppableId;
@@ -407,6 +411,7 @@ export default function CategoryTable({
 
   return (
     <Box
+      ref={scrollArea}
       sx={{
         border: BORDER,
         borderRadius: 2,
@@ -415,7 +420,15 @@ export default function CategoryTable({
         overflowX: 'auto',
       }}
     >
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext
+        onDragStart={() => {
+          dragging.current = true;
+        }}
+        onDragEnd={(result) => {
+          dragging.current = false;
+          handleDragEnd(result);
+        }}
+      >
         <Box sx={{ width: 'max-content', minWidth: '100%' }}>
           {/* Row 1: the categories (drag sideways) */}
           <Box sx={{ display: 'flex', borderBottom: '2px solid #111827' }}>

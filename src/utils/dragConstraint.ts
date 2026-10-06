@@ -31,7 +31,12 @@ const clamp = (value: number, min: number, max: number) => (min > max ? min : Ma
  * while dragging. With no container it just stays where it started on the other axis. A transform that
  * is not a plain translate (e.g. none) is returned unchanged.
  */
-export function constrainTransform(transform: string | undefined, axis: DragAxis, start: Box, container: Container | null): string | undefined {
+export function constrainTransform(
+  transform: string | undefined,
+  axis: DragAxis,
+  start: Box,
+  container: Container | null,
+): string | undefined {
   const match = transform ? TRANSLATE.exec(transform.trim()) : null;
   if (!match) return transform;
   let x = Number(match[1]);
