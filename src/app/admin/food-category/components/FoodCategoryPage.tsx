@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Box, Button, Typography, Alert, Snackbar, Chip, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { IconPlus, IconFilter } from '@tabler/icons-react';
 import { CategoryListingType } from '@/types/order';
-import CategoryCard from './CategoryCard';
+import CategoryTable from './CategoryTable';
 import CategoryDialog from './CategoryDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import CategorySkeleton from './CategorySkeleton';
@@ -359,43 +359,13 @@ export default function FoodCategoryPage() {
             </Box>
           )}
 
-          {/* Each category followed by its own sub-categories, both in rank order */}
-          {groupCategoriesByParent(filteredCategories, categories).map((group) => (
-            <Box key={group.parentId} sx={{ mb: 5 }}>
-              {group.parent ? (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: group.children.length > 0 ? 2 : 0 }}>
-                  <CategoryCard
-                    key={group.parent._id?.toString()}
-                    category={group.parent}
-                    onEdit={handleEditClick}
-                    onDelete={handleDeleteClick}
-                    onRefresh={fetchCategories}
-                    onItemSequence={handleItemSequenceClick}
-                  />
-                </Box>
-              ) : null}
-
-              {group.children.length > 0 && (
-                <Box sx={{ pl: { xs: 1.5, sm: 3 }, borderLeft: '3px solid #E5E7EB', ml: { xs: 0.5, sm: 1 } }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: '#6B7280' }}>
-                    {group.parentName ? `Sub categories of ${group.parentName}` : 'Sub categories'} ({group.children.length})
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                    {group.children.map((category) => (
-                      <CategoryCard
-                        key={category._id?.toString()}
-                        category={category}
-                        onEdit={handleEditClick}
-                        onDelete={handleDeleteClick}
-                        onRefresh={fetchCategories}
-                        onItemSequence={handleItemSequenceClick}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          ))}
+          {/* One column per category (rank order) with its sub-categories underneath */}
+          <CategoryTable
+            groups={groupCategoriesByParent(filteredCategories, categories)}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteClick}
+            onItemSequence={handleItemSequenceClick}
+          />
         </Box>
       )}
 
