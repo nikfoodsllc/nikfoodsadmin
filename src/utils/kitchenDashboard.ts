@@ -134,7 +134,7 @@ export interface KitchenItem {
   inCombos: number;
   portions: CountLine[];
   spice: CountLine[];
-  /** Total amount to cook where the sizes are known, as text ('84 oz (5 lb 4 oz)'); '' when no size is known. */
+  /** Total amount to cook where the sizes are known, as text ('84 oz (5.25 lb)'); '' when no size is known. */
   totalText: string;
   /** Units of this item that carry no readable size, so they are not in `totalText`. */
   unsized: number;
@@ -206,15 +206,14 @@ export function addAmount(into: Amount, add: Amount, times = 1): void {
 
 const trim2 = (n: number): string => String(Math.round(n * 100) / 100);
 
-/** '36 oz (2 lb 4 oz)', '8 oz', '300 g', '12 pcs', or '' when there is nothing. Mixed units are joined with ' + '. */
+/** '36 oz (2.25 lb)', '8 oz', '300 g', '12 pcs', or '' when there is nothing. Mixed units are joined with ' + '. */
 export function formatAmount(amount: Amount): string {
   const parts: string[] = [];
   if (amount.oz > 0) {
     const oz = Math.round(amount.oz * 100) / 100;
     if (oz >= 16) {
-      const pounds = Math.floor(oz / 16);
-      const rest = Math.round((oz - pounds * 16) * 100) / 100;
-      parts.push(`${trim2(oz)} oz (${pounds} lb${rest > 0 ? ` ${trim2(rest)} oz` : ''})`);
+      // pounds as a decimal: 300 oz is 18.75 lb
+      parts.push(`${trim2(oz)} oz (${trim2(oz / 16)} lb)`);
     } else {
       parts.push(`${trim2(oz)} oz`);
     }

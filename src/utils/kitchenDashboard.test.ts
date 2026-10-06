@@ -249,11 +249,14 @@ describe('parsePortionAmount (sizes in portion labels)', () => {
 });
 
 describe('formatAmount', () => {
-  it('shows ounces, and pounds once there are 16 ounces or more', () => {
+  it('shows ounces, and decimal pounds once there are 16 ounces or more', () => {
     expect(formatAmount({ oz: 8, grams: 0, pieces: 0 })).toBe('8 oz');
     expect(formatAmount({ oz: 16, grams: 0, pieces: 0 })).toBe('16 oz (1 lb)');
-    expect(formatAmount({ oz: 36, grams: 0, pieces: 0 })).toBe('36 oz (2 lb 4 oz)');
+    expect(formatAmount({ oz: 36, grams: 0, pieces: 0 })).toBe('36 oz (2.25 lb)');
     expect(formatAmount({ oz: 96, grams: 0, pieces: 0 })).toBe('96 oz (6 lb)');
+    expect(formatAmount({ oz: 300, grams: 0, pieces: 0 })).toBe('300 oz (18.75 lb)');
+    expect(formatAmount({ oz: 20, grams: 0, pieces: 0 })).toBe('20 oz (1.25 lb)');
+    expect(formatAmount({ oz: 17, grams: 0, pieces: 0 })).toBe('17 oz (1.06 lb)');
   });
   it('shows grams and pieces and joins mixed units', () => {
     expect(formatAmount({ oz: 0, grams: 300, pieces: 0 })).toBe('300 g');
@@ -272,12 +275,12 @@ describe('total amount per item', () => {
       [row({ quantity: 3, portion: '8Oz' }), row({ orderId: 'B', quantity: 2, portion: '16Oz' })],
       days
     );
-    expect(out[0].items[0]).toMatchObject({ quantity: 5, totalText: '56 oz (3 lb 8 oz)', unsized: 0 });
+    expect(out[0].items[0]).toMatchObject({ quantity: 5, totalText: '56 oz (3.5 lb)', unsized: 0 });
   });
 
   it('handles pound sizes', () => {
     const out = buildKitchenDays([row({ name: 'Kaju Katli', quantity: 3, portion: '1/2Lb' }), row({ orderId: 'B', name: 'Kaju Katli', quantity: 1, portion: '1Lb' })], days);
-    expect(out[0].items[0].totalText).toBe('40 oz (2 lb 8 oz)');
+    expect(out[0].items[0].totalText).toBe('40 oz (2.5 lb)');
   });
 
   it('adds the sizes of combo parts to the same item', () => {
@@ -289,7 +292,7 @@ describe('total amount per item', () => {
       days
     );
     const kale = out[0].items.find((i) => i.name === 'Kale Chane')!;
-    expect(kale.totalText).toBe('84 oz (5 lb 4 oz)'); // 3 in combos + 4 on their own, 12 oz each
+    expect(kale.totalText).toBe('84 oz (5.25 lb)'); // 3 in combos + 4 on their own, 12 oz each
     expect(kale.unsized).toBe(0);
     // Chapati has no size: no total, and nothing to flag because no part of it is sized
     const chapati = out[0].items.find((i) => i.name === 'Chapati')!;
