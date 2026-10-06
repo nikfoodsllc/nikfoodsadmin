@@ -17,6 +17,9 @@ import {
 } from '@mui/material';
 import { IconRefresh } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useColumnPreferences } from '@/hooks/useColumnPreferences';
+import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
+import { KITCHEN_DAY_DEFS, arrangeKitchenDays } from '@/utils/kitchenDayLayout';
 import { formatPSTDateISO } from '@/utils/timezone';
 import {
   formatDayShort,
@@ -187,7 +190,9 @@ export default function KitchenDashboardPage() {
   const [customApplied, setCustomApplied] = useState<DayRange | null>(null);
   const [customError, setCustomError] = useState<string | null>(null);
 
-  const [days, setDays] = useState<KitchenDay[]>([]);
+  const [allDays, setAllDays] = useState<KitchenDay[]>([]);
+  // which weekdays to show and in what order; saved per admin (same mechanism as the table columns)
+  const dayLayout = useColumnPreferences('admin_kitchen_days', KITCHEN_DAY_DEFS, 'kitchen-days');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -211,9 +216,9 @@ export default function KitchenDashboardPage() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Could not load the kitchen dashboard');
-      setDays(body.data?.days ?? []);
+      setAllDays(body.data?.days ?? []);
     } catch (e) {
-      setDays([]);
+      setAllDays([]);
       setError(e instanceof Error ? e.message : 'Could not load the kitchen dashboard');
     } finally {
       setLoading(false);
@@ -244,6 +249,8 @@ export default function KitchenDashboardPage() {
   }
   if (!isAuthenticated) return null;
 
+  const days = arrangeKitchenDays(allDays, dayLayout.allColumns.map((c) => c.key), dayLayout.hiddenKeys);
+  const hiddenDays = allDays.length - days.length;
   const totalUnits = days.reduce((sum, d) => sum + d.totals.units, 0);
   const busyDays = days.filter((d) => d.items.length > 0 || d.combos.length > 0).length;
 
@@ -258,13 +265,26 @@ export default function KitchenDashboardPage() {
             What to cook on each day, by the menu day each item belongs to. Paid orders only; cancelled and refunded orders are left out.
           </Typography>
         </Box>
-        <Tooltip title="Refresh">
-          <span>
-            <IconButton onClick={load} disabled={loading || !range} aria-label="Refresh">
-              <IconRefresh size={20} />
-            </IconButton>
-          </span>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ColumnVisibilityMenu
+            label="Days"
+            description="Tick to show or hide a weekday. Drag a row by its handle to change the order the days appear in. This applies to every week."
+            columns={dayLayout.allColumns}
+            hiddenKeys={dayLayout.hiddenKeys}
+            onToggle={dayLayout.toggleColumn}
+            onMove={dayLayout.moveColumn}
+            onShowAll={dayLayout.showAll}
+            onReset={dayLayout.reset}
+            syncStatus={dayLayout.syncStatus}
+          />
+          <Tooltip title="Refresh">
+            <span>
+              <IconButton onClick={load} disabled={loading || !range} aria-label="Refresh">
+                <IconRefresh size={20} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
 
       <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2.5 }}>
@@ -315,6 +335,7 @@ export default function KitchenDashboardPage() {
           <Typography sx={{ mt: 1.5, fontSize: 13.5, color: '#6B7280' }}>
             {formatRangeLabel(range)}
             {!loading && !error && days.length > 0 ? ` · ${totalUnits} ${totalUnits === 1 ? 'unit' : 'units'} across ${busyDays} ${busyDays === 1 ? 'day' : 'days'}` : ''}
+            {!loading && !error && hiddenDays > 0 ? ` · ${hiddenDays} ${hiddenDays === 1 ? 'day' : 'days'} hidden` : ''}
           </Typography>
         )}
       </Paper>

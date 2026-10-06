@@ -23,6 +23,8 @@ import {
   SelectChangeEvent,
   Divider,
 } from '@mui/material';
+import PreparationTypeField from './PreparationTypeField';
+import { PreparationType } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
 import PortionManager from './PortionManager';
@@ -48,6 +50,7 @@ interface PortionsFoodItem {
   hasSpiceLevel: boolean;
   spiceLevel?: string[];
   isDraft?: boolean;
+  preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
 }
 
 interface PortionsFoodItemDialogProps {
@@ -408,6 +411,15 @@ export default function PortionsFoodItemDialog({
               }
             />
           </Box>
+
+          {/* Preparation Type: Cooked / Ready to eat / Not set yet */}
+          <PreparationTypeField
+            value={formData.preparationType}
+            onChange={(value) => setFormData((prev) => ({ ...prev, preparationType: value }))}
+            disabled={loading}
+          />
+
+          <Divider />
 
           {/* Available Toggle */}
           <Box>

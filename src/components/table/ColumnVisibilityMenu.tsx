@@ -19,6 +19,10 @@ interface ColumnVisibilityMenuProps {
   onReset: () => void;
   syncStatus?: ColumnSyncStatus;
   disabled?: boolean;
+  /** What the list holds, for the button and title (default 'Columns'). */
+  label?: string;
+  /** Help text under the title (default explains columns). */
+  description?: string;
 }
 
 const STATUS_TEXT: Record<ColumnSyncStatus, string> = {
@@ -28,7 +32,21 @@ const STATUS_TEXT: Record<ColumnSyncStatus, string> = {
   error: "Couldn't reach your account, so this is saved on this computer only",
 };
 
-export default function ColumnVisibilityMenu({ columns, hiddenKeys, onToggle, onMove, onShowAll, onReset, syncStatus = 'idle', disabled }: ColumnVisibilityMenuProps) {
+const DEFAULT_DESCRIPTION =
+  'Tick to show or hide. Drag a row by its handle to change the order the table shows. You can also resize a column by dragging the edge of its header.';
+
+export default function ColumnVisibilityMenu({
+  columns,
+  hiddenKeys,
+  onToggle,
+  onMove,
+  onShowAll,
+  onReset,
+  syncStatus = 'idle',
+  disabled,
+  label = 'Columns',
+  description = DEFAULT_DESCRIPTION,
+}: ColumnVisibilityMenuProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const listed = columns.filter((c) => !c.locked);
   const hiddenCount = listed.filter((c) => hiddenKeys.has(c.key)).length;
@@ -54,7 +72,7 @@ export default function ColumnVisibilityMenu({ columns, hiddenKeys, onToggle, on
           '&:hover': { borderColor: '#4F8CFF', backgroundColor: 'rgba(79, 140, 255, 0.04)' },
         }}
       >
-        {hiddenCount > 0 ? `Columns (${hiddenCount} hidden)` : 'Columns'}
+        {hiddenCount > 0 ? `${label} (${hiddenCount} hidden)` : label}
       </Button>
       <Popover
         open={Boolean(anchor)}
@@ -65,9 +83,9 @@ export default function ColumnVisibilityMenu({ columns, hiddenKeys, onToggle, on
         slotProps={{ paper: { sx: { borderRadius: 2, mt: 0.5, width: 300, maxHeight: 'calc(100vh - 100px)' } } }}
       >
         <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-          <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Columns</Typography>
+          <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{label}</Typography>
           <Typography sx={{ fontSize: '12px', color: '#6B7280', mt: 0.25 }}>
-            Tick to show or hide. Drag a row by its handle to change the order the table shows. You can also resize a column by dragging the edge of its header.
+            {description}
           </Typography>
         </Box>
         <Divider />

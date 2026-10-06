@@ -29,6 +29,8 @@ import PortionsFoodItemDialog from './PortionsFoodItemDialog';
 import ComboFoodItemDialog from './ComboFoodItemDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import TableFilters from './TableFilters';
+import { PreparationType } from '@/utils/preparationType';
+import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, foodItemFilterParams } from './foodItemFilters';
 import TablePagination from './TablePagination';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import {
@@ -55,6 +57,7 @@ interface FoodItem {
   url?: string;
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
+  preparationType?: PreparationType;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -219,7 +222,10 @@ export default function FoodItemsPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [vegOnly, setVegOnly] = useState('all');
+  // Column filters (veg, available, type, preparation type) + the rows ticked for the bulk update
+  const [filters, setFilters] = useState<FoodItemFilters>(DEFAULT_FOOD_ITEM_FILTERS);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -336,8 +342,8 @@ export default function FoodItemsPage() {
         params.append('search', searchQuery);
       }
 
-      if (vegOnly === 'true' || vegOnly === 'false') {
-        params.append('vegOnly', vegOnly);
+      for (const [key, value] of foodItemFilterParams(filters)) {
+        params.append(key, value);
       }
 
       params.append('page', currentPage.toString());
@@ -366,7 +372,7 @@ export default function FoodItemsPage() {
   }, [
     token,
     searchQuery,
-    vegOnly,
+    filters,
     currentPage,
   ]);
 
@@ -378,6 +384,80 @@ export default function FoodItemsPage() {
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  // =========================
+  // BULK PREPARATION TYPE
+  // =========================
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allOnPage = items.length > 0 && items.every((i) => next.has(i._id));
+      for (const i of items) {
+        if (allOnPage) next.delete(i._id);
+        else next.add(i._id);
+      }
+      return next;
+    });
+  };
+
+  // Ticks every item that matches the current search and filters, on all pages
+  const selectAllMatching = async () => {
+    try {
+      setBulkLoading(true);
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      for (const [key, value] of foodItemFilterParams(filters)) params.append(key, value);
+      params.append('page', '1');
+      params.append('limit', '1000');
+      const response = await fetch(`/api/admin/food-items?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to load items');
+      const ids: string[] = (data.data?.items || []).map((i: { _id: string }) => i._id);
+      setSelectedIds(new Set(ids));
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to select items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const applyPreparationType = async (preparationType: PreparationType | null) => {
+    if (selectedIds.size === 0) return;
+    try {
+      setBulkLoading(true);
+      const response = await fetch('/api/admin/food-items/preparation-type', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: [...selectedIds], preparationType }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update items');
+      const label = preparationType === 'cooked' ? 'Cooked' : preparationType === 'ready_to_eat' ? 'Ready to eat' : 'not set yet';
+      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
+      setSelectedIds(new Set());
+      await fetchItems();
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const handleAddMenuClick = (
     event: React.MouseEvent<HTMLElement>
@@ -645,16 +725,67 @@ export default function FoodItemsPage() {
 
       <TableFilters
         searchValue={searchQuery}
-        vegOnly={vegOnly}
         onSearchChange={(value) => {
           setSearchQuery(value);
           setCurrentPage(1);
         }}
-        onVegChange={(value) => {
-          setVegOnly(value);
+        filters={filters}
+        onFilterChange={(key, value) => {
+          setFilters((prev) => ({ ...prev, [key]: value }));
           setCurrentPage(1);
         }}
       />
+
+      {/* BULK UPDATE BAR: appears once rows are ticked */}
+      {selectedIds.size > 0 && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            mb: 2,
+            p: 1.5,
+            borderRadius: 2,
+            border: '1px solid #C7D2FE',
+            backgroundColor: '#EEF2FF',
+          }}
+        >
+          <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#3730A3' }}>
+            {selectedIds.size} {selectedIds.size === 1 ? 'item' : 'items'} selected
+          </Typography>
+          {totalItems > selectedIds.size && (
+            <Button size="small" onClick={selectAllMatching} disabled={bulkLoading} sx={{ textTransform: 'none' }}>
+              Select all {totalItems} matching
+            </Button>
+          )}
+          <Box sx={{ flex: 1 }} />
+          <Button
+            size="small"
+            variant="contained"
+            disabled={bulkLoading}
+            onClick={() => applyPreparationType('cooked')}
+            sx={{ textTransform: 'none', backgroundColor: '#C2410C', '&:hover': { backgroundColor: '#9A3412' } }}
+          >
+            Mark as Cooked
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={bulkLoading}
+            onClick={() => applyPreparationType('ready_to_eat')}
+            sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}
+          >
+            Mark as Ready to eat
+          </Button>
+          <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
+            Clear (not set yet)
+          </Button>
+          <Button size="small" disabled={bulkLoading} onClick={clearSelection} sx={{ textTransform: 'none' }}>
+            Deselect all
+          </Button>
+        </Box>
+      )}
 
       {/* TABLE */}
 
@@ -671,6 +802,9 @@ export default function FoodItemsPage() {
 
         // NEW PROP
         onDuplicate={handleDuplicateClick}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onToggleSelectPage={toggleSelectPage}
       />
 
       {/* PAGINATION */}

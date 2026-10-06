@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { Box, Button, Typography, Alert, Snackbar, Chip, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { IconPlus, IconFilter } from '@tabler/icons-react';
 import { CategoryListingType } from '@/types/order';
-import CategoryCard from './CategoryCard';
+import CategoryTable from './CategoryTable';
 import CategoryDialog from './CategoryDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import CategorySkeleton from './CategorySkeleton';
 import ItemSequenceDialog from './ItemSequenceDialog';
 import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
+import { groupCategoriesByParent } from '@/utils/categoryTree';
 
 function categoryHasParent(c: FoodCategory): boolean {
   const p = c.parentCategoryId;
@@ -30,6 +31,7 @@ export default function FoodCategoryPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<FoodCategory | null>(null);
   const [selectedCategoryForSequence, setSelectedCategoryForSequence] = useState<FoodCategory | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -174,6 +176,38 @@ export default function FoodCategoryPage() {
     } catch (error) {
       console.error('Error saving category:', error);
       throw error;
+    }
+  };
+
+  /** Saves a new order for one group of siblings (parentId null = the top-level categories). */
+  const handleReorder = async (parentId: string | null, orderedIds: string[]) => {
+    const before = categories;
+    const rank = new Map(orderedIds.map((id, index) => [id, index + 1]));
+    // show the new order right away; put the old one back if the save fails
+    setCategories((prev) => prev.map((c) => (rank.has(String(c._id)) ? { ...c, sequence: rank.get(String(c._id)) } : c)));
+    setReorderSaving(true);
+    let listChanged = false;
+    try {
+      if (!token || !isAuthenticated) throw new Error('No authentication token found');
+      const response = await fetch('/api/admin/food-category/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ parentId, orderedIds }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        listChanged = response.status === 409;
+        throw new Error(body.error || 'Failed to save the new order');
+      }
+      showSnackbar('Order saved');
+    } catch (error) {
+      // a conflict means the page was out of date: reload the real list instead of restoring the old one
+      if (listChanged) await fetchCategories();
+      else setCategories(before);
+      console.error('Error saving category order:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to save the new order', 'error');
+    } finally {
+      setReorderSaving(false);
     }
   };
 
@@ -358,92 +392,21 @@ export default function FoodCategoryPage() {
             </Box>
           )}
 
-          {/* Separate Main Categories and Sub Categories */}
-{(() => {
-  const mainCategories = filteredCategories.filter(
-    (cat) => !cat.parentCategoryId
-  );
-
-  const subCategories = filteredCategories.filter(
-    (cat) => cat.parentCategoryId
-  );
-
-  return (
-    <>
-      {/* Main Categories */}
-      {mainCategories.length > 0 && (
-        <>
-          <Typography
-            variant="h6"
-            sx={{
-              mb: 2,
-              mt: 2,
-              fontWeight: 700,
-              color: '#222',
-            }}
-          >
-            Categories
+          {/* One column per category (rank order) with its sub-categories underneath */}
+          <Typography variant="body2" sx={{ color: '#6B7280', mb: 1.5 }}>
+            {filterType === 'all'
+              ? 'Drag the handle on a category left or right, or on a sub-category up or down, to change its rank. Changes save automatically.'
+              : 'Show All categories to drag and re-rank them.'}
           </Typography>
-
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 3,
-              mb: 5,
-            }}
-          >
-            {mainCategories.map((category) => (
-              <CategoryCard
-                key={category._id?.toString()}
-                category={category}
-                onEdit={handleEditClick}
-                onDelete={handleDeleteClick}
-                onRefresh={fetchCategories}
-                onItemSequence={handleItemSequenceClick}
-              />
-            ))}
-          </Box>
-        </>
-      )}
-
-      {/* Sub Categories */}
-      {subCategories.length > 0 && (
-        <>
-          <Typography
-            variant="h6"
-            sx={{
-              mb: 2,
-              fontWeight: 700,
-              color: '#222',
-            }}
-          >
-            Sub Categories
-          </Typography>
-
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 3,
-            }}
-          >
-            {subCategories.map((category) => (
-              <CategoryCard
-                key={category._id?.toString()}
-                category={category}
-                onEdit={handleEditClick}
-                onDelete={handleDeleteClick}
-                onRefresh={fetchCategories}
-                onItemSequence={handleItemSequenceClick}
-              />
-            ))}
-          </Box>
-        </>
-      )}
-    </>
-  );
-})()}
+          <CategoryTable
+            groups={groupCategoriesByParent(filteredCategories, categories)}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteClick}
+            onItemSequence={handleItemSequenceClick}
+            onReorderCategories={(orderedIds) => handleReorder(null, orderedIds)}
+            onReorderSubCategories={(parentId, orderedIds) => handleReorder(parentId, orderedIds)}
+            dragDisabled={filterType !== 'all' || reorderSaving}
+          />
         </Box>
       )}
 
