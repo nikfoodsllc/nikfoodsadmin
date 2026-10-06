@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { planReorder } from '@/utils/categoryReorder';
-import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
+import { invalidateLivesiteHomeMenuCacheAndWait } from '@/lib/invalidateHomeMenuCache';
 
 /**
  * Re-rank a group of sibling categories.
@@ -76,10 +76,13 @@ export async function PATCH(request: NextRequest) {
         })),
         { ordered: false },
       );
-      invalidateLivesiteHomeMenuCache();
     }
 
-    return NextResponse.json({ data: { changed: plan.updates.length }, message: 'Order saved' });
+    // the customer menu follows this order: tell the livesite right away and wait for its answer, so the
+    // request cannot end (and the host freeze it) before the notification went out
+    const livesiteNotified = plan.updates.length > 0 ? await invalidateLivesiteHomeMenuCacheAndWait() : true;
+
+    return NextResponse.json({ data: { changed: plan.updates.length, livesiteNotified }, message: 'Order saved' });
   } catch (error) {
     console.error('[category reorder] failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
