@@ -48,7 +48,7 @@ const navItems: NavItem[] = [
     icon: IconLayoutDashboard,
   },
   {
-    title: 'Kitchen Dashboard',
+    title: 'Kitchen Dashboard (Beta)',
     href: '/admin/kitchen-dashboard',
     icon: IconChefHat,
   },
