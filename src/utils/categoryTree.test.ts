@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupCategoriesByParent, type TreeCategory } from './categoryTree';
+import { categoryTableRows, groupCategoriesByParent, type TreeCategory } from './categoryTree';
 
 const cat = (id: string, name: string, sequence?: number, parent?: string): TreeCategory => ({ _id: id, name, sequence, parentCategoryId: parent });
 const shape = (groups: ReturnType<typeof groupCategoriesByParent>) =>
@@ -59,5 +59,21 @@ describe('groupCategoriesByParent', () => {
 
   it('returns nothing for an empty list', () => {
     expect(groupCategoriesByParent([])).toEqual([]);
+  });
+});
+
+describe('categoryTableRows', () => {
+  it('lines each category\'s sub-categories up in its own column, padding short columns with null', () => {
+    const groups = groupCategoriesByParent([
+      cat('c1', 'Cat 1', 1), cat('a', 'Sub 1', 1, 'c1'), cat('b', 'Sub 2', 2, 'c1'),
+      cat('c2', 'Cat 2', 2), cat('d', 'Sub 1', 1, 'c2'), cat('e', 'Sub 2', 2, 'c2'), cat('f', 'Sub 3', 3, 'c2'),
+      cat('c3', 'Cat 3', 3),
+    ]);
+    const rows = categoryTableRows(groups).map((row) => row.map((c) => c?.name ?? '-').join(' | '));
+    expect(rows).toEqual(['Sub 1 | Sub 1 | -', 'Sub 2 | Sub 2 | -', '- | Sub 3 | -']);
+  });
+
+  it('has no rows when nothing has sub-categories', () => {
+    expect(categoryTableRows(groupCategoriesByParent([cat('a', 'A', 1)]))).toEqual([]);
   });
 });

@@ -85,3 +85,12 @@ export function groupCategoriesByParent<T extends TreeCategory>(shown: T[], all:
   }
   return [...merged, ...pending];
 }
+
+/**
+ * The sub-category grid under the category columns: row r holds the r-th sub-category of every group
+ * (null where a group has fewer), so each group's sub-categories read top to bottom in its column.
+ */
+export function categoryTableRows<T extends TreeCategory>(groups: CategoryGroup<T>[]): Array<Array<T | null>> {
+  const rowCount = groups.reduce((max, g) => Math.max(max, g.children.length), 0);
+  return Array.from({ length: rowCount }, (_, r) => groups.map((g) => g.children[r] ?? null));
+}
