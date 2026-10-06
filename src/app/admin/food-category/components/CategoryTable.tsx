@@ -1,87 +1,189 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Box,
-  Chip,
-  IconButton,
-  ListItemIcon,
-  Menu,
-  MenuItem,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from "@mui/material";
+import { ReactNode, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Box, Chip, IconButton, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
 import {
   IconDotsVertical,
   IconEdit,
+  IconGripHorizontal,
+  IconGripVertical,
   IconListDetails,
   IconSortDescending,
   IconTrash,
-} from "@tabler/icons-react";
-import { FoodCategory } from "@/types/order";
-import { CategoryGroup, categoryTableRows } from "@/utils/categoryTree";
+} from '@tabler/icons-react';
+import { DragDropContext, Draggable, Droppable, DropResult, DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
+import { FoodCategory } from '@/types/order';
+import { CategoryGroup } from '@/utils/categoryTree';
+import { moveItem } from '@/utils/categoryReorder';
 
 interface CategoryTableProps {
   groups: CategoryGroup<FoodCategory>[];
   onEdit: (category: FoodCategory) => void;
   onDelete: (category: FoodCategory) => void;
   onItemSequence: (category: FoodCategory) => void;
+  /** New order of the top-level categories (ids, left to right). */
+  onReorderCategories: (orderedIds: string[]) => void;
+  /** New order of one category's sub-categories (ids, top to bottom). */
+  onReorderSubCategories: (parentId: string, orderedIds: string[]) => void;
+  /** Dragging is off while a filter is active (the list would be partial) or a save is running. */
+  dragDisabled: boolean;
 }
 
-const COLUMN_WIDTH = 220;
-const DEFAULT_IMAGE =
-  "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400";
-const BORDER = "1px solid #E5E7EB";
+const COLUMN_WIDTH = 250;
+const ROW_HEIGHT = 96;
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400';
+const BORDER = '1px solid #E5E7EB';
 
-const typeColor = (category: FoodCategory) =>
-  category.listingType === "day-wise" ? "#8B5CF6" : "#10B981";
-const typeLabel = (category: FoodCategory) =>
-  category.listingType === "day-wise" ? "Day-wise" : "Flat";
+const typeColor = (category: FoodCategory) => (category.listingType === 'day-wise' ? '#8B5CF6' : '#10B981');
+const typeLabel = (category: FoodCategory) => (category.listingType === 'day-wise' ? 'Day-wise' : 'Flat');
+const idOf = (category: FoodCategory) => String(category._id);
 
 function itemCountOf(category: FoodCategory): number {
   if (category.itemCount !== undefined) return category.itemCount;
-  if (category.listingType === "day-wise" && category.dayWiseItems) {
-    return category.dayWiseItems.reduce(
-      (total, day) => total + day.items.length,
-      0,
-    );
+  if (category.listingType === 'day-wise' && category.dayWiseItems) {
+    return category.dayWiseItems.reduce((total, day) => total + day.items.length, 0);
   }
   return 0;
 }
 
-/** One category or sub-category: name, rank, type, item count, and the same actions menu the cards had. */
+function DragHandle({
+  handleProps,
+  label,
+  horizontal,
+  disabled,
+}: {
+  handleProps?: DraggableProvidedDragHandleProps | null;
+  label: string;
+  horizontal?: boolean;
+  disabled: boolean;
+}) {
+  if (!handleProps) return null;
+  return (
+    <Box
+      {...handleProps}
+      aria-label={label}
+      title={disabled ? 'Show all categories to re-rank' : label}
+      onClick={(e) => e.stopPropagation()}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 28,
+        height: 28,
+        borderRadius: 1,
+        color: disabled ? '#D1D5DB' : '#9CA3AF',
+        cursor: disabled ? 'not-allowed' : 'grab',
+        '&:hover, &:focus-visible': {
+          color: disabled ? '#D1D5DB' : '#4F8CFF',
+          backgroundColor: disabled ? 'transparent' : '#EEF4FF',
+        },
+      }}
+    >
+      {horizontal ? <IconGripHorizontal size={18} /> : <IconGripVertical size={18} />}
+    </Box>
+  );
+}
+
+/** One category or sub-category: image, name, rank, type, item count, actions menu and (when given) a drag handle. */
 function CategoryEntry({
   category,
   isTop,
+  handle,
   onEdit,
   onDelete,
   onItemSequence,
-}: { category: FoodCategory; isTop: boolean } & Pick<
-  CategoryTableProps,
-  "onEdit" | "onDelete" | "onItemSequence"
->) {
+}: { category: FoodCategory; isTop: boolean; handle: ReactNode } & Pick<CategoryTableProps, 'onEdit' | 'onDelete' | 'onItemSequence'>) {
   const router = useRouter();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const count = isTop ? itemCountOf(category) : 0;
+  const count = itemCountOf(category);
   const close = () => setAnchor(null);
-  const manageItems = () =>
-    router.push(`/admin/food-category/${category._id?.toString()}/items`);
+  const manageItems = () => router.push(`/admin/food-category/${category._id?.toString()}/items`);
+  const image = `url("${category.url || DEFAULT_IMAGE}")`;
+
+  const countChip =
+    isTop && count > 0 ? (
+      <Chip
+        size="small"
+        label={`${count} ${count === 1 ? 'item' : 'items'}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          manageItems();
+        }}
+        sx={{
+          height: 20,
+          fontSize: 11,
+          bgcolor: '#F59E0B',
+          color: '#fff',
+          fontWeight: 600,
+          '&:hover': { bgcolor: '#D97706' },
+        }}
+      />
+    ) : (
+      <Chip
+        size="small"
+        label={`${count} ${count === 1 ? 'item' : 'items'}`}
+        sx={{
+          height: 20,
+          fontSize: 11,
+          fontWeight: 600,
+          bgcolor: count > 0 ? '#FEF3C7' : '#F3F4F6',
+          color: count > 0 ? '#92400E' : '#6B7280',
+        }}
+      />
+    );
+
+  const chips = (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+      <Chip
+        size="small"
+        label={`#${category.sequence || 0}`}
+        sx={{
+          height: 20,
+          fontSize: 11,
+          bgcolor: '#EEF2FF',
+          color: '#4F8CFF',
+          fontWeight: 600,
+        }}
+      />
+      <Chip
+        size="small"
+        label={typeLabel(category)}
+        sx={{
+          height: 20,
+          fontSize: 11,
+          bgcolor: typeColor(category),
+          color: '#fff',
+          fontWeight: 600,
+        }}
+      />
+      {countChip}
+    </Box>
+  );
+
+  const menuButton = (
+    <IconButton
+      size="small"
+      aria-label={`Actions for ${category.name}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setAnchor(e.currentTarget);
+      }}
+      sx={{ color: '#4F8CFF', p: 0.5 }}
+    >
+      <IconDotsVertical size={18} />
+    </IconButton>
+  );
 
   return (
     <Box
       onClick={() => onEdit(category)}
       title={category.description || undefined}
       sx={{
-        display: "flex",
-        flexDirection: "column",
+        display: 'flex',
+        flexDirection: 'column',
         gap: 1,
-        cursor: "pointer",
+        cursor: 'pointer',
       }}
     >
       {isTop && (
@@ -89,24 +191,17 @@ function CategoryEntry({
           role="img"
           aria-label={category.name}
           sx={{
-            width: "100%",
+            width: '100%',
             height: 96,
             borderRadius: 1.5,
-            backgroundColor: "#FFF4E4",
-            backgroundImage: `url("${category.url || DEFAULT_IMAGE}")`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+            backgroundColor: '#FFF4E4',
+            backgroundImage: image,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
           }}
         />
       )}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 1,
-        }}
-      >
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
         {!isTop && (
           <Box
             role="img"
@@ -116,10 +211,10 @@ function CategoryEntry({
               height: 44,
               flexShrink: 0,
               borderRadius: 1,
-              backgroundColor: "#FFF4E4",
-              backgroundImage: `url("${category.url || DEFAULT_IMAGE}")`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
+              backgroundColor: '#FFF4E4',
+              backgroundImage: image,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
             }}
           />
         )}
@@ -128,268 +223,290 @@ function CategoryEntry({
             sx={{
               fontWeight: isTop ? 700 : 500,
               fontSize: isTop ? 15 : 14,
-              color: "#111827",
+              color: '#111827',
               lineHeight: 1.3,
-              wordBreak: "break-word",
+              wordBreak: 'break-word',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
             }}
           >
             {category.name}
             {category.isDraft ? (
-              <Typography
-                component="span"
-                sx={{ fontSize: 12, color: "#B45309", ml: 0.75 }}
-              >
+              <Typography component="span" sx={{ fontSize: 12, color: '#B45309', ml: 0.75 }}>
                 (draft)
               </Typography>
             ) : null}
           </Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
-            <Chip
-              size="small"
-              label={`#${category.sequence || 0}`}
-              sx={{
-                height: 20,
-                fontSize: 11,
-                bgcolor: "#EEF2FF",
-                color: "#4F8CFF",
-                fontWeight: 600,
-              }}
-            />
-            <Chip
-              size="small"
-              label={typeLabel(category)}
-              sx={{
-                height: 20,
-                fontSize: 11,
-                bgcolor: typeColor(category),
-                color: "#fff",
-                fontWeight: 600,
-              }}
-            />
-            {isTop && count > 0 && (
-              <Chip
-                size="small"
-                label={`${count} ${count === 1 ? "item" : "items"}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  manageItems();
-                }}
-                sx={{
-                  height: 20,
-                  fontSize: 11,
-                  bgcolor: "#F59E0B",
-                  color: "#fff",
-                  fontWeight: 600,
-                  "&:hover": { bgcolor: "#D97706" },
-                }}
-              />
-            )}
-          </Box>
+          {chips}
         </Box>
-        <IconButton
-          size="small"
-          aria-label={`Actions for ${category.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setAnchor(e.currentTarget);
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            flexShrink: 0,
+            mr: -0.5,
           }}
-          sx={{ mt: -0.5, mr: -0.75, color: "#4F8CFF", flexShrink: 0 }}
         >
-          <IconDotsVertical size={18} />
-        </IconButton>
-        <Menu
-          anchorEl={anchor}
-          open={Boolean(anchor)}
-          onClose={close}
-          onClick={(e) => e.stopPropagation()}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          {isTop && (
-            <MenuItem
-              onClick={() => {
-                close();
-                manageItems();
-              }}
-              sx={{ gap: 1.5 }}
-            >
-              <ListItemIcon>
-                <IconListDetails size={18} />
-              </ListItemIcon>
-              Manage Category Items
-            </MenuItem>
-          )}
-          {isTop && (
-            <MenuItem
-              onClick={() => {
-                close();
-                onItemSequence(category);
-              }}
-              sx={{ gap: 1.5 }}
-            >
-              <ListItemIcon>
-                <IconSortDescending size={18} />
-              </ListItemIcon>
-              Item Sequence
-            </MenuItem>
-          )}
+          {menuButton}
+          {handle}
+        </Box>
+      </Box>
+      <Menu
+        anchorEl={anchor}
+        open={Boolean(anchor)}
+        onClose={close}
+        onClick={(e) => e.stopPropagation()}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {isTop && (
           <MenuItem
             onClick={() => {
               close();
-              onEdit(category);
+              manageItems();
             }}
             sx={{ gap: 1.5 }}
           >
             <ListItemIcon>
-              <IconEdit size={18} />
+              <IconListDetails size={18} />
             </ListItemIcon>
-            Edit
+            Manage Category Items
           </MenuItem>
+        )}
+        {isTop && (
           <MenuItem
             onClick={() => {
               close();
-              onDelete(category);
+              onItemSequence(category);
             }}
-            sx={{ gap: 1.5, color: "#FF7675" }}
+            sx={{ gap: 1.5 }}
           >
             <ListItemIcon>
-              <IconTrash size={18} color="#FF7675" />
+              <IconSortDescending size={18} />
             </ListItemIcon>
-            Delete
+            Item Sequence
           </MenuItem>
-        </Menu>
-      </Box>
+        )}
+        <MenuItem
+          onClick={() => {
+            close();
+            onEdit(category);
+          }}
+          sx={{ gap: 1.5 }}
+        >
+          <ListItemIcon>
+            <IconEdit size={18} />
+          </ListItemIcon>
+          Edit
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close();
+            onDelete(category);
+          }}
+          sx={{ gap: 1.5, color: '#FF7675' }}
+        >
+          <ListItemIcon>
+            <IconTrash size={18} color="#FF7675" />
+          </ListItemIcon>
+          Delete
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }
 
+const labelCellSx = {
+  position: 'sticky',
+  left: 0,
+  zIndex: 2,
+  flexShrink: 0,
+  boxSizing: 'border-box',
+  bgcolor: '#F9FAFB',
+  width: { xs: 104, sm: 132 },
+  px: { xs: 1, sm: 2 },
+  py: 1.5,
+  fontWeight: 700,
+  fontSize: { xs: 11.5, sm: 14 },
+  color: '#374151',
+  borderRight: BORDER,
+} as const;
+
 /**
  * Food categories as a table: one column per category (in rank order), its sub-categories listed
- * underneath in rank order. The first column holds the row labels and stays in view when the table
- * scrolls sideways (many categories, or a phone).
+ * underneath in rank order. Drag a category's handle left or right to re-rank the categories, and a
+ * sub-category's handle up or down to re-rank the sub-categories of that category. The first column
+ * holds the row labels and stays in view when the table scrolls sideways.
  */
 export default function CategoryTable({
   groups,
   onEdit,
   onDelete,
   onItemSequence,
+  onReorderCategories,
+  onReorderSubCategories,
+  dragDisabled,
 }: CategoryTableProps) {
-  const rows = categoryTableRows(groups);
-  const labelCell = {
-    position: "sticky" as const,
-    left: 0,
-    zIndex: 1,
-    bgcolor: "#F9FAFB",
-    width: { xs: 92, sm: 120 },
-    minWidth: { xs: 92, sm: 120 },
-    px: { xs: 1, sm: 2 },
-    fontWeight: 700,
-    fontSize: { xs: 12.5, sm: 14 },
-    color: "#374151",
-    borderRight: BORDER,
-    verticalAlign: "top" as const,
+  const handleDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    const droppableId = source.droppableId;
+    if (!destination || destination.droppableId !== droppableId || destination.index === source.index) return;
+    if (droppableId === 'categories') {
+      onReorderCategories(
+        moveItem(
+          groups.map((g) => g.parentId),
+          source.index,
+          destination.index,
+        ),
+      );
+      return;
+    }
+    const group = groups.find((g) => `subs-${g.parentId}` === droppableId);
+    if (group) onReorderSubCategories(group.parentId, moveItem(group.children.map(idOf), source.index, destination.index));
   };
 
   return (
-    <TableContainer
+    <Box
       sx={{
         border: BORDER,
         borderRadius: 2,
-        bgcolor: "#fff",
-        maxWidth: "100%",
+        bgcolor: '#fff',
+        maxWidth: '100%',
+        overflowX: 'auto',
       }}
     >
-      <Table
-        size="small"
-        sx={{ width: "max-content", minWidth: "100%", tableLayout: "fixed" }}
-      >
-        <TableHead>
-          <TableRow>
-            <TableCell sx={{ ...labelCell, borderBottom: "2px solid #111827" }}>
-              Categories
-            </TableCell>
-            {groups.map((group) => (
-              <TableCell
-                key={group.parentId}
-                sx={{
-                  width: COLUMN_WIDTH,
-                  minWidth: COLUMN_WIDTH,
-                  verticalAlign: "top",
-                  borderBottom: "2px solid #111827",
-                  borderRight: BORDER,
-                  py: 1.5,
-                }}
-              >
-                {group.parent ? (
-                  <CategoryEntry
-                    category={group.parent}
-                    isTop
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onItemSequence={onItemSequence}
-                  />
-                ) : (
-                  <Typography
-                    sx={{ fontSize: 13, color: "#6B7280", fontStyle: "italic" }}
-                  >
-                    {group.parentName
-                      ? `${group.parentName} (hidden by the filter)`
-                      : "Parent not found"}
-                  </Typography>
-                )}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell sx={labelCell}>Subcategories</TableCell>
-              <TableCell
-                colSpan={Math.max(1, groups.length)}
-                sx={{ color: "#9CA3AF", fontSize: 13 }}
-              >
-                No sub-categories yet.
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((row, r) => (
-              <TableRow key={r}>
-                <TableCell
-                  sx={{
-                    ...labelCell,
-                    color: r === 0 ? "#374151" : "transparent",
-                    borderBottom: r === rows.length - 1 ? "none" : BORDER,
-                  }}
-                >
-                  {r === 0 ? "Subcategories" : ""}
-                </TableCell>
-                {row.map((sub, c) => (
-                  <TableCell
-                    key={groups[c].parentId}
-                    sx={{
-                      verticalAlign: "top",
-                      borderRight: BORDER,
-                      borderBottom: r === rows.length - 1 ? "none" : BORDER,
-                      py: 1.25,
-                    }}
-                  >
-                    {sub && (
-                      <CategoryEntry
-                        category={sub}
-                        isTop={false}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onItemSequence={onItemSequence}
-                      />
-                    )}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Box sx={{ width: 'max-content', minWidth: '100%' }}>
+          {/* Row 1: the categories (drag sideways) */}
+          <Box sx={{ display: 'flex', borderBottom: '2px solid #111827' }}>
+            <Box sx={labelCellSx}>Categories</Box>
+            <Droppable droppableId="categories" direction="horizontal" type="CATEGORY">
+              {(drop) => (
+                <Box ref={drop.innerRef} {...drop.droppableProps} sx={{ display: 'flex' }}>
+                  {groups.map((group, index) => (
+                    <Draggable
+                      key={group.parentId}
+                      draggableId={`cat-${group.parentId}`}
+                      index={index}
+                      isDragDisabled={dragDisabled || !group.parent}
+                    >
+                      {(drag, snapshot) => (
+                        <Box
+                          ref={drag.innerRef}
+                          {...drag.draggableProps}
+                          sx={{
+                            width: COLUMN_WIDTH,
+                            flexShrink: 0,
+                            boxSizing: 'border-box',
+                            p: 1.5,
+                            borderRight: BORDER,
+                            bgcolor: snapshot.isDragging ? '#EEF4FF' : '#fff',
+                            boxShadow: snapshot.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : 'none',
+                          }}
+                        >
+                          {group.parent ? (
+                            <CategoryEntry
+                              category={group.parent}
+                              isTop
+                              handle={
+                                <DragHandle
+                                  handleProps={drag.dragHandleProps}
+                                  label={`Drag to re-rank ${group.parent.name} (left or right)`}
+                                  horizontal
+                                  disabled={dragDisabled}
+                                />
+                              }
+                              onEdit={onEdit}
+                              onDelete={onDelete}
+                              onItemSequence={onItemSequence}
+                            />
+                          ) : (
+                            <Typography
+                              sx={{
+                                fontSize: 13,
+                                color: '#6B7280',
+                                fontStyle: 'italic',
+                              }}
+                              {...(drag.dragHandleProps ?? {})}
+                            >
+                              {group.parentName ? `${group.parentName} (hidden by the filter)` : 'Parent not found'}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+                    </Draggable>
+                  ))}
+                  {drop.placeholder}
+                </Box>
+              )}
+            </Droppable>
+          </Box>
+
+          {/* Row 2: each category's sub-categories (drag up or down inside their own column) */}
+          <Box sx={{ display: 'flex' }}>
+            <Box sx={{ ...labelCellSx, alignSelf: 'stretch' }}>Subcategories</Box>
+            <Box sx={{ display: 'flex' }}>
+              {groups.map((group) => (
+                <Droppable key={group.parentId} droppableId={`subs-${group.parentId}`} type={`SUB-${group.parentId}`}>
+                  {(drop) => (
+                    <Box
+                      ref={drop.innerRef}
+                      {...drop.droppableProps}
+                      sx={{
+                        width: COLUMN_WIDTH,
+                        flexShrink: 0,
+                        boxSizing: 'border-box',
+                        borderRight: BORDER,
+                        minHeight: ROW_HEIGHT,
+                      }}
+                    >
+                      {group.children.map((sub, index) => (
+                        <Draggable key={idOf(sub)} draggableId={`sub-${idOf(sub)}`} index={index} isDragDisabled={dragDisabled}>
+                          {(drag, snapshot) => (
+                            <Box
+                              ref={drag.innerRef}
+                              {...drag.draggableProps}
+                              sx={{
+                                height: ROW_HEIGHT,
+                                boxSizing: 'border-box',
+                                px: 1.5,
+                                py: 1.25,
+                                borderBottom: BORDER,
+                                bgcolor: snapshot.isDragging ? '#EEF4FF' : '#fff',
+                                boxShadow: snapshot.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : 'none',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <CategoryEntry
+                                category={sub}
+                                isTop={false}
+                                handle={
+                                  <DragHandle
+                                    handleProps={drag.dragHandleProps}
+                                    label={`Drag to re-rank ${sub.name} (up or down)`}
+                                    disabled={dragDisabled}
+                                  />
+                                }
+                                onEdit={onEdit}
+                                onDelete={onDelete}
+                                onItemSequence={onItemSequence}
+                              />
+                            </Box>
+                          )}
+                        </Draggable>
+                      ))}
+                      {drop.placeholder}
+                    </Box>
+                  )}
+                </Droppable>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      </DragDropContext>
+    </Box>
   );
 }
