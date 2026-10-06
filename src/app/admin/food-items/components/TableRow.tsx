@@ -1,10 +1,11 @@
 'use client';
 
 import { Fragment, ReactNode } from 'react';
-import { Box, TableRow as MuiTableRow, TableCell, Typography, IconButton } from '@mui/material';
+import { Box, TableRow as MuiTableRow, TableCell, Typography, IconButton, Checkbox } from '@mui/material';
 import { IconEdit, IconTrash, IconCopy  } from '@tabler/icons-react';
 import Image from 'next/image';
 import TypeBadge from './TypeBadge';
+import PreparationBadge from './PreparationBadge';
 import { safeFormatCurrency } from '@/utils/currency';
 
 interface FoodItem {
@@ -19,6 +20,7 @@ interface FoodItem {
   url?: string;
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
+  preparationType?: 'cooked' | 'ready_to_eat';
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -46,10 +48,23 @@ interface TableRowProps {
   onEdit: (item: FoodItem) => void;
   onDelete: (item: FoodItem) => void;
   onDuplicate: (item: FoodItem) => void;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
 }
 
-export default function TableRow({ item, index, columns, onEdit, onDelete, onDuplicate }: TableRowProps) {
+export default function TableRow({ item, index, columns, onEdit, onDelete, onDuplicate, selected, onToggleSelect }: TableRowProps) {
   const cells: Record<string, ReactNode> = {
+    // Select (for the bulk preparation-type update)
+    select: (
+      <TableCell sx={{ padding: '4px', verticalAlign: 'middle' }}>
+        <Checkbox
+          size="small"
+          checked={selected}
+          onChange={() => onToggleSelect(item._id)}
+          inputProps={{ 'aria-label': `Select ${item.name}` }}
+        />
+      </TableCell>
+    ),
     // Actions
     actions: (
             <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
@@ -264,6 +279,12 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
         <TypeBadge type={item.itemType} />
       </TableCell>
     ),
+    // Preparation type: Cooked / Ready to eat / (not set yet)
+    preparation: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <PreparationBadge value={item.preparationType} />
+      </TableCell>
+    ),
     // Description
     description: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
@@ -288,7 +309,7 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
   return (
     <MuiTableRow
       sx={{
-        backgroundColor: index % 2 === 0 ? '#F6FAFF' : '#fff',
+        backgroundColor: selected ? '#EEF2FF' : index % 2 === 0 ? '#F6FAFF' : '#fff',
         '&:hover': {
           backgroundColor: '#F9FAFB',
         },

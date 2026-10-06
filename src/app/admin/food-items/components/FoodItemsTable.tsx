@@ -11,6 +11,7 @@ import {
   TableRow,
   Paper,
   Typography,
+  Checkbox,
 } from '@mui/material';
 import TableRowComponent from './TableRow';
 import FoodItemSkeleton from './FoodItemSkeleton';
@@ -30,6 +31,7 @@ interface FoodItem {
   url?: string;
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
+  preparationType?: 'cooked' | 'ready_to_eat';
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -66,6 +68,12 @@ interface FoodItemsTableProps {
 
   // ADD THIS
   onDuplicate: (item: FoodItem) => void;
+
+  /** Rows ticked for the bulk preparation-type update. */
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  /** Ticks or unticks every row on this page. */
+  onToggleSelectPage: () => void;
 }
 
 export default function FoodItemsTable({
@@ -79,7 +87,12 @@ export default function FoodItemsTable({
   onEdit,
   onDelete,
   onDuplicate,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectPage,
 }: FoodItemsTableProps) {
+  const pageSelected = items.length > 0 && items.every((i) => selectedIds.has(i._id));
+  const pageSomeSelected = !pageSelected && items.some((i) => selectedIds.has(i._id));
   const tableRef = useRef<HTMLTableElement>(null);
   const handleLiveResize = useLiveColumnResize(tableRef, widths, totalWidth);
 
@@ -116,7 +129,18 @@ export default function FoodItemsTable({
               }}
             >
               {columns.map((c) =>
-                c.locked ? (
+                c.key === 'select' ? (
+                  <TableCell key={c.key} sx={{ padding: '4px' }}>
+                    <Checkbox
+                      size="small"
+                      checked={pageSelected}
+                      indeterminate={pageSomeSelected}
+                      disabled={loading || items.length === 0}
+                      onChange={onToggleSelectPage}
+                      inputProps={{ 'aria-label': 'Select all items on this page' }}
+                    />
+                  </TableCell>
+                ) : c.locked ? (
                   <TableCell
                     key={c.key}
                     sx={{ padding: '12px 8px', fontWeight: 600, color: '#374151', fontSize: '13px', whiteSpace: 'nowrap' }}
@@ -157,6 +181,8 @@ export default function FoodItemsTable({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onDuplicate={onDuplicate}
+                  selected={selectedIds.has(item._id)}
+                  onToggleSelect={onToggleSelect}
                 />
               ))
             )}

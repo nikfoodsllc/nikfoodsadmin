@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { ObjectId, type Filter } from 'mongodb';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
+import { isPreparationType } from '@/utils/preparationType';
 
 // Interface for available days
 interface AvailableDay {
@@ -227,6 +228,8 @@ const foodItemSchema = z.object({
   url: z.string().optional(),
   public_id: z.string().optional(),
   itemType: z.enum(['simple', 'portions', 'combo']).default('simple'),
+  // How the item is prepared for the kitchen. null (or leaving it out on create) means "not set yet".
+  preparationType: z.enum(['cooked', 'ready_to_eat']).nullish(),
 
   // Portions type fields
   portions: z.array(z.string()).optional(),
@@ -316,6 +319,8 @@ interface FoodItem {
   url?: string;
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
+  // 'cooked' = made fresh for the day's menu, 'ready_to_eat' = already made, only packed; missing = not set yet
+  preparationType?: 'cooked' | 'ready_to_eat';
 
   // Portions fields
   portions?: string[];
@@ -409,6 +414,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const categoryId = searchParams.get('category') || '';
     const vegOnly = searchParams.get('vegOnly') === 'true';
+    const preparationFilter = searchParams.get('preparationType') || '';
     const draftOnly = searchParams.get('draftOnly') === 'true';
     const excludeDrafts = searchParams.get('excludeDrafts') === 'true';
     const day = searchParams.get('day');
@@ -513,6 +519,13 @@ export async function GET(request: NextRequest) {
     // Filter by veg only
     if (vegOnly) {
       filter.veg = true;
+    }
+
+    // Filter by how the item is prepared ('not_set' = not classified yet)
+    if (preparationFilter === 'cooked' || preparationFilter === 'ready_to_eat') {
+      filter.preparationType = preparationFilter;
+    } else if (preparationFilter === 'not_set') {
+      filter.preparationType = { $nin: ['cooked', 'ready_to_eat'] };
     }
 
     // Filter by draft status
@@ -709,6 +722,7 @@ export async function POST(request: NextRequest) {
       ecoContainerCharge: data.ecoContainerCharge,
       hasSpiceLevel: data.hasSpiceLevel,
       spiceLevel: data.spiceLevel || [],
+      ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -932,6 +946,7 @@ const updateData: Partial<FoodItem> = {
   ecoContainerCharge: data.ecoContainerCharge,
   hasSpiceLevel: data.hasSpiceLevel,
   spiceLevel: data.spiceLevel || [],
+  ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   updatedAt: new Date(),
 };
 
@@ -1016,10 +1031,11 @@ const updateData: Partial<FoodItem> = {
     }
 
     // Update food item
+    // preparationType: sent as null means "back to not set yet"; left out means "leave as it is"
     const updateResult = await db.updateOne<FoodItem>(
       'fooditems',
       { _id: new ObjectId(_id) },
-      { $set: updateData }
+      data.preparationType === null ? { $set: updateData, $unset: { preparationType: '' } } : { $set: updateData }
     );
 
     if (!updateResult.success) {

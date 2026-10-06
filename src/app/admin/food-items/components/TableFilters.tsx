@@ -1,6 +1,7 @@
 'use client';
 
 import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
+import { PreparationFilter } from '@/utils/preparationType';
 import { IconSearch } from '@tabler/icons-react';
 
 interface TableFiltersProps {
@@ -8,6 +9,8 @@ interface TableFiltersProps {
   vegOnly: string;
   onSearchChange: (value: string) => void;
   onVegChange: (value: string) => void;
+  preparation: PreparationFilter;
+  onPreparationChange: (value: PreparationFilter) => void;
 }
 
 export default function TableFilters({
@@ -15,6 +18,8 @@ export default function TableFilters({
   vegOnly,
   onSearchChange,
   onVegChange,
+  preparation,
+  onPreparationChange,
 }: TableFiltersProps) {
   return (
     <Box
@@ -59,6 +64,22 @@ export default function TableFilters({
           <MenuItem value="all">All</MenuItem>
           <MenuItem value="true">Vegetarian</MenuItem>
           <MenuItem value="false">Non-Vegetarian</MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* Preparation Filter */}
+      <FormControl size="small" sx={{ minWidth: 170 }}>
+        <InputLabel>Preparation</InputLabel>
+        <Select
+          value={preparation}
+          label="Preparation"
+          onChange={(e) => onPreparationChange(e.target.value as PreparationFilter)}
+          sx={{ backgroundColor: '#fff' }}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="cooked">Cooked</MenuItem>
+          <MenuItem value="ready_to_eat">Ready to eat</MenuItem>
+          <MenuItem value="not_set">(not set yet)</MenuItem>
         </Select>
       </FormControl>
     </Box>
