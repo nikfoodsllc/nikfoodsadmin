@@ -150,7 +150,7 @@ export default function OrderTableRow({
         </Typography>
       </TableCell>
     ),
-    // Service Fee (Platform Fee)
+    // Platform Fee (stored as platformFee; the column key stays 'serviceFee' so saved layouts keep working)
     serviceFee: (
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle', textAlign: 'right' }}>
         <Typography

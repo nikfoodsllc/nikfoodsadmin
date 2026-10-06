@@ -93,7 +93,7 @@ export function generateOrdersListingCSV(orders: any[]): string {
     'Order Status',
     'Payment Status',
     'Sub Total',
-    'Service Fee',
+    'Platform Fee',
     'Tax',
     'Tip',
     'Grand Total',

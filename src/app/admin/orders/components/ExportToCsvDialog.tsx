@@ -312,7 +312,7 @@ export default function ExportToCsvDialog({
 
         {!loading && !fetchError && orderCount !== null && orderCount > 0 && (
           <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', marginTop: 1 }}>
-            Export will include all columns: Order Date, Order ID, Customer Name, Email, Order Status, Payment Status, Sub Total, Service Fee, Tax, Tip, Grand Total, Phone, Address, Apt. No., Gate Code, Delivery Instructions, Instruction to Driver, Deliver On
+            Export will include all columns: Order Date, Order ID, Customer Name, Email, Order Status, Payment Status, Sub Total, Platform Fee, Tax, Tip, Grand Total, Phone, Address, Apt. No., Gate Code, Delivery Instructions, Instruction to Driver, Deliver On
           </Typography>
         )}
       </DialogContent>
