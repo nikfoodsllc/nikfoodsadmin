@@ -3,11 +3,18 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { AvailableDate } from '@/types/order';
+import { parseCutoff, validateCutoff } from '@/utils/orderCutoff';
+import { invalidateLivesiteHomeMenuCacheAndWait } from '@/lib/invalidateHomeMenuCache';
 
 interface CreateUpdateRequest {
   date: string;
   flatCategoryEnabled: boolean;
   dayWiseCategoryEnabled: boolean;
+  /**
+   * Custom order cutoff for this date (ISO moment). Omit to leave it unchanged; null clears it
+   * (back to the standard 1 PM Pacific the day before).
+   */
+  cutoffAt?: string | null;
 }
 
 interface BulkUpdateRequest {
@@ -100,6 +107,17 @@ function validateCreateUpdateRequest(data: CreateUpdateRequest): { isValid: bool
     return { isValid: false, error: 'dayWiseCategoryEnabled is required and must be a boolean' };
   }
 
+  if (data.cutoffAt !== undefined && data.cutoffAt !== null) {
+    const cutoff = typeof data.cutoffAt === 'string' ? parseCutoff(data.cutoffAt) : null;
+    if (!cutoff) {
+      return { isValid: false, error: 'cutoffAt must be a valid date and time, or null to use the standard cutoff' };
+    }
+    const problem = validateCutoff(data.date, cutoff);
+    if (problem) {
+      return { isValid: false, error: problem };
+    }
+  }
+
   return { isValid: true };
 }
 
@@ -168,6 +186,7 @@ export async function GET(request: NextRequest) {
       date: date.date,
       flatCategoryEnabled: date.flatCategoryEnabled,
       dayWiseCategoryEnabled: date.dayWiseCategoryEnabled,
+      cutoffAt: date.cutoffAt ?? null,
       createdAt: date.createdAt,
       updatedAt: date.updatedAt
     }));
@@ -208,6 +227,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, flatCategoryEnabled, dayWiseCategoryEnabled } = body;
+    // undefined = leave the custom cutoff as it is, null = clear it, string = set it
+    const cutoffAt: string | null | undefined = body.cutoffAt;
 
     // Check if date already exists
     const existingResult = await db.readOne<AvailableDate>('availableDates', { date });
@@ -227,6 +248,7 @@ export async function POST(request: NextRequest) {
         date,
         flatCategoryEnabled,
         dayWiseCategoryEnabled,
+        ...(typeof cutoffAt === 'string' ? { cutoffAt: new Date(cutoffAt) } : {}),
         createdAt: now,
         updatedAt: now
       };
@@ -259,6 +281,7 @@ export async function POST(request: NextRequest) {
           date: createdDate.data.date,
           flatCategoryEnabled: createdDate.data.flatCategoryEnabled,
           dayWiseCategoryEnabled: createdDate.data.dayWiseCategoryEnabled,
+          cutoffAt: createdDate.data.cutoffAt ?? null,
           createdAt: createdDate.data.createdAt,
           updatedAt: createdDate.data.updatedAt
         },
@@ -272,11 +295,14 @@ export async function POST(request: NextRequest) {
       dayWiseCategoryEnabled,
       updatedAt: now
     };
+    if (typeof cutoffAt === 'string') {
+      updateData.cutoffAt = new Date(cutoffAt);
+    }
 
     const updateResult = await db.updateOne<AvailableDate>(
       'availableDates',
       { _id: existingResult.data._id },
-      { $set: updateData }
+      cutoffAt === null ? { $set: updateData, $unset: { cutoffAt: '' } } : { $set: updateData }
     );
 
     if (!updateResult.success) {
@@ -288,15 +314,20 @@ export async function POST(request: NextRequest) {
       _id: existingResult.data._id
     });
 
+    // A changed cutoff changes what customers can order: tell the customer site now and wait for its answer
+    const livesiteNotified = cutoffAt !== undefined ? await invalidateLivesiteHomeMenuCacheAndWait() : undefined;
+
     return NextResponse.json({
       data: {
         id: updatedDate.data?._id?.toString(),
         date: updatedDate.data?.date,
         flatCategoryEnabled: updatedDate.data?.flatCategoryEnabled,
         dayWiseCategoryEnabled: updatedDate.data?.dayWiseCategoryEnabled,
+        cutoffAt: updatedDate.data?.cutoffAt ?? null,
         createdAt: updatedDate.data?.createdAt,
         updatedAt: updatedDate.data?.updatedAt
       },
+      livesiteNotified,
       message: 'Date updated successfully',
     });
 
@@ -359,11 +390,27 @@ export async function PUT(request: NextRequest) {
     let createdCount = 0;
     const errors: string[] = [];
 
+    // Custom order cutoffs already set on dates in the range: the delete-and-reinsert below must not lose them
+    const keptCutoffs = new Map<string, Date>();
+
     // If date range is provided, delete all dates in that range first
     if (startDate && endDate) {
       const rangeValidation = validateDateRange(startDate, endDate);
       if (!rangeValidation.isValid) {
         return NextResponse.json({ error: rangeValidation.error }, { status: 400 });
+      }
+
+      const existingInRange = await db.read<AvailableDate>('availableDates', {
+        date: { $gte: startDate, $lte: endDate },
+        cutoffAt: { $exists: true, $ne: null },
+      });
+      if (!existingInRange.success) {
+        // without this the reinsert would silently drop custom cutoffs: stop instead
+        throw new Error(existingInRange.error || 'Failed to read existing dates');
+      }
+      for (const existing of existingInRange.data ?? []) {
+        const kept = parseCutoff(existing.cutoffAt);
+        if (kept) keptCutoffs.set(existing.date, kept);
       }
 
       const deleteResult = await db.delete<AvailableDate>('availableDates', {
@@ -379,13 +426,17 @@ export async function PUT(request: NextRequest) {
     }
 
     // Insert all new dates
-    const datesToInsert: AvailableDate[] = dates.map(dateData => ({
-      date: dateData.date,
-      flatCategoryEnabled: dateData.flatCategoryEnabled,
-      dayWiseCategoryEnabled: dateData.dayWiseCategoryEnabled,
-      createdAt: now,
-      updatedAt: now
-    }));
+    const datesToInsert: AvailableDate[] = dates.map(dateData => {
+      const cutoff = typeof dateData.cutoffAt === 'string' ? parseCutoff(dateData.cutoffAt) : keptCutoffs.get(dateData.date) ?? null;
+      return {
+        date: dateData.date,
+        flatCategoryEnabled: dateData.flatCategoryEnabled,
+        dayWiseCategoryEnabled: dateData.dayWiseCategoryEnabled,
+        ...(cutoff ? { cutoffAt: cutoff } : {}),
+        createdAt: now,
+        updatedAt: now
+      };
+    });
 
     const insertResult = await db.createMany<AvailableDate>('availableDates', datesToInsert);
 
@@ -405,6 +456,7 @@ export async function PUT(request: NextRequest) {
       date: date.date,
       flatCategoryEnabled: date.flatCategoryEnabled,
       dayWiseCategoryEnabled: date.dayWiseCategoryEnabled,
+      cutoffAt: date.cutoffAt ?? null,
       createdAt: date.createdAt,
       updatedAt: date.updatedAt
     })) || [];
