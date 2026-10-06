@@ -47,11 +47,9 @@ import {
 } from 'date-fns';
 import { formatInPST } from '@/utils/timezone';
 import {
-  allowedCutoffRange,
   cutoffStatus,
   describeCutoff,
   extendCutoff,
-  formatCutoff,
   inputValueToInstant,
   instantToInputValue,
   parseCutoff,
@@ -855,7 +853,6 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 const problem = typed ? validateCutoff(selectedDate, typed) : 'Pick a date and time';
                 const unchanged =
                   !!typed && Math.abs(typed.getTime() - status.closesAt.getTime()) < 60 * 1000 && status.overridden;
-                const range = allowedCutoffRange(selectedDate);
                 const busy = !!saving[selectedDate];
                 const saveCutoff = (cutoffAt: string | null, message: string) =>
                   updateDateAvailability(
@@ -939,11 +936,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                         onChange={(e) => setCutoffInput(e.target.value)}
                         InputLabelProps={{ shrink: true }}
                         error={!!cutoffInput && !!problem}
-                        helperText={
-                          cutoffInput && problem
-                            ? problem
-                            : `Between ${formatCutoff(range.min)} and ${formatCutoff(range.max)}`
-                        }
+                        helperText={cutoffInput && problem ? problem : undefined}
                         sx={{ flex: '1 1 220px', minWidth: 220 }}
                       />
                       <Button
