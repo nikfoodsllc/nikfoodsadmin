@@ -611,7 +611,7 @@ export default function OrderDetailsDialog({
                 {order.emailStatus && (
                   <Box sx={{ gridColumn: '1 / -1' }}>
                     <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                      Email Status
+                      Confirmation Email
                     </Typography>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {order.emailStatus.status} (Attempts: {order.emailStatus.attempts})
