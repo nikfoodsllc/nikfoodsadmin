@@ -121,6 +121,22 @@ export function addLine(lines: CartLine[], incoming: Omit<CartLine, 'key'>): Car
   return [...lines, { ...incoming, key }];
 }
 
+/**
+ * Replaces the line `key` with an edited pick, in the same place in the list. If the edited line now equals another
+ * line of the order (same item, day and options) the two become one line with the quantities added.
+ */
+export function replaceLine(lines: CartLine[], key: string, incoming: Omit<CartLine, 'key'>): CartLine[] {
+  const at = lines.findIndex((l) => l.key === key);
+  if (at < 0) return addLine(lines, incoming);
+  const newKey = lineSignature(incoming);
+  const rest = lines.filter((l) => l.key !== key);
+  const twin = rest.find((l) => l.key === newKey);
+  if (twin) return rest.map((l) => (l.key === newKey ? { ...l, quantity: Math.min(99, l.quantity + incoming.quantity) } : l));
+  const next = [...rest];
+  next.splice(Math.min(at, next.length), 0, { ...incoming, key: newKey });
+  return next;
+}
+
 export function setLineQuantity(lines: CartLine[], key: string, quantity: number): CartLine[] {
   if (quantity <= 0) return lines.filter((l) => l.key !== key);
   return lines.map((l) => (l.key === key ? { ...l, quantity: Math.min(99, Math.floor(quantity)) } : l));

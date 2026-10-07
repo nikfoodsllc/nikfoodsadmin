@@ -90,6 +90,7 @@ export default function ItemOptionsDialog({
   dayLabel,
   onClose,
   onAdd,
+  editing,
 }: {
   open: boolean;
   item: MenuItem | null;
@@ -97,6 +98,8 @@ export default function ItemOptionsDialog({
   dayLabel: string;
   onClose: () => void;
   onAdd: (line: Omit<CartLine, 'key'>) => void;
+  /** Changing a line that is already in the order: its current pick is shown, and the button saves instead of adds */
+  editing?: CartLine | null;
 }) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -109,6 +112,15 @@ export default function ItemOptionsDialog({
 
   useEffect(() => {
     if (!open || !item) return;
+    if (editing) {
+      setPortion(editing.selectedPortion);
+      setSpice(editing.selectedSpiceLevel);
+      setEco(Boolean(editing.isEcoFriendlyContainer));
+      setCombo(editing.comboSelections ?? {});
+      setNotes(editing.notes ?? '');
+      setQuantity(editing.quantity);
+      return;
+    }
     const d = defaultsFor(item);
     setPortion(d.portion);
     setSpice(d.spice);
@@ -116,7 +128,7 @@ export default function ItemOptionsDialog({
     setCombo(d.combo);
     setNotes('');
     setQuantity(1);
-  }, [open, item]);
+  }, [open, item, editing]);
 
   const pick = useMemo(
     () => ({ selectedPortion: portion, selectedSpiceLevel: spice, isEcoFriendlyContainer: eco || undefined, comboSelections: combo }),
@@ -200,7 +212,7 @@ export default function ItemOptionsDialog({
       <DialogActions sx={{ px: 3, py: 1.5 }}>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
         <Button variant="contained" onClick={add} disabled={Boolean(problem)} sx={{ textTransform: 'none', fontWeight: 700 }}>
-          Add · {money(unit * quantity)}
+          {editing ? 'Save changes' : 'Add'} · {money(unit * quantity)}
         </Button>
       </DialogActions>
     </Dialog>
