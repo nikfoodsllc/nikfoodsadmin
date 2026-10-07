@@ -1,13 +1,21 @@
 'use client';
 
 import { Fragment, ReactNode } from 'react';
-import { TableRow as MuiTableRow, TableCell, Typography, Button, Checkbox } from '@mui/material';
+import { TableRow as MuiTableRow, TableCell, Typography, Button, Checkbox, Chip, Tooltip } from '@mui/material';
 import { IconEye } from '@tabler/icons-react';
 import StatusBadge from './StatusBadge';
 import { Order } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { formatPSTDate } from '@/utils/timezone';
+import { orderEmailStatusView, type EmailTone } from '@/utils/orderEmailStatus';
+
+const EMAIL_TONES: Record<EmailTone, { bg: string; color: string }> = {
+  good: { bg: '#DCFCE7', color: '#166534' },
+  bad: { bg: '#FEE2E2', color: '#991B1B' },
+  warn: { bg: '#FEF3C7', color: '#92400E' },
+  none: { bg: 'transparent', color: '#9CA3AF' },
+};
 
 interface OrderTableRowProps {
   order: Order;
@@ -31,6 +39,7 @@ export default function OrderTableRow({
 }: OrderTableRowProps) {
   const refundedAmount = getRefundedAmount(order);
   const instructionToDriver = order.address?.floor || '-';
+  const emailView = orderEmailStatusView(order.emailStatus);
 
   const cells: Record<string, ReactNode> = {
     // Select
@@ -134,6 +143,23 @@ export default function OrderTableRow({
         <Typography variant="body2" sx={{ fontSize: '13px', color: order.paymentMethod ? '#111827' : '#9CA3AF', whiteSpace: 'nowrap' }}>
           {order.paymentMethod || '-'}
         </Typography>
+      </TableCell>
+    ),
+    // Email Status: the order confirmation email (sent, failed, retrying, pending; a dash when none was sent)
+    emailStatus: (
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Tooltip title={emailView.title} arrow>
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+            {emailView.tone === 'none' ? (
+              <Typography variant="body2" sx={{ fontSize: '13px', color: '#9CA3AF' }}>{emailView.label}</Typography>
+            ) : (
+              <Chip size="small" label={emailView.label} sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: EMAIL_TONES[emailView.tone].bg, color: EMAIL_TONES[emailView.tone].color }} />
+            )}
+            {emailView.detail && (
+              <Typography sx={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>{emailView.detail}</Typography>
+            )}
+          </span>
+        </Tooltip>
       </TableCell>
     ),
     // Sub Total
