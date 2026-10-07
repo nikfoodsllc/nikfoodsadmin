@@ -379,10 +379,10 @@ describe('buildItemOrders (who ordered an item)', () => {
   it('lists every order that contains the item, with its size, spice and eco container', () => {
     const lines = buildItemOrders(rows, 'Rajma');
     expect(lines.map((l) => [l.orderId, l.customerName, l.day, l.quantity, l.portion, l.spice, l.isEco])).toEqual([
-      // spice first (Hot before no spice), then the biggest size (12Oz before 8Oz)
+      // spice first (Hot before no spice), then the most food (3 x 8Oz = 24 oz before 1 x 12Oz)
       ['ORD-2', 'Ben', '2026-10-07', 2, '8Oz', 'Hot', true],
-      ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false],
-      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
+      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false], // 24 oz
+      ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false], // 12 oz
     ]);
   });
 
@@ -463,17 +463,26 @@ describe('who ordered: sorted by spice level, then quantity', () => {
     ];
     expect(order(rows)).toEqual(['Mild (Kid Friendly):4:g', 'Mild (Kid Friendly):1:d', 'Normal:3:e', 'Normal:1:c', 'Medium Spice:2:f', 'Spicy:1:a', 'Hot:1:h', 'none:9:b']);
   });
-  it('inside a spice level the biggest size comes first (16Oz, 12Oz, 8Oz), whatever the quantity', () => {
+  it('inside a spice level the most food comes first: size times quantity, in oz or lb', () => {
     const rows = [
-      r({ orderId: 'a', portion: '12Oz', customerName: 'Kavita' }),
-      r({ orderId: 'b', portion: '16Oz', customerName: 'Hiral' }),
-      r({ orderId: 'c', portion: '8Oz', customerName: 'Pooja', quantity: 5 }),
-      r({ orderId: 'd', portion: '16Oz', customerName: 'Meher', quantity: 2 }),
-      r({ orderId: 'e', portion: '12Oz', customerName: 'Anand', quantity: 3 }),
-      r({ orderId: 'f', portion: null, customerName: 'Zed', quantity: 9 }),
+      r({ orderId: 'a', portion: '12Oz', customerName: 'Kavita' }), // 12 oz
+      r({ orderId: 'b', portion: '16Oz', customerName: 'Hiral' }), // 16 oz
+      r({ orderId: 'c', portion: '8Oz', customerName: 'Pooja', quantity: 5 }), // 40 oz
+      r({ orderId: 'd', portion: '16Oz', customerName: 'Meher', quantity: 2 }), // 32 oz
+      r({ orderId: 'e', portion: '12Oz', customerName: 'Anand', quantity: 3 }), // 36 oz
+      r({ orderId: 'f', portion: null, customerName: 'Zed', quantity: 9 }), // no size: last
+      r({ orderId: 'g', portion: '1Lb', customerName: 'Gita' }), // 16 oz, same as b
     ];
-    // 16Oz: the order of 2 first, then the order of 1; 12Oz: 3 then 1; then 8Oz; no size last
-    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['d', 'b', 'e', 'a', 'c', 'f']);
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['c', 'e', 'd', 'g', 'b', 'a', 'f']); // g (1Lb) and b (16Oz) are the same amount: by customer name (Gita, Hiral)
+  });
+  it('with the same food amount the bigger single size comes first, then the most ordered', () => {
+    const rows = [r({ orderId: 'eight-x2', portion: '8Oz', quantity: 2 }), r({ orderId: 'sixteen-x1', portion: '16Oz', quantity: 1 }), r({ orderId: 'four-x4', portion: '4Oz', quantity: 4 })];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['sixteen-x1', 'eight-x2', 'four-x4']);
+  });
+  it('every order line says how much food it is, in oz and lb', () => {
+    const rows = [r({ orderId: 'a', portion: '16Oz', quantity: 2 }), r({ orderId: 'b', portion: '1/2Lb' }), r({ orderId: 'c', portion: '12Oz' }), r({ orderId: 'd', portion: 'Serves 4' }), r({ orderId: 'e', portion: null })];
+    const text = Object.fromEntries(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => [l.orderId, l.amountText]));
+    expect(text).toEqual({ a: '32 oz (2 lb)', b: '8 oz (0.5 lb)', c: '12 oz (0.75 lb)', d: '', e: '' });
   });
   it('the size sort sits inside the spice sort: a small mild order still comes before a big spicy one', () => {
     const rows = [r({ orderId: 'big-spicy', spiceLevel: 'Spicy', portion: '16Oz' }), r({ orderId: 'small-mild', spiceLevel: 'Mild (Kid Friendly)', portion: '8Oz' })];
