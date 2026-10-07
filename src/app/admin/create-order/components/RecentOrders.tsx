@@ -11,13 +11,15 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Paper,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from '@mui/material';
-import { linkActivity, paidMethodValue, rowsForTab, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
+import { IconSearch, IconX } from '@tabler/icons-react';
+import { linkActivity, paidMethodValue, rowsForTab, searchRows, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
 import PaidMethodPicker from './PaidMethodPicker';
 
 
@@ -57,6 +59,7 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
   const [payTyped, setPayTyped] = useState('');
   const [payNote, setPayNote] = useState('');
   const [tab, setTab] = useState<TabKey>('waiting');
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -158,7 +161,10 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
     setPayChoice('Cash');
   };
 
-  const visible = rows ? rowsForTab(rows, tab) : [];
+  // the search narrows all three tabs, and their counts follow it
+  const found = rows ? searchRows(rows, search) : [];
+  const searching = search.trim().length > 0;
+  const visible = rowsForTab(found, tab);
 
   return (
     <Box sx={{ mt: 3 }}>
@@ -168,16 +174,34 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
       </Box>
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       {!rows && !error && <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={24} /></Box>}
+      {rows && rows.length > 0 && (
+        <TextField
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, email, order number, date, amount…"
+          size="small"
+          fullWidth
+          type="search"
+          inputProps={{ 'aria-label': 'Search recent orders' }}
+          InputProps={{
+            startAdornment: <IconSearch size={18} style={{ marginRight: 8, color: '#9CA3AF', flexShrink: 0 }} />,
+            endAdornment: search ? (
+              <IconButton size="small" aria-label="Clear search" onClick={() => setSearch('')}><IconX size={16} /></IconButton>
+            ) : undefined,
+          }}
+          sx={{ mb: 1, bgcolor: '#fff' }}
+        />
+      )}
       {rows && (
         <Tabs value={tab} onChange={(_, v: TabKey) => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
-          <Tab value="waiting" label={`Waiting for payment (${rows.filter((r) => r.awaitingPayment).length})`} />
-          <Tab value="paid" label={`Paid (${rows.filter((r) => r.paymentStatus === 'paid').length})`} />
-          <Tab value="all" label={`All (${rows.length})`} />
+          <Tab value="waiting" label={`Waiting for payment (${found.filter((r) => r.awaitingPayment).length})`} />
+          <Tab value="paid" label={`Paid (${found.filter((r) => r.paymentStatus === 'paid').length})`} />
+          <Tab value="all" label={`All (${found.length})`} />
         </Tabs>
       )}
       {rows && visible.length === 0 && (
         <Typography sx={{ color: '#6B7280', fontSize: 14 }}>
-          {rows.length === 0 ? 'No orders entered here yet.' : tab === 'waiting' ? 'Nothing is waiting for payment.' : tab === 'paid' ? 'No paid orders yet.' : 'No orders.'}
+          {rows.length === 0 ? 'No orders entered here yet.' : searching ? `No ${tab === 'waiting' ? 'waiting' : tab === 'paid' ? 'paid' : ''} orders match "${search.trim()}".${tab !== 'all' ? ' Try the All tab.' : ''}` : tab === 'waiting' ? 'Nothing is waiting for payment.' : tab === 'paid' ? 'No paid orders yet.' : 'No orders.'}
         </Typography>
       )}
       <Box sx={{ display: 'grid', gap: 1.25 }}>

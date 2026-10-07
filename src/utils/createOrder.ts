@@ -264,6 +264,31 @@ export function rowsForTab(rows: OrderListRow[], tab: OrderTab): OrderListRow[] 
   return [...rows].sort((a, b) => Number(b.awaitingPayment) - Number(a.awaitingPayment) || newestFirst(a, b));
 }
 
+const dayWords = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
+/** Everything about an order a person might type into the search box, lower case. */
+function searchText(r: OrderListRow): string {
+  const state = r.status === 'cancelled' ? 'cancelled' : r.paymentStatus === 'paid' ? 'paid' : r.awaitingPayment ? 'waiting for payment' : r.paymentStatus; // not 'unpaid': typing paid must not find unpaid orders
+  const method = r.paymentMethod === 'Cash on Delivery' ? 'cash on delivery cash' : r.paymentMethod;
+  return [r.orderId, r.customerName, r.customerEmail, method, r.offlinePaymentNote ?? '', state, r.total.toFixed(2), ...r.deliveryDates.flatMap((d) => [d, dayWords(d)])]
+    .join(' ')
+    .toLowerCase();
+}
+
+/**
+ * The orders that match what was typed in the search box: every word must be found somewhere in the order's number,
+ * customer name, email, payment method, payment note, status, total or delivery day ("aditi", "duggal gmail", "wed oct 7",
+ * "6.08", "cash", "2121"). An empty box matches everything.
+ */
+export function searchRows(rows: OrderListRow[], query: string): OrderListRow[] {
+  const words = query.toLowerCase().split(/\s+/).map((w) => w.replace(/^[#$]/, '')).filter(Boolean);
+  if (words.length === 0) return rows;
+  return rows.filter((r) => {
+    const text = searchText(r);
+    return words.every((w) => text.includes(w));
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // The whole menu (Create Order is a master tool: no cutoffs, any date, any item)
 
