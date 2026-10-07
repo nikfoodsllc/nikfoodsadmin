@@ -99,6 +99,8 @@ function KindChip({ label, state, onColor }: { label: string; state: KindState; 
       size="small"
       sx={{
         height: 20,
+        // the same long bar for every state, with the icon and name in the middle
+        width: '100%',
         backgroundColor: look.bg,
         color: look.color,
         border: look.border,
@@ -108,7 +110,7 @@ function KindChip({ label, state, onColor }: { label: string; state: KindState; 
   );
   return state === 'closed' ? (
     <Tooltip title={`${label} is enabled for this date, but ordering has closed (the cutoff passed). An admin can extend the cutoff to reopen it.`} arrow>
-      <span>{chip}</span>
+      <span style={{ display: 'block' }}>{chip}</span>
     </Tooltip>
   ) : (
     chip
