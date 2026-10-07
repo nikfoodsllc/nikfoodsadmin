@@ -81,7 +81,7 @@ export default function MenuPicker({
     return (
       <Box key={id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
         <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: item.veg ? '#16A34A' : '#DC2626' }} aria-label={item.veg ? 'Vegetarian' : 'Non-vegetarian'} />
-        <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Box sx={{ minWidth: 0, flex: '0 1 auto' }}>
           <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.name}</Typography>
           <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
             {item.portions?.length ? `from ${money(Math.min(...(item.portionPrices?.length ? item.portionPrices : [item.price])))}` : money(item.price)}
