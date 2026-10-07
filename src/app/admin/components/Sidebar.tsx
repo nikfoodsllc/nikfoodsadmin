@@ -31,6 +31,7 @@ import {
   IconX,
   IconTemplate,
   IconChefHat,
+  IconShoppingCartPlus,
 } from '@tabler/icons-react';
 import Image from 'next/image';
 
@@ -51,6 +52,11 @@ const navItems: NavItem[] = [
     title: 'Kitchen Dashboard (Beta)',
     href: '/admin/kitchen-dashboard',
     icon: IconChefHat,
+  },
+  {
+    title: 'Create Order (BETA)',
+    href: '/admin/create-order',
+    icon: IconShoppingCartPlus,
   },
   {
     title: 'Food Items',
