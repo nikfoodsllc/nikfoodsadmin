@@ -100,12 +100,7 @@ const navItems: NavItem[] = [
     icon: IconChartBar,
     children: [
       {
-        title: 'Reports Dashboard',
-        href: '/admin/reports',
-        icon: IconChartBar,
-      },
-      {
-        title: 'Kitchen Report',
+        title: 'Kitchen Report (BETA)',
         href: '/admin/reports/kitchen',
         icon: IconToolsKitchen2,
       },
