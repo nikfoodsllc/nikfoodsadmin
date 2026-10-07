@@ -28,6 +28,7 @@ import {
   formatDayShort,
   formatRangeLabel,
   getPresetRange,
+  spiceLineText,
   validateRange,
   type DayRange,
   type KitchenBlock,
@@ -87,30 +88,32 @@ function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void 
       sx={{
         cursor: onSelect ? 'pointer' : 'default',
         '&:hover': onSelect ? { backgroundColor: '#F9FAFB' } : {},
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 1.5,
         py: 1.25,
         borderBottom: '1px solid #F3F4F6',
         '&:last-of-type': { borderBottom: 'none' },
       }}
     >
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word' }}>
+      {/* the name on the left, the amount and the number on the right */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5 }}>
+        <Typography sx={{ fontWeight: 600, fontSize: 15, color: '#111827', lineHeight: 1.3, wordBreak: 'break-word', minWidth: 0 }}>
           {item.name}
         </Typography>
-        <CountChips lines={item.portions} />
-        {(item.spice.length > 0 || item.eco > 0) && (
-          <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-            {[
-              item.spice.length > 0 ? `Spice: ${item.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}` : '',
-              item.eco > 0 ? ecoText(item) : '',
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0 }}>
+          {item.totalText && (
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap' }}>
+              {item.totalText}
+            </Typography>
+          )}
+          <Typography sx={{ fontWeight: 700, fontSize: 22, color: '#111827', lineHeight: 1.1, minWidth: 24, textAlign: 'right' }}>
+            {item.quantity}
           </Typography>
-        )}
+        </Box>
+      </Box>
+      {/* the details run the full width of the card below, so the spice line fits on one line */}
+      <Box sx={{ minWidth: 0 }}>
+        <CountChips lines={item.portions} />
+        {item.spice.length > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>{spiceLineText(item.spice)}</Typography>}
+        {item.eco > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: item.spice.length > 0 ? 0.15 : 0.5 }}>{ecoText(item)}</Typography>}
         {item.totalText && item.unsized > 0 && (
           <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
             {item.unsized} without a size, not in the total
@@ -121,16 +124,6 @@ function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void 
             includes {item.inCombos} inside combos
           </Typography>
         )}
-      </Box>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 1.25, flexShrink: 0 }}>
-        {item.totalText && (
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap' }}>
-            {item.totalText}
-          </Typography>
-        )}
-        <Typography sx={{ fontWeight: 700, fontSize: 22, color: '#111827', lineHeight: 1.1, minWidth: 24, textAlign: 'right' }}>
-          {item.quantity}
-        </Typography>
       </Box>
     </Box>
   );
@@ -185,16 +178,8 @@ function BlockBody({
                 <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{combo.name}</Typography>
                 <Typography sx={{ fontWeight: 700, fontSize: 18, color: '#111827', flexShrink: 0 }}>{combo.quantity}</Typography>
               </Box>
-              {(combo.spice.length > 0 || combo.eco > 0) && (
-                <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
-                  {[
-                    combo.spice.length > 0 ? `Spice: ${combo.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}` : '',
-                    combo.eco > 0 ? `♻️ Eco × ${combo.eco}` : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Typography>
-              )}
+              {combo.spice.length > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{spiceLineText(combo.spice)}</Typography>}
+              {combo.eco > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>♻️ Eco × {combo.eco}</Typography>}
               {combo.parts.length > 0 && (
                 <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
                   {combo.parts
