@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Chip, CircularProgress, FormControlLabel, Paper, Radio, RadioGroup, TextField, Typography } from '@mui/material';
-import type { AddressForm, CustomerForm } from '@/utils/createOrder';
+import { phoneNote, type AddressForm, type CustomerForm } from '@/utils/createOrder';
 
 export interface FoundCustomer {
   id: string;
@@ -120,7 +120,11 @@ export default function CustomerSection({
 
       <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
         {field('Name', customer.name, (v) => onCustomer({ ...customer, name: v }), { disabled: Boolean(accountExists) })}
-        {field('Phone', customer.phone, (v) => onCustomer({ ...customer, phone: v }), { type: 'tel', inputProps: { inputMode: 'tel' } })}
+        {field('Phone', customer.phone, (v) => onCustomer({ ...customer, phone: v }), {
+          type: 'tel',
+          inputProps: { inputMode: 'tel' },
+          helperText: phoneNote(accountExists, customer.phone),
+        })}
         <Box sx={{ gridColumn: { sm: '1 / -1' } }}>
           {field('Email', customer.email, (v) => onCustomer({ ...customer, email: v }), { type: 'email', disabled: Boolean(accountExists), inputProps: { inputMode: 'email' } })}
         </Box>
