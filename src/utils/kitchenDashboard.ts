@@ -470,16 +470,25 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, choices: [] });
     }
   }
-  // spice level first (mild to hot, no spice last), then the biggest orders first
+  // spice level first (mild to hot, no spice last), then the biggest size (16Oz before 12Oz before 8Oz, no size last),
+  // then the most ordered, then day and customer
   return lines.sort(
     (a, b) =>
       spiceRank(a.spice) - spiceRank(b.spice) ||
       clean(a.spice).localeCompare(clean(b.spice)) ||
+      sizeRank(b.portion) - sizeRank(a.portion) ||
       b.quantity - a.quantity ||
       a.day.localeCompare(b.day) ||
       a.customerName.localeCompare(b.customerName) ||
       a.orderId.localeCompare(b.orderId)
   );
+}
+
+/** How big a size label is, for sorting (ounces; grams count as ounces too); labels with no readable size are the smallest. */
+export function sizeRank(portion: string | null | undefined): number {
+  const amount = parsePortionAmount(portion);
+  if (!amount) return -1;
+  return amount.oz + amount.grams / 28.3495 + amount.pieces;
 }
 
 /** Where a spice level stands from mild to hot; levels we do not know come after the known ones, no spice last. */

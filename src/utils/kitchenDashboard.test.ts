@@ -7,6 +7,7 @@ import {
   comboChoiceLines,
   comboParts,
   formatAmount,
+  sizeRank,
   spiceRank,
   parsePortionAmount,
   enumerateDays,
@@ -378,10 +379,10 @@ describe('buildItemOrders (who ordered an item)', () => {
   it('lists every order that contains the item, with its size, spice and eco container', () => {
     const lines = buildItemOrders(rows, 'Rajma');
     expect(lines.map((l) => [l.orderId, l.customerName, l.day, l.quantity, l.portion, l.spice, l.isEco])).toEqual([
-      // spice first (Hot before no spice), then the biggest order first
+      // spice first (Hot before no spice), then the biggest size (12Oz before 8Oz)
       ['ORD-2', 'Ben', '2026-10-07', 2, '8Oz', 'Hot', true],
-      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
       ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false],
+      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
     ]);
   });
 
@@ -462,7 +463,29 @@ describe('who ordered: sorted by spice level, then quantity', () => {
     ];
     expect(order(rows)).toEqual(['Mild (Kid Friendly):4:g', 'Mild (Kid Friendly):1:d', 'Normal:3:e', 'Normal:1:c', 'Medium Spice:2:f', 'Spicy:1:a', 'Hot:1:h', 'none:9:b']);
   });
-  it('same spice and quantity: by day, then customer name', () => {
+  it('inside a spice level the biggest size comes first (16Oz, 12Oz, 8Oz), whatever the quantity', () => {
+    const rows = [
+      r({ orderId: 'a', portion: '12Oz', customerName: 'Kavita' }),
+      r({ orderId: 'b', portion: '16Oz', customerName: 'Hiral' }),
+      r({ orderId: 'c', portion: '8Oz', customerName: 'Pooja', quantity: 5 }),
+      r({ orderId: 'd', portion: '16Oz', customerName: 'Meher', quantity: 2 }),
+      r({ orderId: 'e', portion: '12Oz', customerName: 'Anand', quantity: 3 }),
+      r({ orderId: 'f', portion: null, customerName: 'Zed', quantity: 9 }),
+    ];
+    // 16Oz: the order of 2 first, then the order of 1; 12Oz: 3 then 1; then 8Oz; no size last
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['d', 'b', 'e', 'a', 'c', 'f']);
+  });
+  it('the size sort sits inside the spice sort: a small mild order still comes before a big spicy one', () => {
+    const rows = [r({ orderId: 'big-spicy', spiceLevel: 'Spicy', portion: '16Oz' }), r({ orderId: 'small-mild', spiceLevel: 'Mild (Kid Friendly)', portion: '8Oz' })];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['small-mild', 'big-spicy']);
+  });
+  it('sizes are compared as amounts: 1Lb is bigger than 12Oz, 1/2Lb equals 8Oz', () => {
+    expect(sizeRank('1Lb')).toBeGreaterThan(sizeRank('12Oz'));
+    expect(sizeRank('1/2Lb')).toBe(sizeRank('8Oz'));
+    expect(sizeRank('Full')).toBeLessThan(sizeRank('1Oz'));
+    expect(sizeRank(null)).toBe(sizeRank('Serves 4'));
+  });
+  it('same spice, size and quantity: by day, then customer name', () => {
     const rows = [r({ orderId: 'z', customerName: 'Zed' }), r({ orderId: 'y', customerName: 'Amy' }), r({ orderId: 'x', day: '2026-10-06', customerName: 'Zed' })];
     expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['x', 'y', 'z']);
   });
