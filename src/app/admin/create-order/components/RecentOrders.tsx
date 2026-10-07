@@ -17,7 +17,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { paidMethodValue, rowsForTab, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
+import { linkActivity, paidMethodValue, rowsForTab, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
 import PaidMethodPicker from './PaidMethodPicker';
 
 
@@ -26,6 +26,21 @@ const REFRESH_MS = 30000;
 const money = (n: number) => `$${n.toFixed(2)}`;
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 const dayText = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+/** The lines about what happened to the pay link (email delivered, pay page opened). */
+function ActivityLines({ row }: { row: Row }) {
+  const lines = linkActivity(row);
+  if (lines.length === 0) return null;
+  return (
+    <Box sx={{ mt: 0.5, display: 'grid', gap: 0.35 }}>
+      {lines.map((line, i) => (
+        <Typography key={i} sx={{ fontSize: 12.5, fontWeight: line.tone === 'info' ? 400 : 600, color: { good: '#15803D', bad: '#B91C1C', warn: '#B45309', info: '#6B7280' }[line.tone], wordBreak: 'break-word' }}>
+          {line.tone === 'info' ? '○ ' : '● '}{line.text}
+        </Typography>
+      ))}
+    </Box>
+  );
+}
 
 /**
  * The orders entered on this screen, newest first. They stay here after the form is left or the page is changed, so a
@@ -178,6 +193,7 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
                   <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>
                     {row.linkSentAt ? `Link emailed ${when(row.linkSentAt)}` : 'The payment link has not been emailed yet'}
                   </Typography>
+                  <ActivityLines row={row} />
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void emailLink(row)} sx={{ textTransform: 'none' }}>Email a new link</Button>
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void copyLink(row)} sx={{ textTransform: 'none' }}>Copy a new link</Button>
@@ -186,6 +202,7 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
                   </Box>
                 </>
               )}
+              {!row.awaitingPayment && <ActivityLines row={row} />}
               {row.offlinePaymentNote && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>Note: {row.offlinePaymentNote}</Typography>}
               {notice?.orderId === row.orderId && <Alert severity={notice.error ? 'error' : 'success'} sx={{ mt: 1 }} onClose={() => setNotice(null)}>{notice.text}</Alert>}
             </Paper>
