@@ -199,6 +199,18 @@ describe('whole menu helpers', () => {
     // whole menu: a sub-category shows all of its items, whatever the date
     expect(whole.children.find((n) => n.name === 'Beverages')!.itemIds).toEqual(['x', 'z']);
   });
+  it('items under a sub-category of a day-wise category follow the order of the day\'s menu, like the website', () => {
+    const c: CatalogPayload = {
+      today: 't', dates: [], items: { a: item('a', 'Chapati'), b: item('b', 'Jeera Rice'), c: item('c', 'Veg Combo'), d: item('d', 'Dhaba Dal') },
+      categories: [{
+        _id: 'fm', name: 'Food Menu', listingType: 'day-wise', flatItemIds: [], allItemIds: ['a', 'b', 'c', 'd'],
+        dayWise: { '2026-10-08': ['c', 'd', 'a', 'b'] },
+        children: [{ _id: 'main', name: 'Main Course', listingType: 'flat', flatItemIds: ['a', 'b', 'c', 'd'], allItemIds: ['a', 'b', 'c', 'd'], dayWise: {}, children: [] }],
+      }],
+    };
+    const main = dayMenuNodes(c, '2026-10-08')[0].children[0];
+    expect(main.itemIds).toEqual(['c', 'd', 'a', 'b']); // the day's order, not the sub-category's own a, b, c, d
+  });
   it('search keeps matching items and the categories holding them', () => {
     const found = filterNodes(allMenuNodes(catalog), catalog.items, 'halwa');
     expect(found.map((n) => n.name)).toEqual(['Indian Sweets']);

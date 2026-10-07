@@ -307,7 +307,10 @@ export interface MenuNode {
  * tagged to it, whatever its date. An item is shown once per place it is grouped.
  */
 function toNode(category: CatalogCategory, base: (c: CatalogCategory) => string[], scope: string[] | null, limitChildrenToDate: boolean): MenuNode | null {
-  const own = [...new Set(base(category))].filter((id) => !scope || scope.includes(id));
+  // Under a day-wise category the order is the order of the day's menu (what the website shows), so when a scope is given
+  // (the day's items) its order wins over the sub-category's own order.
+  const wanted = new Set(base(category));
+  const own = scope ? [...new Set(scope)].filter((id) => wanted.has(id)) : [...new Set(base(category))];
   const dayWise = category.listingType === 'day-wise';
   const children = category.children
     .map((child) => toNode(child, (c) => c.allItemIds ?? [], dayWise && limitChildrenToDate ? own : null, limitChildrenToDate))
