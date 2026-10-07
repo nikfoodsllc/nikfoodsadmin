@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
     icon: IconLayoutDashboard,
   },
   {
-    title: 'Kitchen Dashboard (Beta)',
+    title: 'Kitchen Dashboard (BETA)',
     href: '/admin/kitchen-dashboard',
     icon: IconChefHat,
   },
@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
     icon: IconShoppingCartPlus,
   },
   {
-    title: 'Abandoned Checkouts',
+    title: 'Abandoned Checkout (BETA)',
     href: '/admin/abandoned-checkouts',
     icon: IconShoppingCartOff,
   },
