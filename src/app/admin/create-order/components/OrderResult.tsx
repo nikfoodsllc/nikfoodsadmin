@@ -13,6 +13,8 @@ export interface CreatedOrder {
   payLink?: string;
   emailSent: boolean;
   emailError?: string;
+  /** Set when this order replaced another (an edit) */
+  replaced?: { orderId: string; cancelled: boolean; error?: string };
 }
 
 /** What happened after Create: the order number, the pay link (copy it, resend it), and whether the emails went out. */

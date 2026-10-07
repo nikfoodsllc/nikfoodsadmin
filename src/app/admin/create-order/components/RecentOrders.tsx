@@ -46,12 +46,13 @@ function ActivityLines({ row }: { row: Row }) {
  * The orders entered on this screen, newest first. They stay here after the form is left or the page is changed, so a
  * payment link can be copied or sent again, or the order marked as paid another way, at any time.
  */
-export default function RecentOrders({ token, version, onChanged }: { token: string; version: number; onChanged: () => void }) {
+export default function RecentOrders({ token, version, onChanged, onEdit }: { token: string; version: number; onChanged: () => void; onEdit: (orderId: string) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ orderId: string; text: string; error?: boolean } | null>(null);
   const [payDialog, setPayDialog] = useState<Row | null>(null);
+  const [cancelDialog, setCancelDialog] = useState<Row | null>(null);
   const [payChoice, setPayChoice] = useState<PaidChoice>('Cash');
   const [payTyped, setPayTyped] = useState('');
   const [payNote, setPayNote] = useState('');
@@ -129,6 +130,16 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
       }
     });
 
+  const cancelOrder = async () => {
+    const row = cancelDialog;
+    if (!row) return;
+    setCancelDialog(null);
+    await run(row, 'cancel', async () => {
+      await post(row.orderId, 'cancel', {});
+      return 'Order cancelled. Its payment link no longer works.';
+    });
+  };
+
   const markPaid = async () => {
     const row = payDialog;
     if (!row) return;
@@ -198,6 +209,8 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void emailLink(row)} sx={{ textTransform: 'none' }}>Email a new link</Button>
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void copyLink(row)} sx={{ textTransform: 'none' }}>Copy a new link</Button>
                     <Button size="small" variant="outlined" color="warning" disabled={Boolean(busy)} onClick={() => setPayDialog(row)} sx={{ textTransform: 'none' }}>Paid another way</Button>
+                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => onEdit(row.orderId)} sx={{ textTransform: 'none' }}>Edit</Button>
+                    <Button size="small" variant="outlined" color="error" disabled={Boolean(busy)} onClick={() => setCancelDialog(row)} sx={{ textTransform: 'none' }}>Cancel order</Button>
                     {busy?.startsWith(`${row.orderId}:`) && <CircularProgress size={20} />}
                   </Box>
                 </>
@@ -209,6 +222,19 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
           );
         })}
       </Box>
+
+      <Dialog open={Boolean(cancelDialog)} onClose={() => setCancelDialog(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Cancel this order?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 14 }}>
+            {cancelDialog?.orderId} · {cancelDialog ? money(cancelDialog.total) : ''} for {cancelDialog?.customerName}. The payment link stops working and the order is cancelled. The customer is not emailed. If they already paid, this is refused.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialog(null)} sx={{ textTransform: 'none' }}>Keep it</Button>
+          <Button variant="contained" color="error" onClick={() => void cancelOrder()} sx={{ textTransform: 'none', fontWeight: 700 }}>Cancel order</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(payDialog)} onClose={() => setPayDialog(null)} fullWidth maxWidth="xs">
         <DialogTitle>The customer paid another way</DialogTitle>
