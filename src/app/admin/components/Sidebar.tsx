@@ -32,6 +32,7 @@ import {
   IconTemplate,
   IconChefHat,
   IconShoppingCartPlus,
+  IconShoppingCartOff,
 } from '@tabler/icons-react';
 import Image from 'next/image';
 
@@ -49,7 +50,7 @@ const navItems: NavItem[] = [
     icon: IconLayoutDashboard,
   },
   {
-    title: 'Kitchen Dashboard (Beta)',
+    title: 'Kitchen Dashboard (BETA)',
     href: '/admin/kitchen-dashboard',
     icon: IconChefHat,
   },
@@ -57,6 +58,11 @@ const navItems: NavItem[] = [
     title: 'Create Order (BETA)',
     href: '/admin/create-order',
     icon: IconShoppingCartPlus,
+  },
+  {
+    title: 'Abandoned Checkout (BETA)',
+    href: '/admin/abandoned-checkouts',
+    icon: IconShoppingCartOff,
   },
   {
     title: 'Food Items',
