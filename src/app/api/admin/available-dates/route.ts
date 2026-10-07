@@ -104,9 +104,22 @@ function toResponse(date: Partial<AvailableDate> | null | undefined) {
     cutoffAt: date?.cutoffAt ?? null,
     flatCutoffAt: date?.flatCutoffAt ?? null,
     dayWiseCutoffAt: date?.dayWiseCutoffAt ?? null,
+    flatCutoffSet: date?.flatCutoffSet ?? null,
+    dayWiseCutoffSet: date?.dayWiseCutoffSet ?? null,
     createdAt: date?.createdAt,
     updatedAt: date?.updatedAt,
   };
+}
+
+/** Name of the admin who is saving (shown next to a custom cutoff so people can see who set it and when). */
+async function adminName(userId: unknown): Promise<string | undefined> {
+  try {
+    if (typeof userId !== 'string' || !ObjectId.isValid(userId)) return undefined;
+    const user = await db.readOne<{ name?: string; email?: string }>('users', { _id: new ObjectId(userId) } as never);
+    return user.data?.name || user.data?.email || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -255,6 +268,7 @@ export async function POST(request: NextRequest) {
     const flatInstruction = cutoffInstruction(body.flatCutoffAt, body.cutoffAt);
     const dayWiseInstruction = cutoffInstruction(body.dayWiseCutoffAt, body.cutoffAt);
     const cutoffTouched = flatInstruction !== undefined || dayWiseInstruction !== undefined;
+    const setBy = cutoffTouched ? await adminName(authResult.userId) : undefined;
 
     // Check if date already exists
     const existingResult = await db.readOne<AvailableDate>('availableDates', { date });
@@ -274,8 +288,8 @@ export async function POST(request: NextRequest) {
         date,
         flatCategoryEnabled,
         dayWiseCategoryEnabled,
-        ...(typeof flatInstruction === 'string' ? { flatCutoffAt: new Date(flatInstruction) } : {}),
-        ...(typeof dayWiseInstruction === 'string' ? { dayWiseCutoffAt: new Date(dayWiseInstruction) } : {}),
+        ...(typeof flatInstruction === 'string' ? { flatCutoffAt: new Date(flatInstruction), flatCutoffSet: { at: now, by: setBy } } : {}),
+        ...(typeof dayWiseInstruction === 'string' ? { dayWiseCutoffAt: new Date(dayWiseInstruction), dayWiseCutoffSet: { at: now, by: setBy } } : {}),
         createdAt: now,
         updatedAt: now
       };
@@ -327,6 +341,11 @@ export async function POST(request: NextRequest) {
       else unsetFields.flatCutoffAt = '';
       if (dayWise) updateData.dayWiseCutoffAt = dayWise;
       else unsetFields.dayWiseCutoffAt = '';
+      // remember when and by whom each cutoff that was just set got set; clearing a cutoff clears that note too
+      if (typeof flatInstruction === 'string') updateData.flatCutoffSet = { at: now, by: setBy };
+      else if (!flat) unsetFields.flatCutoffSet = '';
+      if (typeof dayWiseInstruction === 'string') updateData.dayWiseCutoffSet = { at: now, by: setBy };
+      else if (!dayWise) unsetFields.dayWiseCutoffSet = '';
       unsetFields.cutoffAt = '';
     }
 

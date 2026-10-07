@@ -285,6 +285,9 @@ export interface AvailableDate {
   flatCutoffAt?: Date | string | null;
   /** Custom order cutoff for day-wise (Food Menu) items. Missing/null = the standard, 1 PM Pacific the day before. */
   dayWiseCutoffAt?: Date | string | null;
+  /** When and by whom the custom flat / day-wise cutoff was set (not recorded for cutoffs saved before this existed). */
+  flatCutoffSet?: { at: Date | string; by?: string } | null;
+  dayWiseCutoffSet?: { at: Date | string; by?: string } | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
