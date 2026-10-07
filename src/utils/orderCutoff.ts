@@ -162,3 +162,23 @@ export function extendCutoff(deliveryDate: string, cutoffAt: unknown, hours: num
   const base = Math.max(current.getTime(), now.getTime());
   return new Date(base + hours * 3600 * 1000);
 }
+
+/**
+ * Where one kind of item stands on a date, for what the admin sees:
+ *  - 'off'    the Enabled / Disabled switch is off: not offered at all
+ *  - 'closed' the switch is on but the cutoff has passed: customers can no longer order it (an admin can extend the cutoff to reopen it)
+ *  - 'open'   the switch is on and the cutoff has not passed
+ * The switch never flips by itself when the cutoff passes; this is what tells the two apart.
+ */
+export type KindState = 'off' | 'closed' | 'open';
+
+export function kindState(
+  deliveryDate: string,
+  availability: (CutoffFields & { flatCategoryEnabled?: boolean; dayWiseCategoryEnabled?: boolean }) | null | undefined,
+  kind: ItemKind,
+  now: Date = new Date()
+): KindState {
+  const on = kind === 'flat' ? availability?.flatCategoryEnabled : availability?.dayWiseCategoryEnabled;
+  if (!on) return 'off';
+  return cutoffStatus(deliveryDate, overrideForKind(availability, kind), now, kind).isOpen ? 'open' : 'closed';
+}
