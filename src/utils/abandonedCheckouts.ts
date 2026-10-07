@@ -109,7 +109,8 @@ export function problemText(info: OrderInfo | undefined): string | undefined {
 /**
  * One row per person from their open drafts:
  *  - drafts still active in the last QUIET_MINUTES are left out (still shopping), as are dismissed ones;
- *  - a person who has PAID an order since leaving the checkout is not a lead (they disappear from the list);
+ *  - checkouts left BEFORE the person's last paid order do not count (they ordered since); a person is on the list only
+ *    if they have a checkout newer than their last paid order;
  *  - several drafts of one person show as one row (the latest), noting how many came before.
  */
 export function buildAbandonedRows(
@@ -129,15 +130,16 @@ export function buildAbandonedRows(
   }
 
   const out: Record<View, AbandonedRow[]> & { orderedSince: number } = { to_contact: [], contacted: [], orderedSince: 0 };
-  for (const [userId, list] of byUser) {
-    const sorted = [...list].sort((a, b) => ms(b.lastActivityAt) - ms(a.lastActivityAt));
-    const latest = sorted[0];
-    // paid something after the OLDEST open checkout: they ordered, so none of these are leads
-    const oldest = Math.min(...sorted.map((d) => ms(d.createdAt)));
-    if ((paidByUser.get(userId) ?? []).some((t) => t > oldest)) {
+  for (const [userId, all] of byUser) {
+    // a checkout left before the person's last paid order is history: they ordered afterwards
+    const lastPaid = Math.max(0, ...(paidByUser.get(userId) ?? []));
+    const list = all.filter((d) => ms(d.createdAt) > lastPaid);
+    if (list.length === 0) {
       out.orderedSince += 1;
       continue;
     }
+    const sorted = [...list].sort((a, b) => ms(b.lastActivityAt) - ms(a.lastActivityAt));
+    const latest = sorted[0];
     if (ms(latest.lastActivityAt) > quietBefore) continue;
 
     const info = latest.orderId ? orderInfo.get(latest.orderId) : undefined;
