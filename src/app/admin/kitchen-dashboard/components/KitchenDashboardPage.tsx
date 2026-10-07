@@ -351,7 +351,7 @@ export default function KitchenDashboardPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5, gap: 2, flexWrap: 'wrap' }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: 20, color: '#111827' }}>
-            Kitchen Dashboard (Beta)
+            Kitchen Dashboard (BETA)
           </Typography>
           <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
             What to cook on each day, by the menu day each item belongs to. Paid orders only; cancelled and refunded orders are left out.
