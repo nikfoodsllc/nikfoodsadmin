@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   addLine,
   estimateUnitPrice,
+  lineSignature,
   lineTags,
   missingForCreate,
   needsOptions,
@@ -18,6 +19,7 @@ import {
   type CatalogPayload,
   type CustomerForm,
   type MenuItem,
+  type OrderListRow,
   type PaidChoice,
 } from '@/utils/createOrder';
 import CustomerSection, { EMPTY_ADDRESS, type FoundCustomer } from './CustomerSection';
@@ -74,6 +76,10 @@ export default function CreateOrderPage() {
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const submittingRef = useRef(false);
   const [listVersion, setListVersion] = useState(0);
+  // editing an order that was sent: its number (creating replaces it) and any problem loading it
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editError, setEditError] = useState('');
+  const [listRows, setListRows] = useState<OrderListRow[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -159,6 +165,7 @@ export default function CreateOrderPage() {
       waivePlatformFee: waiveFee,
       payment: payment === 'link' ? { mode: 'link' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
+      ...(editing ? { replacesOrderId: editing } : {}),
     };
     const r = await callApi(token, 'create', { method: 'POST', body: JSON.stringify(body) });
     setSubmitting(false);
@@ -185,6 +192,39 @@ export default function CreateOrderPage() {
     setNote('');
     setPreview(null);
     setSubmitError('');
+    setEditing(null);
+    setEditError('');
+  };
+
+  // Edit: load a sent, unpaid order into the form; pressing Create makes the new version and cancels the old one
+  const startEdit = async (orderId: string) => {
+    if (!token) return;
+    setEditError('');
+    const r = await callApi(token, `orders/${encodeURIComponent(orderId)}`);
+    if (!r.ok) {
+      setEditError(r.body?.error || 'Could not open that order for editing');
+      return;
+    }
+    const o = r.body.data;
+    setResult(null);
+    setRequestId(crypto.randomUUID());
+    setCustomer(o.customer);
+    setAddress(o.address);
+    setExisting(null);
+    setLines(
+      o.lines.map((l: CartLine) => {
+        const { name, unitPrice, tags, ...pick } = l;
+        return { ...pick, name, unitPrice, tags, key: lineSignature(pick) };
+      })
+    );
+    setTip(o.tipPercentage);
+    setWaiveFee(o.waivePlatformFee);
+    setPayment('link');
+    setNote('');
+    setSubmitError('');
+    setDate((d) => o.lines[0]?.date || d);
+    setEditing(orderId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (authLoading || !isAuthenticated || !token) {
@@ -232,8 +272,21 @@ export default function CreateOrderPage() {
         Enter an order for a customer who ordered by phone or in person. Prices come from the live menu. This is a master tool: no cutoff, delivery area or day rules apply.
       </Typography>
 
+      {editError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError('')}>{editError}</Alert>}
+      {editing && !result && (
+        <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>Stop editing</Button>}>
+          Editing {editing}. Change anything, then press Create: the new order replaces it, the old payment link stops working and the customer gets a new link by email.
+        </Alert>
+      )}
+      {result?.replaced && (
+        <Alert severity={result.replaced.cancelled ? 'success' : 'warning'} sx={{ mb: 2 }}>
+          {result.replaced.cancelled
+            ? `${result.replaced.orderId} was cancelled and replaced by this order.`
+            : `The new order was created, but ${result.replaced.orderId} could not be cancelled (${result.replaced.error || 'unknown reason'}). Check the Recent orders list.`}
+        </Alert>
+      )}
       {result ? (
-        <OrderResult result={result} token={token} onAnother={reset} onChanged={() => setListVersion((v) => v + 1)} />
+        <OrderResult result={result} token={token} onAnother={reset} onChanged={() => setListVersion((v) => v + 1)} listed={listRows.find((r) => r.orderId === result.orderId)} />
       ) : menuError ? (
         <Alert severity="error">{menuError}</Alert>
       ) : !menu ? (
@@ -248,7 +301,7 @@ export default function CreateOrderPage() {
         </Box>
       )}
 
-      <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} />
+      <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} onEdit={(id) => void startEdit(id)} onRows={setListRows} />
 
       {form && !wide && (
         <>
@@ -285,6 +338,7 @@ export default function CreateOrderPage() {
         <DialogContent>
           <DialogContentText>
             {preview ? `$${preview.totals.total.toFixed(2)} for ${customer.name || 'the customer'}. ` : ''}
+            {editing ? `This replaces ${editing}: that order is cancelled and its link stops working. ` : ''}
             {payment === 'link'
               ? `A payment link will be emailed to ${customer.email}.`
               : `It will be saved as paid (${paidMethodValue(paidChoice, paidTyped) ?? '?'}) and a confirmation emailed to ${customer.email}.`}

@@ -32,9 +32,10 @@ function targetFor(slug: string[], method: string): string | null {
     if (first === 'orders' && method === 'GET') return '/api/admin/offline-orders';
     return null;
   }
+  if (slug.length === 2 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'GET') return `/api/admin/offline-orders/${encodeURIComponent(second)}`;
   if (slug.length === 3 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'POST') {
     const action = slug[2];
-    if (action === 'resend' || action === 'mark-paid') return `/api/admin/offline-orders/${encodeURIComponent(second)}/${action}`;
+    if (action === 'resend' || action === 'mark-paid' || action === 'cancel') return `/api/admin/offline-orders/${encodeURIComponent(second)}/${action}`;
   }
   return null;
 }
