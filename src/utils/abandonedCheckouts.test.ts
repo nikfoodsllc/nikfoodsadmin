@@ -70,6 +70,14 @@ describe('abandoned checkouts', () => {
     expect(r.to_contact[0]).toMatchObject({ id: 'pi_new', total: 99, earlierCheckouts: 1 });
   });
 
+  it('when two checkouts have the same last activity the one started last is shown', () => {
+    const r = build([
+      draft({ paymentIntentId: 'older', userId: 'u1', createdAt: ago(900), lastActivityAt: ago(200), items: [] }),
+      draft({ paymentIntentId: 'newer', userId: 'u1', createdAt: ago(250), lastActivityAt: ago(200) }),
+    ]);
+    expect(r.to_contact[0].id).toBe('newer');
+  });
+
   it(`leaves out checkouts active in the last ${QUIET_MINUTES} minutes (still shopping)`, () => {
     expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1', lastActivityAt: ago(10), createdAt: ago(20) })]).to_contact).toHaveLength(0);
     expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1', lastActivityAt: ago(31), createdAt: ago(40) })]).to_contact).toHaveLength(1);
