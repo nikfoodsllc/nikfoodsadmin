@@ -140,7 +140,7 @@ describe('rowsForTab', () => {
   });
 });
 
-import { phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
+import { searchRows, phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
 
 describe('whole menu helpers', () => {
   const item = (id: string, name: string) => ({ _id: id, name, price: 5 });
@@ -311,5 +311,65 @@ describe('phone note in Create Order', () => {
   });
   it('a different number: used for this order only', () => {
     expect(phoneNote({ phone: '2065550100' }, '2065550199')).toContain('this order only');
+  });
+});
+
+describe('search in Recent orders', () => {
+  const row = (over: Partial<OrderListRow>): OrderListRow => ({
+    orderId: 'ORD-1791392098152121',
+    createdAt: '2026-10-07T16:54:00.000Z',
+    customerName: 'Aditi Nagpal',
+    customerEmail: 'duggal.aditi@gmail.com',
+    total: 6.08,
+    status: 'pending',
+    paymentStatus: 'unpaid',
+    paymentMethod: 'Credit Card',
+    linkOrder: true,
+    awaitingPayment: true,
+    deliveryDates: ['2026-10-07'],
+    ...over,
+  });
+  const rows = [
+    row({}),
+    row({ orderId: 'ORD-1791348392591569', customerName: 'Shrey Test', customerEmail: 'jainshrey2004+pay3@gmail.com', total: 38.65, paymentStatus: 'paid', status: 'confirmed', awaitingPayment: false, paymentMethod: 'Cash on Delivery', offlinePaymentNote: 'paid at the door', deliveryDates: ['2026-10-09'] }),
+    row({ orderId: 'ORD-1791336924112871', customerName: 'Kunal Mehra', customerEmail: 'kmehra1@gmail.com', total: 51.92, status: 'cancelled', awaitingPayment: false, paymentMethod: 'Zelle', deliveryDates: ['2026-10-08', '2026-10-09'] }),
+  ];
+  const ids = (q: string) => searchRows(rows, q).map((r) => r.orderId.slice(-4));
+  it('an empty or blank box matches everything', () => {
+    expect(searchRows(rows, '')).toHaveLength(3);
+    expect(searchRows(rows, '   ')).toHaveLength(3);
+  });
+  it('finds by name, email, order number (also the last digits) and ignores case', () => {
+    expect(ids('aditi')).toEqual(['2121']);
+    expect(ids('ADITI')).toEqual(['2121']);
+    expect(ids('kmehra1')).toEqual(['2871']);
+    expect(ids('1791348392591569')).toEqual(['1569']);
+    expect(ids('2871')).toEqual(['2871']);
+    expect(ids('ord-17913')).toEqual(['2121', '1569', '2871']);
+  });
+  it('every word must match, in any order', () => {
+    expect(ids('aditi gmail')).toEqual(['2121']);
+    expect(ids('gmail aditi')).toEqual(['2121']);
+    expect(ids('aditi kunal')).toEqual([]);
+  });
+  it('finds by amount, with or without a $', () => {
+    expect(ids('6.08')).toEqual(['2121']);
+    expect(ids('$38.65')).toEqual(['1569']);
+  });
+  it('finds by delivery day, written as a date or in words', () => {
+    expect(ids('2026-10-09')).toEqual(['1569', '2871']);
+    expect(ids('friday')).toEqual(['1569', '2871']);
+    expect(ids('wednesday oct 7')).toEqual(['2121']);
+  });
+  it('finds by payment method, note and state', () => {
+    expect(ids('cash')).toEqual(['1569']);
+    expect(ids('zelle')).toEqual(['2871']);
+    expect(ids('door')).toEqual(['1569']);
+    expect(ids('cancelled')).toEqual(['2871']);
+    expect(ids('paid')).toEqual(['1569']);
+    expect(ids('waiting')).toEqual(['2121']);
+  });
+  it('no match gives an empty list', () => {
+    expect(ids('zzzz')).toEqual([]);
   });
 });
