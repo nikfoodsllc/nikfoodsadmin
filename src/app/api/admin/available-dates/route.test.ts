@@ -66,7 +66,7 @@ describe('POST: custom cutoff', () => {
   it('null clears both custom cutoffs (back to the standard rules)', async () => {
     await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, cutoffAt: null }));
     const [, , update] = updateOne.mock.calls[0];
-    expect(update.$unset).toEqual({ flatCutoffAt: '', dayWiseCutoffAt: '', cutoffAt: '' });
+    expect(update.$unset).toEqual({ flatCutoffAt: '', dayWiseCutoffAt: '', cutoffAt: '', flatCutoffSet: '', dayWiseCutoffSet: '' });
     expect(update.$set.flatCutoffAt).toBeUndefined();
     expect(update.$set.dayWiseCutoffAt).toBeUndefined();
     expect(invalidate).toHaveBeenCalledTimes(1);
@@ -89,7 +89,14 @@ describe('POST: custom cutoff', () => {
     const [, , update] = updateOne.mock.calls[0];
     expect(update.$set.flatCutoffAt).toEqual(flatExisting);
     expect(update.$set.dayWiseCutoffAt).toBeUndefined();
-    expect(update.$unset).toEqual({ dayWiseCutoffAt: '', cutoffAt: '' });
+    expect(update.$unset).toEqual({ dayWiseCutoffAt: '', cutoffAt: '', dayWiseCutoffSet: '' });
+  });
+
+  it('records when and by whom a custom cutoff was set, only for the kind that was set', async () => {
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, flatCutoffAt: CUTOFF }));
+    const [, , update] = updateOne.mock.calls[0];
+    expect(update.$set.flatCutoffSet.at).toBeInstanceOf(Date);
+    expect(update.$set.dayWiseCutoffSet).toBeUndefined();
   });
 
   it('a date that still has the older single cutoff keeps it for the kind that was not changed', async () => {

@@ -54,6 +54,7 @@ import {
   DEFAULT_CUTOFF_HOUR_BY_KIND,
   type ItemKind,
   describeCutoff,
+  formatCutoff,
   extendCutoff,
   inputValueToInstant,
   instantToInputValue,
@@ -869,6 +870,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 const field = kind === 'flat' ? 'flatCutoffAt' : 'dayWiseCutoffAt';
                 const standardHour = DEFAULT_CUTOFF_HOUR_BY_KIND[kind];
                 const standardTime = `${standardHour > 12 ? standardHour - 12 : standardHour}:00 ${standardHour >= 12 ? 'PM' : 'AM'}`;
+                const setInfo = (kind === 'flat' ? availability?.flatCutoffSet : availability?.dayWiseCutoffSet) ?? null;
+                const setAt = setInfo ? parseCutoff(setInfo.at) : null;
                 const saveCutoff = (value: string | null, message: string) =>
                   updateDateAvailability(
                     selectedDate,
@@ -902,6 +905,13 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 500 }}>
                       {describeCutoff(selectedDate, override, new Date(), kind)}
                     </Typography>
+                    {status.overridden && (
+                      <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+                        {setAt
+                          ? `Custom cutoff set ${formatCutoff(setAt)} Pacific${setInfo?.by ? ` by ${setInfo.by}` : ''}`
+                          : 'Custom cutoff (the time it was set was not recorded)'}
+                      </Typography>
+                    )}
 
                     <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                       {[1, 2].map((hours) => (
