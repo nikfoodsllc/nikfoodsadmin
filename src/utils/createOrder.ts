@@ -235,6 +235,8 @@ export interface OrderListRow {
   createdAt: string;
   customerName: string;
   customerEmail: string;
+  /** 10 digits, as entered for the order (missing from an older server) */
+  customerPhone?: string;
   total: number;
   status: string;
   paymentStatus: string;
@@ -270,22 +272,28 @@ const dayWords = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('e
 function searchText(r: OrderListRow): string {
   const state = r.status === 'cancelled' ? 'cancelled' : r.paymentStatus === 'paid' ? 'paid' : r.awaitingPayment ? 'waiting for payment' : r.paymentStatus; // not 'unpaid': typing paid must not find unpaid orders
   const method = r.paymentMethod === 'Cash on Delivery' ? 'cash on delivery cash' : r.paymentMethod;
-  return [r.orderId, r.customerName, r.customerEmail, method, r.offlinePaymentNote ?? '', state, r.total.toFixed(2), ...r.deliveryDates.flatMap((d) => [d, dayWords(d)])]
+  return [r.orderId, r.customerName, r.customerEmail, r.customerPhone ?? '', method, r.offlinePaymentNote ?? '', state, r.total.toFixed(2), ...r.deliveryDates.flatMap((d) => [d, dayWords(d)])]
     .join(' ')
     .toLowerCase();
 }
 
 /**
  * The orders that match what was typed in the search box: every word must be found somewhere in the order's number,
- * customer name, email, payment method, payment note, status, total or delivery day ("aditi", "duggal gmail", "wed oct 7",
- * "6.08", "cash", "2121"). An empty box matches everything.
+ * customer name, email, phone, payment method, payment note, status, total or delivery day ("aditi", "duggal gmail",
+ * "wed oct 7", "6.08", "cash", "2121", "206 555"). An empty box matches everything.
  */
 export function searchRows(rows: OrderListRow[], query: string): OrderListRow[] {
-  const words = query.toLowerCase().split(/\s+/).map((w) => w.replace(/^[#$]/, '')).filter(Boolean);
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w !== '+1').map((w) => w.replace(/^[#$]/, '')).filter(Boolean); // '+1' is only the country code of a phone
   if (words.length === 0) return rows;
   return rows.filter((r) => {
     const text = searchText(r);
-    return words.every((w) => text.includes(w));
+    const phone = phoneDigits(r.customerPhone ?? '');
+    return words.every((w) => {
+      if (text.includes(w)) return true;
+      // a phone typed any way ("(206) 555-0144", "206.555.0144", "1-206-555-0144", or just the last digits) finds the digits of the stored number
+      const digits = phoneDigits(w);
+      return digits.length >= 3 && phone.includes(digits);
+    });
   });
 }
 
