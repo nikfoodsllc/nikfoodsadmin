@@ -60,6 +60,13 @@ function CountChips({ lines }: { lines: Array<{ label: string; quantity: number 
   );
 }
 
+/** Eco containers of an item by size: '♻️ Eco: 16Oz × 3, 12Oz × 2' (just '♻️ Eco × 3' when no sizes are involved). */
+export function ecoText(item: Pick<KitchenItem, 'eco' | 'ecoBySize'>): string {
+  const lines = item.ecoBySize ?? [];
+  if (lines.length === 0 || (lines.length === 1 && lines[0].label === 'No size')) return `♻️ Eco × ${item.eco}`;
+  return `♻️ Eco: ${lines.map((l) => `${l.label === 'No size' ? 'no size' : l.label} × ${l.quantity}`).join(', ')}`;
+}
+
 function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void }) {
   return (
     <Box
@@ -98,7 +105,7 @@ function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void 
           <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
             {[
               item.spice.length > 0 ? `Spice: ${item.spice.map((s) => `${s.label} × ${s.quantity}`).join(', ')}` : '',
-              item.eco > 0 ? `♻️ Eco × ${item.eco}` : '',
+              item.eco > 0 ? ecoText(item) : '',
             ]
               .filter(Boolean)
               .join(' · ')}

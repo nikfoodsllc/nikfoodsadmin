@@ -4,8 +4,10 @@ import {
   buildItemOrders,
   buildKitchenDays,
   buildKitchenWeek,
+  comboChoiceLines,
   comboParts,
   formatAmount,
+  spiceRank,
   parsePortionAmount,
   enumerateDays,
   formatDayShort,
@@ -251,8 +253,10 @@ describe('parsePortionAmount (sizes in portion labels)', () => {
 });
 
 describe('formatAmount', () => {
-  it('shows ounces, and decimal pounds once there are 16 ounces or more', () => {
-    expect(formatAmount({ oz: 8, grams: 0, pieces: 0 })).toBe('8 oz');
+  it('shows ounces with the pounds beside them, as a decimal', () => {
+    expect(formatAmount({ oz: 8, grams: 0, pieces: 0 })).toBe('8 oz (0.5 lb)');
+    expect(formatAmount({ oz: 4, grams: 0, pieces: 0 })).toBe('4 oz (0.25 lb)');
+    expect(formatAmount({ oz: 12, grams: 0, pieces: 0 })).toBe('12 oz (0.75 lb)');
     expect(formatAmount({ oz: 16, grams: 0, pieces: 0 })).toBe('16 oz (1 lb)');
     expect(formatAmount({ oz: 36, grams: 0, pieces: 0 })).toBe('36 oz (2.25 lb)');
     expect(formatAmount({ oz: 96, grams: 0, pieces: 0 })).toBe('96 oz (6 lb)');
@@ -264,7 +268,7 @@ describe('formatAmount', () => {
     expect(formatAmount({ oz: 0, grams: 300, pieces: 0 })).toBe('300 g');
     expect(formatAmount({ oz: 0, grams: 1500, pieces: 0 })).toBe('1500 g (1.5 kg)');
     expect(formatAmount({ oz: 0, grams: 0, pieces: 12 })).toBe('12 pcs');
-    expect(formatAmount({ oz: 8, grams: 0, pieces: 6 })).toBe('8 oz + 6 pcs');
+    expect(formatAmount({ oz: 8, grams: 0, pieces: 6 })).toBe('8 oz (0.5 lb) + 6 pcs');
     expect(formatAmount({ oz: 0, grams: 0, pieces: 0 })).toBe('');
   });
 });
@@ -374,14 +378,15 @@ describe('buildItemOrders (who ordered an item)', () => {
   it('lists every order that contains the item, with its size, spice and eco container', () => {
     const lines = buildItemOrders(rows, 'Rajma');
     expect(lines.map((l) => [l.orderId, l.customerName, l.day, l.quantity, l.portion, l.spice, l.isEco])).toEqual([
-      ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false],
+      // spice first (Hot before no spice), then the biggest order first
       ['ORD-2', 'Ben', '2026-10-07', 2, '8Oz', 'Hot', true],
       ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
+      ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false],
     ]);
   });
 
   it('only one menu day when a day is given (an item listed under a specific day)', () => {
-    expect(buildItemOrders(rows, 'Rajma', '2026-10-07').map((l) => l.orderId)).toEqual(['ORD-1', 'ORD-2']);
+    expect(buildItemOrders(rows, 'Rajma', '2026-10-07').map((l) => l.orderId)).toEqual(['ORD-2', 'ORD-1']);
     expect(buildItemOrders(rows, 'Rajma', '2026-10-08').map((l) => l.orderId)).toEqual(['ORD-3']);
     expect(buildItemOrders(rows, 'Rajma', '2026-10-09')).toEqual([]);
   });
@@ -438,5 +443,96 @@ describe('eco containers per item', () => {
     expect(items['Rajma'].quantity).toBe(5);
     expect(items['Samosa Pav'].eco).toBe(0);
     expect(out[0].totals.ecoContainers).toBe(2);
+  });
+});
+
+describe('who ordered: sorted by spice level, then quantity', () => {
+  const r = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'A', day: '2026-10-07', name: 'Matar Paneer Bhurji', quantity: 1, portion: '8Oz', spiceLevel: 'Normal', customerName: 'X', ...over });
+  const order = (rows: KitchenRow[]) => buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => `${l.spice ?? 'none'}:${l.quantity}:${l.orderId}`);
+  it('mild, normal, medium, spicy, hot, then no spice; biggest first inside a level', () => {
+    const rows = [
+      r({ orderId: 'a', spiceLevel: 'Spicy', quantity: 1 }),
+      r({ orderId: 'b', spiceLevel: null, quantity: 9 }),
+      r({ orderId: 'c', spiceLevel: 'Normal', quantity: 1 }),
+      r({ orderId: 'd', spiceLevel: 'Mild (Kid Friendly)', quantity: 1 }),
+      r({ orderId: 'e', spiceLevel: 'Normal', quantity: 3 }),
+      r({ orderId: 'f', spiceLevel: 'Medium Spice', quantity: 2 }),
+      r({ orderId: 'g', spiceLevel: 'Mild (Kid Friendly)', quantity: 4 }),
+      r({ orderId: 'h', spiceLevel: 'Hot', quantity: 1 }),
+    ];
+    expect(order(rows)).toEqual(['Mild (Kid Friendly):4:g', 'Mild (Kid Friendly):1:d', 'Normal:3:e', 'Normal:1:c', 'Medium Spice:2:f', 'Spicy:1:a', 'Hot:1:h', 'none:9:b']);
+  });
+  it('same spice and quantity: by day, then customer name', () => {
+    const rows = [r({ orderId: 'z', customerName: 'Zed' }), r({ orderId: 'y', customerName: 'Amy' }), r({ orderId: 'x', day: '2026-10-06', customerName: 'Zed' })];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['x', 'y', 'z']);
+  });
+  it('an unknown spice name sits after the known levels and before no spice', () => {
+    expect(spiceRank('Mild (Kid Friendly)')).toBeLessThan(spiceRank('Normal'));
+    expect(spiceRank('Normal')).toBeLessThan(spiceRank('Medium Spice'));
+    expect(spiceRank('Medium Spice')).toBeLessThan(spiceRank('Spicy'));
+    expect(spiceRank('Spicy')).toBeLessThan(spiceRank('Hot'));
+    expect(spiceRank('Hot')).toBeLessThan(spiceRank('Extra Hot'));
+    expect(spiceRank('Extra Hot')).toBeLessThan(spiceRank('Surprise me'));
+    expect(spiceRank('Surprise me')).toBeLessThan(spiceRank(null));
+    expect(spiceRank('')).toBe(spiceRank(undefined));
+  });
+});
+
+describe('combo breakdown per order', () => {
+  const sections = [
+    { _id: 's1', title: 'Veg Curry of the Day', selectedItems: [{ _id: 'o1', portion: '12Oz', item: { name: 'Kale Chane' } }, { _id: 'o2', portion: '12Oz', item: { name: 'Rajma' } }] },
+    { _id: 's2', title: 'Choice of Staple', selectedItems: [{ _id: 'o3', portion: '', item: { name: 'Chapati' } }, { _id: 'o4', portion: '16Oz', item: { name: 'Jeera Rice' } }] },
+    { _id: 's3', title: 'Sides', selectedItems: [{ _id: 'o5', portion: '4Oz', item: { name: 'Raita' } }, { _id: 'o6', portion: '4Oz', item: { name: 'Salad' } }] },
+  ];
+  const combo = (orderId: string, picks: Record<string, string[]>, over: Partial<KitchenRow> = {}): KitchenRow => ({ orderId, day: '2026-10-07', name: 'Veg Combo', quantity: 1, spiceLevel: 'Normal', customerName: orderId, sections, comboSelections: picks, ...over });
+  it('one line per section with the size in brackets, no brackets when there is no size', () => {
+    expect(comboChoiceLines(combo('A', { s1: ['o1'], s2: ['o3'] }))).toEqual(['Veg Curry of the Day: Kale Chane (12Oz)', 'Choice of Staple: Chapati']);
+  });
+  it('two picks in a section are joined; a section with no pick is left out', () => {
+    expect(comboChoiceLines(combo('A', { s3: ['o5', 'o6'] }))).toEqual(['Sides: Raita (4Oz), Salad (4Oz)']);
+  });
+  it('unknown ids, missing data and a missing title are handled', () => {
+    expect(comboChoiceLines(combo('A', { s1: ['nope'] }))).toEqual([]);
+    expect(comboChoiceLines({ sections: null, comboSelections: null })).toEqual([]);
+    expect(comboChoiceLines({ sections: [{ _id: 's9', selectedItems: [{ _id: 'q', item: { name: 'X' } }] }], comboSelections: { s9: ['q'] } })).toEqual(['Choice: X']);
+  });
+  it('tracing the combo gives each order its own breakdown; tracing a part gives none', () => {
+    const rows = [combo('A', { s1: ['o1'], s2: ['o4'] }), combo('B', { s1: ['o2'], s2: ['o3'] }, { spiceLevel: 'Spicy' })];
+    const lines = buildItemOrders(rows, 'Veg Combo');
+    expect(lines.map((l) => [l.orderId, l.choices])).toEqual([
+      ['A', ['Veg Curry of the Day: Kale Chane (12Oz)', 'Choice of Staple: Jeera Rice (16Oz)']],
+      ['B', ['Veg Curry of the Day: Rajma (12Oz)', 'Choice of Staple: Chapati']],
+    ]);
+    const part = buildItemOrders(rows, 'Kale Chane');
+    expect(part).toHaveLength(1);
+    expect(part[0]).toMatchObject({ viaCombo: 'Veg Combo', choices: [] });
+  });
+});
+
+describe('eco containers by size', () => {
+  const days = ['2026-10-07'];
+  const r = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'A', day: '2026-10-07', name: 'Rajma', quantity: 1, portion: '16Oz', isEco: true, ...over });
+  it('counts eco containers per size, biggest first', () => {
+    const out = buildKitchenDays([r({ quantity: 3 }), r({ orderId: 'B', quantity: 1, portion: '12Oz' }), r({ orderId: 'C', quantity: 1, portion: '12Oz' }), r({ orderId: 'D', quantity: 5, isEco: false })], days);
+    const item = out[0].items[0];
+    expect(item.eco).toBe(5);
+    expect(item.ecoBySize).toEqual([{ label: '16Oz', quantity: 3 }, { label: '12Oz', quantity: 2 }]);
+  });
+  it('an eco item without a size is counted under No size', () => {
+    const out = buildKitchenDays([r({ portion: null, quantity: 2 })], days);
+    expect(out[0].items[0].ecoBySize).toEqual([{ label: 'No size', quantity: 2 }]);
+  });
+  it('no eco gives an empty list, and the by-size numbers add up to the eco total', () => {
+    const none = buildKitchenDays([r({ isEco: false })], days);
+    expect(none[0].items[0].ecoBySize).toEqual([]);
+    const mixed = buildKitchenDays([r({ quantity: 4 }), r({ orderId: 'B', portion: null, quantity: 1 }), r({ orderId: 'C', portion: '8Oz', quantity: 2 })], days);
+    const item = mixed[0].items[0];
+    expect(item.ecoBySize.reduce((s, l) => s + l.quantity, 0)).toBe(item.eco);
+  });
+  it('eco inside a combo stays on the combo, not on its parts', () => {
+    const parts = [{ _id: 's1', title: 'Curry', selectedItems: [{ _id: 'o1', portion: '12Oz', item: { name: 'Kale Chane' } }] }];
+    const out = buildKitchenDays([{ orderId: 'A', day: '2026-10-07', name: 'Veg Combo', quantity: 2, isEco: true, sections: parts, comboSelections: { s1: ['o1'] } }], days);
+    expect(out[0].combos[0].eco).toBe(2);
+    expect(out[0].items.find((i) => i.name === 'Kale Chane')?.ecoBySize).toEqual([]);
   });
 });
