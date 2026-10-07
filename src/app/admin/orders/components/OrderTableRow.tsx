@@ -39,7 +39,7 @@ export default function OrderTableRow({
 }: OrderTableRowProps) {
   const refundedAmount = getRefundedAmount(order);
   const instructionToDriver = order.address?.floor || '-';
-  const emailView = orderEmailStatusView(order.emailStatus);
+  const emailView = orderEmailStatusView(order.emailStatus, order.emailDelivery);
 
   const cells: Record<string, ReactNode> = {
     // Select

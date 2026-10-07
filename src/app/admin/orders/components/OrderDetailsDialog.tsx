@@ -32,6 +32,7 @@ import { getItemPortionLabel } from '@/utils/portions';
 import { Order, OrderStatus } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
+import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -615,6 +616,15 @@ export default function OrderDetailsDialog({
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {order.emailStatus.status} (Attempts: {order.emailStatus.attempts})
                     </Typography>
+                    {order.emailDelivery && (() => {
+                      const view = orderEmailStatusView(order.emailStatus, order.emailDelivery);
+                      return (
+                        <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+                          {view.label}
+                          {view.detail ? ` · ${view.detail}` : ''}
+                        </Typography>
+                      );
+                    })()}
                     {order.emailStatus.error && (
                       <Typography variant="caption" sx={{ color: '#EF4444' }}>
                         Error: {order.emailStatus.error}
