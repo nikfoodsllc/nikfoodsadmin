@@ -320,6 +320,7 @@ describe('search in Recent orders', () => {
     createdAt: '2026-10-07T16:54:00.000Z',
     customerName: 'Aditi Nagpal',
     customerEmail: 'duggal.aditi@gmail.com',
+    customerPhone: '2065550144',
     total: 6.08,
     status: 'pending',
     paymentStatus: 'unpaid',
@@ -331,8 +332,8 @@ describe('search in Recent orders', () => {
   });
   const rows = [
     row({}),
-    row({ orderId: 'ORD-1791348392591569', customerName: 'Shrey Test', customerEmail: 'jainshrey2004+pay3@gmail.com', total: 38.65, paymentStatus: 'paid', status: 'confirmed', awaitingPayment: false, paymentMethod: 'Cash on Delivery', offlinePaymentNote: 'paid at the door', deliveryDates: ['2026-10-09'] }),
-    row({ orderId: 'ORD-1791336924112871', customerName: 'Kunal Mehra', customerEmail: 'kmehra1@gmail.com', total: 51.92, status: 'cancelled', awaitingPayment: false, paymentMethod: 'Zelle', deliveryDates: ['2026-10-08', '2026-10-09'] }),
+    row({ orderId: 'ORD-1791348392591569', customerName: 'Shrey Test', customerEmail: 'jainshrey2004+pay3@gmail.com', customerPhone: '4255550177', total: 38.65, paymentStatus: 'paid', status: 'confirmed', awaitingPayment: false, paymentMethod: 'Cash on Delivery', offlinePaymentNote: 'paid at the door', deliveryDates: ['2026-10-09'] }),
+    row({ orderId: 'ORD-1791336924112871', customerName: 'Kunal Mehra', customerEmail: 'kmehra1@gmail.com', customerPhone: '2535550123', total: 51.92, status: 'cancelled', awaitingPayment: false, paymentMethod: 'Zelle', deliveryDates: ['2026-10-08', '2026-10-09'] }),
   ];
   const ids = (q: string) => searchRows(rows, q).map((r) => r.orderId.slice(-4));
   it('an empty or blank box matches everything', () => {
@@ -368,6 +369,23 @@ describe('search in Recent orders', () => {
     expect(ids('cancelled')).toEqual(['2871']);
     expect(ids('paid')).toEqual(['1569']);
     expect(ids('waiting')).toEqual(['2121']);
+  });
+  it('finds by phone, however it is typed, and also by a part of it', () => {
+    expect(ids('2065550144')).toEqual(['2121']);
+    expect(ids('(206) 555-0144')).toEqual(['2121']);
+    expect(ids('206.555.0144')).toEqual(['2121']);
+    expect(ids('1-206-555-0144')).toEqual(['2121']);
+    expect(ids('+1 206 555 0144')).toEqual(['2121']);
+    expect(ids('555-0177')).toEqual(['1569']);
+    expect(ids('425')).toEqual(['1569']);
+    expect(ids('555')).toEqual(['2121', '1569', '2871']);
+    expect(ids('aditi 0144')).toEqual(['2121']);
+    expect(ids('aditi 0177')).toEqual([]);
+  });
+  it('an order from an older server without a phone is still found by everything else', () => {
+    const old = [row({ customerPhone: undefined })];
+    expect(searchRows(old, 'aditi')).toHaveLength(1);
+    expect(searchRows(old, '2065550144')).toHaveLength(0);
   });
   it('no match gives an empty list', () => {
     expect(ids('zzzz')).toEqual([]);

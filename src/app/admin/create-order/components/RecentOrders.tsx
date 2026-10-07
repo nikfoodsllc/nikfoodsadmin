@@ -178,7 +178,7 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
         <TextField
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, email, order number, date, amount…"
+          placeholder="Search by name, email, phone, order number, date, amount…"
           size="small"
           fullWidth
           type="search"
@@ -213,7 +213,7 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
               <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 700, fontSize: 14, wordBreak: 'break-all' }}>{row.orderId}</Typography>
-                  <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{row.customerName} · {row.customerEmail}</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{row.customerName} · {row.customerEmail}{row.customerPhone ? ` · ${row.customerPhone}` : ''}</Typography>
                   <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
                     Entered {when(row.createdAt)} · delivers {row.deliveryDates.map(dayText).join(', ')}
                   </Typography>
