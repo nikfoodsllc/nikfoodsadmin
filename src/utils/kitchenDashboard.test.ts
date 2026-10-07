@@ -7,7 +7,9 @@ import {
   comboChoiceLines,
   comboParts,
   formatAmount,
+  shortSpiceLabel,
   sizeRank,
+  spiceLineText,
   spiceRank,
   parsePortionAmount,
   enumerateDays,
@@ -149,13 +151,14 @@ describe('buildKitchenDays', () => {
     const wed = out[2];
     expect(wed.items).toHaveLength(1);
     expect(wed.items[0]).toMatchObject({ name: 'Rajma', quantity: 6, inCombos: 0 });
+    // sizes biggest first, spice mild to hot (not most-ordered first)
     expect(wed.items[0].portions).toEqual([
-      { label: '8Oz', quantity: 3 },
       { label: '16Oz', quantity: 3 },
-    ].sort((a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label)));
+      { label: '8Oz', quantity: 3 },
+    ]);
     expect(wed.items[0].spice).toEqual([
-      { label: 'Hot', quantity: 4 },
       { label: 'Medium Spice', quantity: 2 },
+      { label: 'Hot', quantity: 4 },
     ]);
     expect(wed.totals).toMatchObject({ units: 6, orders: 3 });
   });
@@ -201,8 +204,8 @@ describe('buildKitchenDays', () => {
     expect(wed.combos).toHaveLength(1);
     expect(wed.combos[0]).toMatchObject({ name: 'Veg Combo', quantity: 3 });
     expect(wed.combos[0].spice).toEqual([
-      { label: 'Hot', quantity: 2 },
       { label: 'Medium Spice', quantity: 1 },
+      { label: 'Hot', quantity: 2 },
     ]);
     expect(wed.combos[0].parts.find((p) => p.name === 'Kale Chane')).toMatchObject({ quantity: 3, portion: '12Oz' });
     // units = what was ordered: 3 combos + 4 Kale Chane (combo parts are not counted twice)
@@ -580,5 +583,63 @@ describe('eco containers by size', () => {
     const out = buildKitchenDays([{ orderId: 'A', day: '2026-10-07', name: 'Veg Combo', quantity: 2, isEco: true, sections: parts, comboSelections: { s1: ['o1'] } }], days);
     expect(out[0].combos[0].eco).toBe(2);
     expect(out[0].items.find((i) => i.name === 'Kale Chane')?.ecoBySize).toEqual([]);
+  });
+});
+
+describe('item cards: sizes biggest first, spice mild to hot', () => {
+  const days = ['2026-10-07'];
+  const r = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'A', day: '2026-10-07', name: 'Rajma', quantity: 1, portion: '8Oz', spiceLevel: 'Normal', ...over });
+  it('the size chips run 16Oz, 12Oz, 8Oz whatever the counts, no size last', () => {
+    const out = buildKitchenDays([r({ quantity: 9 }), r({ orderId: 'B', portion: '16Oz', quantity: 1 }), r({ orderId: 'C', portion: '12Oz', quantity: 4 }), r({ orderId: 'D', portion: null, quantity: 20 })], days);
+    expect(out[0].items[0].portions.map((p) => `${p.label}:${p.quantity}`)).toEqual(['16Oz:1', '12Oz:4', '8Oz:9', 'No size:20']);
+  });
+  it('the Spice line runs mild, normal, medium, spicy, hot whatever the counts', () => {
+    const out = buildKitchenDays(
+      [
+        r({ spiceLevel: 'Hot', quantity: 9 }),
+        r({ orderId: 'B', spiceLevel: 'Normal', quantity: 5 }),
+        r({ orderId: 'C', spiceLevel: 'Spicy', quantity: 7 }),
+        r({ orderId: 'D', spiceLevel: 'Mild (Kid Friendly)', quantity: 1 }),
+        r({ orderId: 'E', spiceLevel: 'Medium Spice', quantity: 3 }),
+      ],
+      days
+    );
+    expect(out[0].items[0].spice.map((s) => s.label)).toEqual(['Mild (Kid Friendly)', 'Normal', 'Medium Spice', 'Spicy', 'Hot']);
+  });
+  it('the spice line of a combo follows the same order', () => {
+    const sections = [{ _id: 's1', title: 'Curry', selectedItems: [{ _id: 'o1', portion: '12Oz', item: { name: 'Kale Chane' } }] }];
+    const combo = (orderId: string, spiceLevel: string, quantity: number): KitchenRow => ({ orderId, day: '2026-10-07', name: 'Veg Combo', quantity, spiceLevel, sections, comboSelections: { s1: ['o1'] } });
+    const out = buildKitchenDays([combo('A', 'Spicy', 5), combo('B', 'Normal', 1), combo('C', 'Mild (Kid Friendly)', 2)], days);
+    expect(out[0].combos[0].spice.map((s) => s.label)).toEqual(['Mild (Kid Friendly)', 'Normal', 'Spicy']);
+  });
+  it('an unknown spice name comes after the known levels', () => {
+    const out = buildKitchenDays([r({ spiceLevel: 'Surprise me', quantity: 9 }), r({ orderId: 'B', spiceLevel: 'Hot' }), r({ orderId: 'C', spiceLevel: 'Mild (Kid Friendly)' })], days);
+    expect(out[0].items[0].spice.map((s) => s.label)).toEqual(['Mild (Kid Friendly)', 'Hot', 'Surprise me']);
+  });
+  it('the week total uses the same order', () => {
+    const week = buildKitchenWeek([r({ quantity: 9 }), r({ orderId: 'B', portion: '16Oz' }), r({ orderId: 'C', spiceLevel: 'Hot', quantity: 4 }), r({ orderId: 'D', spiceLevel: 'Mild (Kid Friendly)' })]);
+    expect(week.items[0].portions.map((p) => p.label)).toEqual(['16Oz', '8Oz']);
+    expect(week.items[0].spice.map((s) => s.label)).toEqual(['Mild (Kid Friendly)', 'Normal', 'Hot']);
+  });
+});
+
+describe('the spice line of a card', () => {
+  it('short names: Mild (Kid Friendly) is Mild, Medium Spice is Medium, the others stay', () => {
+    expect(shortSpiceLabel('Mild (Kid Friendly)')).toBe('Mild');
+    expect(shortSpiceLabel('Mild')).toBe('Mild');
+    expect(shortSpiceLabel('Medium Spice')).toBe('Medium');
+    expect(shortSpiceLabel('Normal')).toBe('Normal');
+    expect(shortSpiceLabel('Spicy')).toBe('Spicy');
+    expect(shortSpiceLabel('Hot')).toBe('Hot');
+    expect(shortSpiceLabel(' Extra Hot ')).toBe('Extra Hot');
+  });
+  it('one line with the chilli icon instead of the word Spice', () => {
+    const line = spiceLineText([{ label: 'Mild (Kid Friendly)', quantity: 9 }, { label: 'Normal', quantity: 5 }, { label: 'Medium Spice', quantity: 3 }, { label: 'Spicy', quantity: 2 }]);
+    expect(line).toBe('🌶️ Mild × 9, Normal × 5, Medium × 3, Spicy × 2');
+    expect(line).not.toContain('Spice:');
+    expect(line.length).toBeLessThan(50);
+  });
+  it('nothing when no spice level was ordered', () => {
+    expect(spiceLineText([])).toBe('');
   });
 });

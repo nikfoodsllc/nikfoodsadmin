@@ -138,7 +138,9 @@ export interface KitchenItem {
   quantity: number;
   /** How much of `quantity` is a part of a combo. */
   inCombos: number;
+  /** Sizes ordered, biggest first (16Oz, 12Oz, 8Oz; no size last) */
   portions: CountLine[];
+  /** Spice levels ordered, mild to hot */
   spice: CountLine[];
   /** How many of the units ordered on their own come in an eco container (parts inside a combo count on the combo). */
   eco: number;
@@ -239,17 +241,32 @@ function bump(map: Map<string, number>, key: string, by: number) {
   map.set(key, (map.get(key) ?? 0) + by);
 }
 
-function toLines(map: Map<string, number>): CountLine[] {
-  return [...map.entries()]
-    .map(([label, quantity]) => ({ label, quantity }))
-    .sort((a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label));
-}
-
 /** Counts by size, the biggest size first (16Oz, 12Oz, 8Oz), so the same sizes always read in the same order; unsized last. */
 function toSizeLines(map: Map<string, number>): CountLine[] {
   return [...map.entries()]
     .map(([label, quantity]) => ({ label, quantity }))
     .sort((a, b) => sizeRank(b.label === 'No size' ? null : b.label) - sizeRank(a.label === 'No size' ? null : a.label) || a.label.localeCompare(b.label));
+}
+
+/** The short name of a spice level for the cards ('Mild (Kid Friendly)' -> 'Mild', 'Medium Spice' -> 'Medium'); other names stay as they are. */
+export function shortSpiceLabel(label: string): string {
+  const s = clean(label);
+  if (/^mild\b/i.test(s)) return 'Mild';
+  if (/^medium\b/i.test(s)) return 'Medium';
+  return s;
+}
+
+/** The spice line of a card on one line: '🌶️ Mild × 9, Normal × 5, Medium × 3, Spicy × 2'; '' when there is no spice. */
+export function spiceLineText(spice: CountLine[]): string {
+  if (spice.length === 0) return '';
+  return `🌶️ ${spice.map((s) => `${shortSpiceLabel(s.label)} × ${s.quantity}`).join(', ')}`;
+}
+
+/** Counts by spice level, mild to hot (the same order as the who-ordered list); levels we do not know come last. */
+function toSpiceLines(map: Map<string, number>): CountLine[] {
+  return [...map.entries()]
+    .map(([label, quantity]) => ({ label, quantity }))
+    .sort((a, b) => spiceRank(a.label) - spiceRank(b.label) || a.label.localeCompare(b.label));
 }
 
 /** The picked options of a combo line, as name + portion. Unknown ids are skipped. */
@@ -382,7 +399,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
 
   const itemList: KitchenItem[] = [...items.entries()]
     .map(([name, acc]) => {
-      const portions = toLines(acc.portions);
+      const portions = toSizeLines(acc.portions);
       // a single "No size" line adds nothing to the total, so it is left out
       const showPortions = portions.length > 1 || (portions.length === 1 && portions[0].label !== 'No size');
       return {
@@ -390,7 +407,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         quantity: acc.total,
         inCombos: acc.inCombos,
         portions: showPortions ? portions : [],
-        spice: toLines(acc.spice),
+        spice: toSpiceLines(acc.spice),
         eco: acc.eco,
         ecoBySize: toSizeLines(acc.ecoBySize),
         totalText: formatAmount(acc.amount),
@@ -403,7 +420,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
     .map(([name, c]) => ({
       name,
       quantity: c.quantity,
-      spice: toLines(c.spice),
+      spice: toSpiceLines(c.spice),
       eco: c.eco,
       parts: [...c.parts.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)),
     }))
