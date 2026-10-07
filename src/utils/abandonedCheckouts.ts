@@ -138,7 +138,8 @@ export function buildAbandonedRows(
       out.orderedSince += 1;
       continue;
     }
-    const sorted = [...list].sort((a, b) => ms(b.lastActivityAt) - ms(a.lastActivityAt));
+    // newest activity first; on a tie the checkout that was started last (it is the one with the real cart)
+    const sorted = [...list].sort((a, b) => ms(b.lastActivityAt) - ms(a.lastActivityAt) || ms(b.createdAt) - ms(a.createdAt));
     const latest = sorted[0];
     if (ms(latest.lastActivityAt) > quietBefore) continue;
 
