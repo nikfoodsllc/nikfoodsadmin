@@ -277,10 +277,17 @@ export interface AvailableDate {
   flatCategoryEnabled: boolean; // Enable flat category listing for this date
   dayWiseCategoryEnabled: boolean; // Enable day-wise category listing for this date
   /**
-   * Custom order cutoff for this date (an absolute moment). Missing/null = the standard cutoff,
-   * 1 PM Pacific the day before. Set by an admin to extend, reopen or close a date early.
+   * Older single custom order cutoff for this date (an absolute moment): applies to both kinds of items when the
+   * kind's own field below is not set. New saves use the two fields below instead.
    */
   cutoffAt?: Date | string | null;
+  /** Custom order cutoff for flat items (an absolute moment). Missing/null = the standard, 5 PM Pacific the day before. */
+  flatCutoffAt?: Date | string | null;
+  /** Custom order cutoff for day-wise (Food Menu) items. Missing/null = the standard, 1 PM Pacific the day before. */
+  dayWiseCutoffAt?: Date | string | null;
+  /** When and by whom the custom flat / day-wise cutoff was set (not recorded for cutoffs saved before this existed). */
+  flatCutoffSet?: { at: Date | string; by?: string } | null;
+  dayWiseCutoffSet?: { at: Date | string; by?: string } | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }

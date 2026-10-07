@@ -48,7 +48,13 @@ import {
 import { formatInPST } from '@/utils/timezone';
 import {
   cutoffStatus,
+  ITEM_KINDS,
+  ITEM_KIND_LABEL,
+  overrideForKind,
+  DEFAULT_CUTOFF_HOUR_BY_KIND,
+  type ItemKind,
   describeCutoff,
+  formatCutoff,
   extendCutoff,
   inputValueToInstant,
   instantToInputValue,
@@ -87,8 +93,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  // the cutoff time typed in the dialog, as a Pacific-time datetime-local value
-  const [cutoffInput, setCutoffInput] = useState('');
+  // the cutoff time typed in the dialog for each kind of item, as a Pacific-time datetime-local value
+  const [cutoffInputs, setCutoffInputs] = useState<Record<ItemKind, string>>({ flat: '', 'day-wise': '' });
   const [error, setError] = useState<string | null>(null);
 
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' = 'success') => {
@@ -173,7 +179,11 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
   // Show the cutoff in effect for the selected date (custom or standard) when the dialog opens or the data is saved
   useEffect(() => {
     if (!dialogOpen || !selectedDate) return;
-    setCutoffInput(instantToInputValue(cutoffStatus(selectedDate, datesData[selectedDate]?.cutoffAt).closesAt));
+    const data = datesData[selectedDate];
+    setCutoffInputs({
+      flat: instantToInputValue(cutoffStatus(selectedDate, overrideForKind(data, 'flat'), new Date(), 'flat').closesAt),
+      'day-wise': instantToInputValue(cutoffStatus(selectedDate, overrideForKind(data, 'day-wise'), new Date(), 'day-wise').closesAt),
+    });
   }, [dialogOpen, selectedDate, datesData]);
 
   // Update single date availability
@@ -181,8 +191,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
     date: string,
     flatCategoryEnabled: boolean,
     dayWiseCategoryEnabled: boolean,
-    /** undefined = leave the custom order cutoff as it is, null = back to the standard cutoff, string = set it (ISO) */
-    cutoffAt?: string | null,
+    /** per kind of item: undefined = leave the custom order cutoff as it is, null = back to the standard cutoff, string = set it (ISO) */
+    cutoffs?: { flatCutoffAt?: string | null; dayWiseCutoffAt?: string | null },
     successMessage = 'Availability updated successfully'
   ) => {
     if (!token || !isAuthenticated) return;
@@ -200,7 +210,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
           date,
           flatCategoryEnabled,
           dayWiseCategoryEnabled,
-          ...(cutoffAt !== undefined ? { cutoffAt } : {}),
+          ...(cutoffs?.flatCutoffAt !== undefined ? { flatCutoffAt: cutoffs.flatCutoffAt } : {}),
+          ...(cutoffs?.dayWiseCutoffAt !== undefined ? { dayWiseCutoffAt: cutoffs.dayWiseCutoffAt } : {}),
         }),
       });
 
@@ -684,7 +695,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                             },
                           }}
                         />
-                        {parseCutoff(dateData.availability?.cutoffAt) && (
+                        {ITEM_KINDS.some((k) => parseCutoff(overrideForKind(dateData.availability, k))) && (
                           <Chip
                             icon={<IconClock size={12} />}
                             label="Custom cutoff"
@@ -846,31 +857,38 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 </ToggleButtonGroup>
               </Box>
 
-              {selectedDate && (() => {
+              {selectedDate && ITEM_KINDS.map((kind) => {
                 const availability = datesData[selectedDate];
-                const status = cutoffStatus(selectedDate, availability?.cutoffAt);
-                const typed = inputValueToInstant(cutoffInput);
+                const override = overrideForKind(availability, kind);
+                const status = cutoffStatus(selectedDate, override, new Date(), kind);
+                const input = cutoffInputs[kind];
+                const typed = inputValueToInstant(input);
                 const problem = typed ? validateCutoff(selectedDate, typed) : 'Pick a date and time';
                 const unchanged =
                   !!typed && Math.abs(typed.getTime() - status.closesAt.getTime()) < 60 * 1000 && status.overridden;
                 const busy = !!saving[selectedDate];
-                const saveCutoff = (cutoffAt: string | null, message: string) =>
+                const field = kind === 'flat' ? 'flatCutoffAt' : 'dayWiseCutoffAt';
+                const standardHour = DEFAULT_CUTOFF_HOUR_BY_KIND[kind];
+                const standardTime = `${standardHour > 12 ? standardHour - 12 : standardHour}:00 ${standardHour >= 12 ? 'PM' : 'AM'}`;
+                const setInfo = (kind === 'flat' ? availability?.flatCutoffSet : availability?.dayWiseCutoffSet) ?? null;
+                const setAt = setInfo ? parseCutoff(setInfo.at) : null;
+                const saveCutoff = (value: string | null, message: string) =>
                   updateDateAvailability(
                     selectedDate,
                     availability?.flatCategoryEnabled ?? false,
                     availability?.dayWiseCategoryEnabled ?? false,
-                    cutoffAt,
+                    { [field]: value },
                     message
                   );
                 return (
-                  <Box sx={{ p: 2, backgroundColor: '#F9FAFB', borderRadius: 2 }}>
+                  <Box key={kind} sx={{ p: 2, backgroundColor: '#F9FAFB', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
                       <Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                          Order cutoff
+                          Order cutoff: {ITEM_KIND_LABEL[kind]}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                          When customers can no longer order for this date. The standard time is 1:00 PM the day before.
+                          When customers can no longer order these items for this date. The standard time is {standardTime} the day before.
                         </Typography>
                       </Box>
                       <Chip
@@ -885,32 +903,34 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     </Box>
 
                     <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 500 }}>
-                      {describeCutoff(selectedDate, availability?.cutoffAt)}
+                      {describeCutoff(selectedDate, override, new Date(), kind)}
                     </Typography>
+                    {status.overridden && (
+                      <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+                        {setAt
+                          ? `Custom cutoff set ${formatCutoff(setAt)} Pacific${setInfo?.by ? ` by ${setInfo.by}` : ''}`
+                          : 'Custom cutoff (the time it was set was not recorded)'}
+                      </Typography>
+                    )}
 
                     <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        disabled={busy}
-                        onClick={() =>
-                          saveCutoff(extendCutoff(selectedDate, availability?.cutoffAt, 1).toISOString(), 'Cutoff extended by 1 hour')
-                        }
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Extend 1 hour
-                      </Button>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        disabled={busy}
-                        onClick={() =>
-                          saveCutoff(extendCutoff(selectedDate, availability?.cutoffAt, 2).toISOString(), 'Cutoff extended by 2 hours')
-                        }
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Extend 2 hours
-                      </Button>
+                      {[1, 2].map((hours) => (
+                        <Button
+                          key={hours}
+                          variant="contained"
+                          size="small"
+                          disabled={busy}
+                          onClick={() =>
+                            saveCutoff(
+                              extendCutoff(selectedDate, override, hours, new Date(), kind).toISOString(),
+                              `Cutoff extended by ${hours} hour${hours > 1 ? 's' : ''}`
+                            )
+                          }
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Extend {hours} hour{hours > 1 ? 's' : ''}
+                        </Button>
+                      ))}
                       {status.overridden && (
                         <Button
                           variant="outlined"
@@ -932,11 +952,11 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                         type="datetime-local"
                         size="small"
                         label="Close ordering at (Pacific time)"
-                        value={cutoffInput}
-                        onChange={(e) => setCutoffInput(e.target.value)}
+                        value={input}
+                        onChange={(e) => setCutoffInputs((prev) => ({ ...prev, [kind]: e.target.value }))}
                         InputLabelProps={{ shrink: true }}
-                        error={!!cutoffInput && !!problem}
-                        helperText={cutoffInput && problem ? problem : undefined}
+                        error={!!input && !!problem}
+                        helperText={input && problem ? problem : undefined}
                         sx={{ flex: '1 1 220px', minWidth: 220 }}
                       />
                       <Button
@@ -951,7 +971,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     </Box>
                   </Box>
                 );
-              })()}
+              })}
             </Box>
           </Box>
         </DialogContent>
