@@ -7,6 +7,7 @@ import {
   extendCutoff,
   inputValueToInstant,
   instantToInputValue,
+  overrideForKind,
   parseCutoff,
   validateCutoff,
 } from './orderCutoff';
@@ -82,5 +83,31 @@ describe('validateCutoff', () => {
     expect(validateCutoff(day, new Date('2026-10-08T12:00:00.000Z'))).toMatch(/after the delivery date/);
     expect(validateCutoff(day, new Date('nope'))).toMatch(/Invalid cutoff/);
     expect(validateCutoff('bad', new Date())).toMatch(/Invalid delivery date/);
+  });
+});
+
+describe('cutoffs per kind of item', () => {
+  const DAY = '2026-10-09';
+  it('standard cutoff: flat 5 PM, day-wise 1 PM Pacific the day before', () => {
+    expect(defaultCutoffInstant(DAY, 'flat').toISOString()).toBe('2026-10-09T00:00:00.000Z');
+    expect(defaultCutoffInstant(DAY, 'day-wise').toISOString()).toBe('2026-10-08T20:00:00.000Z');
+    expect(defaultCutoffInstant(DAY).toISOString()).toBe('2026-10-08T20:00:00.000Z');
+  });
+  it('status follows the kind: at 2 PM day-wise is closed and flat still open', () => {
+    const now = new Date('2026-10-08T21:00:00.000Z');
+    expect(cutoffStatus(DAY, undefined, now, 'day-wise').isOpen).toBe(false);
+    expect(cutoffStatus(DAY, undefined, now, 'flat').isOpen).toBe(true);
+    expect(describeCutoff(DAY, undefined, now, 'flat')).toContain('5:00 PM');
+  });
+  it("a kind's own override wins, else the older single cutoff, else none", () => {
+    const d = { cutoffAt: '2026-10-08T10:00:00.000Z', flatCutoffAt: '2026-10-08T22:00:00.000Z' };
+    expect(overrideForKind(d, 'flat')).toBe(d.flatCutoffAt);
+    expect(overrideForKind(d, 'day-wise')).toBe(d.cutoffAt);
+    expect(overrideForKind({}, 'flat')).toBeUndefined();
+    expect(overrideForKind(null, 'day-wise')).toBeUndefined();
+  });
+  it('extending a closed kind counts from now', () => {
+    const now = new Date('2026-10-09T01:00:00.000Z'); // Thu 6 PM: both closed
+    expect(extendCutoff(DAY, undefined, 2, now, 'flat').toISOString()).toBe('2026-10-09T03:00:00.000Z');
   });
 });

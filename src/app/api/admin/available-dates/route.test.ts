@@ -51,23 +51,64 @@ beforeEach(() => {
 });
 
 describe('POST: custom cutoff', () => {
-  it('sets a custom cutoff, keeps the toggles, and tells the customer site', async () => {
+  it('a cutoffAt (both kinds at once) sets flat and day-wise, replaces the older single field, and tells the customer site', async () => {
     const res = await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, cutoffAt: CUTOFF }));
     expect(res.status).toBe(200);
     const [, filter, update] = updateOne.mock.calls[0];
     expect(String(filter._id)).toBe(ID);
-    expect(update.$set.cutoffAt).toEqual(new Date(CUTOFF));
-    expect(update.$unset).toBeUndefined();
+    expect(update.$set.flatCutoffAt).toEqual(new Date(CUTOFF));
+    expect(update.$set.dayWiseCutoffAt).toEqual(new Date(CUTOFF));
+    expect(update.$unset).toEqual({ cutoffAt: '' });
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect((await res.json()).livesiteNotified).toBe(true);
   });
 
-  it('null clears the custom cutoff (back to the standard rule)', async () => {
+  it('null clears both custom cutoffs (back to the standard rules)', async () => {
     await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, cutoffAt: null }));
     const [, , update] = updateOne.mock.calls[0];
-    expect(update.$unset).toEqual({ cutoffAt: '' });
-    expect(update.$set.cutoffAt).toBeUndefined();
+    expect(update.$unset).toEqual({ flatCutoffAt: '', dayWiseCutoffAt: '', cutoffAt: '' });
+    expect(update.$set.flatCutoffAt).toBeUndefined();
+    expect(update.$set.dayWiseCutoffAt).toBeUndefined();
     expect(invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('sets only the flat cutoff and leaves the day-wise one alone', async () => {
+    const dayWiseExisting = new Date('2026-10-06T21:00:00.000Z');
+    readOne.mockResolvedValueOnce({ success: true, data: { ...existing, dayWiseCutoffAt: dayWiseExisting } }).mockResolvedValue({ success: true, data: existing });
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, flatCutoffAt: CUTOFF }));
+    const [, , update] = updateOne.mock.calls[0];
+    expect(update.$set.flatCutoffAt).toEqual(new Date(CUTOFF));
+    expect(update.$set.dayWiseCutoffAt).toEqual(dayWiseExisting);
+    expect(update.$unset).toEqual({ cutoffAt: '' });
+  });
+
+  it('clears only the day-wise cutoff and keeps the flat one', async () => {
+    const flatExisting = new Date('2026-10-06T22:00:00.000Z');
+    readOne.mockResolvedValueOnce({ success: true, data: { ...existing, flatCutoffAt: flatExisting, dayWiseCutoffAt: new Date(CUTOFF) } }).mockResolvedValue({ success: true, data: existing });
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, dayWiseCutoffAt: null }));
+    const [, , update] = updateOne.mock.calls[0];
+    expect(update.$set.flatCutoffAt).toEqual(flatExisting);
+    expect(update.$set.dayWiseCutoffAt).toBeUndefined();
+    expect(update.$unset).toEqual({ dayWiseCutoffAt: '', cutoffAt: '' });
+  });
+
+  it('a date that still has the older single cutoff keeps it for the kind that was not changed', async () => {
+    const legacy = new Date('2026-10-06T21:30:00.000Z');
+    readOne.mockResolvedValueOnce({ success: true, data: { ...existing, cutoffAt: legacy } }).mockResolvedValue({ success: true, data: existing });
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, flatCutoffAt: CUTOFF }));
+    const [, , update] = updateOne.mock.calls[0];
+    expect(update.$set.flatCutoffAt).toEqual(new Date(CUTOFF));
+    expect(update.$set.dayWiseCutoffAt).toEqual(legacy); // carried over from the older field, which is then removed
+    expect(update.$unset).toEqual({ cutoffAt: '' });
+  });
+
+  it('rejects a bad per-kind cutoff and names the field', async () => {
+    const res = await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, flatCutoffAt: 'nope' }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain('flatCutoffAt');
+    const res2 = await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true, dayWiseCutoffAt: '2026-10-08T12:00:00.000Z' }));
+    expect(res2.status).toBe(400);
+    expect(updateOne).not.toHaveBeenCalled();
   });
 
   it('leaves the cutoff alone when the field is not sent (a plain availability toggle)', async () => {
@@ -83,7 +124,9 @@ describe('POST: custom cutoff', () => {
     readOne.mockResolvedValueOnce({ success: true, data: null }).mockResolvedValueOnce({ success: true, data: { ...existing, cutoffAt: new Date(CUTOFF) } });
     const res = await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: false, cutoffAt: CUTOFF }));
     expect(res.status).toBe(201);
-    expect(create.mock.calls[0][1].cutoffAt).toEqual(new Date(CUTOFF));
+    expect(create.mock.calls[0][1].flatCutoffAt).toEqual(new Date(CUTOFF));
+    expect(create.mock.calls[0][1].dayWiseCutoffAt).toEqual(new Date(CUTOFF));
+    expect(create.mock.calls[0][1].cutoffAt).toBeUndefined();
   });
 
   it('rejects an unreadable cutoff, one a week+ too early, and one after the delivery day', async () => {
@@ -114,6 +157,50 @@ describe('GET', () => {
     read.mockResolvedValue({ success: true, data: [{ ...existing, cutoffAt: new Date(CUTOFF) }, { _id: 'x', date: '2026-10-08', flatCategoryEnabled: true, dayWiseCategoryEnabled: true }] });
     const body = await (await GET(req('GET', undefined, '?startDate=2026-10-01&endDate=2026-10-31'))).json();
     expect(body.data.map((d: { cutoffAt: unknown }) => d.cutoffAt)).toEqual([new Date(CUTOFF).toISOString(), null]);
+  });
+});
+
+describe('GET: per kind', () => {
+  it('returns the flat and day-wise cutoffs of each date', async () => {
+    read.mockResolvedValue({ success: true, data: [{ ...existing, flatCutoffAt: new Date(CUTOFF) }] });
+    const body = await (await GET(req('GET', undefined, '?startDate=2026-10-01&endDate=2026-10-31'))).json();
+    expect(body.data[0].flatCutoffAt).toBe(new Date(CUTOFF).toISOString());
+    expect(body.data[0].dayWiseCutoffAt).toBeNull();
+    expect(body.data[0].cutoffAt).toBeNull();
+  });
+});
+
+describe('PUT (month-wide save): per kind cutoffs survive', () => {
+  it('keeps each kind of custom cutoff and the older single one as they were', async () => {
+    const legacy = new Date('2026-10-06T21:30:00.000Z');
+    read
+      .mockResolvedValueOnce({
+        success: true,
+        data: [
+          { ...existing, flatCutoffAt: new Date(CUTOFF) },
+          { _id: 'y', date: '2026-10-08', flatCategoryEnabled: true, dayWiseCategoryEnabled: true, cutoffAt: legacy },
+        ],
+      })
+      .mockResolvedValue({ success: true, data: [] });
+    const res = await PUT(
+      req('PUT', {
+        startDate: '2026-10-01',
+        endDate: '2026-10-31',
+        dates: [
+          { date: DAY, flatCategoryEnabled: false, dayWiseCategoryEnabled: false },
+          { date: '2026-10-08', flatCategoryEnabled: false, dayWiseCategoryEnabled: false },
+        ],
+      })
+    );
+    expect(res.status).toBe(200);
+    const inserted = createMany.mock.calls[0][1] as Array<{ date: string; cutoffAt?: Date; flatCutoffAt?: Date; dayWiseCutoffAt?: Date }>;
+    const a = inserted.find((d) => d.date === DAY)!;
+    expect(a.flatCutoffAt).toEqual(new Date(CUTOFF));
+    expect(a.dayWiseCutoffAt).toBeUndefined();
+    expect(a.cutoffAt).toBeUndefined();
+    const b = inserted.find((d) => d.date === '2026-10-08')!;
+    expect(b.cutoffAt).toEqual(legacy);
+    expect(b.flatCutoffAt).toBeUndefined();
   });
 });
 

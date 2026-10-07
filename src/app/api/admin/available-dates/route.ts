@@ -11,9 +11,16 @@ interface CreateUpdateRequest {
   flatCategoryEnabled: boolean;
   dayWiseCategoryEnabled: boolean;
   /**
-   * Custom order cutoff for this date (ISO moment). Omit to leave it unchanged; null clears it
+   * Custom order cutoff for flat items (ISO moment). Omit to leave it unchanged; null clears it
+   * (back to the standard 5 PM Pacific the day before).
+   */
+  flatCutoffAt?: string | null;
+  /**
+   * Custom order cutoff for day-wise (Food Menu) items (ISO moment). Omit to leave it unchanged; null clears it
    * (back to the standard 1 PM Pacific the day before).
    */
+  dayWiseCutoffAt?: string | null;
+  /** Both kinds at once (what older versions of the screen sent): sets or clears flat and day-wise together. */
   cutoffAt?: string | null;
 }
 
@@ -87,6 +94,29 @@ function validateDateRange(startDate: string, endDate: string): { isValid: boole
   return { isValid: true };
 }
 
+/** A date as the admin screen gets it back (all the custom cutoff fields). */
+function toResponse(date: Partial<AvailableDate> | null | undefined) {
+  return {
+    id: date?._id?.toString(),
+    date: date?.date,
+    flatCategoryEnabled: date?.flatCategoryEnabled,
+    dayWiseCategoryEnabled: date?.dayWiseCategoryEnabled,
+    cutoffAt: date?.cutoffAt ?? null,
+    flatCutoffAt: date?.flatCutoffAt ?? null,
+    dayWiseCutoffAt: date?.dayWiseCutoffAt ?? null,
+    createdAt: date?.createdAt,
+    updatedAt: date?.updatedAt,
+  };
+}
+
+/**
+ * What to do with one kind's cutoff when a date is saved: undefined = leave it, null = clear it, a string = set it.
+ * The older single `cutoffAt` in a request means "both kinds" and applies where the kind has no field of its own.
+ */
+function cutoffInstruction(own: string | null | undefined, both: string | null | undefined): string | null | undefined {
+  return own !== undefined ? own : both;
+}
+
 /**
  * Validate create/update request data
  */
@@ -107,10 +137,12 @@ function validateCreateUpdateRequest(data: CreateUpdateRequest): { isValid: bool
     return { isValid: false, error: 'dayWiseCategoryEnabled is required and must be a boolean' };
   }
 
-  if (data.cutoffAt !== undefined && data.cutoffAt !== null) {
-    const cutoff = typeof data.cutoffAt === 'string' ? parseCutoff(data.cutoffAt) : null;
+  for (const field of ['cutoffAt', 'flatCutoffAt', 'dayWiseCutoffAt'] as const) {
+    const value = data[field];
+    if (value === undefined || value === null) continue;
+    const cutoff = typeof value === 'string' ? parseCutoff(value) : null;
     if (!cutoff) {
-      return { isValid: false, error: 'cutoffAt must be a valid date and time, or null to use the standard cutoff' };
+      return { isValid: false, error: `${field} must be a valid date and time, or null to use the standard cutoff` };
     }
     const problem = validateCutoff(data.date, cutoff);
     if (problem) {
@@ -181,15 +213,7 @@ export async function GET(request: NextRequest) {
 
     const dates = result.data || [];
 
-    const responseData = dates.map(date => ({
-      id: date._id?.toString(),
-      date: date.date,
-      flatCategoryEnabled: date.flatCategoryEnabled,
-      dayWiseCategoryEnabled: date.dayWiseCategoryEnabled,
-      cutoffAt: date.cutoffAt ?? null,
-      createdAt: date.createdAt,
-      updatedAt: date.updatedAt
-    }));
+    const responseData = dates.map(toResponse);
 
     return NextResponse.json({
       data: responseData,
@@ -227,8 +251,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { date, flatCategoryEnabled, dayWiseCategoryEnabled } = body;
-    // undefined = leave the custom cutoff as it is, null = clear it, string = set it
-    const cutoffAt: string | null | undefined = body.cutoffAt;
+    // per kind: undefined = leave the custom cutoff as it is, null = clear it, string = set it
+    const flatInstruction = cutoffInstruction(body.flatCutoffAt, body.cutoffAt);
+    const dayWiseInstruction = cutoffInstruction(body.dayWiseCutoffAt, body.cutoffAt);
+    const cutoffTouched = flatInstruction !== undefined || dayWiseInstruction !== undefined;
 
     // Check if date already exists
     const existingResult = await db.readOne<AvailableDate>('availableDates', { date });
@@ -248,7 +274,8 @@ export async function POST(request: NextRequest) {
         date,
         flatCategoryEnabled,
         dayWiseCategoryEnabled,
-        ...(typeof cutoffAt === 'string' ? { cutoffAt: new Date(cutoffAt) } : {}),
+        ...(typeof flatInstruction === 'string' ? { flatCutoffAt: new Date(flatInstruction) } : {}),
+        ...(typeof dayWiseInstruction === 'string' ? { dayWiseCutoffAt: new Date(dayWiseInstruction) } : {}),
         createdAt: now,
         updatedAt: now
       };
@@ -276,15 +303,7 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({
-        data: {
-          id: createdDate.data._id?.toString(),
-          date: createdDate.data.date,
-          flatCategoryEnabled: createdDate.data.flatCategoryEnabled,
-          dayWiseCategoryEnabled: createdDate.data.dayWiseCategoryEnabled,
-          cutoffAt: createdDate.data.cutoffAt ?? null,
-          createdAt: createdDate.data.createdAt,
-          updatedAt: createdDate.data.updatedAt
-        },
+        data: toResponse(createdDate.data),
         message: 'Date created successfully',
       }, { status: 201 });
     }
@@ -295,14 +314,26 @@ export async function POST(request: NextRequest) {
       dayWiseCategoryEnabled,
       updatedAt: now
     };
-    if (typeof cutoffAt === 'string') {
-      updateData.cutoffAt = new Date(cutoffAt);
+    const unsetFields: Record<string, ''> = {};
+    if (cutoffTouched) {
+      // The older single cutoff is replaced by the two fields: what a kind was not told to change keeps the value
+      // it had (its own field, else the older single one), so nothing is lost when that single field goes.
+      const legacy = parseCutoff(existingResult.data.cutoffAt);
+      const resolve = (instruction: string | null | undefined, ownExisting: unknown): Date | null =>
+        instruction === undefined ? parseCutoff(ownExisting) ?? legacy : instruction === null ? null : new Date(instruction);
+      const flat = resolve(flatInstruction, existingResult.data.flatCutoffAt);
+      const dayWise = resolve(dayWiseInstruction, existingResult.data.dayWiseCutoffAt);
+      if (flat) updateData.flatCutoffAt = flat;
+      else unsetFields.flatCutoffAt = '';
+      if (dayWise) updateData.dayWiseCutoffAt = dayWise;
+      else unsetFields.dayWiseCutoffAt = '';
+      unsetFields.cutoffAt = '';
     }
 
     const updateResult = await db.updateOne<AvailableDate>(
       'availableDates',
       { _id: existingResult.data._id },
-      cutoffAt === null ? { $set: updateData, $unset: { cutoffAt: '' } } : { $set: updateData }
+      Object.keys(unsetFields).length > 0 ? { $set: updateData, $unset: unsetFields } : { $set: updateData }
     );
 
     if (!updateResult.success) {
@@ -315,18 +346,10 @@ export async function POST(request: NextRequest) {
     });
 
     // A changed cutoff changes what customers can order: tell the customer site now and wait for its answer
-    const livesiteNotified = cutoffAt !== undefined ? await invalidateLivesiteHomeMenuCacheAndWait() : undefined;
+    const livesiteNotified = cutoffTouched ? await invalidateLivesiteHomeMenuCacheAndWait() : undefined;
 
     return NextResponse.json({
-      data: {
-        id: updatedDate.data?._id?.toString(),
-        date: updatedDate.data?.date,
-        flatCategoryEnabled: updatedDate.data?.flatCategoryEnabled,
-        dayWiseCategoryEnabled: updatedDate.data?.dayWiseCategoryEnabled,
-        cutoffAt: updatedDate.data?.cutoffAt ?? null,
-        createdAt: updatedDate.data?.createdAt,
-        updatedAt: updatedDate.data?.updatedAt
-      },
+      data: toResponse(updatedDate.data),
       livesiteNotified,
       message: 'Date updated successfully',
     });
@@ -391,7 +414,7 @@ export async function PUT(request: NextRequest) {
     const errors: string[] = [];
 
     // Custom order cutoffs already set on dates in the range: the delete-and-reinsert below must not lose them
-    const keptCutoffs = new Map<string, Date>();
+    const keptCutoffs = new Map<string, { cutoffAt?: Date; flatCutoffAt?: Date; dayWiseCutoffAt?: Date }>();
 
     // If date range is provided, delete all dates in that range first
     if (startDate && endDate) {
@@ -402,15 +425,23 @@ export async function PUT(request: NextRequest) {
 
       const existingInRange = await db.read<AvailableDate>('availableDates', {
         date: { $gte: startDate, $lte: endDate },
-        cutoffAt: { $exists: true, $ne: null },
+        $or: [
+          { cutoffAt: { $exists: true, $ne: null } },
+          { flatCutoffAt: { $exists: true, $ne: null } },
+          { dayWiseCutoffAt: { $exists: true, $ne: null } },
+        ],
       });
       if (!existingInRange.success) {
         // without this the reinsert would silently drop custom cutoffs: stop instead
         throw new Error(existingInRange.error || 'Failed to read existing dates');
       }
       for (const existing of existingInRange.data ?? []) {
-        const kept = parseCutoff(existing.cutoffAt);
-        if (kept) keptCutoffs.set(existing.date, kept);
+        const kept = {
+          cutoffAt: parseCutoff(existing.cutoffAt) ?? undefined,
+          flatCutoffAt: parseCutoff(existing.flatCutoffAt) ?? undefined,
+          dayWiseCutoffAt: parseCutoff(existing.dayWiseCutoffAt) ?? undefined,
+        };
+        if (kept.cutoffAt || kept.flatCutoffAt || kept.dayWiseCutoffAt) keptCutoffs.set(existing.date, kept);
       }
 
       const deleteResult = await db.delete<AvailableDate>('availableDates', {
@@ -427,12 +458,26 @@ export async function PUT(request: NextRequest) {
 
     // Insert all new dates
     const datesToInsert: AvailableDate[] = dates.map(dateData => {
-      const cutoff = typeof dateData.cutoffAt === 'string' ? parseCutoff(dateData.cutoffAt) : keptCutoffs.get(dateData.date) ?? null;
+      // a cutoff sent with the date wins; otherwise the date keeps what it had
+      const kept = keptCutoffs.get(dateData.date);
+      const sent = (own: string | null | undefined, both: string | null | undefined) => {
+        const value = own !== undefined ? own : both;
+        return typeof value === 'string' ? parseCutoff(value) : null;
+      };
+      const flatSent = sent(dateData.flatCutoffAt, dateData.cutoffAt);
+      const dayWiseSent = sent(dateData.dayWiseCutoffAt, dateData.cutoffAt);
+      const anySent = [dateData.flatCutoffAt, dateData.dayWiseCutoffAt, dateData.cutoffAt].some((v) => typeof v === 'string');
+      const flatCutoff = anySent ? flatSent ?? kept?.flatCutoffAt ?? kept?.cutoffAt : kept?.flatCutoffAt;
+      const dayWiseCutoff = anySent ? dayWiseSent ?? kept?.dayWiseCutoffAt ?? kept?.cutoffAt : kept?.dayWiseCutoffAt;
+      // an untouched date keeps the older single cutoff as it was
+      const legacyCutoff = anySent ? undefined : kept?.cutoffAt;
       return {
         date: dateData.date,
         flatCategoryEnabled: dateData.flatCategoryEnabled,
         dayWiseCategoryEnabled: dateData.dayWiseCategoryEnabled,
-        ...(cutoff ? { cutoffAt: cutoff } : {}),
+        ...(legacyCutoff ? { cutoffAt: legacyCutoff } : {}),
+        ...(flatCutoff ? { flatCutoffAt: flatCutoff } : {}),
+        ...(dayWiseCutoff ? { dayWiseCutoffAt: dayWiseCutoff } : {}),
         createdAt: now,
         updatedAt: now
       };
@@ -451,15 +496,7 @@ export async function PUT(request: NextRequest) {
       date: { $in: dates.map(d => d.date) }
     });
 
-    const responseData = insertedDates.data?.map(date => ({
-      id: date._id?.toString(),
-      date: date.date,
-      flatCategoryEnabled: date.flatCategoryEnabled,
-      dayWiseCategoryEnabled: date.dayWiseCategoryEnabled,
-      cutoffAt: date.cutoffAt ?? null,
-      createdAt: date.createdAt,
-      updatedAt: date.updatedAt
-    })) || [];
+    const responseData = insertedDates.data?.map(toResponse) || [];
 
     return NextResponse.json({
       data: {
