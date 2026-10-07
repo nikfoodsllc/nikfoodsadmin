@@ -202,3 +202,76 @@ export function reachOutEmail(row: AbandonedRow): { subject: string; body: strin
 
 /** Quick notes for the "Mark contacted" dialog. */
 export const CONTACT_NOTES = ['Called, no answer', 'Left a voicemail', 'Texted', 'Emailed', 'Spoke with them', 'Will order later'];
+
+// ---------------------------------------------------------------------------------------------------------------
+// The date range of the list. Checkouts are kept for 60 days, so no range reaches further back than that.
+
+export const RETENTION_DAYS = 60;
+const TZ = 'America/Los_Angeles';
+const DAY_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+function pacificParts(date: Date): { day: string; hour: number } {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  return { day: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')) };
+}
+
+/** Today's date in Pacific time, 'YYYY-MM-DD' (the business day the admins work in). */
+export function pacificToday(now: Date = new Date()): string {
+  return pacificParts(now).day;
+}
+
+/** A well-formed date that exists on the calendar (2026-02-31 does not). */
+function isRealDay(day: string): boolean {
+  if (!DAY_RE.test(day)) return false;
+  const d = new Date(`${day}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === day;
+}
+
+export function addDaysToDay(day: string, amount: number): string {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + amount);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The moment a Pacific calendar day begins (00:00 Pacific, whether it is standard or daylight time that day). */
+export function pacificDayStart(day: string): Date {
+  const [y, m, d] = day.split('-').map(Number);
+  for (const offsetHours of [7, 8]) {
+    const t = new Date(Date.UTC(y, m - 1, d, offsetHours));
+    const p = pacificParts(t);
+    if (p.day === day && p.hour === 0) return t;
+  }
+  return new Date(Date.UTC(y, m - 1, d, 8));
+}
+
+export interface ResolvedRange {
+  /** Start of the first day (inclusive) */
+  since: Date;
+  /** Start of the day after the last day (exclusive); null = up to now */
+  until: Date | null;
+  from: string;
+  to: string;
+}
+
+/**
+ * The range asked for: either the last `days` days, or a from/to pair of Pacific dates (both ends included).
+ * Returns an error message for anything that cannot be served (bad date, backwards, in the future, older than the
+ * 60 days the checkouts are kept).
+ */
+export function resolveRange(input: { days?: number | null; from?: string | null; to?: string | null }, now: Date = new Date()): ResolvedRange | { error: string } {
+  const today = pacificToday(now);
+  const oldest = addDaysToDay(today, -(RETENTION_DAYS - 1));
+  if (input.from || input.to) {
+    const from = input.from ?? '';
+    const to = input.to ?? '';
+    if (!isRealDay(from) || !isRealDay(to)) return { error: 'Choose a start and an end date' };
+    if (from > to) return { error: 'The start date must not be after the end date' };
+    if (to > today) return { error: 'The end date cannot be in the future' };
+    if (from < oldest) return { error: `Checkouts are only kept for ${RETENTION_DAYS} days, so the earliest start date is ${oldest}` };
+    return { since: pacificDayStart(from), until: pacificDayStart(addDaysToDay(to, 1)), from, to };
+  }
+  const requested = Number(input.days ?? 14);
+  const days = Number.isFinite(requested) ? Math.min(RETENTION_DAYS, Math.max(1, Math.floor(requested))) : 14;
+  return { since: new Date(now.getTime() - days * 24 * 3600 * 1000), until: null, from: addDaysToDay(today, -(days - 1)), to: today };
+}

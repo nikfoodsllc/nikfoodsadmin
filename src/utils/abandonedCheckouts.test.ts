@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAbandonedRows, problemText, reachOutEmail, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
+import { buildAbandonedRows, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
 
 const NOW = new Date('2026-10-07T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60 * 1000);
@@ -137,5 +137,54 @@ describe('abandoned checkouts', () => {
     expect(mail.body).toContain('Hi Rijul,');
     expect(mail.body).toContain('Veg Combo');
     expect(mail.body).toContain('Friday, Oct 9');
+  });
+});
+
+describe('date range of the list', () => {
+  // Wed Oct 7 2026, 11:50 Pacific (18:50 UTC)
+  const now = new Date('2026-10-07T18:50:00Z');
+  it('today in Pacific time, also just after midnight UTC', () => {
+    expect(pacificToday(now)).toBe('2026-10-07');
+    expect(pacificToday(new Date('2026-10-08T02:30:00Z'))).toBe('2026-10-07'); // 7:30 PM Pacific
+    expect(pacificToday(new Date('2026-10-08T07:30:00Z'))).toBe('2026-10-08'); // 00:30 Pacific
+  });
+  it('a Pacific day starts at 07:00 UTC in summer and 08:00 UTC in winter', () => {
+    expect(pacificDayStart('2026-10-07').toISOString()).toBe('2026-10-07T07:00:00.000Z');
+    expect(pacificDayStart('2026-12-15').toISOString()).toBe('2026-12-15T08:00:00.000Z');
+    expect(pacificDayStart('2026-11-01').toISOString()).toBe('2026-11-01T07:00:00.000Z'); // the day daylight time ends
+    expect(pacificDayStart('2026-11-02').toISOString()).toBe('2026-11-02T08:00:00.000Z');
+    expect(pacificDayStart('2026-03-08').toISOString()).toBe('2026-03-08T08:00:00.000Z'); // the day daylight time starts
+  });
+  it('days: last N days, default 14, clamped to 1..60', () => {
+    const r = resolveRange({ days: 7 }, now) as { since: Date; until: Date | null; from: string; to: string };
+    expect(r.until).toBeNull();
+    expect(r.since.toISOString()).toBe('2026-09-30T18:50:00.000Z');
+    expect(r.from).toBe('2026-10-01');
+    expect(r.to).toBe('2026-10-07');
+    expect((resolveRange({}, now) as { from: string }).from).toBe('2026-09-24');
+    expect((resolveRange({ days: 500 }, now) as { from: string }).from).toBe('2026-08-09');
+    expect((resolveRange({ days: 0 }, now) as { from: string }).from).toBe('2026-10-07');
+    expect((resolveRange({ days: Number.NaN }, now) as { from: string }).from).toBe('2026-09-24');
+  });
+  it('custom range: both end days included', () => {
+    const r = resolveRange({ from: '2026-10-05', to: '2026-10-06' }, now) as { since: Date; until: Date };
+    expect(r.since.toISOString()).toBe('2026-10-05T07:00:00.000Z');
+    expect(r.until.toISOString()).toBe('2026-10-07T07:00:00.000Z'); // the start of Oct 7 = the end of Oct 6
+    const one = resolveRange({ from: '2026-10-07', to: '2026-10-07' }, now) as { since: Date; until: Date };
+    expect(one.until.getTime() - one.since.getTime()).toBe(24 * 3600 * 1000);
+  });
+  it('custom range: bad input is refused with a clear message', () => {
+    const msg = (i: { from?: string; to?: string }) => (resolveRange(i, now) as { error: string }).error;
+    expect(msg({ from: '2026-10-05' })).toMatch(/start and an end/);
+    expect(msg({ from: 'x', to: 'y' })).toMatch(/start and an end/);
+    expect(msg({ from: '2026-13-01', to: '2026-13-02' })).toMatch(/start and an end/);
+    expect(msg({ from: '2026-02-31', to: '2026-03-02' })).toMatch(/start and an end/);
+    expect(msg({ from: '2026-10-06', to: '2026-10-05' })).toMatch(/must not be after/);
+    expect(msg({ from: '2026-10-05', to: '2026-10-08' })).toMatch(/future/);
+    expect(msg({ from: '2026-08-01', to: '2026-10-05' })).toMatch(/only kept for 60 days/);
+  });
+  it('the oldest allowed start is 59 days back (60 days including today)', () => {
+    expect('error' in resolveRange({ from: '2026-08-09', to: '2026-08-10' }, now)).toBe(false);
+    expect('error' in resolveRange({ from: '2026-08-08', to: '2026-08-10' }, now)).toBe(true);
   });
 });

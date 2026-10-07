@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { CONTACT_NOTES, QUIET_MINUTES, reachOutEmail, type AbandonedRow, type View } from '@/utils/abandonedCheckouts';
+import { addDaysToDay, CONTACT_NOTES, pacificToday, QUIET_MINUTES, reachOutEmail, resolveRange, RETENTION_DAYS, type AbandonedRow, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -41,8 +41,14 @@ function ago(iso: string): string {
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 
+/** The choices above the list: a quick preset, or a custom pair of dates. */
+type Preset = 'today' | 7 | 14 | 30 | 60 | 'custom';
+
+const dayShort = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
 interface Data {
-  days: number;
+  from: string;
+  to: string;
   rows: Record<View, AbandonedRow[]>;
   to_contact: number;
   contacted: number;
@@ -156,7 +162,22 @@ function PersonCard({ row, onContacted, onUndo, onHide }: { row: AbandonedRow; o
 export default function AbandonedCheckoutsPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [days, setDays] = useState(14);
+  const [preset, setPreset] = useState<Preset>(14);
+  // the custom range (Pacific dates); it starts as the last 7 days so the boxes are never empty
+  const [customFrom, setCustomFrom] = useState(() => addDaysToDay(pacificToday(), -6));
+  const [customTo, setCustomTo] = useState(() => pacificToday());
+  const today = pacificToday();
+  const oldest = addDaysToDay(today, -(RETENTION_DAYS - 1));
+  // what to ask the server for, or why the dates cannot be used yet
+  const query = (() => {
+    if (preset === 'custom') {
+      const r = resolveRange({ from: customFrom, to: customTo });
+      return 'error' in r ? { error: r.error } : { qs: `from=${r.from}&to=${r.to}` };
+    }
+    return preset === 'today' ? { qs: `from=${today}&to=${today}` } : { qs: `days=${preset}` };
+  })();
+  const queryString = 'qs' in query ? query.qs : null;
+  const rangeError = 'error' in query ? query.error : '';
   const [tab, setTab] = useState<View>('to_contact');
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
@@ -173,10 +194,10 @@ export default function AbandonedCheckoutsPage() {
 
   const load = useCallback(
     async (quiet = false) => {
-      if (!token) return;
+      if (!token || !queryString) return;
       if (!quiet) setRefreshing(true);
       try {
-        const res = await fetch(`/api/admin/abandoned-checkouts?days=${days}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+        const res = await fetch(`/api/admin/abandoned-checkouts?${queryString}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
         const body = await res.json().catch(() => ({}));
         if (!res.ok || !body.success) throw new Error(body.error || 'Could not load the abandoned checkouts');
         setData(body.data);
@@ -186,7 +207,7 @@ export default function AbandonedCheckoutsPage() {
       }
       setRefreshing(false);
     },
-    [token, days]
+    [token, queryString]
   );
 
   useEffect(() => {
@@ -241,11 +262,28 @@ export default function AbandonedCheckoutsPage() {
         People who opened checkout but did not pay. They show up here {QUIET_MINUTES} minutes after they leave, and disappear as soon as they place an order.
       </Typography>
 
-      <ToggleButtonGroup exclusive size="small" value={days} onChange={(_, v: number | null) => v && setDays(v)} sx={{ mb: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 1.5 }, '& .Mui-selected': { bgcolor: '#FDE9C4 !important', color: '#7A4300' } }}>
-        <ToggleButton value={7}>Last 7 days</ToggleButton>
-        <ToggleButton value={14}>14 days</ToggleButton>
-        <ToggleButton value={30}>30 days</ToggleButton>
-      </ToggleButtonGroup>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 }}>
+        <ToggleButtonGroup exclusive size="small" value={preset} onChange={(_, v: Preset | null) => v && setPreset(v)} sx={{ flexWrap: 'wrap', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 1.25 }, '& .Mui-selected': { bgcolor: '#FDE9C4 !important', color: '#7A4300' } }}>
+          <ToggleButton value="today">Today</ToggleButton>
+          <ToggleButton value={7}>7 days</ToggleButton>
+          <ToggleButton value={14}>14 days</ToggleButton>
+          <ToggleButton value={30}>30 days</ToggleButton>
+          <ToggleButton value={60}>60 days</ToggleButton>
+          <ToggleButton value="custom">Custom</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+      {preset === 'custom' && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, mb: 1, maxWidth: 420 }}>
+          <TextField label="From" type="date" size="small" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: oldest, max: today }} />
+          <TextField label="To" type="date" size="small" value={customTo} onChange={(e) => setCustomTo(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: oldest, max: today }} />
+        </Box>
+      )}
+      {rangeError && <Alert severity="warning" sx={{ mb: 1.5 }}>{rangeError}</Alert>}
+      {data && !rangeError && (
+        <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 1.5 }}>
+          Showing checkouts opened {data.from === data.to ? dayShort(data.from) : `${dayShort(data.from)} – ${dayShort(data.to)}`} (Pacific time). Checkouts are kept for {RETENTION_DAYS} days.
+        </Typography>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {!data && !error && <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}><CircularProgress /></Box>}
