@@ -391,3 +391,35 @@ describe('search in Recent orders', () => {
     expect(ids('zzzz')).toEqual([]);
   });
 });
+
+describe('Recent orders tabs', () => {
+  const row = (over: Partial<OrderListRow>): OrderListRow => ({
+    orderId: 'ORD-1', createdAt: '2026-10-07T10:00:00.000Z', customerName: 'A', customerEmail: 'a@example.com', total: 10, status: 'pending', paymentStatus: 'unpaid', paymentMethod: 'Credit Card', linkOrder: true, awaitingPayment: true, deliveryDates: ['2026-10-07'], ...over,
+  });
+  const waiting = row({ orderId: 'W', createdAt: '2026-10-07T12:00:00.000Z' });
+  const paid = row({ orderId: 'P', createdAt: '2026-10-07T11:00:00.000Z', status: 'confirmed', paymentStatus: 'paid', awaitingPayment: false });
+  const cancelledOld = row({ orderId: 'C1', createdAt: '2026-10-06T09:00:00.000Z', status: 'cancelled', awaitingPayment: false });
+  const cancelledNew = row({ orderId: 'C2', createdAt: '2026-10-07T09:00:00.000Z', status: 'cancelled', awaitingPayment: false });
+  const rows = [cancelledOld, waiting, paid, cancelledNew];
+  const ids = (tab: 'waiting' | 'paid' | 'cancelled' | 'all') => rowsForTab(rows, tab).map((r) => r.orderId);
+  it('Cancelled shows only cancelled orders, newest first', () => {
+    expect(ids('cancelled')).toEqual(['C2', 'C1']);
+  });
+  it('cancelled orders are not in Waiting or Paid, but are in All', () => {
+    expect(ids('waiting')).toEqual(['W']);
+    expect(ids('paid')).toEqual(['P']);
+    expect(ids('all')).toEqual(['W', 'P', 'C2', 'C1']);
+  });
+  it('the three counts and All add up', () => {
+    expect(ids('waiting').length + ids('paid').length + ids('cancelled').length).toBe(ids('all').length);
+  });
+  it('an order that was paid and then cancelled is only in Cancelled', () => {
+    const odd = [row({ orderId: 'X', status: 'cancelled', paymentStatus: 'paid', awaitingPayment: false })];
+    expect(rowsForTab(odd, 'paid')).toEqual([]);
+    expect(rowsForTab(odd, 'cancelled').map((r) => r.orderId)).toEqual(['X']);
+  });
+  it('search narrows Cancelled too, and the word cancelled finds cancelled orders', () => {
+    expect(rowsForTab(searchRows(rows, 'c1'), 'cancelled').map((r) => r.orderId)).toEqual(['C1']);
+    expect(searchRows(rows, 'cancelled').map((r) => r.orderId).sort()).toEqual(['C1', 'C2']);
+  });
+});

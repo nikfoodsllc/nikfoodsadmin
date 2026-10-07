@@ -253,16 +253,17 @@ export interface OrderListRow {
   offlinePaymentNote?: string;
 }
 
-export type OrderTab = 'waiting' | 'paid' | 'all';
+export type OrderTab = 'waiting' | 'paid' | 'cancelled' | 'all';
 
 /**
  * Which orders a tab shows, newest first. Waiting = unpaid link orders (an order leaves it as soon as it is paid);
- * Paid = paid orders; All = everything, with the unpaid ones on top.
+ * Paid = paid orders; Cancelled = cancelled orders; All = everything, with the unpaid ones on top.
  */
 export function rowsForTab(rows: OrderListRow[], tab: OrderTab): OrderListRow[] {
   const newestFirst = (a: OrderListRow, b: OrderListRow) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   if (tab === 'waiting') return rows.filter((r) => r.awaitingPayment).sort(newestFirst);
-  if (tab === 'paid') return rows.filter((r) => r.paymentStatus === 'paid').sort(newestFirst);
+  if (tab === 'paid') return rows.filter((r) => r.paymentStatus === 'paid' && r.status !== 'cancelled').sort(newestFirst);
+  if (tab === 'cancelled') return rows.filter((r) => r.status === 'cancelled').sort(newestFirst);
   return [...rows].sort((a, b) => Number(b.awaitingPayment) - Number(a.awaitingPayment) || newestFirst(a, b));
 }
 

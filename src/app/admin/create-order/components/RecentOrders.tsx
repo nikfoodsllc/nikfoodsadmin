@@ -195,13 +195,14 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
       {rows && (
         <Tabs value={tab} onChange={(_, v: TabKey) => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
           <Tab value="waiting" label={`Waiting for payment (${found.filter((r) => r.awaitingPayment).length})`} />
-          <Tab value="paid" label={`Paid (${found.filter((r) => r.paymentStatus === 'paid').length})`} />
+          <Tab value="paid" label={`Paid (${found.filter((r) => r.paymentStatus === 'paid' && r.status !== 'cancelled').length})`} />
+          <Tab value="cancelled" label={`Cancelled (${found.filter((r) => r.status === 'cancelled').length})`} />
           <Tab value="all" label={`All (${found.length})`} />
         </Tabs>
       )}
       {rows && visible.length === 0 && (
         <Typography sx={{ color: '#6B7280', fontSize: 14 }}>
-          {rows.length === 0 ? 'No orders entered here yet.' : searching ? `No ${tab === 'waiting' ? 'waiting' : tab === 'paid' ? 'paid' : ''} orders match "${search.trim()}".${tab !== 'all' ? ' Try the All tab.' : ''}` : tab === 'waiting' ? 'Nothing is waiting for payment.' : tab === 'paid' ? 'No paid orders yet.' : 'No orders.'}
+          {rows.length === 0 ? 'No orders entered here yet.' : searching ? `No ${tab === 'waiting' ? 'waiting' : tab === 'paid' ? 'paid' : tab === 'cancelled' ? 'cancelled' : ''} orders match "${search.trim()}".${tab !== 'all' ? ' Try the All tab.' : ''}` : tab === 'waiting' ? 'Nothing is waiting for payment.' : tab === 'paid' ? 'No paid orders yet.' : tab === 'cancelled' ? 'No cancelled orders.' : 'No orders.'}
         </Typography>
       )}
       <Box sx={{ display: 'grid', gap: 1.25 }}>
