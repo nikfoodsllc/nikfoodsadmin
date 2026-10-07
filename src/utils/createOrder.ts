@@ -259,3 +259,135 @@ export function rowsForTab(rows: OrderListRow[], tab: OrderTab): OrderListRow[] 
   if (tab === 'paid') return rows.filter((r) => r.paymentStatus === 'paid').sort(newestFirst);
   return [...rows].sort((a, b) => Number(b.awaitingPayment) - Number(a.awaitingPayment) || newestFirst(a, b));
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// The whole menu (Create Order is a master tool: no cutoffs, any date, any item)
+
+export interface CatalogCategory {
+  _id: string;
+  name: string;
+  listingType: 'flat' | 'day-wise';
+  flatItemIds: string[];
+  allItemIds: string[];
+  dayWise: Record<string, string[]>;
+  children: CatalogCategory[];
+}
+
+export interface CatalogDate {
+  date: string;
+  formattedDate: string;
+  state: 'open' | 'closed' | 'past' | 'unscheduled';
+  flatCategoryEnabled: boolean;
+  dayWiseCategoryEnabled: boolean;
+  hasDayWiseMenu: boolean;
+}
+
+export interface CatalogPayload {
+  items: Record<string, MenuItem>;
+  categories: CatalogCategory[];
+  dates: CatalogDate[];
+  today: string;
+}
+
+/** A category (or sub-category) of the menu as shown in the picker, with the items it holds for the chosen view. */
+export interface MenuNode {
+  id: string;
+  name: string;
+  /** Items directly in this category */
+  itemIds: string[];
+  children: MenuNode[];
+  /** Items in this category and all its sub-categories */
+  total: number;
+}
+
+/**
+ * One category as a node. A day-wise category (Food Menu) lists its items per date and its sub-categories only group
+ * those items, so under it each sub-category shows the date's items that are tagged to it and the rest stay in the
+ * parent. A flat category's sub-categories hold their own items. In the whole-menu view a sub-category shows every item
+ * tagged to it, whatever its date. An item is shown once per place it is grouped.
+ */
+function toNode(category: CatalogCategory, base: (c: CatalogCategory) => string[], scope: string[] | null, limitChildrenToDate: boolean): MenuNode | null {
+  const own = [...new Set(base(category))].filter((id) => !scope || scope.includes(id));
+  const dayWise = category.listingType === 'day-wise';
+  const children = category.children
+    .map((child) => toNode(child, (c) => c.allItemIds ?? [], dayWise && limitChildrenToDate ? own : null, limitChildrenToDate))
+    .filter((n): n is MenuNode => n !== null);
+  const grouped = new Set(children.flatMap((c) => uniqueIds([c])));
+  const direct = own.filter((id) => !grouped.has(id));
+  const total = uniqueIds([{ id: category._id, name: category.name, itemIds: direct, children, total: 0 }]).length;
+  if (total === 0) return null;
+  return { id: category._id, name: category.name, itemIds: direct, children, total };
+}
+
+/** Every distinct item id inside the nodes (an item grouped in two places is counted once). */
+export function uniqueIds(nodes: MenuNode[]): string[] {
+  const seen = new Set<string>();
+  const walk = (n: MenuNode) => {
+    n.itemIds.forEach((id) => seen.add(id));
+    n.children.forEach(walk);
+  };
+  nodes.forEach(walk);
+  return [...seen];
+}
+
+/** What is on the menu for one date: the flat categories' items and the day-wise items listed for that date. */
+export function dayMenuNodes(catalog: CatalogPayload, date: string): MenuNode[] {
+  return catalog.categories
+    .map((c) => toNode(c, (cat) => (cat.listingType === 'day-wise' ? cat.dayWise?.[date] ?? [] : cat.flatItemIds ?? []), null, true))
+    .filter((n): n is MenuNode => n !== null);
+}
+
+/** Every item of every category, whatever its date. */
+export function allMenuNodes(catalog: CatalogPayload): MenuNode[] {
+  return catalog.categories.map((c) => toNode(c, (cat) => cat.allItemIds ?? [], null, false)).filter((n): n is MenuNode => n !== null);
+}
+
+/** Keeps only the items whose name matches, and the categories that still hold something. */
+export function filterNodes(nodes: MenuNode[], items: Record<string, MenuItem>, query: string): MenuNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return nodes;
+  const walk = (node: MenuNode): MenuNode | null => {
+    const itemIds = node.itemIds.filter((id) => (items[id]?.name ?? '').toLowerCase().includes(q));
+    const children = node.children.map(walk).filter((n): n is MenuNode => n !== null);
+    const total = uniqueIds([{ ...node, itemIds, children, total: 0 }]).length;
+    return total === 0 ? null : { ...node, itemIds, children, total };
+  };
+  return nodes.map(walk).filter((n): n is MenuNode => n !== null);
+}
+
+/** Ids of every node that has sub-categories or items (what "expand all" opens). */
+export function allNodeIds(nodes: MenuNode[]): string[] {
+  return nodes.flatMap((n) => [n.id, ...allNodeIds(n.children)]);
+}
+
+/** How many of this item are in the order for a delivery date. */
+export function quantityFor(lines: CartLine[], date: string, foodItemId: string): number {
+  return lines.filter((l) => l.date === date && l.foodItemId === foodItemId).reduce((sum, l) => sum + l.quantity, 0);
+}
+
+/** Takes one off an item for a delivery date: the most recently added line of it loses one (and goes when it reaches 0). */
+export function removeOne(lines: CartLine[], date: string, foodItemId: string): CartLine[] {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].date === date && lines[i].foodItemId === foodItemId) return setLineQuantity(lines, lines[i].key, lines[i].quantity - 1);
+  }
+  return lines;
+}
+
+/** Any calendar date typed or picked (YYYY-MM-DD), not only the ones the site schedules. */
+export function isValidDate(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const d = new Date(`${date}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === date;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// How an order that was paid outside the website was paid
+
+export type PaidChoice = 'Cash' | 'Zelle' | 'Other';
+
+/** The method to store: Cash, Zelle, or what was typed. Null while nothing usable is chosen (Other with no text). */
+export function paidMethodValue(choice: PaidChoice, typed: string): string | null {
+  if (choice !== 'Other') return choice;
+  const text = typed.replace(/\s+/g, ' ').trim();
+  return text.length > 0 ? text.slice(0, 40) : null;
+}

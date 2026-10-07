@@ -25,6 +25,7 @@ function targetFor(slug: string[], method: string): string | null {
   const [first, second] = slug;
   if (slug.length === 1) {
     if (first === 'menu' && method === 'GET') return '/api/admin/offline-orders/menu';
+    if (first === 'catalog' && method === 'GET') return '/api/admin/offline-orders/catalog';
     if (first === 'customers' && method === 'GET') return '/api/admin/offline-orders/customers';
     if (first === 'preview' && method === 'POST') return '/api/admin/offline-orders/preview';
     if (first === 'create' && method === 'POST') return '/api/admin/offline-orders';

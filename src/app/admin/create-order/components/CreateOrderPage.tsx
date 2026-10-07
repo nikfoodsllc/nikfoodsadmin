@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, Typography, useMediaQuery, type Theme } from '@mui/material';
+import { IconShoppingCart, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   addLine,
@@ -10,11 +11,14 @@ import {
   lineTags,
   missingForCreate,
   needsOptions,
+  paidMethodValue,
+  removeOne,
   setLineQuantity,
   type CartLine,
+  type CatalogPayload,
   type CustomerForm,
   type MenuItem,
-  type MenuPayload,
+  type PaidChoice,
 } from '@/utils/createOrder';
 import CustomerSection, { EMPTY_ADDRESS, type FoundCustomer } from './CustomerSection';
 import MenuPicker, { dayChipLabel } from './MenuPicker';
@@ -36,7 +40,10 @@ export default function CreateOrderPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 
-  const [menu, setMenu] = useState<MenuPayload | null>(null);
+  const [menu, setMenu] = useState<CatalogPayload | null>(null);
+  // wide screens show the order next to the items; on a phone or narrow window it opens from a bar at the bottom
+  const wide = useMediaQuery((theme: Theme) => theme.breakpoints.up('lg'));
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuError, setMenuError] = useState('');
   const [date, setDate] = useState('');
 
@@ -49,8 +56,9 @@ export default function CreateOrderPage() {
 
   const [tip, setTip] = useState(0);
   const [waiveFee, setWaiveFee] = useState(false);
-  const [allowBelowMin, setAllowBelowMin] = useState(false);
   const [payment, setPayment] = useState<PaymentChoice>('link');
+  const [paidChoice, setPaidChoice] = useState<PaidChoice>('Cash');
+  const [paidTyped, setPaidTyped] = useState('');
   const [note, setNote] = useState('');
 
   const [preview, setPreview] = useState<PreviewData | null>(null);
@@ -75,15 +83,16 @@ export default function CreateOrderPage() {
     if (!token) return;
     let cancelled = false;
     (async () => {
-      const r = await callApi(token, 'menu');
+      const r = await callApi(token, 'catalog');
       if (cancelled) return;
       if (!r.ok) {
         setMenuError(r.body?.error || 'Could not load the menu from the customer site');
         return;
       }
-      const data = r.body.data as MenuPayload;
+      const data = r.body.data as CatalogPayload;
       setMenu(data);
-      setDate((d) => d || data.openDates[0] || '');
+      // start on the first day that is still open, else today (any date can be picked afterwards)
+      setDate((d) => d || data.dates.find((x) => x.state === 'open')?.date || data.today);
     })();
     return () => {
       cancelled = true;
@@ -134,6 +143,7 @@ export default function CreateOrderPage() {
     }
     setLines((cur) => addLine(cur, { date, foodItemId: item._id, quantity: 1, name: item.name, unitPrice: estimateUnitPrice(item, {}), tags: lineTags(item, {}) }));
   };
+  const takeOne = (item: MenuItem) => setLines((cur) => removeOne(cur, date, item._id));
 
   const submit = async () => {
     if (!token || submittingRef.current) return;
@@ -147,8 +157,7 @@ export default function CreateOrderPage() {
       lines: orderLines(),
       tipPercentage: tip,
       waivePlatformFee: waiveFee,
-      allowBelowMinimum: allowBelowMin,
-      payment: payment === 'link' ? { mode: 'link' } : { mode: 'offline', method: payment === 'cash' ? 'Cash on Delivery' : 'Other', note },
+      payment: payment === 'link' ? { mode: 'link' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
     };
     const r = await callApi(token, 'create', { method: 'POST', body: JSON.stringify(body) });
@@ -170,8 +179,9 @@ export default function CreateOrderPage() {
     setLines([]);
     setTip(0);
     setWaiveFee(false);
-    setAllowBelowMin(false);
     setPayment('link');
+    setPaidChoice('Cash');
+    setPaidTyped('');
     setNote('');
     setPreview(null);
     setSubmitError('');
@@ -181,14 +191,45 @@ export default function CreateOrderPage() {
     return <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}><CircularProgress /></Box>;
   }
 
+  const summary = (
+    <OrderSummary
+      lines={lines}
+      onQuantity={(key, q) => setLines((cur) => setLineQuantity(cur, key, q))}
+      preview={preview}
+      previewLoading={previewLoading}
+      previewError={previewError}
+      tip={tip}
+      onTip={setTip}
+      waiveFee={waiveFee}
+      onWaiveFee={setWaiveFee}
+      payment={payment}
+      onPayment={setPayment}
+      paidChoice={paidChoice}
+      onPaidChoice={setPaidChoice}
+      paidTyped={paidTyped}
+      onPaidTyped={setPaidTyped}
+      note={note}
+      onNote={setNote}
+      missing={missing}
+      submitting={submitting}
+      submitError={submitError}
+      onSubmit={() => {
+        setDrawerOpen(false);
+        setConfirmOpen(true);
+      }}
+    />
+  );
+  const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
+  const form = menu && !result && !menuError;
+
   return (
-    <Box sx={{ maxWidth: 760, mx: 'auto', pb: 6 }}>
+    <Box sx={{ maxWidth: form && wide ? 1320 : 760, mx: 'auto', pb: form && !wide ? 11 : 6 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <Typography variant="h5" sx={{ fontWeight: 800 }}>Create Order</Typography>
         <Chip label="BETA" size="small" color="warning" sx={{ fontWeight: 800 }} />
       </Box>
       <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 2 }}>
-        Enter an order for a customer who ordered by phone or in person. Prices come from the live menu, so they match the website.
+        Enter an order for a customer who ordered by phone or in person. Prices come from the live menu. This is a master tool: no cutoff, delivery area or day rules apply.
       </Typography>
 
       {result ? (
@@ -198,34 +239,34 @@ export default function CreateOrderPage() {
       ) : !menu ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}><CircularProgress /></Box>
       ) : (
-        <Box sx={{ display: 'grid', gap: 2 }}>
-          <CustomerSection token={token} customer={customer} address={address} onCustomer={setCustomer} onAddress={setAddress} onPickedExisting={setExisting} accountExists={existing} />
-          <MenuPicker menu={menu} date={date} onDate={setDate} counts={counts} onChoose={choose} />
-          <OrderSummary
-            lines={lines}
-            onQuantity={(key, q) => setLines((cur) => setLineQuantity(cur, key, q))}
-            preview={preview}
-            previewLoading={previewLoading}
-            previewError={previewError}
-            tip={tip}
-            onTip={setTip}
-            waiveFee={waiveFee}
-            onWaiveFee={setWaiveFee}
-            allowBelowMin={allowBelowMin}
-            onAllowBelowMin={setAllowBelowMin}
-            payment={payment}
-            onPayment={setPayment}
-            note={note}
-            onNote={setNote}
-            missing={missing}
-            submitting={submitting}
-            submitError={submitError}
-            onSubmit={() => setConfirmOpen(true)}
-          />
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: wide ? 'minmax(0, 1fr) 440px' : 'minmax(0, 1fr)', alignItems: 'start' }}>
+          <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+            <CustomerSection token={token} customer={customer} address={address} onCustomer={setCustomer} onAddress={setAddress} onPickedExisting={setExisting} accountExists={existing} />
+            <MenuPicker catalog={menu} date={date} onDate={setDate} lines={lines} counts={counts} onAdd={choose} onRemove={takeOne} />
+          </Box>
+          {wide && <Box sx={{ position: 'sticky', top: 12, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', borderRadius: 2 }}>{summary}</Box>}
         </Box>
       )}
 
       <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} />
+
+      {form && !wide && (
+        <>
+          <Box sx={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1200, p: 1.25, bgcolor: '#fff', borderTop: '1px solid #E5E7EB', boxShadow: '0 -4px 16px rgba(0,0,0,0.08)' }}>
+            <Button fullWidth variant="contained" onClick={() => setDrawerOpen(true)} startIcon={<IconShoppingCart size={20} />} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: '#F59E0B', color: '#111', '&:hover': { bgcolor: '#D97706' }, justifyContent: 'space-between', px: 2 }}>
+              <span>{itemCount === 0 ? 'Your order is empty' : `View order · ${itemCount} item${itemCount === 1 ? '' : 's'}`}</span>
+              <span>{preview ? `$${preview.totals.total.toFixed(2)}` : ''}</span>
+            </Button>
+          </Box>
+          <Drawer anchor="bottom" open={drawerOpen} onClose={() => setDrawerOpen(false)} PaperProps={{ sx: { maxHeight: '92vh', borderTopLeftRadius: 16, borderTopRightRadius: 16, bgcolor: '#F5F5F5' } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, pt: 1.5 }}>
+              <Typography sx={{ fontWeight: 800 }}>Your order</Typography>
+              <IconButton onClick={() => setDrawerOpen(false)} aria-label="Close"><IconX size={20} /></IconButton>
+            </Box>
+            <Box sx={{ p: 1.5, overflowY: 'auto' }}>{summary}</Box>
+          </Drawer>
+        </>
+      )}
 
       <ItemOptionsDialog
         open={Boolean(optionsItem)}
@@ -246,7 +287,7 @@ export default function CreateOrderPage() {
             {preview ? `$${preview.totals.total.toFixed(2)} for ${customer.name || 'the customer'}. ` : ''}
             {payment === 'link'
               ? `A payment link will be emailed to ${customer.email}.`
-              : `It will be saved as paid and a confirmation emailed to ${customer.email}.`}
+              : `It will be saved as paid (${paidMethodValue(paidChoice, paidTyped) ?? '?'}) and a confirmation emailed to ${customer.email}.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

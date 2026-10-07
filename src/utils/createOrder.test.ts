@@ -139,3 +139,92 @@ describe('rowsForTab', () => {
     expect(JSON.stringify(rows)).toBe(copy);
   });
 });
+
+import { uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
+
+describe('whole menu helpers', () => {
+  const item = (id: string, name: string) => ({ _id: id, name, price: 5 });
+  const catalog: CatalogPayload = {
+    today: '2026-10-07',
+    dates: [],
+    items: { a: item('a', 'Aam Panna'), b: item('b', 'Dosa Batter'), c: item('c', 'Veg Combo'), d: item('d', 'Gajar Halwa') },
+    categories: [
+      { _id: 'fm', name: 'Food Menu', listingType: 'day-wise', flatItemIds: [], allItemIds: ['a', 'c'], dayWise: { '2026-10-08': ['a'], '2026-10-09': ['a', 'c'] }, children: [] },
+      {
+        _id: 'sw', name: 'Indian Sweets', listingType: 'flat', flatItemIds: ['d'], allItemIds: ['d'], dayWise: {},
+        children: [{ _id: 'sw2', name: 'Halwa', listingType: 'flat', flatItemIds: ['d'], allItemIds: ['d'], dayWise: {}, children: [] }],
+      },
+      { _id: 'ba', name: 'Batter', listingType: 'flat', flatItemIds: ['b'], allItemIds: ['b'], dayWise: {}, children: [] },
+    ],
+  };
+
+  it('a day shows the flat items and that date\'s day-wise items, with empty categories left out', () => {
+    const nodes = dayMenuNodes(catalog, '2026-10-08');
+    expect(nodes.map((n) => n.name)).toEqual(['Food Menu', 'Indian Sweets', 'Batter']);
+    expect(nodes[0].itemIds).toEqual(['a']);
+    expect(dayMenuNodes(catalog, '2026-12-25').map((n) => n.name)).toEqual(['Indian Sweets', 'Batter']);
+  });
+  it('the whole menu has every item of every category whatever its date', () => {
+    const nodes = allMenuNodes(catalog);
+    expect(nodes[0].itemIds).toEqual(['a', 'c']);
+    expect(uniqueIds(nodes)).toHaveLength(4);
+  });
+  it('sub-categories nest and counts include them', () => {
+    const sweets = allMenuNodes(catalog).find((n) => n.name === 'Indian Sweets')!;
+    expect(sweets.children[0].name).toBe('Halwa');
+    // the halwa is grouped under its sub-category, not repeated in the parent
+    expect(sweets.itemIds).toEqual([]);
+    expect(sweets.children[0].itemIds).toEqual(['d']);
+    expect(sweets.total).toBe(1);
+    expect(allNodeIds(allMenuNodes(catalog))).toContain('sw2');
+  });
+  it('a day-wise category groups its date\'s items under the sub-category they are tagged to', () => {
+    const c: CatalogPayload = {
+      today: 't', dates: [], items: { x: item('x', 'Aam'), y: item('y', 'Dal'), z: item('z', 'Rice') },
+      categories: [{
+        _id: 'fm', name: 'Food Menu', listingType: 'day-wise', flatItemIds: [], allItemIds: ['x', 'y', 'z'], dayWise: { '2026-10-08': ['x', 'y'], '2026-10-09': ['z'] },
+        children: [
+          { _id: 'bev', name: 'Beverages', listingType: 'flat', flatItemIds: ['x'], allItemIds: ['x', 'z'], dayWise: {}, children: [] },
+          { _id: 'main', name: 'Main Course', listingType: 'flat', flatItemIds: ['y'], allItemIds: ['y'], dayWise: {}, children: [] },
+        ],
+      }],
+    };
+    const thu = dayMenuNodes(c, '2026-10-08')[0];
+    expect(thu.children.map((n) => [n.name, n.itemIds])).toEqual([['Beverages', ['x']], ['Main Course', ['y']]]);
+    expect(thu.itemIds).toEqual([]);
+    const fri = dayMenuNodes(c, '2026-10-09')[0];
+    expect(fri.children.map((n) => n.name)).toEqual(['Beverages']); // Rice is tagged Beverages in this sample; Main Course has nothing that day
+    const whole = allMenuNodes(c)[0];
+    expect(uniqueIds([whole])).toHaveLength(3);
+    // whole menu: a sub-category shows all of its items, whatever the date
+    expect(whole.children.find((n) => n.name === 'Beverages')!.itemIds).toEqual(['x', 'z']);
+  });
+  it('search keeps matching items and the categories holding them', () => {
+    const found = filterNodes(allMenuNodes(catalog), catalog.items, 'halwa');
+    expect(found.map((n) => n.name)).toEqual(['Indian Sweets']);
+    expect(found[0].children[0].itemIds).toEqual(['d']);
+    expect(filterNodes(allMenuNodes(catalog), catalog.items, 'zzz')).toEqual([]);
+    expect(filterNodes(allMenuNodes(catalog), catalog.items, '  ')).toHaveLength(3);
+  });
+  it('quantities and take-one-off work per item and date', () => {
+    const line = (key: string, date: string, id: string, q: number): CartLine => ({ key, date, foodItemId: id, quantity: q, name: id, unitPrice: 1, tags: [] });
+    const lines = [line('k1', '2026-10-08', 'a', 2), line('k2', '2026-10-09', 'a', 1), line('k3', '2026-10-08', 'a', 1)];
+    expect(quantityFor(lines, '2026-10-08', 'a')).toBe(3);
+    const after = removeOne(lines, '2026-10-08', 'a');
+    expect(after.find((l) => l.key === 'k3')).toBeUndefined(); // the latest line (qty 1) went
+    expect(quantityFor(after, '2026-10-08', 'a')).toBe(2);
+    expect(removeOne(lines, '2026-10-10', 'a')).toBe(lines);
+  });
+  it('any real calendar date is accepted, impossible ones are not', () => {
+    expect(isValidDate('2026-10-07')).toBe(true);
+    expect(isValidDate('2026-02-30')).toBe(false);
+    expect(isValidDate('10/07/2026')).toBe(false);
+  });
+  it('paid method: Cash and Zelle as is, Other needs text', () => {
+    expect(paidMethodValue('Cash', '')).toBe('Cash');
+    expect(paidMethodValue('Zelle', 'ignored')).toBe('Zelle');
+    expect(paidMethodValue('Other', '   ')).toBeNull();
+    expect(paidMethodValue('Other', '  Venmo   @kunal ')).toBe('Venmo @kunal');
+    expect(paidMethodValue('Other', 'x'.repeat(80))).toHaveLength(40);
+  });
+});
