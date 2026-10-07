@@ -162,6 +162,7 @@ export default function OrderFilters({
             <MenuItem value="Bank">Bank</MenuItem>
             <MenuItem value="Link">Link</MenuItem>
             <MenuItem value="Klarna">Klarna</MenuItem>
+            <MenuItem value="Zelle">Zelle</MenuItem>
             <MenuItem value="Other">Other</MenuItem>
             <MenuItem value="Cash on Delivery">Cash on Delivery</MenuItem>
           </Select>

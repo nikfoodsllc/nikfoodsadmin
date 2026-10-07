@@ -17,18 +17,20 @@ import {
   Typography,
 } from '@mui/material';
 import { IconMinus, IconPlus, IconTrash } from '@tabler/icons-react';
-import type { CartLine } from '@/utils/createOrder';
+import { paidMethodValue, type CartLine, type PaidChoice } from '@/utils/createOrder';
 import { dayChipLabel } from './MenuPicker';
+import PaidMethodPicker from './PaidMethodPicker';
 
 export interface PreviewData {
   days: Array<{ date: string; weekday: string; actualDeliveryDate?: string; message?: string; dayTotal: number; items: Array<{ name: string; quantity: number; unitPrice: number; lineTotal: number }> }>;
   totals: { subtotal: number; platformFee: number; deliveryFee: number; tax: number; tip: number; total: number };
   minOrderValue: number;
   canCheckout: boolean;
+  belowMinimum?: Array<{ date: string; total: number }>;
   deliveryMessages: string[];
 }
 
-export type PaymentChoice = 'link' | 'cash' | 'other';
+export type PaymentChoice = 'link' | 'paid';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -52,10 +54,12 @@ export default function OrderSummary(props: {
   onTip: (t: number) => void;
   waiveFee: boolean;
   onWaiveFee: (v: boolean) => void;
-  allowBelowMin: boolean;
-  onAllowBelowMin: (v: boolean) => void;
   payment: PaymentChoice;
   onPayment: (p: PaymentChoice) => void;
+  paidChoice: PaidChoice;
+  onPaidChoice: (c: PaidChoice) => void;
+  paidTyped: string;
+  onPaidTyped: (t: string) => void;
   note: string;
   onNote: (n: string) => void;
   missing: string[];
@@ -66,8 +70,8 @@ export default function OrderSummary(props: {
   const { lines, preview } = props;
   const byDate = lines.reduce<Record<string, CartLine[]>>((acc, l) => ({ ...acc, [l.date]: [...(acc[l.date] ?? []), l] }), {});
   const dates = Object.keys(byDate).sort();
-  const belowMin = preview ? !preview.canCheckout : false;
-  const blocked = props.missing.length > 0 || (belowMin && !props.allowBelowMin) || Boolean(props.previewError) || !preview;
+  const methodMissing = props.payment === 'paid' && paidMethodValue(props.paidChoice, props.paidTyped) === null;
+  const blocked = props.missing.length > 0 || Boolean(props.previewError) || !preview || methodMissing;
 
   return (
     <Paper elevation={0} sx={{ p: { xs: 1.5, sm: 2.5 }, border: '1px solid #E5E7EB', borderRadius: 2 }}>
@@ -115,10 +119,9 @@ export default function OrderSummary(props: {
           <Row label="Tax" value={money(preview.totals.tax)} />
           {preview.totals.tip > 0 && <Row label="Tip" value={money(preview.totals.tip)} />}
           <Row label="Total" value={money(preview.totals.total)} bold />
-          {belowMin && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              This is below the {money(preview.minOrderValue)} minimum per delivery day for this area.
-              <FormControlLabel sx={{ display: 'flex', mt: 0.5 }} control={<Checkbox size="small" color="warning" checked={props.allowBelowMin} onChange={(e) => props.onAllowBelowMin(e.target.checked)} />} label={<Typography sx={{ fontSize: 13 }}>Allow below the minimum</Typography>} />
+          {(preview.belowMinimum?.length ?? 0) > 0 && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              Under the {money(preview.minOrderValue)} minimum per delivery day: {preview.belowMinimum!.map((d) => `${dayChipLabel(d.date)} (${money(d.total)})`).join(', ')}. That is fine here: each day is delivered on the date you chose.
             </Alert>
           )}
         </Box>
@@ -128,16 +131,19 @@ export default function OrderSummary(props: {
       <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 0.5 }}>How does the customer pay?</Typography>
       <RadioGroup value={props.payment} onChange={(e) => props.onPayment(e.target.value as PaymentChoice)}>
         <FormControlLabel value="link" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email a payment link (card or Apple Pay)</Typography>} />
-        <FormControlLabel value="cash" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid or pays in cash</Typography>} />
-        <FormControlLabel value="other" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid another way (Zelle, check…)</Typography>} />
+        <FormControlLabel value="paid" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid (cash, Zelle, other…)</Typography>} />
       </RadioGroup>
-      {props.payment !== 'link' && (
-        <TextField label="Payment note (optional)" value={props.note} onChange={(e) => props.onNote(e.target.value.slice(0, 200))} size="small" fullWidth sx={{ mt: 1 }} placeholder="For example: paid cash to Kunal on Oct 6" />
+      {props.payment === 'paid' && (
+        <Box sx={{ mt: 1 }}>
+          <Typography sx={{ fontSize: 13, color: '#4B5563', mb: 0.75 }}>How was it paid?</Typography>
+          <PaidMethodPicker choice={props.paidChoice} typed={props.paidTyped} onChoice={props.onPaidChoice} onTyped={props.onPaidTyped} />
+          <TextField label="Payment note (optional)" value={props.note} onChange={(e) => props.onNote(e.target.value.slice(0, 200))} size="small" fullWidth sx={{ mt: 1 }} placeholder="For example: paid to Kunal on Oct 6" />
+        </Box>
       )}
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 1 }}>
         {props.payment === 'link'
           ? 'The customer gets an email with a secure pay link. The order is confirmed (and the confirmation email sent) once they pay.'
-          : 'The order is saved as paid and the customer gets the usual order confirmation email.'}
+          : 'The order is saved as paid with the method you chose, and the customer gets the usual order confirmation email.'}
       </Typography>
 
       {props.missing.length > 0 && lines.length > 0 && (
