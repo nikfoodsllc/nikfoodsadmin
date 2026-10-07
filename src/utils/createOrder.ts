@@ -449,3 +449,22 @@ export function linkActivity(row: Pick<OrderListRow, 'linkOrder' | 'paymentStatu
   }
   return lines;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// The phone typed for an order
+
+const digitsOf = (s: string) => {
+  const d = (s ?? '').replace(/\D/g, '');
+  return d.length === 11 && d.startsWith('1') ? d.slice(1) : d;
+};
+
+/** What happens to the phone typed here: saved on the profile when the profile has none, kept as is when it already has one. */
+export function phoneNote(account: { phone: string } | null, typed: string): string | undefined {
+  if (!account) return 'Saved on the new account.';
+  const onProfile = digitsOf(account.phone);
+  if (onProfile.length !== 10) return 'This customer has no phone on their profile yet: the number is saved to it when the order is created.';
+  const entered = digitsOf(typed);
+  if (entered.length === 10 && entered !== onProfile) return 'Different from the profile number: used for this order only, the profile keeps its number.';
+  return undefined;
+}
+
