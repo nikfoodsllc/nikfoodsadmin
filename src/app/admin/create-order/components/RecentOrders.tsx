@@ -46,7 +46,7 @@ function ActivityLines({ row }: { row: Row }) {
  * The orders entered on this screen, newest first. They stay here after the form is left or the page is changed, so a
  * payment link can be copied or sent again, or the order marked as paid another way, at any time.
  */
-export default function RecentOrders({ token, version, onChanged, onEdit }: { token: string; version: number; onChanged: () => void; onEdit: (orderId: string) => void }) {
+export default function RecentOrders({ token, version, onChanged, onEdit, onRows }: { token: string; version: number; onChanged: () => void; onEdit: (orderId: string) => void; onRows?: (rows: Row[]) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -73,6 +73,11 @@ export default function RecentOrders({ token, version, onChanged, onEdit }: { to
   useEffect(() => {
     void load();
   }, [load, version]);
+
+  // tell the page what the list now says (it keeps the card at the top honest)
+  useEffect(() => {
+    if (rows) onRows?.(rows);
+  }, [rows, onRows]);
 
   // keep the list current: an order the customer pays leaves the Waiting tab by itself
   useEffect(() => {

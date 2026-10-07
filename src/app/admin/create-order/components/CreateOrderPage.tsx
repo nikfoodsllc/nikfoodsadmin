@@ -19,6 +19,7 @@ import {
   type CatalogPayload,
   type CustomerForm,
   type MenuItem,
+  type OrderListRow,
   type PaidChoice,
 } from '@/utils/createOrder';
 import CustomerSection, { EMPTY_ADDRESS, type FoundCustomer } from './CustomerSection';
@@ -78,6 +79,7 @@ export default function CreateOrderPage() {
   // editing an order that was sent: its number (creating replaces it) and any problem loading it
   const [editing, setEditing] = useState<string | null>(null);
   const [editError, setEditError] = useState('');
+  const [listRows, setListRows] = useState<OrderListRow[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -284,7 +286,7 @@ export default function CreateOrderPage() {
         </Alert>
       )}
       {result ? (
-        <OrderResult result={result} token={token} onAnother={reset} onChanged={() => setListVersion((v) => v + 1)} />
+        <OrderResult result={result} token={token} onAnother={reset} onChanged={() => setListVersion((v) => v + 1)} listed={listRows.find((r) => r.orderId === result.orderId)} />
       ) : menuError ? (
         <Alert severity="error">{menuError}</Alert>
       ) : !menu ? (
@@ -299,7 +301,7 @@ export default function CreateOrderPage() {
         </Box>
       )}
 
-      <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} onEdit={(id) => void startEdit(id)} />
+      <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} onEdit={(id) => void startEdit(id)} onRows={setListRows} />
 
       {form && !wide && (
         <>

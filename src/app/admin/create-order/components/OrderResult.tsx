@@ -18,12 +18,15 @@ export interface CreatedOrder {
 }
 
 /** What happened after Create: the order number, the pay link (copy it, resend it), and whether the emails went out. */
-export default function OrderResult({ result, token, onAnother, onChanged }: { result: CreatedOrder; token: string; onAnother: () => void; onChanged?: () => void }) {
+export default function OrderResult({ result, token, onAnother, onChanged, listed }: { result: CreatedOrder; token: string; onAnother: () => void; onChanged?: () => void; listed?: { status: string; paymentStatus: string } }) {
   const [link, setLink] = useState(result.payLink ?? '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [paid, setPaid] = useState(false);
+  const [paidHere, setPaidHere] = useState(false);
+  // what happened to the order since (cancelled from the list, paid by the customer): the Recent orders list knows
+  const cancelled = listed?.status === 'cancelled';
+  const paid = paidHere || listed?.paymentStatus === 'paid';
   const [payOpen, setPayOpen] = useState(false);
   const [payChoice, setPayChoice] = useState<PaidChoice>('Cash');
   const [payTyped, setPayTyped] = useState('');
@@ -63,7 +66,7 @@ export default function OrderResult({ result, token, onAnother, onChanged }: { r
     const data = await call('mark-paid', { method, note: 'Marked paid by an admin' });
     if (!data) return;
     setPayOpen(false);
-    setPaid(true);
+    setPaidHere(true);
     onChanged?.();
     setNote(data.emailSent ? 'Marked as paid. The confirmation email was sent.' : 'Marked as paid, but the confirmation email could not be sent.');
   };
@@ -79,12 +82,14 @@ export default function OrderResult({ result, token, onAnother, onChanged }: { r
 
   return (
     <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4', borderRadius: 2 }}>
-      <Typography sx={{ fontWeight: 800, fontSize: 20 }}>Order created</Typography>
+      <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{cancelled ? 'Order cancelled' : 'Order created'}</Typography>
       <Typography sx={{ fontSize: 15, mt: 0.5 }}>
-        Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {result.mode === 'link' && !paid ? 'waiting for payment' : 'paid'}
+        Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {cancelled ? 'cancelled' : result.mode === 'link' && !paid ? 'waiting for payment' : 'paid'}
       </Typography>
       {result.accountCreated && <Alert severity="info" sx={{ mt: 1.5 }}>A new customer account was created for this email (the customer sets a password with Forgot password).</Alert>}
-      {result.mode === 'link' ? (
+      {cancelled ? (
+        <Alert severity="info" sx={{ mt: 1.5 }}>This order was cancelled. Its payment link no longer works.</Alert>
+      ) : result.mode === 'link' ? (
         <>
           <Alert severity={result.emailSent ? 'success' : 'warning'} sx={{ mt: 1.5 }}>
             {result.emailSent ? 'The payment link was emailed to the customer.' : `The email could not be sent (${result.emailError || 'unknown error'}). Copy the link below and send it to the customer yourself.`}
