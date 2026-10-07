@@ -1,15 +1,33 @@
 /**
  * Order cutoff for a delivery date, as the admin sees and sets it.
  *
- * Standard rule (the customer site): ordering for a delivery date closes at 1:00 PM Pacific on the day
- * before. An admin can set a custom cutoff for one date (an absolute moment, stored as `cutoffAt`) to close
- * earlier or to extend / reopen it. Keep the standard rule in step with livesite/src/lib/server/orderCutoff.ts.
+ * Standard rule (the customer site): ordering for a delivery date closes at 5:00 PM Pacific on the day before for
+ * flat items and at 1:00 PM Pacific on the day before for day-wise (Food Menu) items. An admin can set a custom cutoff
+ * for one date and one kind of item (an absolute moment, stored as `flatCutoffAt` / `dayWiseCutoffAt`) to close
+ * earlier or to extend / reopen it. The older single `cutoffAt` of a date applies to both kinds until the date is
+ * saved again. Keep the standard rules in step with livesite/src/lib/server/orderCutoff.ts.
  *
  * Pure functions. Dates are 'YYYY-MM-DD' strings (Pacific), moments are `Date` objects.
  */
 
 export const CUTOFF_TIMEZONE = 'America/Los_Angeles';
 export const DEFAULT_CUTOFF_HOUR = 13;
+
+/** The two kinds of items that have their own cutoff. */
+export type ItemKind = 'flat' | 'day-wise';
+export const ITEM_KINDS: readonly ItemKind[] = ['flat', 'day-wise'];
+/** Standard cutoff per kind: this hour (24h clock, Pacific) on the day before the delivery date. */
+export const DEFAULT_CUTOFF_HOUR_BY_KIND: Record<ItemKind, number> = { flat: 17, 'day-wise': 13 };
+/** What the admin calls each kind. */
+export const ITEM_KIND_LABEL: Record<ItemKind, string> = { flat: 'Flat items', 'day-wise': 'Day-wise items (Food Menu)' };
+
+/** The custom cutoff fields of a date. */
+export interface CutoffFields {
+  /** Older single cutoff: applies to both kinds when the kind's own field is not set. */
+  cutoffAt?: unknown;
+  flatCutoffAt?: unknown;
+  dayWiseCutoffAt?: unknown;
+}
 
 const DATE_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
 const INPUT_PATTERN = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):([0-5]\d)$/;
@@ -47,9 +65,9 @@ export function previousDay(dateString: string): string {
   return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) - 1)).toISOString().slice(0, 10);
 }
 
-/** The standard cutoff for a delivery date: 1:00 PM Pacific on the day before. */
-export function defaultCutoffInstant(deliveryDate: string): Date {
-  return zonedWallTimeToInstant(previousDay(deliveryDate), DEFAULT_CUTOFF_HOUR);
+/** The standard cutoff for a delivery date: 5:00 PM (flat) or 1:00 PM (day-wise) Pacific on the day before. */
+export function defaultCutoffInstant(deliveryDate: string, kind: ItemKind = 'day-wise'): Date {
+  return zonedWallTimeToInstant(previousDay(deliveryDate), DEFAULT_CUTOFF_HOUR_BY_KIND[kind]);
 }
 
 /** A stored custom cutoff as a valid `Date`, or null (missing, empty or unreadable means "standard"). */
@@ -57,6 +75,13 @@ export function parseCutoff(value: unknown): Date | null {
   if (value === null || value === undefined || value === '') return null;
   const date = value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? new Date(value) : null;
   return date && Number.isFinite(date.getTime()) ? date : null;
+}
+
+/** The custom cutoff in effect for one kind of a date: the kind's own field, else the older single one, else none. */
+export function overrideForKind(date: CutoffFields | null | undefined, kind: ItemKind): unknown {
+  if (!date) return undefined;
+  const own = kind === 'flat' ? date.flatCutoffAt : date.dayWiseCutoffAt;
+  return parseCutoff(own) ? own : date.cutoffAt;
 }
 
 /** A moment as the value of an <input type="datetime-local">, read as Pacific wall-clock time. */
@@ -108,9 +133,9 @@ export interface CutoffStatus {
   isOpen: boolean;
 }
 
-export function cutoffStatus(deliveryDate: string, cutoffAt: unknown, now: Date = new Date()): CutoffStatus {
+export function cutoffStatus(deliveryDate: string, cutoffAt: unknown, now: Date = new Date(), kind: ItemKind = 'day-wise'): CutoffStatus {
   const custom = parseCutoff(cutoffAt);
-  const closesAt = custom ?? defaultCutoffInstant(deliveryDate);
+  const closesAt = custom ?? defaultCutoffInstant(deliveryDate, kind);
   return { closesAt, overridden: custom !== null, isOpen: now.getTime() < closesAt.getTime() };
 }
 
@@ -122,18 +147,18 @@ export function formatCutoff(instant: Date): string {
 }
 
 /** The line shown to the admin: when ordering closes (or closed) and whether that is the standard or a custom time. */
-export function describeCutoff(deliveryDate: string, cutoffAt: unknown, now: Date = new Date()): string {
-  const status = cutoffStatus(deliveryDate, cutoffAt, now);
-  const kind = status.overridden ? 'custom' : 'standard';
-  return `${status.isOpen ? 'Closes' : 'Closed'} ${formatCutoff(status.closesAt)} Pacific (${kind})`;
+export function describeCutoff(deliveryDate: string, cutoffAt: unknown, now: Date = new Date(), kind: ItemKind = 'day-wise'): string {
+  const status = cutoffStatus(deliveryDate, cutoffAt, now, kind);
+  const which = status.overridden ? 'custom' : 'standard';
+  return `${status.isOpen ? 'Closes' : 'Closed'} ${formatCutoff(status.closesAt)} Pacific (${which})`;
 }
 
 /**
  * A cutoff `hours` later than the current closing time, but counted from now if that time has already
  * passed (so "extend by 2 hours" on a closed day reopens it for 2 hours from now).
  */
-export function extendCutoff(deliveryDate: string, cutoffAt: unknown, hours: number, now: Date = new Date()): Date {
-  const current = cutoffStatus(deliveryDate, cutoffAt, now).closesAt;
+export function extendCutoff(deliveryDate: string, cutoffAt: unknown, hours: number, now: Date = new Date(), kind: ItemKind = 'day-wise'): Date {
+  const current = cutoffStatus(deliveryDate, cutoffAt, now, kind).closesAt;
   const base = Math.max(current.getTime(), now.getTime());
   return new Date(base + hours * 3600 * 1000);
 }
