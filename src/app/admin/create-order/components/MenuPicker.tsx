@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Box, Button, Chip, Collapse, InputAdornment, Paper, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { IconChevronDown, IconChevronRight, IconSearch } from '@tabler/icons-react';
 import {
@@ -67,10 +67,7 @@ export default function MenuPicker({
       return next;
     });
 
-  // a day's menu starts opened, the whole menu starts closed (it is long)
-  useEffect(() => {
-    setOpen(view === 'day' ? new Set(allNodeIds(dayMenuNodes(catalog, date))) : new Set());
-  }, [view, date, catalog]);
+  // every category and sub-category starts closed (the menu is long): search, or open the ones you need
 
   const known = new Set(catalog.dates.map((d) => d.date));
   const dateChips = [...catalog.dates.map((d) => ({ date: d.date, hint: d.state === 'past' ? 'past' : d.state === 'closed' ? 'closed' : '' }))];
@@ -99,6 +96,8 @@ export default function MenuPicker({
 
   const renderNode = (node: MenuNode, depth: number) => {
     const isOpen = expanded.has(node.id);
+    // what is already in the order from this category, so it is visible while the category is closed
+    const inOrder = uniqueIds([node]).reduce((sum, id) => sum + quantityFor(lines, date, id), 0);
     return (
       <Box key={node.id} sx={{ mb: depth === 0 ? 1 : 0.5, ml: depth * 1.5 }}>
         <Box
@@ -111,6 +110,7 @@ export default function MenuPicker({
         >
           {isOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
           <Typography sx={{ flex: 1, fontSize: depth === 0 ? 13 : 13, fontWeight: 800, letterSpacing: depth === 0 ? '0.05em' : 0, textTransform: depth === 0 ? 'uppercase' : 'none', color: depth === 0 ? '#A85A00' : '#374151' }}>{node.name}</Typography>
+          {inOrder > 0 && <Chip size="small" color="warning" label={`${inOrder} in order`} sx={{ height: 20, fontWeight: 700 }} />}
           <Chip size="small" label={node.total} sx={{ height: 20, fontWeight: 700 }} />
         </Box>
         <Collapse in={isOpen} timeout="auto" unmountOnExit>
