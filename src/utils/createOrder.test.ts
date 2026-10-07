@@ -140,7 +140,7 @@ describe('rowsForTab', () => {
   });
 });
 
-import { linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
+import { phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
 
 describe('whole menu helpers', () => {
   const item = (id: string, name: string) => ({ _id: id, name, price: 5 });
@@ -293,5 +293,23 @@ describe('payment link activity', () => {
     expect(elapsed('2026-10-08T11:30:00Z', NOW)).toBe('30 min');
     expect(elapsed('2026-10-08T11:00:00Z', NOW)).toBe('1 hour');
     expect(elapsed('2026-10-05T12:00:00Z', NOW)).toBe('3 days');
+  });
+});
+
+describe('phone note in Create Order', () => {
+  it('a new customer: saved on the new account', () => {
+    expect(phoneNote(null, '2065550100')).toBe('Saved on the new account.');
+  });
+  it('an existing customer without a phone: it will be saved to the profile', () => {
+    expect(phoneNote({ phone: '' }, '2065550100')).toContain('saved to it when the order is created');
+    expect(phoneNote({ phone: '12345' }, '')).toContain('no phone on their profile');
+  });
+  it('an existing customer with a phone: nothing to say when it is the same, in any format', () => {
+    expect(phoneNote({ phone: '2065550100' }, '(206) 555-0100')).toBeUndefined();
+    expect(phoneNote({ phone: '2065550100' }, '1-206-555-0100')).toBeUndefined();
+    expect(phoneNote({ phone: '2065550100' }, '')).toBeUndefined();
+  });
+  it('a different number: used for this order only', () => {
+    expect(phoneNote({ phone: '2065550100' }, '2065550199')).toContain('this order only');
   });
 });
