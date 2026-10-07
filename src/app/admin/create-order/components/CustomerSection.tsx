@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Chip, CircularProgress, FormControlLabel, Paper, Radio, RadioGroup, TextField, Typography } from '@mui/material';
 import { phoneNote, type AddressForm, type CustomerForm } from '@/utils/createOrder';
+import AddressLookup from './AddressLookup';
 
 export interface FoundCustomer {
   id: string;
@@ -149,6 +150,11 @@ export default function CustomerSection({
         </RadioGroup>
       )}
       {(!accountExists || accountExists.addresses.length === 0 || savedChoice === 'new') && (
+        <>
+          <AddressLookup
+            token={token}
+            onPick={(found) => onAddress({ ...address, street_address: found.street || address.street_address, city: found.city || address.city, postal_code: found.pincode || address.postal_code })}
+          />
         <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
           <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{field('Street address', address.street_address, (v) => onAddress({ ...address, street_address: v }))}</Box>
           {field('Apartment / unit (optional)', address.apartment, (v) => onAddress({ ...address, apartment: v.slice(0, 10) }))}
@@ -157,6 +163,7 @@ export default function CustomerSection({
           {field('Gate / entrance code (optional)', address.entrance, (v) => onAddress({ ...address, entrance: v }))}
           <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{field('Delivery instructions (optional)', address.floor, (v) => onAddress({ ...address, floor: v.slice(0, 30) }))}</Box>
         </Box>
+        </>
       )}
     </Paper>
   );
