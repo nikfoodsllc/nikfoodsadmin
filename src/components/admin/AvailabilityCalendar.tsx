@@ -30,6 +30,7 @@ import {
   IconCheck,
   IconX,
   IconClock,
+  IconLock,
 } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AvailableDate } from '@/types/order';
@@ -60,6 +61,8 @@ import {
   instantToInputValue,
   parseCutoff,
   validateCutoff,
+  kindState,
+  type KindState,
 } from '@/utils/orderCutoff';
 
 interface DateCellData {
@@ -73,6 +76,43 @@ interface DateCellData {
 interface AvailabilityCalendarProps {
   onDateClick?: (date: string, availability: AvailableDate | undefined) => void;
   initialMonth?: Date;
+}
+
+/** The small Flat / Day-wise tag of a date: green or purple when open, grey with a lock when enabled but closed (cutoff passed), red when switched off. */
+function KindChip({ label, state, onColor }: { label: string; state: KindState; onColor: { bg: string; text: string; border: string } }) {
+  const look =
+    state === 'open'
+      ? { bg: onColor.bg, color: onColor.text, border: `1px solid ${onColor.border}` }
+      : state === 'closed'
+        ? { bg: 'rgba(107, 114, 128, 0.15)', color: '#4B5563', border: '1px dashed #9CA3AF' }
+        : { bg: 'rgba(239, 68, 68, 0.2)', color: '#991B1B', border: '1px solid #EF4444' };
+  const chip = (
+    <Chip
+      label={
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {state === 'open' ? <IconCheck size={12} /> : state === 'closed' ? <IconLock size={12} /> : <IconX size={12} />}
+          <Typography variant="caption" sx={{ fontSize: '10px' }}>
+            {label}
+          </Typography>
+        </Box>
+      }
+      size="small"
+      sx={{
+        height: 20,
+        backgroundColor: look.bg,
+        color: look.color,
+        border: look.border,
+        '& .MuiChip-label': { fontSize: '10px', fontWeight: 500 },
+      }}
+    />
+  );
+  return state === 'closed' ? (
+    <Tooltip title={`${label} is enabled for this date, but ordering has closed (the cutoff passed). An admin can extend the cutoff to reopen it.`} arrow>
+      <span>{chip}</span>
+    </Tooltip>
+  ) : (
+    chip
+  );
 }
 
 export default function AvailabilityCalendar({ onDateClick, initialMonth }: AvailabilityCalendarProps) {
@@ -551,6 +591,20 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 None
               </Typography>
             </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box
+                sx={{
+                  width: 16,
+                  height: 16,
+                  backgroundColor: '#F3F4F6',
+                  border: '2px dashed #9CA3AF',
+                  borderRadius: 1,
+                }}
+              />
+              <Typography variant="caption" sx={{ color: '#374151', fontSize: '12px', fontWeight: 500 }}>
+                Closed (enabled, cutoff passed)
+              </Typography>
+            </Box>
           </Box>
         </Box>
       </Card>
@@ -594,7 +648,11 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
               <Grid container spacing={1}>
                 {calendarDays.map((dateData) => {
                   const status = getDateStatus(dateData);
-                  const colors = getCellColor(status);
+                  const flatState = kindState(dateData.date, dateData.availability, 'flat');
+                  const dayWiseState = kindState(dateData.date, dateData.availability, 'day-wise');
+                  // everything that is switched on has closed (the cutoff passed): the day is over for customers
+                  const allClosed = !dateData.isPadding && [flatState, dayWiseState].some((s) => s === 'closed') && ![flatState, dayWiseState].includes('open');
+                  const colors = allClosed ? { bg: '#F3F4F6', border: '#9CA3AF', text: '#6B7280' } : getCellColor(status);
                   const dateObj = parseISO(dateData.date);
                   const isTodayDate = isToday(dateObj);
 
@@ -605,7 +663,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     sx={{
                       minHeight: 80,
                       backgroundColor: dateData.isPadding ? '#F9FAFB' : colors.bg,
-                      border: `2px solid ${dateData.isPadding ? '#E5E7EB' : colors.border}`,
+                      border: `2px ${allClosed ? 'dashed' : 'solid'} ${dateData.isPadding ? '#E5E7EB' : colors.border}`,
                       borderRadius: 2,
                       p: 1,
                       cursor: dateData.isPadding ? 'default' : 'pointer',
@@ -637,64 +695,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     {/* Status Indicators - only show for current month */}
                     {!dateData.isPadding && (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Chip
-                          label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              {dateData.availability?.flatCategoryEnabled ? (
-                                <IconCheck size={12} />
-                              ) : (
-                                <IconX size={12} />
-                              )}
-                              <Typography variant="caption" sx={{ fontSize: '10px' }}>
-                                Flat
-                              </Typography>
-                            </Box>
-                          }
-                          size="small"
-                          sx={{
-                            height: 20,
-                            backgroundColor: dateData.availability?.flatCategoryEnabled
-                              ? 'rgba(16, 185, 129, 0.2)'
-                              : 'rgba(239, 68, 68, 0.2)',
-                            color: dateData.availability?.flatCategoryEnabled ? '#065F46' : '#991B1B',
-                            border: `1px solid ${
-                              dateData.availability?.flatCategoryEnabled ? '#10B981' : '#EF4444'
-                            }`,
-                            '& .MuiChip-label': {
-                              fontSize: '10px',
-                              fontWeight: 500,
-                            },
-                          }}
-                        />
-                        <Chip
-                          label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              {dateData.availability?.dayWiseCategoryEnabled ? (
-                                <IconCheck size={12} />
-                              ) : (
-                                <IconX size={12} />
-                              )}
-                              <Typography variant="caption" sx={{ fontSize: '10px' }}>
-                                Day-wise
-                              </Typography>
-                            </Box>
-                          }
-                          size="small"
-                          sx={{
-                            height: 20,
-                            backgroundColor: dateData.availability?.dayWiseCategoryEnabled
-                              ? 'rgba(139, 92, 246, 0.2)'
-                              : 'rgba(239, 68, 68, 0.2)',
-                            color: dateData.availability?.dayWiseCategoryEnabled ? '#5B21B6' : '#991B1B',
-                            border: `1px solid ${
-                              dateData.availability?.dayWiseCategoryEnabled ? '#8B5CF6' : '#EF4444'
-                            }`,
-                            '& .MuiChip-label': {
-                              fontSize: '10px',
-                              fontWeight: 500,
-                            },
-                          }}
-                        />
+                        <KindChip label="Flat" state={flatState} onColor={{ bg: 'rgba(16, 185, 129, 0.2)', text: '#065F46', border: '#10B981' }} />
+                        <KindChip label="Day-wise" state={dayWiseState} onColor={{ bg: 'rgba(139, 92, 246, 0.2)', text: '#5B21B6', border: '#8B5CF6' }} />
                         {ITEM_KINDS.some((k) => parseCutoff(overrideForKind(dateData.availability, k))) && (
                           <Chip
                             icon={<IconClock size={12} />}
@@ -778,6 +780,11 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                   <Typography variant="caption" sx={{ color: '#6B7280' }}>
                     Enable flat listing categories
                   </Typography>
+                  {selectedDate && kindState(selectedDate, datesData[selectedDate], 'flat') === 'closed' && (
+                    <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 600, display: 'block', mt: 0.25 }}>
+                      Enabled, but closed for orders: the cutoff passed
+                    </Typography>
+                  )}
                 </Box>
                 <ToggleButtonGroup
                   value={
@@ -825,6 +832,11 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                   <Typography variant="caption" sx={{ color: '#6B7280' }}>
                     Enable day-wise listing categories
                   </Typography>
+                  {selectedDate && kindState(selectedDate, datesData[selectedDate], 'day-wise') === 'closed' && (
+                    <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 600, display: 'block', mt: 0.25 }}>
+                      Enabled, but closed for orders: the cutoff passed
+                    </Typography>
+                  )}
                 </Box>
                 <ToggleButtonGroup
                   value={
