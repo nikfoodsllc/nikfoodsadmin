@@ -14,7 +14,7 @@ export interface CreatedOrder {
 }
 
 /** What happened after Create: the order number, the pay link (copy it, resend it), and whether the emails went out. */
-export default function OrderResult({ result, token, onAnother }: { result: CreatedOrder; token: string; onAnother: () => void }) {
+export default function OrderResult({ result, token, onAnother, onChanged }: { result: CreatedOrder; token: string; onAnother: () => void; onChanged?: () => void }) {
   const [link, setLink] = useState(result.payLink ?? '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -46,6 +46,7 @@ export default function OrderResult({ result, token, onAnother }: { result: Crea
     const data = await call('resend');
     if (!data) return;
     setLink(data.payLink);
+    onChanged?.();
     setNote(data.emailSent ? 'A new link was emailed to the customer. The old link no longer works.' : `The new link could not be emailed (${data.emailError || 'unknown error'}). Copy it below and send it yourself.`);
   };
 
@@ -53,6 +54,7 @@ export default function OrderResult({ result, token, onAnother }: { result: Crea
     const data = await call('mark-paid', { method: 'Cash on Delivery', note: 'Marked paid by an admin' });
     if (!data) return;
     setPaid(true);
+    onChanged?.();
     setNote(data.emailSent ? 'Marked as paid. The confirmation email was sent.' : 'Marked as paid, but the confirmation email could not be sent.');
   };
 

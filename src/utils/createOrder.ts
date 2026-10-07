@@ -228,3 +228,34 @@ export function missingForCreate(customer: CustomerForm, address: AddressForm, l
   if (lineCount === 0) missing.push('At least one item');
   return missing;
 }
+
+/** One order in the "Recent orders entered here" list. */
+export interface OrderListRow {
+  orderId: string;
+  createdAt: string;
+  customerName: string;
+  customerEmail: string;
+  total: number;
+  status: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  linkOrder: boolean;
+  /** A payment link order the customer has not paid yet */
+  awaitingPayment: boolean;
+  linkSentAt?: string;
+  deliveryDates: string[];
+  offlinePaymentNote?: string;
+}
+
+export type OrderTab = 'waiting' | 'paid' | 'all';
+
+/**
+ * Which orders a tab shows, newest first. Waiting = unpaid link orders (an order leaves it as soon as it is paid);
+ * Paid = paid orders; All = everything, with the unpaid ones on top.
+ */
+export function rowsForTab(rows: OrderListRow[], tab: OrderTab): OrderListRow[] {
+  const newestFirst = (a: OrderListRow, b: OrderListRow) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  if (tab === 'waiting') return rows.filter((r) => r.awaitingPayment).sort(newestFirst);
+  if (tab === 'paid') return rows.filter((r) => r.paymentStatus === 'paid').sort(newestFirst);
+  return [...rows].sort((a, b) => Number(b.awaitingPayment) - Number(a.awaitingPayment) || newestFirst(a, b));
+}

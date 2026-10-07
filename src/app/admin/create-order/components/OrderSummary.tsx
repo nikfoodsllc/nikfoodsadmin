@@ -127,7 +127,7 @@ export default function OrderSummary(props: {
       <Divider sx={{ my: 1.5 }} />
       <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 0.5 }}>How does the customer pay?</Typography>
       <RadioGroup value={props.payment} onChange={(e) => props.onPayment(e.target.value as PaymentChoice)}>
-        <FormControlLabel value="link" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email a payment link (card, Apple Pay, Google Pay)</Typography>} />
+        <FormControlLabel value="link" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email a payment link (card or Apple Pay)</Typography>} />
         <FormControlLabel value="cash" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid or pays in cash</Typography>} />
         <FormControlLabel value="other" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid another way (Zelle, check…)</Typography>} />
       </RadioGroup>
