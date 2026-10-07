@@ -12,7 +12,7 @@ export interface FoundCustomer {
   addresses: Array<{ id: string; street_address: string; apartment?: string; city: string; postal_code: string; entrance?: string; floor?: string; isDefault: boolean }>;
 }
 
-export const EMPTY_ADDRESS: AddressForm = { street_address: '', apartment: '', city: 'Seattle', postal_code: '', entrance: '', floor: '' };
+export const EMPTY_ADDRESS: AddressForm = { street_address: '', apartment: '', city: '', postal_code: '', entrance: '', floor: '' };
 
 const addressLine = (a: FoundCustomer['addresses'][number]) =>
   [a.street_address, a.apartment, `${a.city} ${a.postal_code}`.trim()].filter(Boolean).join(', ');
