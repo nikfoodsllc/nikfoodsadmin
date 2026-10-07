@@ -431,6 +431,8 @@ export interface ItemOrderLine {
   isEco: boolean;
   /** Set when the item is a chosen part of this combo rather than ordered on its own. */
   viaCombo: string | null;
+  /** How much food this order line is, size times quantity ('32 oz (2 lb)'); '' when the item has no readable size (a combo, 'Serves 4'). */
+  amountText: string;
   /** For a combo ordered on its own: what this customer picked in it, one line per section ('Veg Curry of the Day: Kale Chane (12Oz)'). */
   choices: string[];
   orderStatus: string | null;
@@ -459,27 +461,52 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
     const parts = comboParts(row);
     if (parts.length > 0) {
       if (clean(row.name) === wanted) {
-        lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null, choices: comboChoiceLines(row) });
+        lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: '', choices: comboChoiceLines(row) });
       }
       for (const part of parts) {
         if (part.name === wanted) {
-          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: null, viaCombo: clean(row.name), choices: [] });
+          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, row.quantity), choices: [] });
         }
       }
     } else if (clean(row.name) === wanted) {
-      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, choices: [] });
+      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: amountTextOf(row.portion, row.quantity), choices: [] });
     }
   }
-  // spice level first (mild to hot, no spice last), then the biggest orders first
+  // spice level first (mild to hot, no spice last), then the most food (size times quantity: 2 x 16Oz = 32 oz before
+  // 1 x 16Oz), then the bigger single size, then the most ordered, then day and customer
   return lines.sort(
     (a, b) =>
       spiceRank(a.spice) - spiceRank(b.spice) ||
       clean(a.spice).localeCompare(clean(b.spice)) ||
+      amountRank(b) - amountRank(a) ||
+      sizeRank(b.portion) - sizeRank(a.portion) ||
       b.quantity - a.quantity ||
       a.day.localeCompare(b.day) ||
       a.customerName.localeCompare(b.customerName) ||
       a.orderId.localeCompare(b.orderId)
   );
+}
+
+/** The food amount of an order line as text ('32 oz (2 lb)'), '' without a readable size. */
+function amountTextOf(portion: string | null | undefined, quantity: number): string {
+  const size = parsePortionAmount(portion);
+  if (!size) return '';
+  const total = emptyAmount();
+  addAmount(total, size, quantity);
+  return formatAmount(total);
+}
+
+/** Size times quantity, for sorting; lines without a readable size come after every sized one. */
+function amountRank(line: Pick<ItemOrderLine, 'portion' | 'quantity'>): number {
+  const size = sizeRank(line.portion);
+  return size < 0 ? -1 : size * line.quantity;
+}
+
+/** How big a size label is, for sorting (ounces; grams count as ounces too); labels with no readable size are the smallest. */
+export function sizeRank(portion: string | null | undefined): number {
+  const amount = parsePortionAmount(portion);
+  if (!amount) return -1;
+  return amount.oz + amount.grams / 28.3495 + amount.pieces;
 }
 
 /** Where a spice level stands from mild to hot; levels we do not know come after the known ones, no spice last. */
