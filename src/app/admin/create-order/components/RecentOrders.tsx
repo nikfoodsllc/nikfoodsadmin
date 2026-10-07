@@ -11,16 +11,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
   Paper,
-  Radio,
-  RadioGroup,
   Tab,
   Tabs,
   TextField,
   Typography,
 } from '@mui/material';
-import { rowsForTab, type OrderListRow as Row, type OrderTab as TabKey } from '@/utils/createOrder';
+import { paidMethodValue, rowsForTab, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
+import PaidMethodPicker from './PaidMethodPicker';
 
 
 const REFRESH_MS = 30000;
@@ -39,7 +37,8 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ orderId: string; text: string; error?: boolean } | null>(null);
   const [payDialog, setPayDialog] = useState<Row | null>(null);
-  const [payMethod, setPayMethod] = useState<'Cash on Delivery' | 'Other'>('Cash on Delivery');
+  const [payChoice, setPayChoice] = useState<PaidChoice>('Cash');
+  const [payTyped, setPayTyped] = useState('');
   const [payNote, setPayNote] = useState('');
   const [tab, setTab] = useState<TabKey>('waiting');
 
@@ -120,10 +119,12 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
     if (!row) return;
     setPayDialog(null);
     await run(row, 'paid', async () => {
-      const d = await post(row.orderId, 'mark-paid', { method: payMethod, note: payNote.trim() || 'Marked paid by an admin' });
+      const d = await post(row.orderId, 'mark-paid', { method: paidMethodValue(payChoice, payTyped), note: payNote.trim() || 'Marked paid by an admin' });
       return d.emailSent ? 'Marked as paid. The confirmation email was sent.' : 'Marked as paid, but the confirmation email could not be sent.';
     });
     setPayNote('');
+    setPayTyped('');
+    setPayChoice('Cash');
   };
 
   const visible = rows ? rowsForTab(rows, tab) : [];
@@ -196,15 +197,12 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
         <DialogTitle>The customer paid another way</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14, mb: 1 }}>{payDialog?.orderId} · {payDialog ? money(payDialog.total) : ''}. The order is confirmed, the pay link stops working and the customer gets the confirmation email.</Typography>
-          <RadioGroup value={payMethod} onChange={(e) => setPayMethod(e.target.value as 'Cash on Delivery' | 'Other')}>
-            <FormControlLabel value="Cash on Delivery" control={<Radio size="small" color="warning" />} label="Cash" />
-            <FormControlLabel value="Other" control={<Radio size="small" color="warning" />} label="Other (Zelle, check…)" />
-          </RadioGroup>
+          <PaidMethodPicker choice={payChoice} typed={payTyped} onChoice={setPayChoice} onTyped={setPayTyped} />
           <TextField label="Note (optional)" value={payNote} onChange={(e) => setPayNote(e.target.value.slice(0, 200))} size="small" fullWidth sx={{ mt: 1 }} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPayDialog(null)} sx={{ textTransform: 'none' }}>Back</Button>
-          <Button variant="contained" onClick={() => void markPaid()} sx={{ textTransform: 'none', fontWeight: 700 }}>Mark as paid</Button>
+          <Button variant="contained" disabled={paidMethodValue(payChoice, payTyped) === null} onClick={() => void markPaid()} sx={{ textTransform: 'none', fontWeight: 700 }}>Mark as paid</Button>
         </DialogActions>
       </Dialog>
     </Box>

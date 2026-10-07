@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
+import { paidMethodValue, type PaidChoice } from '@/utils/createOrder';
+import PaidMethodPicker from './PaidMethodPicker';
 
 export interface CreatedOrder {
   orderId: string;
@@ -20,6 +22,9 @@ export default function OrderResult({ result, token, onAnother, onChanged }: { r
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [paid, setPaid] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payChoice, setPayChoice] = useState<PaidChoice>('Cash');
+  const [payTyped, setPayTyped] = useState('');
 
   const call = async (path: string, body?: unknown) => {
     setBusy(true);
@@ -51,8 +56,11 @@ export default function OrderResult({ result, token, onAnother, onChanged }: { r
   };
 
   const markPaid = async () => {
-    const data = await call('mark-paid', { method: 'Cash on Delivery', note: 'Marked paid by an admin' });
+    const method = paidMethodValue(payChoice, payTyped);
+    if (!method) return;
+    const data = await call('mark-paid', { method, note: 'Marked paid by an admin' });
     if (!data) return;
+    setPayOpen(false);
     setPaid(true);
     onChanged?.();
     setNote(data.emailSent ? 'Marked as paid. The confirmation email was sent.' : 'Marked as paid, but the confirmation email could not be sent.');
@@ -85,9 +93,16 @@ export default function OrderResult({ result, token, onAnother, onChanged }: { r
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
                 <Button variant="outlined" onClick={copy} sx={{ textTransform: 'none' }}>Copy link</Button>
                 <Button variant="outlined" onClick={resend} disabled={busy} sx={{ textTransform: 'none' }}>Email a new link</Button>
-                <Button variant="outlined" color="warning" onClick={markPaid} disabled={busy} sx={{ textTransform: 'none' }}>The customer paid another way</Button>
+                <Button variant="outlined" color="warning" onClick={() => setPayOpen((v) => !v)} disabled={busy} sx={{ textTransform: 'none' }}>The customer paid another way</Button>
                 {busy && <CircularProgress size={22} />}
               </Box>
+              {payOpen && (
+                <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#fff', border: '1px solid #E5E7EB', borderRadius: 1 }}>
+                  <Typography sx={{ fontSize: 13, mb: 0.75 }}>How did the customer pay?</Typography>
+                  <PaidMethodPicker choice={payChoice} typed={payTyped} onChoice={setPayChoice} onTyped={setPayTyped} />
+                  <Button variant="contained" onClick={markPaid} disabled={busy || paidMethodValue(payChoice, payTyped) === null} sx={{ mt: 1.25, textTransform: 'none', fontWeight: 700 }}>Mark as paid</Button>
+                </Box>
+              )}
             </>
           )}
         </>
