@@ -251,6 +251,48 @@ export interface OrderListRow {
   linkViews?: { firstAt: string; lastAt: string; count: number };
   deliveryDates: string[];
   offlinePaymentNote?: string;
+  /** What was ordered (missing from an older server) */
+  details?: OrderDetails;
+}
+
+export interface OrderDetailItem {
+  name: string;
+  quantity: number;
+  lineTotal: number;
+  tags: string[];
+  choices: string[];
+  notes?: string;
+}
+
+export interface OrderDetailDay {
+  menuDay: string;
+  deliveryDay: string;
+  items: OrderDetailItem[];
+  dayTotal: number;
+}
+
+export interface OrderDetails {
+  days: OrderDetailDay[];
+  totals: { subtotal: number; platformFee: number; deliveryFee: number; tax: number; tip: number; discount: number; total: number };
+  address: { line: string; gateCode?: string; instruction?: string };
+}
+
+/** How many things were ordered in all (quantities added up). */
+export function unitCount(details: OrderDetails | undefined): number {
+  return (details?.days ?? []).reduce((sum, day) => sum + day.items.reduce((s, i) => s + (Number.isFinite(i.quantity) ? i.quantity : 0), 0), 0);
+}
+
+/** The totals block of an expanded order, the way the confirmation email shows it: taxes and fees together, a discount only when there is one. */
+export function totalsLines(details: OrderDetails): Array<{ label: string; amount: number; strong?: boolean }> {
+  const t = details.totals;
+  const lines: Array<{ label: string; amount: number; strong?: boolean }> = [
+    { label: 'Subtotal', amount: t.subtotal },
+    { label: 'Taxes & fees', amount: Math.round((t.platformFee + t.tax + t.deliveryFee) * 100) / 100 },
+  ];
+  if (t.tip > 0) lines.push({ label: 'Tip', amount: t.tip });
+  if (t.discount > 0) lines.push({ label: 'Discount', amount: -t.discount });
+  lines.push({ label: 'Total', amount: t.total, strong: true });
+  return lines;
 }
 
 export type OrderTab = 'waiting' | 'paid' | 'cancelled' | 'all';

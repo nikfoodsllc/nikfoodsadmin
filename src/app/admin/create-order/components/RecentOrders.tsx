@@ -18,9 +18,10 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { IconSearch, IconX } from '@tabler/icons-react';
-import { linkActivity, paidMethodValue, rowsForTab, searchRows, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
+import { IconChevronDown, IconChevronUp, IconSearch, IconX } from '@tabler/icons-react';
+import { linkActivity, paidMethodValue, rowsForTab, searchRows, unitCount, type OrderListRow as Row, type OrderTab as TabKey, type PaidChoice } from '@/utils/createOrder';
 import PaidMethodPicker from './PaidMethodPicker';
+import OrderDetailsPanel from './OrderDetailsPanel';
 
 
 const REFRESH_MS = 30000;
@@ -60,6 +61,15 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
   const [payNote, setPayNote] = useState('');
   const [tab, setTab] = useState<TabKey>('waiting');
   const [search, setSearch] = useState('');
+  // the orders opened to show what was ordered (kept when the list refreshes)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (orderId: string) =>
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
 
   const load = useCallback(async () => {
     try {
@@ -247,6 +257,20 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
               )}
               {!row.awaitingPayment && <ActivityLines row={row} />}
               {row.offlinePaymentNote && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>Note: {row.offlinePaymentNote}</Typography>}
+              {row.details && (
+                <>
+                  <Button
+                    size="small"
+                    onClick={() => toggleExpanded(row.orderId)}
+                    aria-expanded={expanded.has(row.orderId)}
+                    startIcon={expanded.has(row.orderId) ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+                    sx={{ textTransform: 'none', fontWeight: 700, mt: 0.75, ml: -0.75 }}
+                  >
+                    {expanded.has(row.orderId) ? 'Hide items' : `Show items (${unitCount(row.details)})`}
+                  </Button>
+                  {expanded.has(row.orderId) && <OrderDetailsPanel details={row.details} />}
+                </>
+              )}
               {notice?.orderId === row.orderId && <Alert severity={notice.error ? 'error' : 'success'} sx={{ mt: 1 }} onClose={() => setNotice(null)}>{notice.text}</Alert>}
             </Paper>
           );

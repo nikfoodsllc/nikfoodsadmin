@@ -140,7 +140,7 @@ describe('rowsForTab', () => {
   });
 });
 
-import { searchRows, phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
+import { totalsLines, unitCount, searchRows, phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
 
 describe('whole menu helpers', () => {
   const item = (id: string, name: string) => ({ _id: id, name, price: 5 });
@@ -421,5 +421,35 @@ describe('Recent orders tabs', () => {
   it('search narrows Cancelled too, and the word cancelled finds cancelled orders', () => {
     expect(rowsForTab(searchRows(rows, 'c1'), 'cancelled').map((r) => r.orderId)).toEqual(['C1']);
     expect(searchRows(rows, 'cancelled').map((r) => r.orderId).sort()).toEqual(['C1', 'C2']);
+  });
+});
+
+describe('expanded order in Recent orders', () => {
+  const details = {
+    days: [
+      { menuDay: '2026-10-07', deliveryDay: '2026-10-09', dayTotal: 17.5, items: [{ name: 'Rajma', quantity: 2, lineTotal: 17.5, tags: ['8Oz', 'Medium Spice', 'Eco'], choices: [] }] },
+      { menuDay: '2026-10-09', deliveryDay: '2026-10-09', dayTotal: 43.75, items: [{ name: 'Veg Combo', quantity: 1, lineTotal: 26.5, tags: [], choices: ['Staple: Chapati'] }, { name: 'Samosa', quantity: 3, lineTotal: 17.25, tags: [], choices: [] }] },
+    ],
+    totals: { subtotal: 60.5, platformFee: 2.73, deliveryFee: 0, tax: 6.5, tip: 3, discount: 0, total: 72.73 },
+    address: { line: '400 Broad Street, Seattle 98109' },
+  };
+  it('counts every unit ordered, across days', () => {
+    expect(unitCount(details)).toBe(6);
+    expect(unitCount(undefined)).toBe(0);
+    expect(unitCount({ ...details, days: [] })).toBe(0);
+  });
+  it('totals: subtotal, taxes and fees together, tip, total', () => {
+    expect(totalsLines(details)).toEqual([
+      { label: 'Subtotal', amount: 60.5 },
+      { label: 'Taxes & fees', amount: 9.23 },
+      { label: 'Tip', amount: 3 },
+      { label: 'Total', amount: 72.73, strong: true },
+    ]);
+  });
+  it('no tip line without a tip, a discount line only when there is a discount, delivery fee is folded into taxes and fees', () => {
+    const lines = totalsLines({ ...details, totals: { ...details.totals, tip: 0, discount: 5, deliveryFee: 3 } });
+    expect(lines.map((l) => l.label)).toEqual(['Subtotal', 'Taxes & fees', 'Discount', 'Total']);
+    expect(lines[1].amount).toBe(12.23);
+    expect(lines[2].amount).toBe(-5);
   });
 });
