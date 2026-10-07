@@ -16,7 +16,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { IconMinus, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconMinus, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { paidMethodValue, type CartLine, type PaidChoice } from '@/utils/createOrder';
 import { dayChipLabel } from './MenuPicker';
 import PaidMethodPicker from './PaidMethodPicker';
@@ -47,6 +47,8 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
 export default function OrderSummary(props: {
   lines: CartLine[];
   onQuantity: (key: string, quantity: number) => void;
+  /** Open the line to change its size, spice level, eco container, combo parts, note or quantity */
+  onEdit: (line: CartLine) => void;
   preview: PreviewData | null;
   previewLoading: boolean;
   previewError: string;
@@ -86,8 +88,18 @@ export default function OrderSummary(props: {
           )}
           {byDate[date].map((l) => (
             <Box key={l.key} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{l.name}</Typography>
+              <Box
+                role="button"
+                tabIndex={0}
+                aria-label={`Change ${l.name}`}
+                onClick={() => props.onEdit(l)}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), props.onEdit(l))}
+                sx={{ minWidth: 0, flex: 1, cursor: 'pointer', borderRadius: 1, mx: -0.5, px: 0.5, '&:hover': { bgcolor: '#FFF8EC' }, '&:focus-visible': { outline: '2px solid #F5C77E' } }}
+              >
+                <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>
+                  {l.name}
+                  <IconPencil size={13} style={{ marginLeft: 6, verticalAlign: '-1px', color: '#A85A00' }} aria-hidden />
+                </Typography>
                 {l.tags.length > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{l.tags.join(' · ')}</Typography>}
                 {l.notes && <Typography sx={{ fontSize: 12, color: '#6B7280', fontStyle: 'italic' }}>Note: {l.notes}</Typography>}
                 <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{money(l.unitPrice)} each</Typography>

@@ -14,6 +14,7 @@ import {
   needsOptions,
   paidMethodValue,
   removeOne,
+  replaceLine,
   setLineQuantity,
   type CartLine,
   type CatalogPayload,
@@ -55,6 +56,9 @@ export default function CreateOrderPage() {
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [optionsItem, setOptionsItem] = useState<MenuItem | null>(null);
+  // a line of the order being changed (size, spice, eco, combo parts, note, quantity)
+  const [editLine, setEditLine] = useState<CartLine | null>(null);
+  const editItem = editLine && menu ? menu.items[editLine.foodItemId] ?? null : null;
 
   const [tip, setTip] = useState(0);
   const [waiveFee, setWaiveFee] = useState(false);
@@ -235,6 +239,7 @@ export default function CreateOrderPage() {
     <OrderSummary
       lines={lines}
       onQuantity={(key, q) => setLines((cur) => setLineQuantity(cur, key, q))}
+      onEdit={(line) => menu?.items[line.foodItemId] && setEditLine(line)}
       preview={preview}
       previewLoading={previewLoading}
       previewError={previewError}
@@ -322,14 +327,20 @@ export default function CreateOrderPage() {
       )}
 
       <ItemOptionsDialog
-        open={Boolean(optionsItem)}
-        item={optionsItem}
-        date={date}
-        dayLabel={date ? dayChipLabel(date) : ''}
-        onClose={() => setOptionsItem(null)}
-        onAdd={(line) => {
-          setLines((cur) => addLine(cur, line));
+        open={Boolean(optionsItem) || Boolean(editItem)}
+        item={editItem ?? optionsItem}
+        editing={editItem ? editLine : null}
+        date={editItem && editLine ? editLine.date : date}
+        dayLabel={editItem && editLine ? dayChipLabel(editLine.date) : date ? dayChipLabel(date) : ''}
+        onClose={() => {
           setOptionsItem(null);
+          setEditLine(null);
+        }}
+        onAdd={(line) => {
+          if (editItem && editLine) setLines((cur) => replaceLine(cur, editLine.key, line));
+          else setLines((cur) => addLine(cur, line));
+          setOptionsItem(null);
+          setEditLine(null);
         }}
       />
 

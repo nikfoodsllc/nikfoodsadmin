@@ -8,6 +8,7 @@ import {
   missingForCreate,
   needsOptions,
   pickProblem,
+  replaceLine,
   rowsForTab,
   type OrderListRow,
   setLineQuantity,
@@ -451,5 +452,50 @@ describe('expanded order in Recent orders', () => {
     expect(lines.map((l) => l.label)).toEqual(['Subtotal', 'Taxes & fees', 'Discount', 'Total']);
     expect(lines[1].amount).toBe(12.23);
     expect(lines[2].amount).toBe(-5);
+  });
+});
+
+describe('replaceLine (changing a line that is already in the order)', () => {
+  const mk = (over: Partial<Parameters<typeof addLine>[1]> = {}) => ({ date: '2026-10-08', foodItemId: 'r', quantity: 1, name: 'Rajma', unitPrice: 8, tags: [], selectedPortion: '8Oz', selectedSpiceLevel: 'Mild', ...over });
+
+  it('changes the options and quantity in the same place in the list', () => {
+    let lines = addLine([], mk({ foodItemId: 'a', name: 'A' }));
+    lines = addLine(lines, mk());
+    lines = addLine(lines, mk({ foodItemId: 'z', name: 'Z' }));
+    const key = lines[1].key;
+    const next = replaceLine(lines, key, mk({ selectedPortion: '12Oz', quantity: 3, unitPrice: 11, tags: ['12Oz', 'Mild'] }));
+    expect(next.map((l) => l.foodItemId)).toEqual(['a', 'r', 'z']);
+    expect(next[1]).toMatchObject({ selectedPortion: '12Oz', quantity: 3, unitPrice: 11 });
+    expect(next[1].key).toBe(lineSignature(next[1]));
+    expect(next).toHaveLength(3);
+  });
+
+  it('merges into another line that is now the same pick, adding the quantities', () => {
+    let lines = addLine([], mk({ quantity: 2 }));
+    lines = addLine(lines, mk({ selectedPortion: '12Oz', quantity: 4 }));
+    const next = replaceLine(lines, lines[0].key, mk({ selectedPortion: '12Oz', quantity: 2 }));
+    expect(next).toHaveLength(1);
+    expect(next[0]).toMatchObject({ selectedPortion: '12Oz', quantity: 6 });
+  });
+
+  it('caps a merged quantity at 99', () => {
+    let lines = addLine([], mk({ quantity: 60 }));
+    lines = addLine(lines, mk({ selectedPortion: '12Oz', quantity: 60 }));
+    expect(replaceLine(lines, lines[0].key, mk({ selectedPortion: '12Oz', quantity: 60 }))[0].quantity).toBe(99);
+  });
+
+  it('keeps everything else untouched and adds the pick when the line is gone', () => {
+    const lines = addLine([], mk());
+    const next = replaceLine(lines, 'no-such-key', mk({ selectedSpiceLevel: 'Normal' }));
+    expect(next).toHaveLength(2);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('a note change makes it a different pick but stays in place', () => {
+    let lines = addLine([], mk({ foodItemId: 'a', name: 'A' }));
+    lines = addLine(lines, mk());
+    const next = replaceLine(lines, lines[1].key, mk({ notes: 'less salt' }));
+    expect(next[1].notes).toBe('less salt');
+    expect(next).toHaveLength(2);
   });
 });

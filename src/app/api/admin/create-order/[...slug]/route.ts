@@ -30,8 +30,11 @@ function targetFor(slug: string[], method: string): string | null {
     if (first === 'preview' && method === 'POST') return '/api/admin/offline-orders/preview';
     if (first === 'create' && method === 'POST') return '/api/admin/offline-orders';
     if (first === 'orders' && method === 'GET') return '/api/admin/offline-orders';
+    // address search (Google Places) of the customer site, the same one its "add address" form uses
+    if (first === 'places' && method === 'GET') return '/api/places';
     return null;
   }
+  if (slug.length === 2 && first === 'places' && second === 'details' && method === 'GET') return '/api/places/details';
   if (slug.length === 2 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'GET') return `/api/admin/offline-orders/${encodeURIComponent(second)}`;
   if (slug.length === 3 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'POST') {
     const action = slug[2];
