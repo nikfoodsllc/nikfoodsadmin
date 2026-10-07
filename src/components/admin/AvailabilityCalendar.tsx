@@ -867,6 +867,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 const unchanged =
                   !!typed && Math.abs(typed.getTime() - status.closesAt.getTime()) < 60 * 1000 && status.overridden;
                 const busy = !!saving[selectedDate];
+                // a kind that is switched off for the date cannot be ordered at all, whatever its cutoff says
+                const switchedOn = !!(kind === 'flat' ? availability?.flatCategoryEnabled : availability?.dayWiseCategoryEnabled);
                 const field = kind === 'flat' ? 'flatCutoffAt' : 'dayWiseCutoffAt';
                 const standardHour = DEFAULT_CUTOFF_HOUR_BY_KIND[kind];
                 const standardTime = `${standardHour > 12 ? standardHour - 12 : standardHour}:00 ${standardHour >= 12 ? 'PM' : 'AM'}`;
@@ -893,16 +895,21 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                       </Box>
                       <Chip
                         size="small"
-                        label={status.isOpen ? 'Open for orders' : 'Closed for orders'}
+                        label={!switchedOn ? 'Disabled: not offered' : status.isOpen ? 'Open for orders' : 'Closed for orders'}
                         sx={{
                           fontWeight: 600,
-                          backgroundColor: status.isOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: status.isOpen ? '#065F46' : '#991B1B',
+                          backgroundColor: !switchedOn ? 'rgba(107, 114, 128, 0.15)' : status.isOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: !switchedOn ? '#374151' : status.isOpen ? '#065F46' : '#991B1B',
                         }}
                       />
                     </Box>
 
-                    <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 500 }}>
+                    {!switchedOn && (
+                      <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 600, color: '#374151' }}>
+                        {kind === 'flat' ? 'Flat' : 'Day-wise'} category is disabled for this date, so customers cannot order these items at all. The cutoff below only matters once you enable it.
+                      </Typography>
+                    )}
+                    <Typography variant="body2" sx={{ mt: 1.5, fontWeight: 500, ...(switchedOn ? {} : { color: '#6B7280' }) }}>
                       {describeCutoff(selectedDate, override, new Date(), kind)}
                     </Typography>
                     {status.overridden && (
