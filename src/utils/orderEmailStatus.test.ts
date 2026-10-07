@@ -38,3 +38,45 @@ describe('order confirmation email status for the Orders table', () => {
     expect(orderEmailStatusView({ status: 'sent', attempts: null, lastAttempt: null })).toMatchObject({ label: 'Sent', detail: '' });
   });
 });
+
+describe('what the email provider reported (delivery record)', () => {
+  const sent = { status: 'sent', attempts: 1, lastAttempt: '2026-10-07T21:24:53.000Z' };
+  it('no record: still Sent', () => {
+    expect(orderEmailStatusView(sent, undefined).label).toBe('Sent');
+    expect(orderEmailStatusView(sent, null).label).toBe('Sent');
+    expect(orderEmailStatusView(sent, {}).label).toBe('Sent');
+  });
+  it('delivered: green with the delivery time', () => {
+    const v = orderEmailStatusView(sent, { status: 'delivered', deliveredAt: '2026-10-07T21:24:55.000Z' });
+    expect(v).toMatchObject({ label: 'Delivered', tone: 'good', detail: 'Oct 7, 2:24 PM' });
+  });
+  it('opened wins over delivered: green, last open time and the number of opens', () => {
+    const v = orderEmailStatusView(sent, { status: 'delivered', openCount: 3, firstOpenedAt: '2026-10-07T22:00:00.000Z', lastOpenedAt: '2026-10-07T23:10:00.000Z' });
+    expect(v).toMatchObject({ label: 'Opened', tone: 'good', detail: 'Oct 7, 4:10 PM · 3×' });
+    expect(v.title).toContain('3 times');
+    expect(orderEmailStatusView(sent, { status: 'delivered', openCount: 1, lastOpenedAt: '2026-10-07T23:10:00.000Z' }).detail).toBe('Oct 7, 4:10 PM');
+  });
+  it('opened with no times (filled from Resend history) still says Opened', () => {
+    expect(orderEmailStatusView(sent, { status: 'delivered', openCount: 1, filledFromHistory: true })).toMatchObject({ label: 'Opened', tone: 'good' });
+  });
+  it('bounced and spam are red; the reason is in the tooltip', () => {
+    const b = orderEmailStatusView(sent, { status: 'bounced', bounceReason: 'Mailbox does not exist' });
+    expect(b).toMatchObject({ label: 'Bounced', tone: 'bad' });
+    expect(b.title).toContain('Mailbox does not exist');
+    expect(orderEmailStatusView(sent, { status: 'complained' })).toMatchObject({ label: 'Spam', tone: 'bad' });
+    expect(orderEmailStatusView(sent, { status: 'failed' })).toMatchObject({ label: 'Failed', tone: 'bad' });
+  });
+  it('a bounce beats an earlier open; delayed is amber', () => {
+    expect(orderEmailStatusView(sent, { status: 'bounced', openCount: 2 }).label).toBe('Bounced');
+    expect(orderEmailStatusView(sent, { status: 'delayed' })).toMatchObject({ label: 'Delayed', tone: 'warn' });
+  });
+  it('the delivery record only refines a sent email: failed/pending/retrying/none stay as they are', () => {
+    expect(orderEmailStatusView({ status: 'failed', attempts: 3 }, { status: 'delivered' }).label).toBe('Failed');
+    expect(orderEmailStatusView({ status: 'pending' }, { status: 'delivered' }).label).toBe('Pending');
+    expect(orderEmailStatusView(undefined, { status: 'delivered' }).label).toBe('-');
+  });
+  it('an unknown delivery status or bad counts leave it at Sent', () => {
+    expect(orderEmailStatusView(sent, { status: 'whatever' }).label).toBe('Sent');
+    expect(orderEmailStatusView(sent, { status: 'delivered', openCount: -2, deliveredAt: 'nope' }).label).toBe('Delivered');
+  });
+});

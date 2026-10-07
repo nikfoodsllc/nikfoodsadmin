@@ -238,6 +238,17 @@ export interface Order {
   deliveryMessages?: string[]; // Cart clubbing messages
   hasReview?: boolean; // Whether this order has been reviewed
   emailStatus?: EmailStatusInfo; // Track order confirmation email status
+  /** What the email provider reported about the confirmation email (delivered, opened, bounced...) */
+  emailDelivery?: {
+    status?: 'delivered' | 'delayed' | 'bounced' | 'complained' | 'failed';
+    deliveredAt?: Date | string;
+    bouncedAt?: Date | string;
+    bounceReason?: string;
+    firstOpenedAt?: Date | string;
+    lastOpenedAt?: Date | string;
+    openCount?: number;
+    filledFromHistory?: boolean;
+  };
   paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
   createdAt?: Date | string;
   updatedAt?: Date | string;
