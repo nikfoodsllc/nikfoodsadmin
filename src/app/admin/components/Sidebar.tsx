@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Box,
@@ -17,7 +17,6 @@ import {
   Divider,
 } from '@mui/material';
 import {
-  IconLayoutDashboard,
   IconToolsKitchen2,
   IconCategory,
   IconCalendarEvent,
@@ -29,7 +28,6 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconX,
-  IconTemplate,
   IconChefHat,
   IconShoppingCartPlus,
   IconShoppingCartOff,
@@ -38,46 +36,36 @@ import Image from 'next/image';
 
 interface NavItem {
   title: string;
-  href: string;
+  /** Missing on a group header: it only opens and closes its list */
+  href?: string;
   icon: React.ComponentType<any>;
   children?: NavItem[];
 }
 
+/**
+ * The admin menu: Order, Reporting (Kitchen Dashboard first: the page admins land on), Manage Days, Delivery Zones,
+ * Food Catalog and User Administration. Pages that are no longer in the menu (the old stats Dashboard at
+ * /admin/dashboard, Modifiers) still work when opened by their address.
+ */
 const navItems: NavItem[] = [
   {
-    title: 'Dashboard',
-    href: '/admin',
-    icon: IconLayoutDashboard,
+    title: 'Order',
+    icon: IconShoppingCart,
+    children: [
+      { title: 'Order', href: '/admin/orders', icon: IconShoppingCart },
+      { title: 'Create Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
+    ],
   },
   {
-    title: 'Kitchen Dashboard (BETA)',
-    href: '/admin/kitchen-dashboard',
-    icon: IconChefHat,
-  },
-  {
-    title: 'Create Order (BETA)',
-    href: '/admin/create-order',
-    icon: IconShoppingCartPlus,
-  },
-  {
-    title: 'Abandoned Checkout (BETA)',
-    href: '/admin/abandoned-checkouts',
-    icon: IconShoppingCartOff,
-  },
-  {
-    title: 'Food Items',
-    href: '/admin/food-items',
-    icon: IconToolsKitchen2,
-  },
-  {
-    title: 'Food Category',
-    href: '/admin/food-category',
-    icon: IconCategory,
-  },
-  {
-    title: 'Modifiers',
-    href: '/admin/modifiers',
-    icon: IconTemplate,
+    title: 'Reporting',
+    icon: IconChartBar,
+    children: [
+      { title: 'Kitchen Dashboard (BETA)', href: '/admin/kitchen-dashboard', icon: IconChefHat },
+      { title: 'Ordered Items', href: '/admin/reports/ordered-items', icon: IconShoppingCart },
+      { title: 'Kitchen Report (BETA)', href: '/admin/reports/kitchen', icon: IconToolsKitchen2 },
+      { title: 'Delivery Report', href: '/admin/reports/delivery', icon: IconMapPin },
+      { title: 'Abandoned Checkout (BETA)', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
+    ],
   },
   {
     title: 'Manage Days',
@@ -90,41 +78,20 @@ const navItems: NavItem[] = [
     icon: IconMapPin,
   },
   {
-    title: 'Orders',
-    href: '/admin/orders',
-    icon: IconShoppingCart,
-  },
-  {
-    title: 'Reports',
-    href: '/admin/reports',
-    icon: IconChartBar,
+    title: 'Food Catalog',
+    icon: IconToolsKitchen2,
     children: [
-      {
-        title: 'Kitchen Report (BETA)',
-        href: '/admin/reports/kitchen',
-        icon: IconToolsKitchen2,
-      },
-      {
-        title: 'Delivery Report',
-        href: '/admin/reports/delivery',
-        icon: IconMapPin,
-      },
-      {
-        title: 'Ordered Items',
-        href: '/admin/reports/ordered-items',
-        icon: IconShoppingCart,
-      },
+      { title: 'Food Items', href: '/admin/food-items', icon: IconToolsKitchen2 },
+      { title: 'Food Category', href: '/admin/food-category', icon: IconCategory },
     ],
   },
   {
-    title: 'All Users',
-    href: '/admin/all-users',
+    title: 'User Administration',
     icon: IconUsers,
-  },
-  {
-    title: 'Admin Users',
-    href: '/admin/admin-users',
-    icon: IconUserShield,
+    children: [
+      { title: 'All Users', href: '/admin/all-users', icon: IconUsers },
+      { title: 'Admin Users', href: '/admin/admin-users', icon: IconUserShield },
+    ],
   },
 ];
 
@@ -138,9 +105,23 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [reportsOpen, setReportsOpen] = useState(
-    pathname?.startsWith('/admin/reports') || false
+  const isActive = (href?: string) => {
+    if (!href) return false;
+    if (href === '/admin') {
+      return pathname === '/admin';
+    }
+    return pathname?.startsWith(href) || false;
+  };
+  const groupHasActive = (item: NavItem) => (item.children ?? []).some((child) => isActive(child.href));
+
+  // which groups are open: the one holding the page you are on opens by itself, any can be opened or closed by hand
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(navItems.filter((item) => item.children && item.children.some((c) => c.href && pathname?.startsWith(c.href))).map((item) => [item.title, true]))
   );
+  useEffect(() => {
+    const holding = navItems.find((item) => item.children && item.children.some((c) => c.href && pathname?.startsWith(c.href)));
+    if (holding) setOpenGroups((current) => (current[holding.title] ? current : { ...current, [holding.title]: true }));
+  }, [pathname]);
 
   const handleNavigation = (href: string) => {
     router.push(href);
@@ -149,15 +130,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     }
   };
 
-  const handleReportsToggle = () => {
-    setReportsOpen(!reportsOpen);
-  };
-
-  const isActive = (href: string) => {
-    if (href === '/admin') {
-      return pathname === '/admin';
-    }
-    return pathname?.startsWith(href);
+  const handleGroupToggle = (title: string) => {
+    setOpenGroups((current) => ({ ...current, [title]: !current[title] }));
   };
 
   const drawerContent = (
@@ -207,14 +181,16 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <List sx={{ flex: 1, paddingY: 2, overflowY: 'auto' }}>
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.href);
+          const active = item.children ? groupHasActive(item) : isActive(item.href);
 
           if (item.children) {
+            const open = Boolean(openGroups[item.title]);
             return (
               <Box key={item.title}>
                 <ListItem disablePadding sx={{ paddingX: 2, marginBottom: 0.5 }}>
                   <ListItemButton
-                    onClick={handleReportsToggle}
+                    onClick={() => handleGroupToggle(item.title)}
+                    aria-expanded={open}
                     sx={{
                       borderRadius: 2,
                       paddingY: 1.5,
@@ -235,10 +211,10 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                         fontWeight: active ? 600 : 500,
                       }}
                     />
-                    {reportsOpen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+                    {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
                   </ListItemButton>
                 </ListItem>
-                <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
+                <Collapse in={open} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
                     {item.children.map((child) => {
                       const ChildIcon = child.icon;
@@ -250,7 +226,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                           sx={{ paddingX: 2, marginBottom: 0.5 }}
                         >
                           <ListItemButton
-                            onClick={() => handleNavigation(child.href)}
+                            onClick={() => child.href && handleNavigation(child.href)}
                             sx={{
                               borderRadius: 2,
                               paddingY: 1.5,
@@ -285,7 +261,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           return (
             <ListItem key={item.title} disablePadding sx={{ paddingX: 2, marginBottom: 0.5 }}>
               <ListItemButton
-                onClick={() => handleNavigation(item.href)}
+                onClick={() => item.href && handleNavigation(item.href)}
                 sx={{
                   borderRadius: 2,
                   paddingY: 1.5,
