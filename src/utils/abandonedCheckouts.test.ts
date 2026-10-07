@@ -32,6 +32,31 @@ describe('abandoned checkouts', () => {
     expect(r.to_contact).toHaveLength(1);
   });
 
+  it('a person who ordered days ago and left a NEW checkout today is still a lead; their old leftovers are ignored', () => {
+    const r = build(
+      [
+        draft({ paymentIntentId: 'pi_oldleft', userId: 'u1', createdAt: ago(3000), lastActivityAt: ago(3000) }), // before their last order
+        draft({ paymentIntentId: 'pi_today', userId: 'u1', createdAt: ago(120), lastActivityAt: ago(100) }),
+      ],
+      [{ user: 'u1', createdAt: ago(2000) }]
+    );
+    expect(r.to_contact).toHaveLength(1);
+    expect(r.to_contact[0]).toMatchObject({ id: 'pi_today', earlierCheckouts: 0 });
+    expect(r.orderedSince).toBe(0);
+  });
+
+  it('a person whose every open checkout is older than their last order is not a lead, even with several of them', () => {
+    const r = build(
+      [
+        draft({ paymentIntentId: 'a', userId: 'u1', createdAt: ago(3000), lastActivityAt: ago(3000) }),
+        draft({ paymentIntentId: 'b', userId: 'u1', createdAt: ago(2500), lastActivityAt: ago(2500) }),
+      ],
+      [{ user: 'u1', createdAt: ago(2000) }]
+    );
+    expect(r.to_contact).toHaveLength(0);
+    expect(r.orderedSince).toBe(1);
+  });
+
   it('another person\'s order does not hide this one', () => {
     expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1' })], [{ user: 'u2', createdAt: ago(10) }]).to_contact).toHaveLength(1);
   });
