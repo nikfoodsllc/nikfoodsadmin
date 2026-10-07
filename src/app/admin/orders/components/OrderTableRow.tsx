@@ -39,7 +39,7 @@ export default function OrderTableRow({
 }: OrderTableRowProps) {
   const refundedAmount = getRefundedAmount(order);
   const instructionToDriver = order.address?.floor || '-';
-  const emailView = orderEmailStatusView(order.emailStatus);
+  const emailView = orderEmailStatusView(order.emailStatus, order.emailDelivery);
 
   const cells: Record<string, ReactNode> = {
     // Select
@@ -145,7 +145,7 @@ export default function OrderTableRow({
         </Typography>
       </TableCell>
     ),
-    // Email Status: the order confirmation email (sent, failed, retrying, pending; a dash when none was sent)
+    // Confirmation Email (key emailStatus): the order confirmation email (sent, failed, retrying, pending; a dash when none was sent)
     emailStatus: (
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Tooltip title={emailView.title} arrow>
