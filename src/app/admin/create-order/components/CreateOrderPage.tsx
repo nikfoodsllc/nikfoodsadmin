@@ -21,6 +21,7 @@ import MenuPicker, { dayChipLabel } from './MenuPicker';
 import ItemOptionsDialog from './ItemOptionsDialog';
 import OrderSummary, { type PaymentChoice, type PreviewData } from './OrderSummary';
 import OrderResult, { type CreatedOrder } from './OrderResult';
+import RecentOrders from './RecentOrders';
 
 async function callApi(token: string, path: string, init?: RequestInit) {
   const res = await fetch(`/api/admin/create-order/${path}`, {
@@ -64,6 +65,7 @@ export default function CreateOrderPage() {
   // one id for this order form: the site refuses a second request with it, so a double tap or a retry cannot create the order twice
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const submittingRef = useRef(false);
+  const [listVersion, setListVersion] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -152,7 +154,10 @@ export default function CreateOrderPage() {
     const r = await callApi(token, 'create', { method: 'POST', body: JSON.stringify(body) });
     setSubmitting(false);
     submittingRef.current = false;
-    if (r.ok) setResult(r.body.data);
+    if (r.ok) {
+      setResult(r.body.data);
+      setListVersion((v) => v + 1);
+    }
     else setSubmitError(r.body?.error || 'The order could not be created');
   };
 
@@ -187,7 +192,7 @@ export default function CreateOrderPage() {
       </Typography>
 
       {result ? (
-        <OrderResult result={result} token={token} onAnother={reset} />
+        <OrderResult result={result} token={token} onAnother={reset} onChanged={() => setListVersion((v) => v + 1)} />
       ) : menuError ? (
         <Alert severity="error">{menuError}</Alert>
       ) : !menu ? (
@@ -219,6 +224,8 @@ export default function CreateOrderPage() {
           />
         </Box>
       )}
+
+      <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} />
 
       <ItemOptionsDialog
         open={Boolean(optionsItem)}

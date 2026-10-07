@@ -28,6 +28,7 @@ function targetFor(slug: string[], method: string): string | null {
     if (first === 'customers' && method === 'GET') return '/api/admin/offline-orders/customers';
     if (first === 'preview' && method === 'POST') return '/api/admin/offline-orders/preview';
     if (first === 'create' && method === 'POST') return '/api/admin/offline-orders';
+    if (first === 'orders' && method === 'GET') return '/api/admin/offline-orders';
     return null;
   }
   if (slug.length === 3 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'POST') {
