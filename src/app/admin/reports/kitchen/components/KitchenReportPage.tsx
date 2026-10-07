@@ -169,7 +169,7 @@ export default function KitchenReportPage() {
       >
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827' }}>
-            Kitchen Report
+            Kitchen Report (BETA)
           </Typography>
           <Typography variant="body2" sx={{ color: '#6B7280', marginTop: 0.5 }}>
             View item-wise totals and order-wise details for kitchen operations
