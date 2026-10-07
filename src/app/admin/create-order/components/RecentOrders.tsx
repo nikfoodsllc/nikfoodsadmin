@@ -15,25 +15,15 @@ import {
   Paper,
   Radio,
   RadioGroup,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
+import { rowsForTab, type OrderListRow as Row, type OrderTab as TabKey } from '@/utils/createOrder';
 
-interface Row {
-  orderId: string;
-  createdAt: string;
-  customerName: string;
-  customerEmail: string;
-  total: number;
-  status: string;
-  paymentStatus: string;
-  paymentMethod: string;
-  linkOrder: boolean;
-  awaitingPayment: boolean;
-  linkSentAt?: string;
-  deliveryDates: string[];
-  offlinePaymentNote?: string;
-}
+
+const REFRESH_MS = 30000;
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
@@ -51,6 +41,7 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
   const [payDialog, setPayDialog] = useState<Row | null>(null);
   const [payMethod, setPayMethod] = useState<'Cash on Delivery' | 'Other'>('Cash on Delivery');
   const [payNote, setPayNote] = useState('');
+  const [tab, setTab] = useState<TabKey>('waiting');
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +58,21 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
   useEffect(() => {
     void load();
   }, [load, version]);
+
+  // keep the list current: an order the customer pays leaves the Waiting tab by itself
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [load]);
 
   const post = async (orderId: string, path: string, payload: unknown) => {
     const res = await fetch(`/api/admin/create-order/orders/${encodeURIComponent(orderId)}/${path}`, {
@@ -120,6 +126,8 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
     setPayNote('');
   };
 
+  const visible = rows ? rowsForTab(rows, tab) : [];
+
   return (
     <Box sx={{ mt: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -128,9 +136,20 @@ export default function RecentOrders({ token, version, onChanged }: { token: str
       </Box>
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       {!rows && !error && <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={24} /></Box>}
-      {rows && rows.length === 0 && <Typography sx={{ color: '#6B7280', fontSize: 14 }}>No orders entered here yet.</Typography>}
+      {rows && (
+        <Tabs value={tab} onChange={(_, v: TabKey) => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
+          <Tab value="waiting" label={`Waiting for payment (${rows.filter((r) => r.awaitingPayment).length})`} />
+          <Tab value="paid" label={`Paid (${rows.filter((r) => r.paymentStatus === 'paid').length})`} />
+          <Tab value="all" label={`All (${rows.length})`} />
+        </Tabs>
+      )}
+      {rows && visible.length === 0 && (
+        <Typography sx={{ color: '#6B7280', fontSize: 14 }}>
+          {rows.length === 0 ? 'No orders entered here yet.' : tab === 'waiting' ? 'Nothing is waiting for payment.' : tab === 'paid' ? 'No paid orders yet.' : 'No orders.'}
+        </Typography>
+      )}
       <Box sx={{ display: 'grid', gap: 1.25 }}>
-        {rows?.map((row) => {
+        {visible.map((row) => {
           const paid = row.paymentStatus === 'paid';
           const cancelled = row.status === 'cancelled';
           return (

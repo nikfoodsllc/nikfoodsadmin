@@ -8,6 +8,8 @@ import {
   missingForCreate,
   needsOptions,
   pickProblem,
+  rowsForTab,
+  type OrderListRow,
   setLineQuantity,
   type MenuItem,
   type MenuPayload,
@@ -109,5 +111,31 @@ describe('missingForCreate', () => {
   });
   it('accepts a leading 1 on the phone number', () => {
     expect(missingForCreate({ ...customer, phone: '1-206-555-0199' }, address, 1)).toEqual([]);
+  });
+});
+
+describe('rowsForTab', () => {
+  const row = (orderId: string, createdAt: string, over: Partial<OrderListRow> = {}): OrderListRow => ({
+    orderId, createdAt, customerName: 'A', customerEmail: 'a@x.com', total: 10, status: 'pending', paymentStatus: 'unpaid', paymentMethod: 'Credit Card',
+    linkOrder: true, awaitingPayment: true, deliveryDates: [], ...over,
+  });
+  const paid = (id: string, at: string) => row(id, at, { status: 'confirmed', paymentStatus: 'paid', awaitingPayment: false });
+  const cancelled = (id: string, at: string) => row(id, at, { status: 'cancelled', awaitingPayment: false });
+  const rows = [paid('P-new', '2026-10-07T12:00:00Z'), row('W-old', '2026-10-05T12:00:00Z'), paid('P-old', '2026-10-04T12:00:00Z'), row('W-new', '2026-10-06T12:00:00Z'), cancelled('C', '2026-10-07T13:00:00Z')];
+  it('Waiting shows only unpaid link orders, newest first', () => {
+    expect(rowsForTab(rows, 'waiting').map((r) => r.orderId)).toEqual(['W-new', 'W-old']);
+  });
+  it('an order that gets paid leaves Waiting and appears under Paid', () => {
+    const after = rows.map((r) => (r.orderId === 'W-new' ? { ...r, paymentStatus: 'paid', status: 'confirmed', awaitingPayment: false } : r));
+    expect(rowsForTab(after, 'waiting').map((r) => r.orderId)).toEqual(['W-old']);
+    expect(rowsForTab(after, 'paid').map((r) => r.orderId)).toEqual(['P-new', 'W-new', 'P-old']);
+  });
+  it('All puts unpaid orders on top, then everything else newest first', () => {
+    expect(rowsForTab(rows, 'all').map((r) => r.orderId)).toEqual(['W-new', 'W-old', 'C', 'P-new', 'P-old']);
+  });
+  it('does not change the list it is given', () => {
+    const copy = JSON.stringify(rows);
+    rowsForTab(rows, 'all');
+    expect(JSON.stringify(rows)).toBe(copy);
   });
 });
