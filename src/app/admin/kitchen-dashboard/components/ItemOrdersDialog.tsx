@@ -181,9 +181,12 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
                   </Box>
                 )}
               </Box>
-              <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#111827', flexShrink: 0, lineHeight: 1.2 }}>
-                × {line.quantity}
-              </Typography>
+              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#111827', lineHeight: 1.2 }}>× {line.quantity}</Typography>
+                {line.amountText && (
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap', mt: 0.25 }}>{line.amountText}</Typography>
+                )}
+              </Box>
             </Box>
             </Box>
           );

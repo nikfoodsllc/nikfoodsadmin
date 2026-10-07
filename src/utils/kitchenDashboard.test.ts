@@ -7,6 +7,7 @@ import {
   comboChoiceLines,
   comboParts,
   formatAmount,
+  sizeRank,
   spiceRank,
   parsePortionAmount,
   enumerateDays,
@@ -378,10 +379,10 @@ describe('buildItemOrders (who ordered an item)', () => {
   it('lists every order that contains the item, with its size, spice and eco container', () => {
     const lines = buildItemOrders(rows, 'Rajma');
     expect(lines.map((l) => [l.orderId, l.customerName, l.day, l.quantity, l.portion, l.spice, l.isEco])).toEqual([
-      // spice first (Hot before no spice), then the biggest order first
+      // spice first (Hot before no spice), then the size (12Oz before 8Oz)
       ['ORD-2', 'Ben', '2026-10-07', 2, '8Oz', 'Hot', true],
-      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
       ['ORD-1', 'Asha', '2026-10-07', 1, '12Oz', null, false],
+      ['ORD-3', 'Asha', '2026-10-08', 3, '8Oz', null, false],
     ]);
   });
 
@@ -446,10 +447,10 @@ describe('eco containers per item', () => {
   });
 });
 
-describe('who ordered: sorted by spice level, then quantity', () => {
+describe('who ordered: sorted by spice level, then size, then name', () => {
   const r = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'A', day: '2026-10-07', name: 'Matar Paneer Bhurji', quantity: 1, portion: '8Oz', spiceLevel: 'Normal', customerName: 'X', ...over });
   const order = (rows: KitchenRow[]) => buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => `${l.spice ?? 'none'}:${l.quantity}:${l.orderId}`);
-  it('mild, normal, medium, spicy, hot, then no spice; biggest first inside a level', () => {
+  it('mild, normal, medium, spicy, hot, then no spice', () => {
     const rows = [
       r({ orderId: 'a', spiceLevel: 'Spicy', quantity: 1 }),
       r({ orderId: 'b', spiceLevel: null, quantity: 9 }),
@@ -462,9 +463,50 @@ describe('who ordered: sorted by spice level, then quantity', () => {
     ];
     expect(order(rows)).toEqual(['Mild (Kid Friendly):4:g', 'Mild (Kid Friendly):1:d', 'Normal:3:e', 'Normal:1:c', 'Medium Spice:2:f', 'Spicy:1:a', 'Hot:1:h', 'none:9:b']);
   });
-  it('same spice and quantity: by day, then customer name', () => {
-    const rows = [r({ orderId: 'z', customerName: 'Zed' }), r({ orderId: 'y', customerName: 'Amy' }), r({ orderId: 'x', day: '2026-10-06', customerName: 'Zed' })];
-    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['x', 'y', 'z']);
+  it('inside a spice level: biggest size first (16Oz, 12Oz, 8Oz), then by customer name', () => {
+    const rows = [
+      r({ orderId: 'a', portion: '12Oz', customerName: 'Kavita' }),
+      r({ orderId: 'b', portion: '16Oz', customerName: 'Hiral' }),
+      r({ orderId: 'c', portion: '8Oz', customerName: 'Pooja', quantity: 5 }),
+      r({ orderId: 'd', portion: '16Oz', customerName: 'Meher', quantity: 2 }),
+      r({ orderId: 'e', portion: '12Oz', customerName: 'Anand', quantity: 3 }),
+      r({ orderId: 'f', portion: null, customerName: 'Zed', quantity: 9 }),
+      r({ orderId: 'g', portion: '1Lb', customerName: 'Gita' }),
+    ];
+    // 1Lb and 16Oz are the same size: Gita, Hiral, Meher; then 12Oz: Anand, Kavita; then 8Oz; no size last
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['g', 'b', 'd', 'e', 'a', 'c', 'f']);
+  });
+  it('a person with several orders of it: every order is listed and they sit together', () => {
+    const rows = [
+      r({ orderId: 'z1', portion: '16Oz', customerName: 'Zed' }),
+      r({ orderId: 'a-late', day: '2026-10-08', portion: '16Oz', customerName: 'Asha' }),
+      r({ orderId: 'm1', portion: '16Oz', customerName: 'Mira' }),
+      r({ orderId: 'a-big', portion: '16Oz', customerName: 'Asha', quantity: 2 }),
+      r({ orderId: 'a-small', portion: '12Oz', customerName: 'Asha' }),
+      r({ orderId: 'a-early', day: '2026-10-06', portion: '16Oz', customerName: 'Asha' }),
+    ];
+    const lines = buildItemOrders(rows, 'Matar Paneer Bhurji');
+    expect(lines).toHaveLength(6); // nothing merged or dropped
+    // 16Oz: Asha's four orders together (biggest quantity first, then by day), Mira, Zed; then the 12Oz
+    expect(lines.map((l) => l.orderId)).toEqual(['a-big', 'a-early', 'a-late', 'm1', 'z1', 'a-small'].map((id) => (id === 'a-big' ? 'a-big' : id)));
+  });
+  it('names are compared without regard to case', () => {
+    const rows = [r({ orderId: '1', customerName: 'hiral jagani' }), r({ orderId: '2', customerName: 'ANAND GHOTGE' }), r({ orderId: '3', customerName: 'Bhavya Sethi' })];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['2', '3', '1']);
+  });
+  it('the size sort sits inside the spice sort: a small mild order still comes before a big spicy one', () => {
+    const rows = [r({ orderId: 'big-spicy', spiceLevel: 'Spicy', portion: '16Oz' }), r({ orderId: 'small-mild', spiceLevel: 'Mild (Kid Friendly)', portion: '8Oz' })];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['small-mild', 'big-spicy']);
+  });
+  it('sizes are compared as amounts: 1Lb is bigger than 12Oz, 1/2Lb equals 8Oz', () => {
+    expect(sizeRank('1Lb')).toBeGreaterThan(sizeRank('12Oz'));
+    expect(sizeRank('1/2Lb')).toBe(sizeRank('8Oz'));
+    expect(sizeRank('Full')).toBeLessThan(sizeRank('1Oz'));
+    expect(sizeRank(null)).toBe(sizeRank('Serves 4'));
+  });
+  it('same spice, size and name: biggest quantity, then day', () => {
+    const rows = [r({ orderId: 'z', customerName: 'Zed' }), r({ orderId: 'y', customerName: 'Zed', quantity: 3 }), r({ orderId: 'x', day: '2026-10-06', customerName: 'Zed' })];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['y', 'x', 'z']);
   });
   it('an unknown spice name sits after the known levels and before no spice', () => {
     expect(spiceRank('Mild (Kid Friendly)')).toBeLessThan(spiceRank('Normal'));
@@ -517,6 +559,10 @@ describe('eco containers by size', () => {
     const item = out[0].items[0];
     expect(item.eco).toBe(5);
     expect(item.ecoBySize).toEqual([{ label: '16Oz', quantity: 3 }, { label: '12Oz', quantity: 2 }]);
+  });
+  it('sizes read biggest first (16Oz, 12Oz, 8Oz) whatever the counts, and unsized last', () => {
+    const out = buildKitchenDays([r({ portion: '8Oz', quantity: 5 }), r({ orderId: 'B', portion: '16Oz', quantity: 1 }), r({ orderId: 'C', portion: '12Oz', quantity: 2 }), r({ orderId: 'D', portion: null, quantity: 9 })], days);
+    expect(out[0].items[0].ecoBySize.map((l) => `${l.label}:${l.quantity}`)).toEqual(['16Oz:1', '12Oz:2', '8Oz:5', 'No size:9']);
   });
   it('an eco item without a size is counted under No size', () => {
     const out = buildKitchenDays([r({ portion: null, quantity: 2 })], days);
