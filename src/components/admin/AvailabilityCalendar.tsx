@@ -110,7 +110,8 @@ function KindChip({ label, state, onColor }: { label: string; state: KindState; 
   );
   return state === 'closed' ? (
     <Tooltip title={`${label} is enabled for this date, but ordering has closed (the cutoff passed). An admin can extend the cutoff to reopen it.`} arrow>
-      <span style={{ display: 'block' }}>{chip}</span>
+      {/* a flex wrapper (not inline): an inline wrapper leaves a few pixels under the tag, which showed as a wider gap than between the red and green tags */}
+      <span style={{ display: 'flex' }}>{chip}</span>
     </Tooltip>
   ) : (
     chip
