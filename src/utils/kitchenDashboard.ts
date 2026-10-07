@@ -142,7 +142,7 @@ export interface KitchenItem {
   spice: CountLine[];
   /** How many of the units ordered on their own come in an eco container (parts inside a combo count on the combo). */
   eco: number;
-  /** The same eco containers by size ('16Oz' × 3), biggest first; a unit without a size counts under 'No size'. */
+  /** The same eco containers by size ('16Oz' × 3), biggest size first (not most-ordered first); a unit without a size counts under 'No size', last. */
   ecoBySize: CountLine[];
   /** Total amount to cook where the sizes are known, as text ('84 oz (5.25 lb)'); '' when no size is known. */
   totalText: string;
@@ -243,6 +243,13 @@ function toLines(map: Map<string, number>): CountLine[] {
   return [...map.entries()]
     .map(([label, quantity]) => ({ label, quantity }))
     .sort((a, b) => b.quantity - a.quantity || a.label.localeCompare(b.label));
+}
+
+/** Counts by size, the biggest size first (16Oz, 12Oz, 8Oz), so the same sizes always read in the same order; unsized last. */
+function toSizeLines(map: Map<string, number>): CountLine[] {
+  return [...map.entries()]
+    .map(([label, quantity]) => ({ label, quantity }))
+    .sort((a, b) => sizeRank(b.label === 'No size' ? null : b.label) - sizeRank(a.label === 'No size' ? null : a.label) || a.label.localeCompare(b.label));
 }
 
 /** The picked options of a combo line, as name + portion. Unknown ids are skipped. */
@@ -385,7 +392,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         portions: showPortions ? portions : [],
         spice: toLines(acc.spice),
         eco: acc.eco,
-        ecoBySize: toLines(acc.ecoBySize),
+        ecoBySize: toSizeLines(acc.ecoBySize),
         totalText: formatAmount(acc.amount),
         unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
       };
@@ -472,17 +479,17 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: amountTextOf(row.portion, row.quantity), choices: [] });
     }
   }
-  // spice level first (mild to hot, no spice last), then the most food (size times quantity: 2 x 16Oz = 32 oz before
-  // 1 x 16Oz), then the bigger single size, then the most ordered, then day and customer
+  // spice level first (mild to hot, no spice last), then the size on the order (16Oz before 12Oz before 8Oz, no size
+  // last), then the customer's name, so all the orders of one person for the same spice and size sit together; every
+  // order line is listed (nothing is merged)
   return lines.sort(
     (a, b) =>
       spiceRank(a.spice) - spiceRank(b.spice) ||
       clean(a.spice).localeCompare(clean(b.spice)) ||
-      amountRank(b) - amountRank(a) ||
       sizeRank(b.portion) - sizeRank(a.portion) ||
+      a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
       b.quantity - a.quantity ||
       a.day.localeCompare(b.day) ||
-      a.customerName.localeCompare(b.customerName) ||
       a.orderId.localeCompare(b.orderId)
   );
 }
@@ -494,12 +501,6 @@ function amountTextOf(portion: string | null | undefined, quantity: number): str
   const total = emptyAmount();
   addAmount(total, size, quantity);
   return formatAmount(total);
-}
-
-/** Size times quantity, for sorting; lines without a readable size come after every sized one. */
-function amountRank(line: Pick<ItemOrderLine, 'portion' | 'quantity'>): number {
-  const size = sizeRank(line.portion);
-  return size < 0 ? -1 : size * line.quantity;
 }
 
 /** How big a size label is, for sorting (ounces; grams count as ounces too); labels with no readable size are the smallest. */
