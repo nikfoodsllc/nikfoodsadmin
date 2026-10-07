@@ -140,7 +140,7 @@ describe('rowsForTab', () => {
   });
 });
 
-import { uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
+import { linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
 
 describe('whole menu helpers', () => {
   const item = (id: string, name: string) => ({ _id: id, name, price: 5 });
@@ -238,5 +238,60 @@ describe('whole menu helpers', () => {
     expect(paidMethodValue('Other', '   ')).toBeNull();
     expect(paidMethodValue('Other', '  Venmo   @kunal ')).toBe('Venmo @kunal');
     expect(paidMethodValue('Other', 'x'.repeat(80))).toHaveLength(40);
+  });
+});
+
+describe('payment link activity', () => {
+  const NOW = new Date('2026-10-08T12:00:00Z');
+  const base = { linkOrder: true, paymentStatus: 'unpaid', awaitingPayment: true, linkSentAt: '2026-10-08T10:00:00Z', linkEmail: { status: 'sent' } };
+  it('nothing to say for orders that are not emailed link orders', () => {
+    expect(linkActivity({ ...base, linkOrder: false }, NOW)).toEqual([]);
+    expect(linkActivity({ ...base, linkSentAt: undefined }, NOW)).toEqual([]);
+  });
+  it('an older link sent before tracking existed (no email record, no views) says nothing', () => {
+    expect(linkActivity({ linkOrder: true, paymentStatus: 'unpaid', awaitingPayment: true, linkSentAt: '2026-10-01T10:00:00Z' }, NOW)).toEqual([]);
+  });
+  it('an older link that was opened still shows the opening', () => {
+    const r = linkActivity({ linkOrder: true, paymentStatus: 'unpaid', awaitingPayment: true, linkSentAt: '2026-10-01T10:00:00Z', linkViews: { firstAt: '2026-10-08T11:00:00Z', lastAt: '2026-10-08T11:00:00Z', count: 1 } }, NOW);
+    expect(r[0].tone).toBe('good');
+  });
+  it('sent but not opened yet: a neutral note with how long ago', () => {
+    expect(linkActivity(base, NOW)).toEqual([{ tone: 'info', text: 'Has not opened the payment page yet (sent 2 hours ago)' }]);
+  });
+  it('not opened after a day: an amber nudge', () => {
+    const r = linkActivity({ ...base, linkSentAt: '2026-10-06T10:00:00Z' }, NOW);
+    expect(r[0].tone).toBe('warn');
+    expect(r[0].text).toContain('after 2 days');
+    expect(r[0].text).toContain('Email a new link or call');
+  });
+  it('opened the payment page: green, with count and last time', () => {
+    const r = linkActivity({ ...base, linkViews: { firstAt: '2026-10-08T11:00:00Z', lastAt: '2026-10-08T11:30:00Z', count: 3 } }, NOW);
+    expect(r).toHaveLength(1);
+    expect(r[0].tone).toBe('good');
+    expect(r[0].text).toContain('3 times');
+  });
+  it('a bounce is red, names the reason and says to check the address', () => {
+    const r = linkActivity({ ...base, linkEmail: { status: 'bounced', bounceReason: 'Mailbox does not exist' } }, NOW);
+    expect(r[0]).toMatchObject({ tone: 'bad' });
+    expect(r[0].text).toContain('Mailbox does not exist');
+    expect(r[0].text).toContain('Check the email address');
+  });
+  it('email opens are only a hint and never shown for a bounced email', () => {
+    const opened = { firstAt: '2026-10-08T11:00:00Z', lastAt: '2026-10-08T11:05:00Z', count: 2 };
+    const ok = linkActivity({ ...base, linkEmail: { status: 'delivered', opened } }, NOW);
+    expect(ok.map((l) => l.text).join(' | ')).toContain('only a hint');
+    expect(linkActivity({ ...base, linkEmail: { status: 'bounced', opened } }, NOW).some((l) => /opened/.test(l.text) && /hint/.test(l.text))).toBe(false);
+  });
+  it('a paid order that was opened says so', () => {
+    const r = linkActivity({ ...base, paymentStatus: 'paid', awaitingPayment: false, linkViews: { firstAt: '2026-10-08T11:00:00Z', lastAt: '2026-10-08T11:30:00Z', count: 1 } }, NOW);
+    expect(r[0].text).toMatch(/and paid$/);
+  });
+  it('a paid order never nags about not opening', () => {
+    expect(linkActivity({ ...base, paymentStatus: 'paid', awaitingPayment: false }, NOW).filter((l) => l.tone === 'warn')).toEqual([]);
+  });
+  it('elapsed wording', () => {
+    expect(elapsed('2026-10-08T11:30:00Z', NOW)).toBe('30 min');
+    expect(elapsed('2026-10-08T11:00:00Z', NOW)).toBe('1 hour');
+    expect(elapsed('2026-10-05T12:00:00Z', NOW)).toBe('3 days');
   });
 });
