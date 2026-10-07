@@ -243,6 +243,10 @@ export interface OrderListRow {
   /** A payment link order the customer has not paid yet */
   awaitingPayment: boolean;
   linkSentAt?: string;
+  /** What the email provider reported about the latest pay-link email */
+  linkEmail?: { status: string; sentAt?: string; deliveredAt?: string; bounceReason?: string; opened?: { firstAt: string; lastAt: string; count: number } };
+  /** When the customer's browser loaded the pay page (not email scanners) */
+  linkViews?: { firstAt: string; lastAt: string; count: number };
   deliveryDates: string[];
   offlinePaymentNote?: string;
 }
@@ -393,4 +397,55 @@ export function paidMethodValue(choice: PaidChoice, typed: string): string | nul
   if (choice !== 'Other') return choice;
   const text = typed.replace(/\s+/g, ' ').trim();
   return text.length > 0 ? text.slice(0, 40) : null;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// What happened to the payment link: was the email delivered, was the pay page opened
+
+export interface ActivityLine {
+  /** good = green, bad = red, warn = amber, info = grey */
+  tone: 'good' | 'bad' | 'warn' | 'info';
+  text: string;
+}
+
+const clock = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+
+/** How long ago, in words ("3 hours", "2 days"). */
+export function elapsed(fromIso: string, now: Date = new Date()): string {
+  const minutes = Math.max(0, Math.round((now.getTime() - new Date(fromIso).getTime()) / 60000));
+  if (minutes < 60) return `${Math.max(1, minutes)} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `${days} days`;
+}
+
+/**
+ * The lines shown under an order's "Link emailed": did the email arrive, and did the customer open the pay page. The pay page
+ * opening is the reliable sign; an email "open" is only a hint (Apple Mail and some scanners load images by themselves).
+ * Only for link orders that were emailed.
+ */
+export function linkActivity(row: Pick<OrderListRow, 'linkOrder' | 'paymentStatus' | 'awaitingPayment' | 'linkSentAt' | 'linkEmail' | 'linkViews'>, now: Date = new Date()): ActivityLine[] {
+  if (!row.linkOrder || !row.linkSentAt) return [];
+  // a link sent before tracking existed has no email record: we cannot say it was not opened, so say nothing about it
+  if (!row.linkEmail && !row.linkViews) return [];
+  const lines: ActivityLine[] = [];
+  const e = row.linkEmail;
+  if (e?.status === 'bounced') lines.push({ tone: 'bad', text: `The email bounced${e.bounceReason ? `: ${e.bounceReason}` : ''}. Check the email address.` });
+  else if (e?.status === 'complained') lines.push({ tone: 'bad', text: "The customer's mail provider marked the email as spam." });
+  else if (e?.status === 'failed') lines.push({ tone: 'bad', text: 'The email could not be delivered.' });
+  else if (e?.status === 'delayed') lines.push({ tone: 'warn', text: 'The email is delayed, it has not reached the customer yet.' });
+  else if (e?.status === 'delivered') lines.push({ tone: 'info', text: 'Email delivered' });
+  if (e?.opened && e.status !== 'bounced') {
+    lines.push({ tone: 'info', text: `Email opened ${e.opened.count > 1 ? `${e.opened.count} times, last ` : ''}${clock(e.opened.lastAt)} (can happen automatically, so it is only a hint)` });
+  }
+  const v = row.linkViews;
+  if (v) {
+    lines.push({ tone: 'good', text: `Opened the payment page ${v.count > 1 ? `${v.count} times, last ` : ''}${clock(v.lastAt)}${row.paymentStatus === 'paid' ? ' and paid' : ''}` });
+  } else if (row.awaitingPayment) {
+    const waited = elapsed(row.linkSentAt, now);
+    const long = now.getTime() - new Date(row.linkSentAt).getTime() >= 24 * 3600 * 1000;
+    lines.push(long ? { tone: 'warn', text: `Has not opened the payment page after ${waited}. Email a new link or call them.` } : { tone: 'info', text: `Has not opened the payment page yet (sent ${waited} ago)` });
+  }
+  return lines;
 }
