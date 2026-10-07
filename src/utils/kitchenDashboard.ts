@@ -115,6 +115,7 @@ export interface KitchenRow {
   /** Combo definition snapshot: sections with their selectable options. */
   sections?: Array<{
     _id?: string;
+    title?: string;
     selectedItems?: Array<{ _id?: string; portion?: string | null; item?: { name?: string } | null }>;
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
@@ -141,6 +142,8 @@ export interface KitchenItem {
   spice: CountLine[];
   /** How many of the units ordered on their own come in an eco container (parts inside a combo count on the combo). */
   eco: number;
+  /** The same eco containers by size ('16Oz' × 3), biggest first; a unit without a size counts under 'No size'. */
+  ecoBySize: CountLine[];
   /** Total amount to cook where the sizes are known, as text ('84 oz (5.25 lb)'); '' when no size is known. */
   totalText: string;
   /** Units of this item that carry no readable size, so they are not in `totalText`. */
@@ -215,17 +218,13 @@ export function addAmount(into: Amount, add: Amount, times = 1): void {
 
 const trim2 = (n: number): string => String(Math.round(n * 100) / 100);
 
-/** '36 oz (2.25 lb)', '8 oz', '300 g', '12 pcs', or '' when there is nothing. Mixed units are joined with ' + '. */
+/** '36 oz (2.25 lb)', '8 oz (0.5 lb)', '300 g', '12 pcs', or '' when there is nothing. Mixed units are joined with ' + '. */
 export function formatAmount(amount: Amount): string {
   const parts: string[] = [];
   if (amount.oz > 0) {
+    // ounces and pounds side by side, pounds as a decimal: 300 oz is 18.75 lb, 8 oz is 0.5 lb
     const oz = Math.round(amount.oz * 100) / 100;
-    if (oz >= 16) {
-      // pounds as a decimal: 300 oz is 18.75 lb
-      parts.push(`${trim2(oz)} oz (${trim2(oz / 16)} lb)`);
-    } else {
-      parts.push(`${trim2(oz)} oz`);
-    }
+    parts.push(`${trim2(oz)} oz (${trim2(oz / 16)} lb)`);
   }
   if (amount.grams > 0) {
     parts.push(amount.grams >= 1000 ? `${trim2(amount.grams)} g (${trim2(amount.grams / 1000)} kg)` : `${trim2(amount.grams)} g`);
@@ -268,6 +267,7 @@ interface ItemAcc {
   portions: Map<string, number>;
   spice: Map<string, number>;
   eco: number;
+  ecoBySize: Map<string, number>;
   amount: Amount;
   sized: number;
 }
@@ -316,7 +316,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
   const itemAcc = (name: string): ItemAcc => {
     let acc = items.get(name);
     if (!acc) {
-      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), eco: 0, amount: emptyAmount(), sized: 0 };
+      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), eco: 0, ecoBySize: new Map(), amount: emptyAmount(), sized: 0 };
       items.set(name, acc);
     }
     return acc;
@@ -361,7 +361,10 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
       const portion = clean(row.portion);
       bump(acc.portions, portion || 'No size', row.quantity);
       if (spice) bump(acc.spice, spice, row.quantity);
-      if (row.isEco) acc.eco += row.quantity;
+      if (row.isEco) {
+        acc.eco += row.quantity;
+        bump(acc.ecoBySize, portion || 'No size', row.quantity);
+      }
       const size = parsePortionAmount(portion);
       if (size) {
         addAmount(acc.amount, size, row.quantity);
@@ -382,6 +385,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         portions: showPortions ? portions : [],
         spice: toLines(acc.spice),
         eco: acc.eco,
+        ecoBySize: toLines(acc.ecoBySize),
         totalText: formatAmount(acc.amount),
         unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
       };
@@ -427,6 +431,8 @@ export interface ItemOrderLine {
   isEco: boolean;
   /** Set when the item is a chosen part of this combo rather than ordered on its own. */
   viaCombo: string | null;
+  /** For a combo ordered on its own: what this customer picked in it, one line per section ('Veg Curry of the Day: Kale Chane (12Oz)'). */
+  choices: string[];
   orderStatus: string | null;
 }
 
@@ -453,20 +459,59 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
     const parts = comboParts(row);
     if (parts.length > 0) {
       if (clean(row.name) === wanted) {
-        lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null });
+        lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null, choices: comboChoiceLines(row) });
       }
       for (const part of parts) {
         if (part.name === wanted) {
-          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: null, viaCombo: clean(row.name) });
+          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: null, viaCombo: clean(row.name), choices: [] });
         }
       }
     } else if (clean(row.name) === wanted) {
-      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null });
+      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, choices: [] });
     }
   }
+  // spice level first (mild to hot, no spice last), then the biggest orders first
   return lines.sort(
-    (a, b) => a.day.localeCompare(b.day) || a.customerName.localeCompare(b.customerName) || a.orderId.localeCompare(b.orderId)
+    (a, b) =>
+      spiceRank(a.spice) - spiceRank(b.spice) ||
+      clean(a.spice).localeCompare(clean(b.spice)) ||
+      b.quantity - a.quantity ||
+      a.day.localeCompare(b.day) ||
+      a.customerName.localeCompare(b.customerName) ||
+      a.orderId.localeCompare(b.orderId)
   );
+}
+
+/** Where a spice level stands from mild to hot; levels we do not know come after the known ones, no spice last. */
+export function spiceRank(level: string | null | undefined): number {
+  const s = clean(level).toLowerCase();
+  if (!s) return 99;
+  if (s.includes('mild')) return 1;
+  if (s.includes('normal') || s.includes('regular')) return 2;
+  if (s.includes('medium')) return 3;
+  if (s.includes('extra') || s.includes('very')) return 6;
+  if (s.includes('spicy')) return 4;
+  if (s.includes('hot')) return 5;
+  return 50;
+}
+
+/** What one customer picked inside a combo, one line per section: 'Veg Curry of the Day: Kale Chane (12Oz)'. */
+export function comboChoiceLines(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): string[] {
+  if (!row.sections?.length || !row.comboSelections) return [];
+  const lines: string[] = [];
+  for (const section of row.sections) {
+    const picked = (section._id && row.comboSelections[section._id]) || [];
+    const names: string[] = [];
+    for (const id of picked) {
+      const option = section.selectedItems?.find((si) => si._id === id);
+      const name = clean(option?.item?.name);
+      if (!name) continue;
+      const portion = clean(option?.portion);
+      names.push(portion ? `${name} (${portion})` : name);
+    }
+    if (names.length > 0) lines.push(`${clean(section.title) || 'Choice'}: ${names.join(', ')}`);
+  }
+  return lines;
 }
 
 /** Normalise an order-day date (string or Date) to 'YYYY-MM-DD'; null when unusable. */

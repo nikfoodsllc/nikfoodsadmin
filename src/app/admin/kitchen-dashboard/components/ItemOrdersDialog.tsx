@@ -16,6 +16,9 @@ import {
 import { IconX } from '@tabler/icons-react';
 import { formatDayShort, type DayRange, type ItemOrderLine } from '@/utils/kitchenDashboard';
 
+/** The heading of a spice group in the list ('No spice level' for lines without one). */
+const spiceHeading = (spice: string | null) => spice || 'No spice level';
+
 interface ItemOrdersDialogProps {
   open: boolean;
   onClose: () => void;
@@ -103,6 +106,10 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
           </Alert>
         )}
         {lines.map((line, index) => {
+          const showSpiceGroups = lines.some((l) => l.spice);
+          // spice headings only when some line has a spice level (a plain item has nothing to group by)
+          const spiceStart = showSpiceGroups && (index === 0 || spiceHeading(lines[index - 1].spice) !== spiceHeading(line.spice));
+          const groupLines = lines.filter((l) => spiceHeading(l.spice) === spiceHeading(line.spice));
           const redelivered = line.deliveredOn && line.deliveredOn !== line.day;
           // the menu day (when tracing the whole range) and the delivery day (when it differs from the menu day)
           const when = [
@@ -112,8 +119,16 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
             .filter(Boolean)
             .join(' · ');
           return (
+            <Box key={`${line.orderId}-${index}`}>
+              {spiceStart && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', bgcolor: '#FEF2F2', color: '#991B1B', borderRadius: 1, px: 1, py: 0.5, mt: index === 0 ? 0 : 1.5, mb: 0.25 }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: 13 }}>{spiceHeading(line.spice)}</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: 12 }}>
+                    {groupLines.reduce((sum, l) => sum + l.quantity, 0)} {groupLines.reduce((sum, l) => sum + l.quantity, 0) === 1 ? 'unit' : 'units'}
+                  </Typography>
+                </Box>
+              )}
             <Box
-              key={`${line.orderId}-${index}`}
               sx={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -152,10 +167,24 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
                     />
                   )}
                 </Box>
+                {(line.choices ?? []).length > 0 && (
+                  <Box sx={{ mt: 0.75, pl: 1, borderLeft: '3px solid #FDE68A' }}>
+                    {line.choices.map((choice) => {
+                      const i = choice.indexOf(':');
+                      return (
+                        <Typography key={choice} sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>
+                          <Typography component="span" sx={{ fontSize: 13, color: '#6B7280' }}>{choice.slice(0, i + 1)} </Typography>
+                          <Typography component="span" sx={{ fontSize: 13, fontWeight: 700 }}>{choice.slice(i + 1).trim()}</Typography>
+                        </Typography>
+                      );
+                    })}
+                  </Box>
+                )}
               </Box>
               <Typography sx={{ fontWeight: 700, fontSize: 20, color: '#111827', flexShrink: 0, lineHeight: 1.2 }}>
                 × {line.quantity}
               </Typography>
+            </Box>
             </Box>
           );
         })}

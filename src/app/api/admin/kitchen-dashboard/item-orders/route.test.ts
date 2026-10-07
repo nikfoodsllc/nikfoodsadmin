@@ -69,8 +69,9 @@ describe('GET /api/admin/kitchen-dashboard/item-orders', () => {
     expect(
       data.lines.map((l: { orderId: string; customerName: string; quantity: number }) => [l.orderId, l.customerName, l.quantity]),
     ).toEqual([
-      ['ORD-1', 'Asha', 2],
+      // no spice on either: the bigger order comes first
       ['ORD-2', 'Ben', 3],
+      ['ORD-1', 'Asha', 2],
     ]);
     expect(data.totals).toEqual({ orders: 2, units: 5, truncated: false });
     expect(fetchKitchenRows).toHaveBeenCalledWith({ startDate: '2026-10-03', endDate: '2026-10-09' });
