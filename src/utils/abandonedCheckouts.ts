@@ -3,8 +3,8 @@
  * (`checkoutDrafts`); this turns those into one row per person for the admin list.
  */
 
-/** A checkout is only called abandoned once it has been quiet this long (the customer may still be shopping). */
-export const QUIET_MINUTES = 30;
+/** A checkout is only called abandoned once it has been quiet this long (the customer may still be paying). */
+export const QUIET_MINUTES = 10;
 
 export interface DraftItem {
   date: string;

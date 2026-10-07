@@ -79,8 +79,8 @@ describe('abandoned checkouts', () => {
   });
 
   it(`leaves out checkouts active in the last ${QUIET_MINUTES} minutes (still shopping)`, () => {
-    expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1', lastActivityAt: ago(10), createdAt: ago(20) })]).to_contact).toHaveLength(0);
-    expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1', lastActivityAt: ago(31), createdAt: ago(40) })]).to_contact).toHaveLength(1);
+    expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1', lastActivityAt: ago(5), createdAt: ago(8) })]).to_contact).toHaveLength(0);
+    expect(build([draft({ paymentIntentId: 'pi_1', userId: 'u1', lastActivityAt: ago(11), createdAt: ago(40) })]).to_contact).toHaveLength(1);
   });
 
   it('leaves out dismissed, converted and superseded drafts', () => {

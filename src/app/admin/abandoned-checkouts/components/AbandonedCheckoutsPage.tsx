@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { CONTACT_NOTES, reachOutEmail, type AbandonedRow, type View } from '@/utils/abandonedCheckouts';
+import { CONTACT_NOTES, QUIET_MINUTES, reachOutEmail, type AbandonedRow, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -238,7 +238,7 @@ export default function AbandonedCheckoutsPage() {
         <Button size="small" onClick={() => void load()} disabled={refreshing} startIcon={refreshing ? <CircularProgress size={14} /> : <IconRefresh size={16} />} sx={{ textTransform: 'none' }}>Refresh</Button>
       </Box>
       <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 1.5 }}>
-        People who opened checkout but did not pay. They show up here 30 minutes after they leave, and disappear as soon as they place an order.
+        People who opened checkout but did not pay. They show up here {QUIET_MINUTES} minutes after they leave, and disappear as soon as they place an order.
       </Typography>
 
       <ToggleButtonGroup exclusive size="small" value={days} onChange={(_, v: number | null) => v && setDays(v)} sx={{ mb: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 1.5 }, '& .Mui-selected': { bgcolor: '#FDE9C4 !important', color: '#7A4300' } }}>
@@ -273,7 +273,7 @@ export default function AbandonedCheckoutsPage() {
               <Box sx={{ color: '#9CA3AF', mb: 0.5 }}><IconShoppingCartOff size={32} /></Box>
               <Typography sx={{ fontWeight: 700 }}>{tab === 'to_contact' ? 'Nobody to follow up with right now' : 'Nobody has been contacted yet'}</Typography>
               <Typography sx={{ fontSize: 13, color: '#6B7280' }}>
-                {tab === 'to_contact' ? 'When someone opens checkout and leaves without paying, they appear here after 30 minutes.' : 'People you mark as contacted move here, with your note.'}
+                {tab === 'to_contact' ? `When someone opens checkout and leaves without paying, they appear here after ${QUIET_MINUTES} minutes.` : 'People you mark as contacted move here, with your note.'}
               </Typography>
             </Paper>
           )}
