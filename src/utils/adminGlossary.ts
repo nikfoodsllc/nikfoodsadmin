@@ -24,6 +24,7 @@ export const GLOSSARY_SECTIONS = [
   'Orders: payment status',
   'Orders: payment method',
   'Orders: Confirmation Email column',
+  'Orders: OptimoRoute column',
   'Orders: money columns',
   'Orders: card payment problems',
   'Create Order and Recent orders',
@@ -80,6 +81,13 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: Confirmation Email column', 'Pending', 'Orders table, Confirmation Email', 'The send is on its way.', 'warn'),
   e('Orders: Confirmation Email column', 'Delayed', 'Orders table, Confirmation Email', "The customer's mail server has not accepted it yet. It is still being tried.", 'warn'),
   e('Orders: Confirmation Email column', '- (dash)', 'Orders table, Confirmation Email', 'No confirmation email was ever sent, for example an unpaid order.', 'none', 'dash empty blank'),
+
+  // ---- optimoroute
+  e('Orders: OptimoRoute column', 'In OptimoRoute', 'Orders table, OptimoRoute; order details', 'The delivery stop for this order is in OptimoRoute (the route planner). The cell shows the delivery day(s). A customer with two orders on one day shares one stop.', 'good', 'optimo routes delivery stop'),
+  e('Orders: OptimoRoute column', 'Failed', 'Orders table, OptimoRoute; order details', 'The stop could not be sent to OptimoRoute (for example an address OptimoRoute could not find). The tooltip has the error. It is tried again every 30 minutes; fix the address if it keeps failing.', 'bad'),
+  e('Orders: OptimoRoute column', 'Remove failed', 'Orders table, OptimoRoute; order details', 'The order was cancelled or fully refunded but its stop could not be removed from OptimoRoute (for example the day is being planned). Delete the stop in OptimoRoute by hand.', 'bad'),
+  e('Orders: OptimoRoute column', 'Removed', 'Orders table, OptimoRoute', 'The order was cancelled or fully refunded, so its stop was taken out of OptimoRoute.', 'warn'),
+  e('Orders: OptimoRoute column', '- (dash)', 'Orders table, OptimoRoute', 'Nothing was sent to OptimoRoute: the order is unpaid, pending or cancelled, is older than the sync (before Oct 8), or its delivery day had already passed.', 'none', 'dash empty blank'),
 
   // ---- money columns
   e('Orders: money columns', 'Subtotal', 'Orders table, order details', 'The food total before taxes, fees and tip.'),

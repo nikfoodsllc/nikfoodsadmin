@@ -33,6 +33,7 @@ import { Order, OrderStatus } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView } from '@/utils/orderEmailStatus';
+import { orderOptimoView } from '@/utils/orderOptimoView';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -590,7 +591,7 @@ export default function OrderDetailsDialog({
         </Box>
 
         {/* Additional Information */}
-        {(order.hasReview !== undefined || order.emailStatus || (order.deliveryMessages && order.deliveryMessages.length > 0)) && (
+        {(order.hasReview !== undefined || order.emailStatus || order.optimo || (order.deliveryMessages && order.deliveryMessages.length > 0)) && (
           <>
             <Divider sx={{ marginY: 2 }} />
             <Box sx={{ marginBottom: 3 }}>
@@ -632,6 +633,23 @@ export default function OrderDetailsDialog({
                     )}
                   </Box>
                 )}
+                {order.optimo && (() => {
+                  const view = orderOptimoView(order.optimo);
+                  return (
+                    <Box sx={{ gridColumn: '1 / -1' }}>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                        OptimoRoute
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {view.label}
+                        {view.detail ? ` · ${view.detail}` : ''}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: view.tone === 'bad' ? '#EF4444' : '#6B7280', display: 'block' }}>
+                        {view.title}
+                      </Typography>
+                    </Box>
+                  );
+                })()}
                 {order.deliveryMessages && order.deliveryMessages.length > 0 && (
                   <Box sx={{ gridColumn: '1 / -1' }}>
                     <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
