@@ -29,7 +29,7 @@ describe('buildKitchenReport', () => {
   });
   it('an item without sizes totals as a number of pieces', () => {
     const r = buildKitchenReport([row({ name: 'Chapati', quantity: 4 }), row({ orderId: 'ORD-2', name: 'Chapati', quantity: 13, customerName: 'Beena' })], byName);
-    expect(r.cooked[0].totalText).toBe(''); expect(blockTotal(r.cooked[0])).toBe('17');
+    expect(r.cooked[0].totalText).toBe(''); expect(blockTotal(r.cooked[0])).toBe('17 units');
   });
   it('mixed sized and unsized units say how many are not in the total', () => {
     const r = buildKitchenReport([row({ portion: '12Oz' }), row({ orderId: 'ORD-2', customerName: 'Beena' })], byName);

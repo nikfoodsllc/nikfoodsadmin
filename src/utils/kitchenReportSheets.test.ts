@@ -30,7 +30,7 @@ describe('prep sheet (Kunal\'s layout)', () => {
   const rajma = () => sheet.rows.filter((r) => r.kind === 'data' && r.cells[0] === 'Rajma');
   it('two margin columns, Kunal\'s five columns first, then the dates', () => {
     expect(sheet.margin).toBe(2);
-    expect(sheet.rows[0].cells.slice(0, 5)).toEqual(['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty', 'Total / ECO']);
+    expect(sheet.rows[0].cells.slice(0, 5)).toEqual(['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty (oz)', 'Item total (lb) / ECO']);
     expect(sheet.rows[0].cells.slice(5, 8)).toEqual(['Order date', 'Kitchen date', 'Delivery date']);
   });
   it('one box per item: blocks separated by a blank row, header joined to the first box', () => {
@@ -45,13 +45,13 @@ describe('prep sheet (Kunal\'s layout)', () => {
   });
   it('amounts are numbers: the ounces of each line and the item total in pounds on the first row', () => {
     // smallest first: Cat 8Oz, then Amy and Bob 12Oz
-    expect(rajma().map((r) => [r.cells[1], r.cells[3]])).toEqual([['Cat', 8], ['Amy', 12], ['Bob', 12]]);
-    expect(rajma()[0].cells[4]).toBe(2); // 32 oz = 2 lb
+    expect(rajma().map((r) => [r.cells[1], r.cells[3]])).toEqual([['Cat', { n: 8, unit: 'oz' }], ['Amy', { n: 12, unit: 'oz' }], ['Bob', { n: 12, unit: 'oz' }]]);
+    expect(rajma()[0].cells[4]).toEqual({ n: 2, unit: 'lb' }); // 32 oz = 2 lb
     expect(rajma()[0].boldCells).toContain(4);
   });
   it('an item without sizes totals in pieces, and the eco rows say ECO in the last column', () => {
     const chapati = sheet.rows.find((r) => r.kind === 'data' && r.cells[0] === 'Chapati')!;
-    expect(chapati.cells[3]).toBe(4); expect(chapati.cells[4]).toBe(4);
+    expect(chapati.cells[3]).toEqual({ n: 4, unit: 'units' }); expect(chapati.cells[4]).toEqual({ n: 4, unit: 'units' });
     expect(rajma()[1].cells[4]).toBe('ECO'); // Amy's eco row (not the first row)
   });
   it('rows are red and white in turn inside a box, an ECO row is green, and every box starts with red', () => {
@@ -72,14 +72,14 @@ describe('prep sheet (Kunal\'s layout)', () => {
 describe('sheetAmounts', () => {
   const line = (portion: string | null, quantity: number) => ({ portion, quantity, amountText: portion ? `${portion}x${quantity}` : '' });
   it('ounces and pounds become numbers', () => {
-    expect(sheetAmounts({ lines: [line('12Oz', 2), line('1Lb', 1)] as never, totalText: '', quantity: 3 })).toEqual({ values: [24, 16], total: 2.5 });
+    expect(sheetAmounts({ lines: [line('12Oz', 2), line('1Lb', 1)] as never, totalText: '', quantity: 3 })).toEqual({ values: [{ n: 24, unit: 'oz' }, { n: 16, unit: 'oz' }], total: { n: 2.5, unit: 'lb' } });
   });
   it('no sizes at all: pieces', () => {
-    expect(sheetAmounts({ lines: [line(null, 4), line(null, 13)] as never, totalText: '', quantity: 17 })).toEqual({ values: [4, 13], total: 17 });
+    expect(sheetAmounts({ lines: [line(null, 4), line(null, 13)] as never, totalText: '', quantity: 17 })).toEqual({ values: [{ n: 4, unit: 'units' }, { n: 13, unit: 'units' }], total: { n: 17, unit: 'units' } });
   });
   it('mixed units fall back to text', () => {
     const r = sheetAmounts({ lines: [line('12Oz', 1), line(null, 1)] as never, totalText: '12 oz (0.75 lb)', quantity: 2 });
-    expect(r.values).toEqual(['12Ozx1', 1]); expect(r.total).toBe('12 oz (0.75 lb)');
+    expect(r.values).toEqual(['12Ozx1', '1 unit']); expect(r.total).toBe('12 oz (0.75 lb)');
   });
 });
 
@@ -110,7 +110,9 @@ describe('the Excel file', () => {
     expect(prep.getRow(2).getCell(3).value).toBe('Rajma');
     expect(prep.getRow(2).getCell(4).value).toBe('Bob'); // 8Oz sorts before Amy's 12Oz? no: Bob is 8Oz, Amy 12Oz
     expect(prep.getRow(2).getCell(6).value).toBe(8);
+    expect(prep.getRow(2).getCell(6).numFmt).toBe('General" oz"'); // the cell is a number that reads "8 oz"
     expect(prep.getRow(2).getCell(7).value).toBe(1.25); // 20 oz = 1.25 lb, bold on the first row
+    expect(prep.getRow(2).getCell(7).numFmt).toBe('General" lb"'); // reads "1.25 lb"
     expect(prep.getRow(2).getCell(7).font?.bold).toBe(true);
     expect(fill(2)).toBe(`FF${TONE_COLORS.red}`); // first row of the box red
     expect(prep.getRow(3).getCell(4).value).toBe('Amy');

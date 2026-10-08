@@ -313,6 +313,9 @@ export default function KitchenReportPage() {
           <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
             What to cook and what to pack for each menu day. Paid orders only; cancelled and refunded orders are left out.
           </Typography>
+          <Typography variant="body2" sx={{ color: '#374151', fontWeight: 600, mt: 0.5 }}>
+            Amounts are in ounces (oz) and pounds (lb): 16 oz = 1 lb. Items without a size are counted in units.
+          </Typography>
         </Box>
         <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           <Button variant="outlined" size="small" startIcon={<IconFileSpreadsheet size={16} />} onClick={download} disabled={!data || loading || exporting} sx={{ textTransform: 'none', fontWeight: 600 }}>

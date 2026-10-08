@@ -20,7 +20,7 @@ export function rowTone(index: number, isEco: boolean): RowTone {
 export const TONE_COLORS: Record<RowTone, string> = { red: 'FDE2E2', white: 'FFFFFF', eco: 'D5F0DB' };
 
 /** A cell: text, a number, or a date ('YYYY-MM-DD') shown like "Tue, Oct 13". */
-export type SheetCell = string | number | { date: string | null };
+export type SheetCell = string | number | { date: string | null } | { n: number; unit: 'oz' | 'lb' | 'units' };
 
 export interface SheetRow {
   kind: 'header' | 'data' | 'section' | 'blank';
@@ -46,8 +46,8 @@ export interface SheetModel {
 const date = (value: string | null | undefined): SheetCell => ({ date: value || null });
 
 /** Kunal's columns first (Item Name, Customer Name, Spice Level, Total Ordered Qty, and the item total / ECO column), then the dates. */
-const PREP_HEADER = ['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty', 'Total / ECO', 'Order date', 'Kitchen date', 'Delivery date', 'With combo'];
-const PREP_WIDTHS = [30, 24, 16, 17, 14, 15, 15, 15, 28];
+const PREP_HEADER = ['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty (oz)', 'Item total (lb) / ECO', 'Order date', 'Kitchen date', 'Delivery date', 'With combo'];
+const PREP_WIDTHS = [30, 24, 16, 22, 20, 15, 15, 15, 28];
 
 /**
  * One box per item, like Kunal's Kitchen Prep sheet: a thick outline round the block, the item's total (pounds, or pieces

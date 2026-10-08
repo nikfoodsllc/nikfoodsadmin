@@ -5,6 +5,7 @@ const THICK = { style: 'medium' as const, color: { argb: 'FF000000' } };
 
 function cellValue(cell: SheetCell): string | number | Date | null {
   if (typeof cell === 'string' || typeof cell === 'number') return cell === '' ? null : cell;
+  if ('n' in cell) return cell.n;
   if (!cell.date) return null;
   // noon UTC, so the day never shifts whatever the reader's time zone is
   return new Date(`${cell.date}T12:00:00Z`);
@@ -59,7 +60,8 @@ export async function buildReportWorkbook(sheets: SheetModel[], title: string): 
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TONE_COLORS[row.tone ?? 'white']}` } };
           if (row.boldCells?.includes(c - first)) cell.font = { bold: true };
         }
-        if (source && typeof source === 'object') cell.numFmt = 'ddd, mmm d';
+        // the unit is part of the cell's number format, so the cell stays a number and still shows "24 oz" or "1.5 lb"
+        if (source && typeof source === 'object') cell.numFmt = 'n' in source ? `General" ${source.unit}"` : 'ddd, mmm d';
         else if (typeof source === 'number' && !row.rightCells?.includes(c - first)) cell.alignment = { vertical: 'top', horizontal: 'center' };
       }
     }
