@@ -17,6 +17,8 @@ import {
 import { IconDownload } from '@tabler/icons-react';
 import UsersTable from './UsersTable';
 import SearchBar from './SearchBar';
+import { useSearchBox } from '@/hooks/useSearchBox';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import UserDetailsDialog from './UserDetailsDialog';
 import ExportCustomersDialog from './ExportCustomersDialog';
 import TablePagination from '../../food-items/components/TablePagination';
@@ -39,8 +41,11 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<UserWithAddresses | null>(null);
 
   // Filters and pagination
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  // what is typed vs what the list is filtered by (it follows the box after a typing pause); only the newest load may update the list
+  const searchBox = useSearchBox(() => setCurrentPage(1));
+  const searchQuery = searchBox.query;
+  const beginRequest = useLatestRequest();
   const [totalUsers, setTotalUsers] = useState(0);
   const itemsPerPage = 100;
 
@@ -64,6 +69,7 @@ export default function UsersPage() {
 
   // Fetch users with search
   const fetchUsers = useCallback(async () => {
+    const request = beginRequest();
     try {
       setLoading(true);
 
@@ -83,6 +89,7 @@ export default function UsersPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: request.signal,
       });
 
       if (!response.ok) {
@@ -90,15 +97,17 @@ export default function UsersPage() {
       }
 
       const data = await response.json();
+      if (!request.isCurrent()) return; // a newer search replaced this one
       setUsers(data.data?.items || []);
       setTotalUsers(data.data?.total || 0);
     } catch (error) {
+      if (request.signal.aborted || !request.isCurrent()) return; // cancelled by a newer search
       console.error('Error fetching users:', error);
       showSnackbar('Failed to load users', 'error');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [token, isAuthenticated, router, searchQuery, currentPage]);
+  }, [token, isAuthenticated, router, searchQuery, currentPage, beginRequest]);
 
   // Fetch users when filters change
   useEffect(() => {
@@ -205,8 +214,7 @@ export default function UsersPage() {
   };
 
   const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1); // Reset to first page on search
+    searchBox.setInput(value);
   };
 
   const handlePageChange = (page: number) => {
@@ -249,7 +257,7 @@ export default function UsersPage() {
 
       {/* Search Bar */}
       <Box sx={{ marginBottom: 3 }}>
-        <SearchBar value={searchQuery} onChange={handleSearchChange} />
+        <SearchBar value={searchBox.input} onChange={handleSearchChange} />
       </Box>
 
       {/* Table */}
