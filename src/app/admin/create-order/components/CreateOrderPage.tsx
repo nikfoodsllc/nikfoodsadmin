@@ -298,11 +298,12 @@ export default function CreateOrderPage() {
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}><CircularProgress /></Box>
       ) : (
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: wide ? 'minmax(0, 1fr) 440px' : 'minmax(0, 1fr)', alignItems: 'start' }}>
-          <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <Box sx={{ display: 'grid', gap: 2, minWidth: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
             <CustomerSection token={token} customer={customer} address={address} onCustomer={setCustomer} onAddress={setAddress} onPickedExisting={setExisting} accountExists={existing} />
             <MenuPicker catalog={menu} date={date} onDate={setDate} lines={lines} counts={counts} onAdd={choose} onRemove={takeOne} />
           </Box>
-          {wide && <Box sx={{ position: 'sticky', top: 12, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', borderRadius: 2 }}>{summary}</Box>}
+          {/* sticks 12px below the 65px top bar (which stays pinned), so the whole panel is visible */}
+          {wide && <Box sx={{ position: 'sticky', top: 77, maxHeight: 'calc(100vh - 89px)', overflowY: 'auto', borderRadius: 2 }}>{summary}</Box>}
         </Box>
       )}
 
