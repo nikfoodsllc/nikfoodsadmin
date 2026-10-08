@@ -69,12 +69,10 @@ export default function OrderDetailsDialog({
     setSelected(new Set());
   }, [order?.orderId, order?.updatedAt]);
 
-  // Update selected status when order changes
-  useState(() => {
-    if (order) {
-      setSelectedStatus(order.status);
-    }
-  });
+  // The status box always starts on the order's current status (when another order is opened or its status changes)
+  useEffect(() => {
+    if (order?.status) setSelectedStatus(order.status);
+  }, [order?.orderId, order?.status]);
 
   // Calculate total eco container charges
   const totalEcoCharges = order?.items.reduce((total, day) => {
