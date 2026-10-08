@@ -123,3 +123,63 @@ export function buildReportSheets(input: { cooked: PrepBlock[]; notSet: PrepBloc
 export function dateCellText(value: string | null): string {
   return value ? formatDayShort(value) : '';
 }
+
+// ---------------------------------------------------------------------------------------------
+// The PDF: the same sheets, drawn as tables
+// ---------------------------------------------------------------------------------------------
+
+/** The text of a cell the way the PDF (and a reader of the sheet) sees it: "24 oz", "1.5 lb", "Tue, Oct 13". */
+export function cellText(cell: SheetCell | undefined): string {
+  if (cell === undefined || cell === null || cell === '') return '';
+  if (typeof cell === 'string') return cell;
+  if (typeof cell === 'number') return String(cell);
+  if ('n' in cell) return `${cell.n} ${cell.unit}`;
+  return dateCellText(cell.date);
+}
+
+export interface PdfTable {
+  /** 'box' = an item's box (thick outline), 'plain' = an ordinary table, 'section' = a heading band */
+  kind: 'box' | 'plain' | 'section';
+  /** Header cells, only on the first table of a sheet */
+  head?: string[];
+  rows: Array<{ cells: string[]; tone: RowTone; box?: { top: boolean; bottom: boolean }; boldCells: number[]; rightCells: number[] }>;
+}
+
+/**
+ * Splits a sheet into the tables the PDF draws one after another. In a sheet of boxes every box is a table of its own
+ * (separated, like in Excel, by the gap where the blank row is), so a box can be kept on one page; the header belongs to
+ * the first box, as in Kunal's sheet. A sheet without boxes is one table.
+ */
+export function sheetToPdfTables(sheet: SheetModel): PdfTable[] {
+  const header = sheet.rows.find((r) => r.kind === 'header');
+  const head = header ? header.cells.map(cellText) : undefined;
+  const hasBoxes = sheet.rows.some((r) => r.kind === 'data' && r.box);
+  const toRow = (r: SheetRow) => ({ cells: r.cells.map(cellText), tone: r.tone ?? ('white' as RowTone), box: r.box, boldCells: r.boldCells ?? [], rightCells: r.rightCells ?? [] });
+  if (!hasBoxes) {
+    return [{ kind: 'plain', head, rows: sheet.rows.filter((r) => r.kind === 'data').map(toRow) }];
+  }
+  const tables: PdfTable[] = [];
+  let current: PdfTable | null = null;
+  let headUsed = false;
+  for (const row of sheet.rows) {
+    if (row.kind === 'header') continue;
+    if (row.kind === 'blank') {
+      current = null;
+      continue;
+    }
+    if (row.kind === 'section') {
+      tables.push({ kind: 'section', rows: [{ cells: [cellText(row.cells[0])], tone: 'white', boldCells: [0], rightCells: [] }] });
+      current = null;
+      continue;
+    }
+    if (!current) {
+      current = { kind: 'box', head: headUsed ? undefined : head, rows: [] };
+      headUsed = true;
+      tables.push(current);
+    }
+    current.rows.push(toRow(row));
+  }
+  // a sheet with a header but no rows still prints its header
+  if (tables.length === 0 && head) tables.push({ kind: 'box', head, rows: [] });
+  return tables;
+}
