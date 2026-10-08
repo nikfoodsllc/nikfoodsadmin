@@ -5,6 +5,7 @@ import { ObjectId } from 'mongodb';
 import { AvailableDate } from '@/types/order';
 import { parseCutoff, validateCutoff } from '@/utils/orderCutoff';
 import { invalidateLivesiteHomeMenuCacheAndWait } from '@/lib/invalidateHomeMenuCache';
+import { applyLockedMenuToDates } from '@/lib/server/lockedMenu';
 
 interface CreateUpdateRequest {
   date: string;
@@ -33,6 +34,17 @@ interface BulkUpdateRequest {
 interface BulkDeleteRequest {
   startDate: string;
   endDate: string;
+}
+
+/** Locked rows onto the given days; a problem here is logged and never fails the day save. */
+async function applyLockedMenuSafely(days: string[]): Promise<number> {
+  if (days.length === 0) return 0;
+  try {
+    return (await applyLockedMenuToDates(days)).added;
+  } catch (error) {
+    console.error('[locked-menu] could not repeat the locked rows onto', days, error);
+    return 0;
+  }
 }
 
 /**
@@ -316,8 +328,12 @@ export async function POST(request: NextRequest) {
         throw new Error('Failed to fetch created date data');
       }
 
+      // switched on for day-wise ordering: locked rows repeat onto this day (never fails the save)
+      const lockedAdded = dayWiseCategoryEnabled === true ? await applyLockedMenuSafely([date]) : 0;
+
       return NextResponse.json({
         data: toResponse(createdDate.data),
+        lockedItemsAdded: lockedAdded,
         message: 'Date created successfully',
       }, { status: 201 });
     }
@@ -367,8 +383,13 @@ export async function POST(request: NextRequest) {
     // A changed cutoff changes what customers can order: tell the customer site now and wait for its answer
     const livesiteNotified = cutoffTouched ? await invalidateLivesiteHomeMenuCacheAndWait() : undefined;
 
+    // only when day-wise ordering has just been switched ON for this day: locked rows repeat onto it
+    const justEnabled = dayWiseCategoryEnabled === true && existingResult.data.dayWiseCategoryEnabled !== true;
+    const lockedAdded = justEnabled ? await applyLockedMenuSafely([date]) : 0;
+
     return NextResponse.json({
       data: toResponse(updatedDate.data),
+      lockedItemsAdded: lockedAdded,
       livesiteNotified,
       message: 'Date updated successfully',
     });
@@ -432,6 +453,13 @@ export async function PUT(request: NextRequest) {
     let createdCount = 0;
     const errors: string[] = [];
 
+    // days that already had day-wise ordering on, so only days switched on now repeat the locked rows
+    const alreadyOn = new Set<string>();
+    const rememberDaysAlreadyOn = async () => {
+      const prior = await db.read<AvailableDate>('availableDates', { date: { $in: dateStrings }, dayWiseCategoryEnabled: true });
+      for (const d of prior.data ?? []) alreadyOn.add(d.date);
+    };
+
     // Custom order cutoffs already set on dates in the range: the delete-and-reinsert below must not lose them
     const keptCutoffs = new Map<string, { cutoffAt?: Date; flatCutoffAt?: Date; dayWiseCutoffAt?: Date }>();
 
@@ -463,6 +491,8 @@ export async function PUT(request: NextRequest) {
         if (kept.cutoffAt || kept.flatCutoffAt || kept.dayWiseCutoffAt) keptCutoffs.set(existing.date, kept);
       }
 
+      await rememberDaysAlreadyOn();
+
       const deleteResult = await db.delete<AvailableDate>('availableDates', {
         date: {
           $gte: startDate,
@@ -474,6 +504,9 @@ export async function PUT(request: NextRequest) {
         deletedCount = deleteResult.deletedCount || 0;
       }
     }
+
+    // without a range nothing was deleted above: read the current state before the insert
+    if (!(startDate && endDate)) await rememberDaysAlreadyOn();
 
     // Insert all new dates
     const datesToInsert: AvailableDate[] = dates.map(dateData => {
@@ -510,6 +543,9 @@ export async function PUT(request: NextRequest) {
       errors.push(insertResult.error || 'Failed to insert dates');
     }
 
+    // days switched on for day-wise ordering by this save: locked rows repeat onto them (never fails the save)
+    const lockedAdded = await applyLockedMenuSafely(dates.filter((d) => d.dayWiseCategoryEnabled === true && !alreadyOn.has(d.date)).map((d) => d.date));
+
     // Fetch all inserted dates to return complete data
     const insertedDates = await db.read<AvailableDate>('availableDates', {
       date: { $in: dates.map(d => d.date) }
@@ -522,6 +558,7 @@ export async function PUT(request: NextRequest) {
         updated: responseData,
         deletedCount,
         createdCount,
+        lockedItemsAdded: lockedAdded,
         errors: errors.length > 0 ? errors : undefined
       },
       message: `Bulk update completed. ${deletedCount} deleted, ${createdCount} created${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
