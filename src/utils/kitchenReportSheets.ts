@@ -75,7 +75,7 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
           li === 0 ? amounts.total : eco ? 'ECO' : '',
           date(line.day),
           date(line.deliveryDate),
-          line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '',
+          [line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '', line.movedFrom ? `Moved from ${dateCellText(line.movedFrom)}` : ''].filter(Boolean).join(' · '),
         ],
       });
     });
@@ -99,7 +99,7 @@ export function stickersSheet(stickers: StickerLine[]): SheetModel {
     rows.push({
       kind: 'data',
       tone: rowTone(i, s.isEco),
-      cells: [date(s.deliveryDate), s.customerName, s.item, s.portion ?? '', s.quantity, s.spice ?? '', s.isEco ? 'ECO' : '', s.viaCombo ?? '', s.orderId, date(s.orderedOn), date(s.day)],
+      cells: [date(s.deliveryDate), s.customerName, s.item, s.portion ?? '', s.quantity, s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.orderedOn), date(s.day)],
     });
   });
   return { name: 'Stickers', widths: [15, 22, 30, 9, 6, 14, 6, 24, 24, 15, 15], rows };

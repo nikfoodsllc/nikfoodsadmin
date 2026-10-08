@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { jwtHandler } from '@/lib/jwt';
-import { fetchKitchenRows } from '@/lib/kitchenRows';
+import { fetchKitchenRows, fetchMovedKitchenRows } from '@/lib/kitchenRows';
 import { buildKitchenDays, comboParts, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
 import { buildKitchenReport, type TypeLookup } from '@/utils/kitchenReport';
 import { normalizePreparationType, type PreparationType } from '@/utils/preparationType';
@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
     const problem = validateRange(range);
     if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
-    const rows = await fetchKitchenRows(range);
+    // items an admin moved to another date are cooked for their new date
+    const rows = [...(await fetchKitchenRows(range, { report: true })), ...(await fetchMovedKitchenRows(range))];
 
     // how each item is prepared: by food id (a combo's parts have their own), and by name for anything without an id
     const ids = new Set<string>();
