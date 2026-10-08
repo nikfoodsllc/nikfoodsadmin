@@ -1,603 +1,379 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Box,
-  Typography,
-  TextField,
-  Button,
-  TableContainer,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  CircularProgress,
-  Alert,
-  Snackbar,
-  Paper,
-  IconButton,
-  Tooltip,
-} from '@mui/material';
-import { IconRefresh } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
+import { IconDownload, IconPrinter, IconRefresh, IconTruckDelivery } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatPSTDate } from '@/utils/timezone';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { formatPSTDateISO } from '@/utils/timezone';
+import {
+  addDays,
+  deliveryNote,
+  formatDayShort,
+  formatRangeLabel,
+  getPresetRange,
+  shortSpiceLabel,
+  validateRange,
+  type DayRange,
+  type KitchenDay,
+} from '@/utils/kitchenDashboard';
+import {
+  blockTotal,
+  prepCsvRows,
+  stickersCsvRows,
+  toCsvText,
+  type KitchenReport,
+  type PrepBlock,
+  type PrepLine,
+  type StickerLine,
+} from '@/utils/kitchenReport';
+import { downloadCSV } from '@/utils/csv';
 
-interface ItemWiseTotal {
-  itemName: string;
-  spiceLevel: string;
-  totalQuantity: number;
-}
+type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
+type TabId = 'prep' | 'stickers' | 'days';
 
-interface OrderItem {
-  name: string;
-  quantity: number;
-  spiceLevel?: string;
-}
+const PRESETS: Array<{ id: Preset; label: string }> = [
+  { id: 'today', label: 'Today' },
+  { id: 'tomorrow', label: 'Tomorrow' },
+  { id: 'thisWeek', label: 'This week' },
+  { id: 'custom', label: 'Custom dates' },
+];
 
-interface OrderWiseDetail {
-  orderId: string;
-  customerName: string;
-  items: OrderItem[];
-}
-
-interface KitchenReportData {
-  itemWiseTotals: ItemWiseTotal[];
-  orderWiseDetails: OrderWiseDetail[];
+interface ReportData extends KitchenReport {
   startDate: string;
   endDate: string;
+  days: KitchenDay[];
+}
+
+/** Printing: only the report, no sidebar or top bar, and a block is never split across two pages. */
+const PRINT_CSS = `
+@media print {
+  .no-print { display: none !important; }
+  header, nav, aside, .MuiDrawer-root, .MuiAppBar-root { display: none !important; }
+  main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  body { background: #fff !important; }
+  .print-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; }
+}
+`;
+
+const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
+
+function LineRow({ line, showDay }: { line: PrepLine; showDay: boolean }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, py: 0.9, borderTop: '1px solid #F3F4F6' }}>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{line.customerName}</Typography>
+        {line.viaCombo && (
+          <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
+            with {line.viaCombo}
+            {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
+          </Typography>
+        )}
+        {showDay && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{formatDayShort(line.day)}</Typography>}
+        {line.deliveredOn && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#B45309' }}>
+            <IconTruckDelivery size={13} style={{ flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'inherit' }}>Delivered {formatDayShort(line.deliveredOn)}</Typography>
+          </Box>
+        )}
+      </Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '62%' }}>
+        {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
+        <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>
+          {line.portion ? `${line.portion} × ${line.quantity}` : `× ${line.quantity}`}
+        </Typography>
+        {line.amountText && <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', whiteSpace: 'nowrap' }}>{line.amountText}</Typography>}
+        {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+      </Box>
+    </Box>
+  );
+}
+
+function PrepCard({ block, showDay, warn }: { block: PrepBlock; showDay: boolean; warn?: boolean }) {
+  return (
+    <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#111827', wordBreak: 'break-word', lineHeight: 1.3 }}>{block.name}</Typography>
+          <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
+            {block.quantity} unit{block.quantity === 1 ? '' : 's'} · {block.lines.length} order{block.lines.length === 1 ? '' : 's'}
+            {block.unsized > 0 && block.totalText ? ` · ${block.unsized} without a size` : ''}
+          </Typography>
+          {block.eco > 0 && <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#126B2C' }}>♻️ Eco × {block.eco}</Typography>}
+        </Box>
+        <Typography sx={{ fontWeight: 800, fontSize: block.totalText ? 18 : 22, color: '#92400E', textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>{blockTotal(block)}</Typography>
+      </Box>
+      <Box sx={{ px: 2, pb: 0.25 }}>
+        {block.lines.map((line, i) => (
+          <LineRow key={`${line.orderId}-${i}`} line={line} showDay={showDay} />
+        ))}
+      </Box>
+    </Paper>
+  );
+}
+
+function StickersTab({ stickers }: { stickers: StickerLine[] }) {
+  const groups = useMemo(() => {
+    const map = new Map<string, StickerLine[]>();
+    for (const s of stickers) {
+      const key = s.deliveredOn ?? s.day;
+      map.set(key, [...(map.get(key) ?? []), s]);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [stickers]);
+  if (stickers.length === 0) return <Typography sx={{ color: '#9CA3AF', py: 3 }}>No ready-to-eat items for these days.</Typography>;
+  return (
+    <>
+      {groups.map(([day, list]) => (
+        <Paper key={day} className="print-card" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
+          <Box sx={{ px: 2, py: 1, bgcolor: '#F9FAFB', display: 'flex', justifyContent: 'space-between' }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Delivery {formatDayShort(day)}</Typography>
+            <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{list.length} sticker{list.length === 1 ? '' : 's'}</Typography>
+          </Box>
+          <Box sx={{ px: 2, pb: 0.25 }}>
+            {list.map((s, i) => (
+              <Box key={`${s.orderId}-${i}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, py: 0.9, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.customerName}</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{s.item}</Typography>
+                  {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '55%' }}>
+                  {s.spice && <Chip size="small" label={shortSpiceLabel(s.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
+                  <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>{s.portion ? `${s.portion} × ${s.quantity}` : `× ${s.quantity}`}</Typography>
+                  {s.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      ))}
+    </>
+  );
+}
+
+function DayTotalsTab({ days }: { days: KitchenDay[] }) {
+  const filled = days.filter((d) => d.items.length > 0 || d.combos.length > 0);
+  if (filled.length === 0) return <Typography sx={{ color: '#9CA3AF', py: 3 }}>Nothing ordered for these days.</Typography>;
+  return (
+    <>
+      {filled.map((day) => (
+        <Paper key={day.day} className="print-card" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
+          <Box sx={{ px: 2, py: 1, bgcolor: '#F9FAFB', display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
+              {day.weekday} <Typography component="span" sx={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>{formatDayShort(day.day)}</Typography>
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{day.totals.units} units · {day.totals.orders} orders</Typography>
+          </Box>
+          <Box sx={{ px: 2, pb: 0.25 }}>
+            {day.items.map((item, i) => {
+              const note = deliveryNote(item.deliveries, item.quantity);
+              return (
+                <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, py: 0.8, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.name}</Typography>
+                    {note && <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#B45309' }}>{note}</Typography>}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, flexShrink: 0 }}>
+                    {item.totalText && <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap' }}>{item.totalText}</Typography>}
+                    <Typography sx={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'right' }}>{item.quantity}</Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+            {day.combos.map((combo) => (
+              <Box key={combo.name} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.8, borderTop: '1px solid #F3F4F6', bgcolor: '#FFFBEB', mx: -2, px: 2 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{combo.name} <Typography component="span" sx={{ fontSize: 12, color: '#6B7280' }}>(combo)</Typography></Typography>
+                <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{combo.quantity}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      ))}
+    </>
+  );
 }
 
 export default function KitchenReportPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [reportData, setReportData] = useState<KitchenReportData | null>(null);
+  const today = useMemo(() => formatPSTDateISO(new Date()), []);
+  const [preset, setPreset] = useState<Preset>('tomorrow');
+  const [custom, setCustom] = useState<DayRange>({ startDate: today, endDate: addDays(today, 1) });
+  const [customApplied, setCustomApplied] = useState<DayRange | null>(null);
+  const [tab, setTab] = useState<TabId>('prep');
+  const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [error, setError] = useState('');
+  const startRequest = useLatestRequest();
 
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error';
-  }>({
-    open: false,
-    message: '',
-    severity: 'success',
-  });
+  const range = useMemo<DayRange | null>(() => {
+    if (preset === 'today') return { startDate: today, endDate: today };
+    if (preset === 'tomorrow') return { startDate: addDays(today, 1), endDate: addDays(today, 1) };
+    if (preset === 'thisWeek') return getPresetRange('thisWeek', today);
+    return customApplied;
+  }, [preset, today, customApplied]);
 
-  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
-    setSnackbar({ open: true, message, severity });
-  };
+  const load = useCallback(async () => {
+    if (!token || !range) return;
+    const request = startRequest();
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/admin/kitchen-report?startDate=${range.startDate}&endDate=${range.endDate}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: request.signal,
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!request.isCurrent()) return;
+      if (!response.ok) throw new Error(json.error || 'Could not load the report');
+      setData(json.data as ReportData);
+    } catch (e) {
+      if (!request.isCurrent() || (e instanceof DOMException && e.name === 'AbortError')) return;
+      setData(null);
+      setError(e instanceof Error ? e.message : 'Could not load the report');
+    } finally {
+      if (request.isCurrent()) setLoading(false);
+    }
+  }, [token, range, startRequest]);
 
-  const hideSnackbar = () => {
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  // Handle authentication loading and redirects
-  if (authLoading) {
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) router.push('/login');
+  }, [authLoading, isAuthenticated, router]);
+
+  if (authLoading || !isAuthenticated) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '400px',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
         <CircularProgress />
       </Box>
     );
   }
 
-  if (!isAuthenticated) {
-    router.push('/login');
-    return null;
-  }
+  const customProblem = preset === 'custom' ? validateRange(custom) : null;
+  const multiDay = range ? range.startDate !== range.endDate : false;
+  const cookedCount = data?.cooked.length ?? 0;
+  const notSetCount = data?.notSet.length ?? 0;
 
-  // Fetch kitchen report data
-  const fetchKitchenReport = useCallback(async () => {
-    try {
-      setLoading(true);
-      if (!token) {
-        throw new Error('No authentication token found');
+  const download = () => {
+    if (!data || !range) return;
+    const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
+    if (tab === 'prep') downloadCSV(toCsvText(prepCsvRows([...data.cooked, ...data.notSet])), `kitchen-prep-${label}.csv`);
+    else if (tab === 'stickers') downloadCSV(toCsvText(stickersCsvRows(data.stickers)), `stickers-${label}.csv`);
+    else {
+      const rows: string[][] = [['Day', 'Item', 'Quantity', 'Total amount', 'Delivered later']];
+      for (const d of data.days) {
+        for (const i of d.items) rows.push([d.day, i.name, String(i.quantity), i.totalText, deliveryNote(i.deliveries, i.quantity)]);
+        for (const c of d.combos) rows.push([d.day, `${c.name} (combo)`, String(c.quantity), '', deliveryNote(c.deliveries, c.quantity)]);
       }
-
-      // Build query parameters
-      const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-
-      const response = await fetch(`/api/admin/reports/kitchen?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch kitchen report');
-      }
-
-      const data = await response.json();
-      setReportData(data.data);
-    } catch (error) {
-      console.error('Error fetching kitchen report:', error);
-      showSnackbar('Failed to load kitchen report', 'error');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      downloadCSV(toCsvText(rows), `day-totals-${label}.csv`);
     }
-  }, [startDate, endDate, token]);
-
-  // Fetch report when date filters change
-  useEffect(() => {
-    fetchKitchenReport();
-  }, [fetchKitchenReport]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchKitchenReport();
-  };
-
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setStartDate(e.target.value);
-  };
-
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEndDate(e.target.value);
-  };
-
-  const handleClearFilters = () => {
-    setStartDate('');
-    setEndDate('');
   };
 
   return (
     <Box>
-      {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 3,
-          flexWrap: 'wrap',
-          gap: 2,
-        }}
-      >
-        <Box>
+      <style>{PRINT_CSS}</style>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827' }}>
             Kitchen Report (BETA)
           </Typography>
-          <Typography variant="body2" sx={{ color: '#6B7280', marginTop: 0.5 }}>
-            View item-wise totals and order-wise details for kitchen operations
+          <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
+            What to cook and what to pack for each menu day. Paid orders only; cancelled and refunded orders are left out.
           </Typography>
         </Box>
+        <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Button variant="outlined" size="small" startIcon={<IconDownload size={16} />} onClick={download} disabled={!data || loading} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Download CSV
+          </Button>
+          <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} onClick={() => window.print()} disabled={!data || loading} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Print
+          </Button>
+          <Tooltip title="Reload">
+            <span>
+              <IconButton onClick={load} disabled={loading} aria-label="Reload the report">
+                <IconRefresh size={20} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
 
-      {/* Filters */}
-      <Box
-        sx={{
-          backgroundColor: '#fff',
-          padding: 3,
-          borderRadius: 2,
-          marginBottom: 3,
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 2,
-            alignItems: 'flex-end',
-          }}
-        >
-          <Box sx={{ flex: { xs: '1 1 200px', sm: '1 1 250px' } }}>
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '13px',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: 1,
-              }}
-            >
-              Start Date
-            </Typography>
-            <TextField
-              type="date"
-              value={startDate}
-              onChange={handleStartDateChange}
-              size="small"
-              fullWidth
-              sx={{
-                '& .MuiInputBase-root': {
-                  backgroundColor: '#fff',
-                },
-              }}
+      <Paper className="no-print" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: preset === 'custom' ? 1.5 : 0 }}>
+          {PRESETS.map((p) => (
+            <Chip
+              key={p.id}
+              label={p.label}
+              clickable
+              onClick={() => setPreset(p.id)}
+              color={preset === p.id ? 'primary' : 'default'}
+              variant={preset === p.id ? 'filled' : 'outlined'}
+              sx={{ fontWeight: 600, ...(preset === p.id ? { bgcolor: '#F89C35', color: '#fff', '&:hover': { bgcolor: '#E08A28' } } : {}) }}
             />
-          </Box>
-
-          <Box sx={{ flex: { xs: '1 1 200px', sm: '1 1 250px' } }}>
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '13px',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: 1,
-              }}
-            >
-              End Date
-            </Typography>
-            <TextField
-              type="date"
-              value={endDate}
-              onChange={handleEndDateChange}
-              size="small"
-              fullWidth
-              sx={{
-                '& .MuiInputBase-root': {
-                  backgroundColor: '#fff',
-                },
-              }}
-            />
-          </Box>
-
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="outlined"
-              onClick={handleClearFilters}
-              disabled={loading || refreshing}
-              sx={{
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 3,
-              }}
-            >
-              Clear
-            </Button>
-            <Tooltip title="Refresh data">
-              <IconButton
-                onClick={handleRefresh}
-                disabled={refreshing || loading}
-                sx={{
-                  border: '1px solid #e0e0e0',
-                  '&:hover': {
-                    backgroundColor: 'rgba(79, 140, 255, 0.04)',
-                    borderColor: '#4F8CFF',
-                  },
-                }}
-              >
-                <IconRefresh
-                  size={20}
-                  style={{
-                    animation: refreshing ? 'spin 1s linear infinite' : 'none',
-                  }}
-                />
-              </IconButton>
-            </Tooltip>
-          </Box>
+          ))}
         </Box>
-
-        {reportData?.startDate && reportData?.endDate && (
-          <Box sx={{ marginTop: 2 }}>
-            <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
-              Showing data from <strong>{formatPSTDate(reportData.startDate)}</strong> to{' '}
-              <strong>{formatPSTDate(reportData.endDate)}</strong>
-            </Typography>
+        {preset === 'custom' && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+            <TextField label="From" type="date" size="small" value={custom.startDate} onChange={(e) => setCustom((c) => ({ ...c, startDate: e.target.value }))} InputLabelProps={{ shrink: true }} />
+            <TextField label="To" type="date" size="small" value={custom.endDate} onChange={(e) => setCustom((c) => ({ ...c, endDate: e.target.value }))} InputLabelProps={{ shrink: true }} />
+            <Button variant="contained" size="small" disabled={Boolean(customProblem)} onClick={() => setCustomApplied({ ...custom })} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#F89C35', '&:hover': { bgcolor: '#E08A28' } }}>
+              Show
+            </Button>
+            {customProblem && <Typography sx={{ fontSize: 12, color: '#B91C1C' }}>{customProblem}</Typography>}
           </Box>
         )}
-      </Box>
+      </Paper>
 
-      {/* Loading State */}
+      {range && (
+        <Typography sx={{ fontSize: 14, color: '#374151', fontWeight: 600, mb: 1.5 }}>
+          {formatRangeLabel(range)}
+          {data && !loading ? ` · ${cookedCount} item${cookedCount === 1 ? '' : 's'} to cook · ${data.stickers.length} sticker${data.stickers.length === 1 ? '' : 's'}` : ''}
+        </Typography>
+      )}
+      {preset === 'custom' && !range && <Typography sx={{ color: '#6B7280', mb: 2 }}>Pick the dates and press Show.</Typography>}
+
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      <Tabs className="no-print" value={tab} onChange={(_, v: TabId) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ borderBottom: '1px solid #E5E7EB', mb: 2 }}>
+        <Tab value="prep" label={`Kitchen Prep${data ? ` (${cookedCount})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab value="stickers" label={`Stickers${data ? ` (${data.stickers.length})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab value="days" label="Day totals" sx={{ textTransform: 'none', fontWeight: 600 }} />
+      </Tabs>
+
       {loading && (
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '400px',
-          }}
-        >
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />
         </Box>
       )}
 
-      {/* Report Content */}
-      {!loading && reportData && (
-        <Box>
-          {/* Section 1: Item-wise Totals */}
-          <Box sx={{ marginBottom: 4 }}>
-            <Typography
-              variant="h6"
-              sx={{
-                fontSize: '17px',
-                fontWeight: 600,
-                marginBottom: 2,
-                color: '#111827',
-              }}
-            >
-              Item-wise Totals
-            </Typography>
-
-            {(!reportData.itemWiseTotals || reportData.itemWiseTotals.length === 0) ? (
-              <Box
-                sx={{
-                  textAlign: 'center',
-                  padding: 4,
-                  backgroundColor: '#fff',
-                  borderRadius: 2,
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                }}
-              >
-                <Typography variant="body1" sx={{ color: '#6B7280' }}>
-                  No items found for the selected date range
-                </Typography>
-              </Box>
-            ) : (
-              <TableContainer
-                component={Paper}
-                sx={{
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                }}
-              >
-                <Table>
-                  <TableHead>
-                    <TableRow sx={{ backgroundColor: '#f9fafb' }}>
-                      <TableCell
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          color: '#374151',
-                          borderBottom: '2px solid #e5e7eb',
-                        }}
-                      >
-                        Food Item
-                      </TableCell>
-                      <TableCell
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          color: '#374151',
-                          borderBottom: '2px solid #e5e7eb',
-                        }}
-                      >
-                        Spice Level
-                      </TableCell>
-                      <TableCell
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          color: '#374151',
-                          borderBottom: '2px solid #e5e7eb',
-                        }}
-                        align="right"
-                      >
-                        Total Quantity
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {reportData.itemWiseTotals?.map((item, index) => (
-                      <TableRow
-                        key={`${item.itemName}-${item.spiceLevel}-${index}`}
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: '#f9fafb',
-                          },
-                        }}
-                      >
-                        <TableCell
-                          sx={{
-                            fontSize: '14px',
-                            color: '#111827',
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                        >
-                          {item.itemName}
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontSize: '14px',
-                            color: '#6B7280',
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                        >
-                          {item.spiceLevel || 'N/A'}
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontSize: '14px',
-                            color: '#111827',
-                            fontWeight: 600,
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                          align="right"
-                        >
-                          {item.totalQuantity}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Box>
-
-          {/* Section 2: Order-wise Details */}
-          <Box>
-            <Typography
-              variant="h6"
-              sx={{
-                fontSize: '17px',
-                fontWeight: 600,
-                marginBottom: 2,
-                color: '#111827',
-              }}
-            >
-              Order-wise Details
-            </Typography>
-
-            {(!reportData.orderWiseDetails || reportData.orderWiseDetails.length === 0) ? (
-              <Box
-                sx={{
-                  textAlign: 'center',
-                  padding: 4,
-                  backgroundColor: '#fff',
-                  borderRadius: 2,
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                }}
-              >
-                <Typography variant="body1" sx={{ color: '#6B7280' }}>
-                  No orders found for the selected date range
-                </Typography>
-              </Box>
-            ) : (
-              <TableContainer
-                component={Paper}
-                sx={{
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                }}
-              >
-                <Table>
-                  <TableHead>
-                    <TableRow sx={{ backgroundColor: '#f9fafb' }}>
-                      <TableCell
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          color: '#374151',
-                          borderBottom: '2px solid #e5e7eb',
-                        }}
-                      >
-                        Order ID
-                      </TableCell>
-                      <TableCell
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          color: '#374151',
-                          borderBottom: '2px solid #e5e7eb',
-                        }}
-                      >
-                        Customer Name
-                      </TableCell>
-                      <TableCell
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          color: '#374151',
-                          borderBottom: '2px solid #e5e7eb',
-                        }}
-                      >
-                        Items
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {reportData.orderWiseDetails?.map((order) => (
-                      <TableRow
-                        key={order.orderId}
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: '#f9fafb',
-                          },
-                        }}
-                      >
-                        <TableCell
-                          sx={{
-                            fontSize: '14px',
-                            color: '#111827',
-                            fontWeight: 500,
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                        >
-                          {order.orderId}
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontSize: '14px',
-                            color: '#6B7280',
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                        >
-                          {order.customerName}
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            fontSize: '14px',
-                            color: '#111827',
-                            borderBottom: '1px solid #f3f4f6',
-                          }}
-                        >
-                          {order.items.map((item, idx) => (
-                            <Box
-                              key={idx}
-                              sx={{
-                                marginBottom: idx < order.items.length - 1 ? 1 : 0,
-                                paddingBottom: idx < order.items.length - 1 ? 1 : 0,
-                                borderBottom:
-                                  idx < order.items.length - 1 ? '1px dashed #e5e7eb' : 'none',
-                              }}
-                            >
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 500, color: '#111827' }}
-                              >
-                                {item.name} × {item.quantity}
-                              </Typography>
-                              {item.spiceLevel && (
-                                <Typography
-                                  variant="caption"
-                                  sx={{ color: '#6B7280', fontSize: '12px' }}
-                                >
-                                  Spice: {item.spiceLevel}
-                                </Typography>
-                              )}
-                            </Box>
-                          ))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Box>
-        </Box>
+      {!loading && data && tab === 'prep' && (
+        <>
+          {notSetCount > 0 && (
+            <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
+              {notSetCount} item{notSetCount === 1 ? ' has' : 's have'} no preparation type yet ({data.notSet.map((b) => b.name).join(', ')}). They are listed at the end. Set Cooked or Ready to eat in Food Items so they go to the right list.
+            </Alert>
+          )}
+          {cookedCount === 0 && notSetCount === 0 && <Typography sx={{ color: '#9CA3AF', py: 3 }}>Nothing to cook for these days.</Typography>}
+          {data.cooked.map((block) => (
+            <PrepCard key={block.name} block={block} showDay={multiDay} />
+          ))}
+          {notSetCount > 0 && (
+            <>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mt: 3, mb: 1 }}>Preparation type not set yet</Typography>
+              {data.notSet.map((block) => (
+                <PrepCard key={`notset-${block.name}`} block={block} showDay={multiDay} warn />
+              ))}
+            </>
+          )}
+        </>
       )}
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={hideSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert onClose={hideSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-
-      {/* CSS for spin animation */}
-      <style jsx global>{`
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
+      {!loading && data && tab === 'stickers' && <StickersTab stickers={data.stickers} />}
+      {!loading && data && tab === 'days' && <DayTotalsTab days={data.days} />}
     </Box>
   );
 }

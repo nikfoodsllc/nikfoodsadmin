@@ -108,6 +108,8 @@ export interface KitchenRow {
   orderId: string;
   day: string; // the menu day the item belongs to, 'YYYY-MM-DD'
   name: string;
+  /** The food item's id, to look up how it is prepared (cooked or ready to eat). */
+  foodId?: string | null;
   quantity: number;
   portion?: string | null;
   spiceLevel?: string | null;
@@ -116,7 +118,7 @@ export interface KitchenRow {
   sections?: Array<{
     _id?: string;
     title?: string;
-    selectedItems?: Array<{ _id?: string; portion?: string | null; item?: { name?: string } | null }>;
+    selectedItems?: Array<{ _id?: string; portion?: string | null; item?: { _id?: string; name?: string } | null }>;
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
@@ -274,16 +276,17 @@ function toSpiceLines(map: Map<string, number>): CountLine[] {
 }
 
 /** The picked options of a combo line, as name + portion. Unknown ids are skipped. */
-export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null }> {
+export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; id?: string }> {
   if (!row.sections?.length || !row.comboSelections) return [];
-  const parts: Array<{ name: string; portion: string | null }> = [];
+  const parts: Array<{ name: string; portion: string | null; id?: string }> = [];
   for (const section of row.sections) {
     const picked = (section._id && row.comboSelections[section._id]) || [];
     for (const id of picked) {
       const option = section.selectedItems?.find((si) => si._id === id);
       const name = clean(option?.item?.name);
       if (!name) continue;
-      parts.push({ name, portion: clean(option?.portion) || null });
+      const foodId = option?.item?._id ? String(option.item._id) : '';
+      parts.push(foodId ? { name, portion: clean(option?.portion) || null, id: foodId } : { name, portion: clean(option?.portion) || null });
     }
   }
   return parts;
@@ -546,7 +549,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
 }
 
 /** The food amount of an order line as text ('32 oz (2 lb)'), '' without a readable size. */
-function amountTextOf(portion: string | null | undefined, quantity: number): string {
+export function amountTextOf(portion: string | null | undefined, quantity: number): string {
   const size = parsePortionAmount(portion);
   if (!size) return '';
   const total = emptyAmount();
