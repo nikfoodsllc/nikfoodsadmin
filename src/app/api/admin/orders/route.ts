@@ -79,11 +79,13 @@ export async function GET(request: NextRequest) {
     const filter: any = {};
 
     // Search by order ID, customer name, or email
-    if (search) {
+    if (search.trim()) {
+      // typed text is matched as plain text: ( + [ and the like must not be read as pattern characters
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { orderId: { $regex: search, $options: 'i' } },
-        { 'customerInfo.name': { $regex: search, $options: 'i' } },
-        { 'customerInfo.email': { $regex: search, $options: 'i' } },
+        { orderId: { $regex: escaped, $options: 'i' } },
+        { 'customerInfo.name': { $regex: escaped, $options: 'i' } },
+        { 'customerInfo.email': { $regex: escaped, $options: 'i' } },
       ];
     }
 

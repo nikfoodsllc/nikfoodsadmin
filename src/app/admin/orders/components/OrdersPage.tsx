@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -37,7 +37,12 @@ export default function OrdersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Filters and pagination
+  // what is typed in the search box, and what the table is actually filtered by (it follows the box after a short pause)
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // every request gets a number; only the newest one may update the table (a slow earlier answer must never replace it)
+  const fetchSeq = useRef(0);
+  const fetchAbort = useRef<AbortController | null>(null);
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('all');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
@@ -51,6 +56,17 @@ export default function OrdersPage() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | ''>('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  // Search while typing: wait for a short pause instead of asking the server for every letter
+  useEffect(() => {
+    if (searchInput === searchQuery) return;
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+      setCurrentPage(1);
+      setSelectedOrderIds(new Set());
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchInput, searchQuery]);
   const itemsPerPage = 100;
 
   // Column order, widths and hidden columns, saved to this admin's account
@@ -97,6 +113,10 @@ export default function OrdersPage() {
 
   // Fetch orders with filters
   const fetchOrders = useCallback(async () => {
+    const seq = ++fetchSeq.current;
+    fetchAbort.current?.abort();
+    const controller = new AbortController();
+    fetchAbort.current = controller;
     try {
       setLoading(true);
       if (!token) {
@@ -120,6 +140,7 @@ export default function OrdersPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -127,6 +148,7 @@ export default function OrdersPage() {
       }
 
       const data = await response.json();
+      if (seq !== fetchSeq.current) return; // a newer search replaced this one
       const nextOrders = data.data?.items || [];
       setOrders(nextOrders);
       setTotalOrders(data.data?.total || 0);
@@ -145,10 +167,11 @@ export default function OrdersPage() {
         return nextSelected;
       });
     } catch (error) {
+      if (controller.signal.aborted || seq !== fetchSeq.current) return; // cancelled because a newer search started
       console.error('Error fetching orders:', error);
       showSnackbar('Failed to load orders', 'error');
     } finally {
-      setLoading(false);
+      if (seq === fetchSeq.current) setLoading(false);
     }
   }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, startDate, endDate, sortBy, currentPage, token]);
 
@@ -213,9 +236,7 @@ export default function OrdersPage() {
   };
 
   const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
-    setSelectedOrderIds(new Set());
+    setSearchInput(value);
   };
 
   const handleStatusChange = (value: string) => {
@@ -261,6 +282,7 @@ export default function OrdersPage() {
   };
 
   const handleClearFilters = () => {
+    setSearchInput('');
     setSearchQuery('');
     setSelectedStatus('all');
     setSelectedPaymentStatus('all');
@@ -502,7 +524,7 @@ export default function OrdersPage() {
       {/* Filters */}
       <Box sx={{ marginBottom: 3 }}>
         <OrderFilters
-          searchValue={searchQuery}
+          searchValue={searchInput}
           selectedStatus={selectedStatus}
           selectedPaymentStatus={selectedPaymentStatus}
           selectedPaymentMethod={selectedPaymentMethod}
