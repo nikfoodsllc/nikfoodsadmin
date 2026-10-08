@@ -16,6 +16,7 @@ import {
   comboParts,
   emptyAmount,
   formatAmount,
+  matchesSearch,
   parsePortionAmount,
   sizeRank,
   spiceRank,
@@ -255,4 +256,40 @@ export function stickersCsvRows(stickers: StickerLine[]): string[][] {
 export function toCsvText(rows: string[][]): string {
   const cell = (value: string) => escapeCSVValue(/^[=+\-@]/.test(value) ? `'${value}` : value);
   return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+}
+
+// ---------------------------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Keeps the item cards that match a search: by the item's name (then every line stays), or by a customer, the order
+ * number or the combo a line came with (then only those lines stay). An empty query keeps everything.
+ */
+export function filterBlocksBySearch(blocks: PrepBlock[], query: string): PrepBlock[] {
+  if (!query.trim()) return blocks;
+  const out: PrepBlock[] = [];
+  for (const block of blocks) {
+    if (matchesSearch(block.name, query)) {
+      out.push(block);
+      continue;
+    }
+    const lines = block.lines.filter((l) => matchesSearch(`${l.customerName} ${l.orderId} ${l.viaCombo ?? ''}`, query));
+    if (lines.length > 0) out.push({ ...block, lines, quantity: lines.reduce((s, l) => s + l.quantity, 0), eco: lines.filter((l) => l.isEco).reduce((s, l) => s + l.quantity, 0), totalText: sumText(lines), unsized: 0 });
+  }
+  return out;
+}
+
+export function filterStickersBySearch(stickers: StickerLine[], query: string): StickerLine[] {
+  if (!query.trim()) return stickers;
+  return stickers.filter((s) => matchesSearch(`${s.item} ${s.customerName} ${s.orderId} ${s.viaCombo ?? ''}`, query));
+}
+
+function sumText(lines: PrepLine[]): string {
+  const amount = emptyAmount();
+  for (const line of lines) {
+    const size = parsePortionAmount(line.portion);
+    if (size) addAmount(amount, size, line.quantity);
+  }
+  return formatAmount(amount);
 }

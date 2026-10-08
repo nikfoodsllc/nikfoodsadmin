@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { blockTotal, buildKitchenReport, prepCsvRows, stickersCsvRows, toCsvText, type TypeLookup } from './kitchenReport';
+import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, prepCsvRows, stickersCsvRows, toCsvText, type TypeLookup } from './kitchenReport';
 import type { KitchenRow } from './kitchenDashboard';
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
@@ -139,5 +139,36 @@ describe('the three dates of a line', () => {
     const r = buildKitchenReport([row({ orderedOn: null })], byName);
     expect(r.cooked[0].lines[0].orderedOn).toBeNull();
     expect(prepCsvRows(r.cooked)[1].slice(10)).toEqual(['', '2026-10-13', '2026-10-13']);
+  });
+});
+
+describe('report search', () => {
+  const report = buildKitchenReport([
+    row({ orderId: 'ORD-11', customerName: 'Asha Rao', portion: '12Oz', quantity: 2, isEco: true }),
+    row({ orderId: 'ORD-22', customerName: 'Beena Shah', portion: '8Oz' }),
+    row({ orderId: 'ORD-33', name: 'Pickle', customerName: 'Asha Rao', portion: '16Oz' }),
+    row({ orderId: 'ORD-44', ...combo, customerName: 'Dev Patel' }),
+  ], byName);
+  it('an item name keeps the whole card', () => {
+    const out = filterBlocksBySearch(report.cooked, 'rajma');
+    expect(out.map((b) => b.name)).toEqual(['Rajma']); expect(out[0].lines).toHaveLength(2); expect(out[0].quantity).toBe(3);
+  });
+  it('a customer keeps only that customer lines and recounts the card', () => {
+    const out = filterBlocksBySearch(report.cooked, 'beena');
+    expect(out.map((b) => b.name)).toEqual(['Rajma']);
+    expect(out[0].lines.map((l) => l.customerName)).toEqual(['Beena Shah']);
+    expect(out[0].quantity).toBe(1); expect(out[0].eco).toBe(0); expect(out[0].totalText).toBe('8 oz (0.5 lb)');
+  });
+  it('an order number and a combo name find their lines', () => {
+    expect(filterBlocksBySearch(report.cooked, 'ord-22')[0].lines).toHaveLength(1);
+    expect(filterBlocksBySearch(report.cooked, 'veg combo').map((b) => b.name)).toEqual(['Chapati', 'Kale Chane']);
+  });
+  it('stickers by item, customer or order; nothing matched is empty; empty search keeps all', () => {
+    expect(filterStickersBySearch(report.stickers, 'asha')).toHaveLength(1);
+    expect(filterStickersBySearch(report.stickers, 'pickle')).toHaveLength(1);
+    expect(filterStickersBySearch(report.stickers, 'nobody')).toEqual([]);
+    expect(filterStickersBySearch(report.stickers, '')).toBe(report.stickers);
+    expect(filterBlocksBySearch(report.cooked, '')).toBe(report.cooked);
+    expect(filterBlocksBySearch(report.cooked, 'zzzz')).toEqual([]);
   });
 });

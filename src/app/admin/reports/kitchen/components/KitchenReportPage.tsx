@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
-import { IconDownload, IconPrinter, IconRefresh, IconTruckDelivery } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
+import { IconDownload, IconPrinter, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { formatPSTDateISO } from '@/utils/timezone';
 import {
   addDays,
   deliveryNote,
+  filterBlockBySearch,
   formatDayShort,
   formatRangeLabel,
   getPresetRange,
@@ -20,6 +21,8 @@ import {
 } from '@/utils/kitchenDashboard';
 import {
   blockTotal,
+  filterBlocksBySearch,
+  filterStickersBySearch,
   prepCsvRows,
   stickersCsvRows,
   toCsvText,
@@ -122,7 +125,7 @@ function PrepCard({ block, warn }: { block: PrepBlock; warn?: boolean }) {
   );
 }
 
-function StickersTab({ stickers }: { stickers: StickerLine[] }) {
+function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searching: boolean }) {
   const groups = useMemo(() => {
     const map = new Map<string, StickerLine[]>();
     for (const s of stickers) {
@@ -131,7 +134,7 @@ function StickersTab({ stickers }: { stickers: StickerLine[] }) {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [stickers]);
-  if (stickers.length === 0) return <Typography sx={{ color: '#9CA3AF', py: 3 }}>No ready-to-eat items for these days.</Typography>;
+  if (stickers.length === 0) return <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? 'No sticker matches your search.' : 'No ready-to-eat items for these days.'}</Typography>;
   return (
     <>
       {groups.map(([day, list]) => (
@@ -163,9 +166,9 @@ function StickersTab({ stickers }: { stickers: StickerLine[] }) {
   );
 }
 
-function DayTotalsTab({ days }: { days: KitchenDay[] }) {
+function DayTotalsTab({ days, searching }: { days: KitchenDay[]; searching: boolean }) {
   const filled = days.filter((d) => d.items.length > 0 || d.combos.length > 0);
-  if (filled.length === 0) return <Typography sx={{ color: '#9CA3AF', py: 3 }}>Nothing ordered for these days.</Typography>;
+  if (filled.length === 0) return <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? 'No item matches your search.' : 'Nothing ordered for these days.'}</Typography>;
   return (
     <>
       {filled.map((day) => (
@@ -213,6 +216,8 @@ export default function KitchenReportPage() {
   const [custom, setCustom] = useState<DayRange>({ startDate: today, endDate: addDays(today, 1) });
   const [customApplied, setCustomApplied] = useState<DayRange | null>(null);
   const [tab, setTab] = useState<TabId>('prep');
+  // search: an item, a customer, an order number or a combo
+  const [search, setSearch] = useState('');
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -256,6 +261,14 @@ export default function KitchenReportPage() {
     if (!authLoading && !isAuthenticated) router.push('/login');
   }, [authLoading, isAuthenticated, router]);
 
+  const searching = search.trim().length > 0;
+  const cooked = useMemo(() => (data ? filterBlocksBySearch(data.cooked, search) : []), [data, search]);
+  const notSet = useMemo(() => (data ? filterBlocksBySearch(data.notSet, search) : []), [data, search]);
+  const stickers = useMemo(() => (data ? filterStickersBySearch(data.stickers, search) : []), [data, search]);
+  const dayBlocks = useMemo(() => (data ? data.days.map((d) => (searching ? filterBlockBySearch(d, search) : d)) : []), [data, search, searching]);
+  const cookedCount = cooked.length;
+  const notSetCount = notSet.length;
+
   if (authLoading || !isAuthenticated) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -265,17 +278,15 @@ export default function KitchenReportPage() {
   }
 
   const customProblem = preset === 'custom' ? validateRange(custom) : null;
-  const cookedCount = data?.cooked.length ?? 0;
-  const notSetCount = data?.notSet.length ?? 0;
 
   const download = () => {
     if (!data || !range) return;
     const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
-    if (tab === 'prep') downloadCSV(toCsvText(prepCsvRows([...data.cooked, ...data.notSet])), `kitchen-prep-${label}.csv`);
-    else if (tab === 'stickers') downloadCSV(toCsvText(stickersCsvRows(data.stickers)), `stickers-${label}.csv`);
+    if (tab === 'prep') downloadCSV(toCsvText(prepCsvRows([...cooked, ...notSet])), `kitchen-prep-${label}.csv`);
+    else if (tab === 'stickers') downloadCSV(toCsvText(stickersCsvRows(stickers)), `stickers-${label}.csv`);
     else {
       const rows: string[][] = [['Day', 'Item', 'Quantity', 'Total amount', 'Delivered later']];
-      for (const d of data.days) {
+      for (const d of dayBlocks) {
         for (const i of d.items) rows.push([d.day, i.name, String(i.quantity), i.totalText, deliveryNote(i.deliveries, i.quantity)]);
         for (const c of d.combos) rows.push([d.day, `${c.name} (combo)`, String(c.quantity), '', deliveryNote(c.deliveries, c.quantity)]);
       }
@@ -341,16 +352,41 @@ export default function KitchenReportPage() {
       {range && (
         <Typography sx={{ fontSize: 14, color: '#374151', fontWeight: 600, mb: 1.5 }}>
           {formatRangeLabel(range)}
-          {data && !loading ? ` · ${cookedCount} item${cookedCount === 1 ? '' : 's'} to cook · ${data.stickers.length} sticker${data.stickers.length === 1 ? '' : 's'}` : ''}
+          {data && !loading ? ` · ${cookedCount} item${cookedCount === 1 ? '' : 's'} to cook · ${stickers.length} sticker${stickers.length === 1 ? '' : 's'}` : ''}
         </Typography>
       )}
       {preset === 'custom' && !range && <Typography sx={{ color: '#6B7280', mb: 2 }}>Pick the dates and press Show.</Typography>}
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      <TextField
+        className="no-print"
+        size="small"
+        fullWidth
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search an item, customer or order number"
+        inputProps={{ 'aria-label': 'Search the report' }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <IconSearch size={18} />
+            </InputAdornment>
+          ),
+          endAdornment: searching ? (
+            <InputAdornment position="end">
+              <IconButton size="small" aria-label="Clear the search" onClick={() => setSearch('')}>
+                <IconX size={16} />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
+        }}
+        sx={{ maxWidth: 520, mb: 1.5, bgcolor: '#fff' }}
+      />
+
       <Tabs className="no-print" value={tab} onChange={(_, v: TabId) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ borderBottom: '1px solid #E5E7EB', mb: 2 }}>
         <Tab value="prep" label={`Kitchen Prep${data ? ` (${cookedCount})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
-        <Tab value="stickers" label={`Stickers${data ? ` (${data.stickers.length})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab value="stickers" label={`Stickers${data ? ` (${stickers.length})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
         <Tab value="days" label="Day totals" sx={{ textTransform: 'none', fontWeight: 600 }} />
       </Tabs>
 
@@ -364,25 +400,27 @@ export default function KitchenReportPage() {
         <>
           {notSetCount > 0 && (
             <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
-              {notSetCount} item{notSetCount === 1 ? ' has' : 's have'} no preparation type yet ({data.notSet.map((b) => b.name).join(', ')}). They are listed at the end. Set Cooked or Ready to eat in Food Items so they go to the right list.
+              {notSetCount} item{notSetCount === 1 ? ' has' : 's have'} no preparation type yet ({notSet.map((b) => b.name).join(', ')}). They are listed at the end. Set Cooked or Ready to eat in Food Items so they go to the right list.
             </Alert>
           )}
-          {cookedCount === 0 && notSetCount === 0 && <Typography sx={{ color: '#9CA3AF', py: 3 }}>Nothing to cook for these days.</Typography>}
-          {data.cooked.map((block) => (
+          {cookedCount === 0 && notSetCount === 0 && (
+            <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? `Nothing matches “${search.trim()}”.` : 'Nothing to cook for these days.'}</Typography>
+          )}
+          {cooked.map((block) => (
             <PrepCard key={block.name} block={block} />
           ))}
           {notSetCount > 0 && (
             <>
               <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mt: 3, mb: 1 }}>Preparation type not set yet</Typography>
-              {data.notSet.map((block) => (
+              {notSet.map((block) => (
                 <PrepCard key={`notset-${block.name}`} block={block} warn />
               ))}
             </>
           )}
         </>
       )}
-      {!loading && data && tab === 'stickers' && <StickersTab stickers={data.stickers} />}
-      {!loading && data && tab === 'days' && <DayTotalsTab days={data.days} />}
+      {!loading && data && tab === 'stickers' && <StickersTab stickers={stickers} searching={searching} />}
+      {!loading && data && tab === 'days' && <DayTotalsTab days={dayBlocks} searching={searching} />}
     </Box>
   );
 }
