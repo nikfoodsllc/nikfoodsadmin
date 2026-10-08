@@ -21,7 +21,7 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { IconX, IconMapPin, IconPhone, IconMail, IconEye } from '@tabler/icons-react';
+import { IconX, IconMapPin, IconPhone, IconMail, IconEye, IconEdit, IconPlus } from '@tabler/icons-react';
 import { UserWithAddresses } from '@/types/user';
 import { Order } from '@/types/order';
 import StatusBadge from '../../orders/components/StatusBadge';
@@ -29,14 +29,19 @@ import OrderDetailsDialog from '../../orders/components/OrderDetailsDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDate } from '@/utils/timezone';
+import { AddressEditor, ProfileEditor } from './UserEditSections';
 
 interface UserDetailsDialogProps {
   open: boolean;
   user: UserWithAddresses | null;
   onClose: () => void;
+  /** Open straight in edit mode (the pencil in the users table) */
+  startEditing?: boolean;
+  /** Called after something was saved, so the list (and this dialog) show the new values */
+  onChanged?: () => void;
 }
 
-export default function UserDetailsDialog({ open, user, onClose }: UserDetailsDialogProps) {
+export default function UserDetailsDialog({ open, user, onClose, startEditing, onChanged }: UserDetailsDialogProps) {
   const router = useRouter();
   const { token, loading: authLoading, isAuthenticated } = useAuth();
 
@@ -46,6 +51,23 @@ export default function UserDetailsDialog({ open, user, onClose }: UserDetailsDi
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  // editing: the customer's own details, one address (by id), or a new address
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<string | 'new' | null>(null);
+  const userKey = user?._id ? String(user._id) : '';
+
+  // every time the dialog opens for a customer it starts in view mode (or edit mode when asked)
+  useEffect(() => {
+    if (!open) return;
+    setEditingProfile(Boolean(startEditing));
+    setEditingAddress(null);
+  }, [open, userKey, startEditing]);
+
+  const saved = () => {
+    setEditingProfile(false);
+    setEditingAddress(null);
+    onChanged?.();
+  };
 
   // Fetch user orders when dialog opens
   useEffect(() => {
@@ -174,10 +196,22 @@ export default function UserDetailsDialog({ open, user, onClose }: UserDetailsDi
         <DialogContent sx={{ paddingX: 3, paddingY: 3 }}>
           {/* User Information */}
           <Box sx={{ marginBottom: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}>
-              User Information
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
+                User Information
+              </Typography>
+              {!editingProfile && (
+                <Button size="small" startIcon={<IconEdit size={14} />} onClick={() => setEditingProfile(true)} sx={{ textTransform: 'none', color: '#4F8CFF' }}>
+                  Edit details
+                </Button>
+              )}
+            </Box>
+            {editingProfile && token && (
+              <Box sx={{ marginBottom: 2 }}>
+                <ProfileEditor key={userKey} user={user} token={token} onSaved={saved} onCancel={() => setEditingProfile(false)} />
+              </Box>
+            )}
+            <Box sx={{ display: editingProfile ? 'none' : 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
               <Box>
                 <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
                   Name
@@ -259,16 +293,31 @@ export default function UserDetailsDialog({ open, user, onClose }: UserDetailsDi
 
           {/* Addresses */}
           <Box sx={{ marginBottom: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}>
-              Addresses ({user.addresses?.length || 0})
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
+                Addresses ({user.addresses?.length || 0})
+              </Typography>
+              {editingAddress === null && (
+                <Button size="small" startIcon={<IconPlus size={14} />} onClick={() => setEditingAddress('new')} sx={{ textTransform: 'none', color: '#4F8CFF' }}>
+                  Add address
+                </Button>
+              )}
+            </Box>
+            {editingAddress === 'new' && token && (
+              <Box sx={{ marginBottom: 1.5 }}>
+                <AddressEditor user={user} token={token} onSaved={saved} onCancel={() => setEditingAddress(null)} />
+              </Box>
+            )}
             {!user.addresses || user.addresses.length === 0 ? (
               <Typography variant="body2" sx={{ color: '#6B7280', fontStyle: 'italic' }}>
                 No addresses saved
               </Typography>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {user.addresses.map((address, index) => (
+                {user.addresses.map((address, index) =>
+                  editingAddress !== null && editingAddress === String(address._id) && token ? (
+                    <AddressEditor key={String(address._id)} user={user} address={address} token={token} onSaved={saved} onCancel={() => setEditingAddress(null)} />
+                  ) : (
                   <Paper
                     key={address._id?.toString() || index}
                     elevation={0}
@@ -282,9 +331,21 @@ export default function UserDetailsDialog({ open, user, onClose }: UserDetailsDi
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                       <IconMapPin size={16} color="#4F8CFF" style={{ marginTop: 2 }} />
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: 0.5 }}>
-                          {address.name}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, marginBottom: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {address.name}
+                            </Typography>
+                            {(address as { isDefault?: boolean }).isDefault && (
+                              <Chip label="Default" size="small" sx={{ height: 18, fontSize: '10px', fontWeight: 600, backgroundColor: '#D1FAE5', color: '#10B981' }} />
+                            )}
+                          </Box>
+                          {editingAddress === null && (
+                            <Button size="small" startIcon={<IconEdit size={13} />} onClick={() => setEditingAddress(String(address._id))} sx={{ textTransform: 'none', fontSize: '12px', color: '#4F8CFF', minWidth: 0 }}>
+                              Edit
+                            </Button>
+                          )}
+                        </Box>
                         <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px', lineHeight: 1.6 }}>
                           {address.street_address}
                           {address.apartment && `, Apt ${address.apartment}`}
@@ -319,7 +380,8 @@ export default function UserDetailsDialog({ open, user, onClose }: UserDetailsDi
                       </Box>
                     </Box>
                   </Paper>
-                ))}
+                  )
+                )}
               </Box>
             )}
           </Box>

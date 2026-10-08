@@ -13,12 +13,12 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  TextField,
 } from '@mui/material';
-import { IconX } from '@tabler/icons-react';
+import { IconDownload } from '@tabler/icons-react';
 import UsersTable from './UsersTable';
 import SearchBar from './SearchBar';
 import UserDetailsDialog from './UserDetailsDialog';
+import ExportCustomersDialog from './ExportCustomersDialog';
 import TablePagination from '../../food-items/components/TablePagination';
 import { UserWithAddresses } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,22 +31,18 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<UserWithAddresses | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserWithAddresses | null>(null);
+  // the details dialog can open straight in edit mode (the pencil in the table)
+  const [startEditing, setStartEditing] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithAddresses | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-  });
 
   // Filters and pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
-  const itemsPerPage = 10;
+  const itemsPerPage = 100;
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -104,6 +100,20 @@ export default function UsersPage() {
     }
   }, [token, isAuthenticated, router, searchQuery, currentPage]);
 
+  // Fetch users when filters change
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // after a save the list is reloaded: show the saved values in the open dialog
+  useEffect(() => {
+    setSelectedUser((cur) => {
+      if (!cur?._id) return cur;
+      const id = String(cur._id);
+      return users.find((u) => String(u._id) === id) ?? cur;
+    });
+  }, [users]);
+
   // Show loading spinner while auth is initializing
   if (authLoading) {
     return (
@@ -126,12 +136,8 @@ export default function UsersPage() {
     return null;
   }
 
-  // Fetch users when filters change
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
   const handleViewDetails = (user: UserWithAddresses) => {
+    setStartEditing(false);
     setSelectedUser(user);
     setDialogOpen(true);
   };
@@ -139,6 +145,7 @@ export default function UsersPage() {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setSelectedUser(null);
+    setStartEditing(false);
   };
 
   const getUserId = (user: UserWithAddresses): string => {
@@ -147,13 +154,9 @@ export default function UsersPage() {
   };
 
   const handleEditUser = (user: UserWithAddresses) => {
-    setEditingUser(user);
-    setEditForm({
-      name: user.name || '',
-      email: user.email || '',
-      phone: user.phone || '',
-    });
-    setEditDialogOpen(true);
+    setStartEditing(true);
+    setSelectedUser(user);
+    setDialogOpen(true);
   };
 
   const handleDeleteUser = (user: UserWithAddresses) => {
@@ -161,57 +164,10 @@ export default function UsersPage() {
     setDeleteDialogOpen(true);
   };
 
-  const handleEditDialogClose = () => {
-    if (actionLoading) return;
-    setEditDialogOpen(false);
-    setEditingUser(null);
-    setEditForm({ name: '', email: '', phone: '' });
-  };
-
   const handleDeleteDialogClose = () => {
     if (actionLoading) return;
     setDeleteDialogOpen(false);
     setUserToDelete(null);
-  };
-
-  const handleUpdateUser = async () => {
-    if (!editingUser) return;
-
-    const userId = getUserId(editingUser);
-    if (!userId) {
-      showSnackbar('Invalid user ID', 'error');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: editForm.name.trim() || null,
-          email: editForm.email.trim(),
-          phone: editForm.phone.trim() || null,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update user');
-      }
-
-      showSnackbar('User updated successfully');
-      handleEditDialogClose();
-      await fetchUsers();
-    } catch (error) {
-      console.error('Error updating user:', error);
-      showSnackbar(error instanceof Error ? error.message : 'Failed to update user', 'error');
-    } finally {
-      setActionLoading(false);
-    }
   };
 
   const handleConfirmDeleteUser = async () => {
@@ -279,6 +235,15 @@ export default function UsersPage() {
           <Typography variant="body2" sx={{ color: '#6B7280' }}>
             Total: {totalUsers} users
           </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<IconDownload size={16} />}
+            onClick={() => setExportOpen(true)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Export CSV
+          </Button>
         </Box>
       </Box>
 
@@ -313,75 +278,12 @@ export default function UsersPage() {
       <UserDetailsDialog
         open={dialogOpen}
         user={selectedUser}
+        startEditing={startEditing}
+        onChanged={fetchUsers}
         onClose={handleDialogClose}
       />
 
-      {/* Update User Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleEditDialogClose} maxWidth="sm" fullWidth>
-        <DialogTitle
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid #E5E7EB',
-          }}
-        >
-          Update User
-          <Button
-            onClick={handleEditDialogClose}
-            sx={{
-              minWidth: 'auto',
-              padding: 0.5,
-              color: '#6B7280',
-              '&:hover': {
-                backgroundColor: '#F3F4F6',
-              },
-            }}
-          >
-            <IconX size={18} />
-          </Button>
-        </DialogTitle>
-        <DialogContent sx={{ paddingTop: 3 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 1 }}>
-            <TextField
-              label="Name"
-              value={editForm.name}
-              onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-              fullWidth
-              size="small"
-            />
-            {/* <TextField
-              label="Email"
-              type="email"
-              value={editForm.email}
-              onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
-              fullWidth
-              size="small"
-              required
-            /> */}
-            <TextField
-              label="Phone"
-              value={editForm.phone}
-              onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
-              fullWidth
-              size="small"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ padding: 2, borderTop: '1px solid #E5E7EB' }}>
-          <Button onClick={handleEditDialogClose} disabled={actionLoading} sx={{ textTransform: 'none' }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleUpdateUser}
-            disabled={actionLoading || !editForm.email.trim()}
-            sx={{ textTransform: 'none', backgroundColor: '#4F8CFF' }}
-          >
-            {actionLoading ? 'Saving...' : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ExportCustomersDialog open={exportOpen} token={token} onClose={() => setExportOpen(false)} />
 
       {/* Delete User Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteDialogClose} maxWidth="xs" fullWidth>
