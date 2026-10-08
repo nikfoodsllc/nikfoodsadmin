@@ -40,7 +40,7 @@ describe('buildKitchenReport', () => {
     expect(r.cooked.map((b) => b.name)).toEqual(['Chapati', 'Kale Chane']);
     const kale = r.cooked.find((b) => b.name === 'Kale Chane')!;
     expect(kale.quantity).toBe(2); expect(kale.totalText).toBe('24 oz (1.5 lb)');
-    expect(kale.lines[0]).toMatchObject({ viaCombo: 'Veg Combo', viaSpice: 'Medium', spice: null, customerName: 'Dev', portion: '12Oz' });
+    expect(kale.lines[0]).toMatchObject({ viaCombo: 'Veg Combo', viaSpice: 'Medium', spice: 'Medium', customerName: 'Dev', portion: '12Oz' });
     expect(r.cooked.some((b) => b.name === 'Veg Combo')).toBe(false);
   });
   it('a combo in an eco container marks every one of its parts ECO; a combo without one marks none', () => {
