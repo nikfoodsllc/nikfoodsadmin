@@ -129,6 +129,8 @@ export interface KitchenRow {
   orderStatus?: string | null;
   /** The day the order was placed (Pacific time), 'YYYY-MM-DD'. */
   orderedOn?: string | null;
+  /** Set when an admin moved this item's delivery date and the row sits on its new date: the kitchen day it was picked for. */
+  movedFrom?: string | null;
 }
 
 export interface CountLine {
