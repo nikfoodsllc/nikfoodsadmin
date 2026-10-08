@@ -14,6 +14,7 @@ import {
   formatDayShort,
   formatRangeLabel,
   getPresetRange,
+  pacificDayOf,
   shortSpiceLabel,
   validateRange,
   type DayRange,
@@ -34,12 +35,15 @@ import { buildReportSheets, rowTone, TONE_COLORS, type RowTone } from '@/utils/k
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
 type TabId = 'prep' | 'stickers' | 'days';
 
-const PRESETS: Array<{ id: Preset; label: string }> = [
-  { id: 'today', label: 'Today' },
-  { id: 'tomorrow', label: 'Tomorrow' },
-  { id: 'thisWeek', label: 'This week' },
-  { id: 'custom', label: 'Custom dates' },
-];
+/** The range buttons. The first two show the day and the date ("Thu, Oct 8"), so there is no doubt which day they mean. */
+function presetsFor(today: string): Array<{ id: Preset; label: string }> {
+  return [
+    { id: 'today', label: formatDayShort(today) },
+    { id: 'tomorrow', label: formatDayShort(addDays(today, 1)) },
+    { id: 'thisWeek', label: 'This week' },
+    { id: 'custom', label: 'Custom dates' },
+  ];
+}
 
 interface ReportData extends KitchenReport {
   startDate: string;
@@ -217,7 +221,9 @@ function DayTotalsTab({ days, searching }: { days: KitchenDay[]; searching: bool
 export default function KitchenReportPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const today = useMemo(() => formatPSTDateISO(new Date()), []);
+  // today in Pacific time, whatever time zone this browser is in
+  const today = useMemo(() => pacificDayOf(new Date()) ?? formatPSTDateISO(new Date()), []);
+  const presets = useMemo(() => presetsFor(today), [today]);
   const [preset, setPreset] = useState<Preset>('tomorrow');
   const [custom, setCustom] = useState<DayRange>({ startDate: today, endDate: addDays(today, 1) });
   const [customApplied, setCustomApplied] = useState<DayRange | null>(null);
@@ -336,7 +342,7 @@ export default function KitchenReportPage() {
 
       <Paper className="no-print" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: preset === 'custom' ? 1.5 : 0 }}>
-          {PRESETS.map((p) => (
+          {presets.map((p) => (
             <Chip
               key={p.id}
               label={p.label}
