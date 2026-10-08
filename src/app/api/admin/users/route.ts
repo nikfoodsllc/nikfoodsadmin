@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') || '10', 10) || 10));
     const skip = (page - 1) * limit;
 
     // Build filter query
@@ -56,15 +56,16 @@ export async function GET(request: NextRequest) {
       $or: [{ isActive: true }, { isActive: { $exists: false } }],
     };
 
-    // Search by name, email, or phone
+    // Search by name, email, or phone (typed text, so special characters like ( or + are matched as they are)
     if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$and = [
         { $or: [{ isActive: true }, { isActive: { $exists: false } }] },
         {
           $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { email: { $regex: search, $options: 'i' } },
-            { phone: { $regex: search, $options: 'i' } },
+            { name: { $regex: escaped, $options: 'i' } },
+            { email: { $regex: escaped, $options: 'i' } },
+            { phone: { $regex: escaped, $options: 'i' } },
           ],
         },
       ];
@@ -72,8 +73,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count for pagination
-    const countResult = await db.read<UserDocument>('users', filter);
-    const total = countResult.data?.length || 0;
+    const database = await db.getDb();
+    const total = await database.collection('users').countDocuments(filter);
 
     // Fetch paginated users (exclude password)
     const result = await db.read<UserDocument>('users', filter, {
