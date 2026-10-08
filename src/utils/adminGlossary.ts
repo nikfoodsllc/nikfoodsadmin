@@ -32,6 +32,7 @@ export const GLOSSARY_SECTIONS = [
   'Manage Days and cutoffs',
   'Abandoned Checkout',
   'Kitchen Dashboard',
+  'Kitchen Report',
   'Food Items',
 ] as const;
 
@@ -170,6 +171,12 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Kitchen Dashboard', 'Who ordered', 'Kitchen Dashboard, item dialog', 'Every order line for the item, sorted by spice level (Mild to Hot), then size (biggest first), then customer name.'),
 
   // ---- food items
+  // ---- kitchen report
+  e('Kitchen Report', 'Kitchen Prep tab', 'Reporting > Kitchen Report (BETA)', 'One card per COOKED item for the menu days you pick: the item total on top (ounces and pounds, or the number of pieces), the number of eco containers, then one line per order with the customer, spice, size, amount and ECO, and three dates: Ordered (the day the customer placed the order), Kitchen (the menu day it is cooked) and Delivery (the day it goes out; amber when that is a later day). Lines go mild to hot, biggest size first. A combo is not an item to cook: its chosen parts (curry, rice, chapati ...) are listed as their own items with "with <combo>" under the customer. Rows alternate red and white (each item starts with red) so no row is missed, and an ECO row is green. Print it, or download the Excel file: its Kitchen Prep sheet is laid out like Kunal\'s sheet (a box round each item, the item total in pounds or pieces in bold on the first row, ECO written on eco rows), plus a Stickers and a Day totals sheet; it follows the search box.', undefined, 'prep cooked report cook list print csv'),
+  e('Kitchen Report', 'Stickers tab', 'Reporting > Kitchen Report (BETA)', 'The READY TO EAT items (pickles, sweets, batters ...): one line per customer order line, grouped by delivery day, with the same three dates, so you can print a sticker for each. Only items set to Ready to eat in Food Items appear here.', undefined, 'stickers ready to eat pack label'),
+  e('Kitchen Report', 'Day totals tab', 'Reporting > Kitchen Report (BETA)', 'What to make on each menu day, like the Kitchen Dashboard: every item with its quantity and total amount. An item that goes out on a later day says "Delivered <day>".', undefined, 'totals per day'),
+  e('Kitchen Report', 'Preparation type not set yet', 'Kitchen Prep tab (amber section)', 'Items whose Preparation Type is not set in Food Items. They are kept in the report (at the end) so nothing is missing, but they are not in the cooked list or in the stickers until you set Cooked or Ready to eat.', 'warn', 'not set unclassified'),
+
   e('Food Items', 'Preparation Type: Cooked', 'Food Items table and edit dialog', 'Made fresh for the day\'s menu. It is for admin reporting only: customers never see it.', 'info'),
   e('Food Items', 'Preparation Type: Ready to eat', 'Food Items table and edit dialog', 'Already made, only packed (for example sweets or pickles). Admin reporting only.', 'info'),
   e('Food Items', '(not set yet)', 'Food Items, Preparation Type', 'Nobody has chosen Cooked or Ready to eat for this item yet.', 'none'),

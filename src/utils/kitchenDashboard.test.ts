@@ -7,7 +7,10 @@ import {
   comboChoiceLines,
   comboParts,
   deliveryNote,
+  filterBlockBySearch,
   formatAmount,
+  matchesSearch,
+  pacificDayOf,
   shortSpiceLabel,
   sizeRank,
   spiceLineText,
@@ -692,5 +695,45 @@ describe('deliveryNote', () => {
     expect(deliveryNote([], 3)).toBe('');
     expect(deliveryNote(undefined, 3)).toBe('');
     expect(deliveryNote([{ label: '2026-10-14', quantity: 0 }], 3)).toBe('');
+  });
+});
+
+describe('search', () => {
+  it('matches every word in any order, any case, ignoring accents and extra spaces', () => {
+    expect(matchesSearch('Tandoori Paneer Tikka Roll', 'paneer tik')).toBe(true);
+    expect(matchesSearch('Tandoori Paneer Tikka Roll', 'ROLL   tandoori')).toBe(true);
+    expect(matchesSearch('Crème Brûlée', 'creme brulee')).toBe(true);
+    expect(matchesSearch('Rajma', 'paneer')).toBe(false);
+    expect(matchesSearch('Rajma', 'raj chana')).toBe(false);
+  });
+  it('an empty search matches everything', () => {
+    for (const q of ['', '   ']) expect(matchesSearch('Rajma', q)).toBe(true);
+    expect(matchesSearch(null, '')).toBe(true);
+    expect(matchesSearch(null, 'x')).toBe(false);
+  });
+  const combo2 = { name: 'Veg Combo', spiceLevel: 'Medium', sections: [{ _id: 's1', title: 'Curry', selectedItems: [{ _id: 'a1', portion: '12Oz', item: { name: 'Kale Chane' } }] }], comboSelections: { s1: ['a1'] } };
+  it('keeps the matching items and combos of a day, a combo also by its parts', () => {
+    const day = buildKitchenDays([row({ name: 'Rajma' }), row({ orderId: '2', name: 'Paneer Roll' }), row({ orderId: '3', ...combo2 })], ['2026-10-07'])[0];
+    expect(filterBlockBySearch(day, 'paneer').items.map((i) => i.name)).toEqual(['Paneer Roll']);
+    expect(filterBlockBySearch(day, 'paneer').combos).toEqual([]);
+    expect(filterBlockBySearch(day, 'kale').items.map((i) => i.name)).toEqual(['Kale Chane']);
+    expect(filterBlockBySearch(day, 'kale').combos.map((c) => c.name)).toEqual(['Veg Combo']);
+    expect(filterBlockBySearch(day, '')).toBe(day);
+    expect(filterBlockBySearch(day, 'zzz').items).toEqual([]);
+  });
+});
+
+describe('pacificDayOf', () => {
+  it('is the Pacific day, not the UTC day', () => {
+    expect(pacificDayOf(new Date('2026-10-09T06:30:00Z'))).toBe('2026-10-08'); // 11:30 PM PDT on the 8th
+    expect(pacificDayOf(new Date('2026-10-09T07:00:00Z'))).toBe('2026-10-09'); // midnight PDT
+    expect(pacificDayOf('2026-10-08T19:00:00Z')).toBe('2026-10-08');
+  });
+  it('follows daylight saving', () => {
+    expect(pacificDayOf(new Date('2026-11-02T07:30:00Z'))).toBe('2026-11-01'); // PST (UTC-8): 11:30 PM on Nov 1
+    expect(pacificDayOf(new Date('2026-11-02T08:00:00Z'))).toBe('2026-11-02');
+  });
+  it('is null for anything that is not a date', () => {
+    for (const v of [null, undefined, '', 'nope', {}, NaN]) expect(pacificDayOf(v)).toBeNull();
   });
 });

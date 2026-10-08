@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Box, Chip, InputAdornment, Paper, TextField, Typography } from '@mui/material';
-import { IconSearch } from '@tabler/icons-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, InputAdornment, TextField, Typography } from '@mui/material';
+import { IconChevronDown, IconSearch } from '@tabler/icons-react';
 import { GLOSSARY, groupBySection, searchGlossary, type GlossaryTone } from '@/utils/adminGlossary';
 
 const TONES: Record<GlossaryTone, { label: string; color: string; bg: string } | null> = {
@@ -18,6 +18,16 @@ export default function UnderstandingAdminPage() {
   const [query, setQuery] = useState('');
   const found = useMemo(() => searchGlossary(GLOSSARY, query), [query]);
   const groups = useMemo(() => groupBySection(found), [found]);
+  const searching = query.trim().length > 0;
+  // the topics start closed; while searching, the ones with matches open by themselves. A topic the admin opens or
+  // closes by hand keeps that choice until the search changes.
+  const [chosen, setChosen] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setChosen({});
+  }, [query]);
+  const isOpen = (section: string) => chosen[section] ?? searching;
+  const allOpen = groups.length > 0 && groups.every((g) => isOpen(g.section));
+  const setAll = (open: boolean) => setChosen(Object.fromEntries(groups.map((g) => [g.section, open])));
 
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto', pb: 6 }}>
@@ -36,16 +46,36 @@ export default function UnderstandingAdminPage() {
         InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={18} /></InputAdornment> }}
         inputProps={{ 'aria-label': 'Search the glossary' }}
       />
-      <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 2 }}>
-        {query.trim() ? `${found.length} of ${GLOSSARY.length} entries match` : `${GLOSSARY.length} entries`}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 2 }}>
+        <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
+          {searching ? `${found.length} of ${GLOSSARY.length} entries match` : `${GLOSSARY.length} entries in ${groups.length} topics`}
+        </Typography>
+        {groups.length > 0 && (
+          <Button size="small" onClick={() => setAll(!allOpen)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </Button>
+        )}
+      </Box>
 
       {groups.length === 0 && <Typography sx={{ color: '#6B7280' }}>Nothing matches “{query}”. Try one word.</Typography>}
 
       {groups.map((group) => (
-        <Box key={group.section} sx={{ mb: 3 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: 16, mb: 1 }}>{group.section}</Typography>
-          <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden' }}>
+        <Accordion
+          key={group.section}
+          expanded={isOpen(group.section)}
+          onChange={(_, open) => setChosen((prev) => ({ ...prev, [group.section]: open }))}
+          disableGutters
+          elevation={0}
+          TransitionProps={{ unmountOnExit: true }}
+          sx={{ border: '1px solid #E5E7EB', borderRadius: '8px !important', mb: 1, overflow: 'hidden', '&:before': { display: 'none' } }}
+        >
+          <AccordionSummary expandIcon={<IconChevronDown size={18} />} sx={{ minHeight: 48, '& .MuiAccordionSummary-content': { alignItems: 'center', justifyContent: 'space-between', gap: 1, my: 1 } }}>
+            <Typography sx={{ fontWeight: 800, fontSize: 16 }}>{group.section}</Typography>
+            <Typography sx={{ fontSize: 12, color: '#6B7280', flexShrink: 0, mr: 1 }}>
+              {group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 0, borderTop: '1px solid #F3F4F6' }}>
             {group.entries.map((entry, index) => {
               const tone = TONES[entry.tone ?? 'none'];
               return (
@@ -63,8 +93,8 @@ export default function UnderstandingAdminPage() {
                 </Box>
               );
             })}
-          </Paper>
-        </Box>
+          </AccordionDetails>
+        </Accordion>
       ))}
     </Box>
   );

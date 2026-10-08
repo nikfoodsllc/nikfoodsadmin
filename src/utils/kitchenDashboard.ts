@@ -108,6 +108,8 @@ export interface KitchenRow {
   orderId: string;
   day: string; // the menu day the item belongs to, 'YYYY-MM-DD'
   name: string;
+  /** The food item's id, to look up how it is prepared (cooked or ready to eat). */
+  foodId?: string | null;
   quantity: number;
   portion?: string | null;
   spiceLevel?: string | null;
@@ -116,7 +118,7 @@ export interface KitchenRow {
   sections?: Array<{
     _id?: string;
     title?: string;
-    selectedItems?: Array<{ _id?: string; portion?: string | null; item?: { name?: string } | null }>;
+    selectedItems?: Array<{ _id?: string; portion?: string | null; item?: { _id?: string; name?: string } | null }>;
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
@@ -125,6 +127,8 @@ export interface KitchenRow {
   /** The day the items are finally delivered (it can differ from `day` when a day was combined into another). */
   deliveredOn?: string | null;
   orderStatus?: string | null;
+  /** The day the order was placed (Pacific time), 'YYYY-MM-DD'. */
+  orderedOn?: string | null;
 }
 
 export interface CountLine {
@@ -274,16 +278,17 @@ function toSpiceLines(map: Map<string, number>): CountLine[] {
 }
 
 /** The picked options of a combo line, as name + portion. Unknown ids are skipped. */
-export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null }> {
+export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; id?: string }> {
   if (!row.sections?.length || !row.comboSelections) return [];
-  const parts: Array<{ name: string; portion: string | null }> = [];
+  const parts: Array<{ name: string; portion: string | null; id?: string }> = [];
   for (const section of row.sections) {
     const picked = (section._id && row.comboSelections[section._id]) || [];
     for (const id of picked) {
       const option = section.selectedItems?.find((si) => si._id === id);
       const name = clean(option?.item?.name);
       if (!name) continue;
-      parts.push({ name, portion: clean(option?.portion) || null });
+      const foodId = option?.item?._id ? String(option.item._id) : '';
+      parts.push(foodId ? { name, portion: clean(option?.portion) || null, id: foodId } : { name, portion: clean(option?.portion) || null });
     }
   }
   return parts;
@@ -546,7 +551,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
 }
 
 /** The food amount of an order line as text ('32 oz (2 lb)'), '' without a readable size. */
-function amountTextOf(portion: string | null | undefined, quantity: number): string {
+export function amountTextOf(portion: string | null | undefined, quantity: number): string {
   const size = parsePortionAmount(portion);
   if (!size) return '';
   const total = emptyAmount();
@@ -601,4 +606,46 @@ export function toDayString(value: unknown): string | null {
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   return null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------------------------
+
+/** Lower case, accents removed, extra spaces gone, so 'Paneer  Tikka' and 'paneer tikka' compare equal. */
+function normalizeSearch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when every word of the query appears somewhere in the text (any order, any case); an empty query matches everything. */
+export function matchesSearch(text: string | null | undefined, query: string): boolean {
+  const words = normalizeSearch(query).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  const haystack = normalizeSearch(text ?? '');
+  return words.every((w) => haystack.includes(w));
+}
+
+/** A day (or the week) reduced to the items and combos that match a search; a combo also matches by the parts chosen in it. */
+export function filterBlockBySearch<T extends { items: KitchenItem[]; combos: KitchenCombo[] }>(block: T, query: string): T {
+  if (!normalizeSearch(query)) return block;
+  return {
+    ...block,
+    items: block.items.filter((i) => matchesSearch(i.name, query)),
+    combos: block.combos.filter((c) => matchesSearch(c.name, query) || c.parts.some((p) => matchesSearch(p.name, query))),
+  };
+}
+
+/**
+ * The calendar day ('YYYY-MM-DD') of a moment in Pacific time, whatever time zone the server runs in (an order placed at
+ * 11:30 PM Pacific is still that day, even though it is already the next day in UTC). Null for anything that is not a date.
+ */
+export function pacificDayOf(value: unknown): string | null {
+  const date = value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? new Date(value) : null;
+  if (!date || !Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }

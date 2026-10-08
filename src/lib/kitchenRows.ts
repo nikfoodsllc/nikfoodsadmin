@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
+import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 
 /**
  * The order lines the kitchen has to produce within a date range, one per ordered item, flattened for
@@ -30,10 +30,12 @@ export async function fetchKitchenRows(range: DayRange): Promise<KitchenRow[]> {
         _id: 0,
         orderId: 1,
         orderStatus: '$status',
+        orderedAt: '$createdAt',
         customerName: '$customerInfo.name',
         day: '$items.deliveryDate',
         deliveredOn: '$items.actualDeliveryDate',
         name: '$items.items.food.name',
+        foodId: '$items.items.food._id',
         quantity: '$items.items.quantity',
         portion: '$items.items.selectedPortion',
         spiceLevel: '$items.items.spiceLevel',
@@ -57,6 +59,7 @@ export async function fetchKitchenRows(range: DayRange): Promise<KitchenRow[]> {
       orderId: String(raw.orderId ?? ''),
       day,
       name: String(raw.name ?? ''),
+      foodId: raw.foodId ? String(raw.foodId) : null,
       quantity: Number(raw.quantity),
       portion: raw.portion ?? null,
       spiceLevel: raw.spiceLevel ?? null,
@@ -66,6 +69,7 @@ export async function fetchKitchenRows(range: DayRange): Promise<KitchenRow[]> {
       customerName: typeof raw.customerName === 'string' ? raw.customerName : null,
       deliveredOn: toDayString(raw.deliveredOn),
       orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
+      orderedOn: pacificDayOf(raw.orderedAt),
     });
   }
   return rows;
