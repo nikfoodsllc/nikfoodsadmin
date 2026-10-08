@@ -25,7 +25,7 @@ describe('buildKitchenReport', () => {
     expect(r.cooked.map((b) => b.name)).toEqual(['Rajma']);
     const b = r.cooked[0];
     expect(b.quantity).toBe(3); expect(b.totalText).toBe('32 oz (2 lb)'); expect(b.eco).toBe(2); expect(b.unsized).toBe(0);
-    expect(b.lines.map((l) => [l.customerName, l.portion, l.amountText, l.isEco])).toEqual([['Beena', '12Oz', '24 oz (1.5 lb)', true], ['Chitra', '8Oz', '8 oz (0.5 lb)', false]]);
+    expect(b.lines.map((l) => [l.customerName, l.portion, l.amountText, l.isEco])).toEqual([['Chitra', '8Oz', '8 oz (0.5 lb)', false], ['Beena', '12Oz', '24 oz (1.5 lb)', true]]);
   });
   it('an item without sizes totals as a number of pieces', () => {
     const r = buildKitchenReport([row({ name: 'Chapati', quantity: 4 }), row({ orderId: 'ORD-2', name: 'Chapati', quantity: 13, customerName: 'Beena' })], byName);
@@ -43,7 +43,7 @@ describe('buildKitchenReport', () => {
     expect(kale.lines[0]).toMatchObject({ viaCombo: 'Veg Combo', viaSpice: 'Medium', spice: null, customerName: 'Dev', portion: '12Oz' });
     expect(r.cooked.some((b) => b.name === 'Veg Combo')).toBe(false);
   });
-  it('lines go spice mild to hot (none last), biggest size first, then by customer', () => {
+  it('lines go spice mild to hot (none last), smallest size first like Kunal\'s sheet, then by customer', () => {
     const r = buildKitchenReport([
       row({ orderId: '1', customerName: 'Zed', spiceLevel: 'Hot', portion: '8Oz' }),
       row({ orderId: '2', customerName: 'Amy', spiceLevel: 'Mild', portion: '8Oz' }),
@@ -51,7 +51,7 @@ describe('buildKitchenReport', () => {
       row({ orderId: '4', customerName: 'Cat', portion: '12Oz' }),
       row({ orderId: '5', customerName: 'Abe', spiceLevel: 'Mild', portion: '8Oz' }),
     ], byName);
-    expect(r.cooked[0].lines.map((l) => l.customerName)).toEqual(['Bob', 'Abe', 'Amy', 'Zed', 'Cat']);
+    expect(r.cooked[0].lines.map((l) => l.customerName)).toEqual(['Abe', 'Amy', 'Bob', 'Zed', 'Cat']);
   });
   it('splits cooked, ready to eat and not set yet, and never drops an item', () => {
     const r = buildKitchenReport([row({ name: 'Pickle', customerName: 'Beena' }), row({ name: 'Mystery Dish' }), row({})], byName);

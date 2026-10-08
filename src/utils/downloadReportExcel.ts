@@ -1,6 +1,7 @@
 import { dateCellText, TONE_COLORS, type SheetCell, type SheetModel } from './kitchenReportSheets';
 
 const BORDER = { style: 'thin' as const, color: { argb: 'FFE5E7EB' } };
+const THICK = { style: 'medium' as const, color: { argb: 'FF000000' } };
 
 function cellValue(cell: SheetCell): string | number | Date | null {
   if (typeof cell === 'string' || typeof cell === 'number') return cell === '' ? null : cell;
@@ -20,31 +21,46 @@ export async function buildReportWorkbook(sheets: SheetModel[], title: string): 
       views: [{ state: 'frozen', ySplit: 1 }],
       pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     });
-    ws.columns = sheet.widths.map((width) => ({ width }));
+    const margin = sheet.margin ?? 0;
+    ws.columns = [...Array.from({ length: margin }, () => ({ width: 2 })), ...sheet.widths.map((width) => ({ width }))];
+    const first = margin + 1;
+    const last = margin + sheet.widths.length;
     for (const row of sheet.rows) {
-      const excelRow = ws.addRow(row.cells.map(cellValue));
+      const excelRow = ws.addRow([...Array.from({ length: margin }, () => null), ...row.cells.map(cellValue)]);
       if (row.kind === 'blank') continue;
       if (row.kind === 'section') {
-        ws.mergeCells(excelRow.number, 1, excelRow.number, sheet.widths.length);
-        excelRow.getCell(1).font = { bold: true, color: { argb: 'FF92400E' } };
-        excelRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+        ws.mergeCells(excelRow.number, first, excelRow.number, last);
+        excelRow.getCell(first).font = { bold: true, color: { argb: 'FF92400E' } };
+        excelRow.getCell(first).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
         continue;
       }
       const isHeader = row.kind === 'header';
-      for (let c = 1; c <= sheet.widths.length; c++) {
+      for (let c = first; c <= last; c++) {
         const cell = excelRow.getCell(c);
-        const source = row.cells[c - 1];
-        cell.border = { top: BORDER, left: BORDER, bottom: BORDER, right: BORDER };
-        cell.alignment = { vertical: 'top', wrapText: true };
-        if (isHeader) {
+        const source = row.cells[c - first];
+        if (row.box) {
+          // a thick outline round the whole box, no lines between the rows (like Kunal's sheet)
+          cell.border = {
+            top: row.box.top ? THICK : undefined,
+            bottom: row.box.bottom ? THICK : undefined,
+            left: c === first ? THICK : undefined,
+            right: c === last ? THICK : undefined,
+          };
+        } else {
+          cell.border = { top: BORDER, left: BORDER, bottom: BORDER, right: BORDER };
+        }
+        cell.alignment = { vertical: 'top', wrapText: true, ...(row.rightCells?.includes(c - first) ? { horizontal: 'right' as const } : {}) };
+        if (isHeader && !row.box) {
           cell.font = { bold: true, color: { argb: 'FF1A1106' } };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF89C35' } };
+        } else if (isHeader) {
+          cell.font = { bold: true };
         } else {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TONE_COLORS[row.tone ?? 'white']}` } };
-          if (row.boldCells?.includes(c - 1)) cell.font = { bold: true };
+          if (row.boldCells?.includes(c - first)) cell.font = { bold: true };
         }
         if (source && typeof source === 'object') cell.numFmt = 'ddd, mmm d';
-        else if (typeof source === 'number') cell.alignment = { vertical: 'top', horizontal: 'center' };
+        else if (typeof source === 'number' && !row.rightCells?.includes(c - first)) cell.alignment = { vertical: 'top', horizontal: 'center' };
       }
     }
   }
