@@ -131,12 +131,12 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
   return atoms;
 }
 
-/** Spice level first (mild to hot, none last), then the size biggest first, then the customer's name, then everything else so the order is stable. */
+/** Spice level first (mild to hot, none last), then the size smallest first (8, 12, 16, 32 like Kunal's sheet), then the customer's name, then everything else so the order is stable. */
 function compareLines(a: PrepLine, b: PrepLine): number {
   return (
     spiceRank(a.spice) - spiceRank(b.spice) ||
     clean(a.spice).localeCompare(clean(b.spice)) ||
-    sizeRank(b.portion) - sizeRank(a.portion) ||
+    sizeRank(a.portion) - sizeRank(b.portion) ||
     a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
     b.quantity - a.quantity ||
     a.day.localeCompare(b.day) ||
@@ -245,4 +245,21 @@ function sumText(lines: PrepLine[]): string {
     if (size) addAmount(amount, size, line.quantity);
   }
   return formatAmount(amount);
+}
+
+/**
+ * The numbers for an item's box in the Excel file, like Kunal's sheet: every line's amount in ounces and the item's total
+ * in pounds when all sizes are ounces / pounds; the number of pieces for an item without sizes; otherwise the text.
+ */
+export function sheetAmounts(block: Pick<PrepBlock, 'lines' | 'totalText' | 'quantity'>): { values: Array<number | string>; total: number | string } {
+  const sizes = block.lines.map((l) => parsePortionAmount(l.portion));
+  const round = (n: number) => Math.round(n * 100) / 100;
+  if (sizes.every((s) => s && s.oz > 0 && s.grams === 0 && s.pieces === 0)) {
+    const values = block.lines.map((l, i) => round((sizes[i] as { oz: number }).oz * l.quantity));
+    return { values, total: round(values.reduce((a, b) => a + (b as number), 0) / 16) };
+  }
+  if (sizes.every((s) => !s)) {
+    return { values: block.lines.map((l) => l.quantity), total: block.quantity };
+  }
+  return { values: block.lines.map((l) => l.amountText || l.quantity), total: blockTotal(block) };
 }
