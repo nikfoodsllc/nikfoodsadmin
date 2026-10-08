@@ -10,6 +10,7 @@ import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils
 import { formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView, type EmailTone } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
+import { rescheduleView } from '@/utils/orderReschedule';
 
 const EMAIL_TONES: Record<EmailTone, { bg: string; color: string }> = {
   good: { bg: '#DCFCE7', color: '#166534' },
@@ -42,6 +43,10 @@ export default function OrderTableRow({
   const instructionToDriver = order.address?.floor || '-';
   const emailView = orderEmailStatusView(order.emailStatus, order.emailDelivery);
   const optimoView = orderOptimoView(order.optimo);
+  const resched = rescheduleView(order);
+  const reschedTitle = resched.rescheduled
+    ? `${resched.summary}${resched.lastBy ? ` \u00b7 moved by ${resched.lastBy}` : ''}${resched.email === 'pending' ? ' \u00b7 the customer has not been emailed yet' : resched.email === 'sent' ? ' \u00b7 the customer was emailed' : ''}`
+    : 'The delivery date was never moved';
 
   const cells: Record<string, ReactNode> = {
     // Select
@@ -159,6 +164,28 @@ export default function OrderTableRow({
             )}
             {emailView.detail && (
               <Typography sx={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>{emailView.detail}</Typography>
+            )}
+          </span>
+        </Tooltip>
+      </TableCell>
+    ),
+    // Rescheduled (key rescheduled): an admin moved this order's delivery date; says whether the customer was told
+    rescheduled: (
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Tooltip title={reschedTitle} arrow>
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+            {resched.rescheduled ? (
+              <>
+                <Chip size="small" label="Rescheduled" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#FEF3C7', color: '#92400E' }} />
+                {resched.email === 'pending' && (
+                  <Typography sx={{ fontSize: '11px', color: '#B91C1C', fontWeight: 600, whiteSpace: 'nowrap' }}>Customer not told</Typography>
+                )}
+                {resched.email === 'sent' && (
+                  <Typography sx={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>Customer emailed</Typography>
+                )}
+              </>
+            ) : (
+              <Typography variant="body2" sx={{ fontSize: '13px', color: '#9CA3AF' }}>-</Typography>
             )}
           </span>
         </Tooltip>
@@ -392,10 +419,12 @@ export default function OrderTableRow({
   return (
     <MuiTableRow
       sx={{
-        backgroundColor: selected ? '#E6F0FF' : index % 2 === 0 ? '#F6FAFF' : '#fff',
+        // a moved delivery date gets a warm tint and an amber edge so these orders stand out in the list
+        backgroundColor: selected ? '#E6F0FF' : resched.rescheduled ? '#FFFBEB' : index % 2 === 0 ? '#F6FAFF' : '#fff',
+        boxShadow: resched.rescheduled ? 'inset 4px 0 0 #F59E0B' : undefined,
         cursor: 'pointer',
         '&:hover': {
-          backgroundColor: selected ? '#D6E6FF' : '#F0F6FF',
+          backgroundColor: selected ? '#D6E6FF' : resched.rescheduled ? '#FEF3C7' : '#F0F6FF',
         },
       }}
       onClick={() => onViewDetails(order)}

@@ -25,6 +25,7 @@ export const GLOSSARY_SECTIONS = [
   'Orders: payment method',
   'Orders: Confirmation Email column',
   'Orders: OptimoRoute column',
+  'Orders: moving a delivery date',
   'Orders: money columns',
   'Orders: card payment problems',
   'Create Order and Recent orders',
@@ -89,6 +90,14 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: OptimoRoute column', 'Removed', 'Orders table, OptimoRoute', 'The order was cancelled or fully refunded, so its stop was taken out of OptimoRoute.', 'warn'),
   e('Orders: OptimoRoute column', '- (dash)', 'Orders table, OptimoRoute', 'Nothing was sent to OptimoRoute: the order is unpaid, pending or cancelled, is older than the sync (before Oct 8), or its delivery day had already passed.', 'none', 'dash empty blank'),
 
+  // ---- moving a delivery date
+  e('Orders: moving a delivery date', 'Move items to a new delivery date', 'Order details: tick items, pick a date, press Move', 'Tick one or more items (or a whole day with the box next to the day), pick a new delivery date and press Move. Only the DELIVERY date changes; the kitchen day (the menu day it was picked for) stays, so the Kitchen Dashboard, Kitchen Report and Ordered Items report do not move. If only some items of a day move, the day is split in two lines (same kitchen day, different delivery date); moving them back joins them again. The stop in OptimoRoute, the customer\'s order page and the email follow the new delivery date. Any date from today to 120 days ahead can be picked, also one that has already closed for ordering. Only paid orders that are confirmed, preparing or ready can be moved.', undefined, 'reschedule move delivery date change date checkbox tick select items'),
+  e('Orders: moving a delivery date', 'Rescheduled', 'Orders table, Rescheduled column; Rescheduled filter', 'This order has had a delivery date moved by an admin. The row is tinted amber with an amber edge. Hover for what moved, who did it and whether the customer was emailed.', 'warn', 'reschedule moved'),
+  e('Orders: moving a delivery date', 'Customer not told', 'Orders table, Rescheduled column', 'The date was moved but the customer has not been emailed since. Open the order and press "Send email to customer".', 'bad'),
+  e('Orders: moving a delivery date', 'Customer emailed', 'Orders table, Rescheduled column; order details', 'The customer was sent the "delivery date updated" email after the last move. If the date is moved again, it goes back to "Customer not told".', 'good'),
+  e('Orders: moving a delivery date', 'Send email to customer', 'Order details, amber banner', 'Sends the customer an email with the new delivery date(s) and what is on each day. Support gets an identical copy. It is never sent by itself; press it when you are ready (after all moves).'),
+  e('Orders: moving a delivery date', 'Delivery date moved', 'Order details, amber banner', 'Shows the original and the new dates, who moved them and when. If an order is moved back to its original date, it says so and no email is needed.'),
+
   // ---- money columns
   e('Orders: money columns', 'Subtotal', 'Orders table, order details', 'The food total before taxes, fees and tip.'),
   e('Orders: money columns', 'Platform Fee', 'Orders table, order details', 'The customer-facing fee for digital payment processing: 4% of the subtotal plus $0.31. It does not depend on the tip. On the website and in emails it is included in "Taxes & Fees".'),
@@ -149,6 +158,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Abandoned Checkout', 'Date range (Today, 7, 14, 30, 60 days, Custom)', 'Abandoned Checkout', 'Which days of leftovers to show, in Pacific days, both ends included. The oldest you can look back is 60 days.'),
 
   // ---- kitchen dashboard
+  e('Kitchen Dashboard', 'Delivered Wed, Oct 14 (amber truck line)', 'Kitchen Dashboard, under an item or combo', 'The item stays on the day it is cooked (its menu day) but goes out on a later day: a small day the cart combined into the next delivery, or items an admin moved to another delivery date. The line says when. If only some of the units go later it says how many ("1 of 3 delivered Wed, Oct 14"). Tap the item to see which order goes out when.', 'warn', 'delivery later clubbed moved deliver date'),
   e('Kitchen Dashboard', 'Week (Saturday to Friday)', 'Kitchen Dashboard', 'A kitchen week runs Saturday to Friday: the menu goes out on Friday night and deliveries run through the next Friday. This week, Last week and Week before last follow it.', undefined, 'saturday friday weeks'),
   e('Kitchen Dashboard', 'Menu day', 'Kitchen Dashboard day columns', 'Each item counts on the menu day it was picked for, not the day it is delivered. An item picked for Wednesday but delivered with Thursday\'s order is still produced for Wednesday.', undefined, 'delivery day clubbing'),
   e('Kitchen Dashboard', 'Which orders are counted', 'Kitchen Dashboard', 'Orders that are not cancelled and either paid, or already in preparing / ready / out for delivery / delivered with a payment that is not failed or refunded.'),

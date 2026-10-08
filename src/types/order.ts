@@ -149,6 +149,8 @@ export interface OrderDayItem {
   food: FoodItemSnapshot;
   quantity: number;
   price: number;
+  /** Set when an admin moved this item to another delivery date: the date it started with */
+  originalDeliveryDate?: string;
   spiceLevel?: string;
   selectedPortion?: string; // Portion name (e.g., "Full", "Half")
   portions?: number; // Portion index for backwards compatibility
@@ -256,6 +258,15 @@ export interface Order {
     stops?: Array<{ date?: string; result?: string; orderNo?: string; error?: string }>;
   };
   paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
+  /** Delivery dates an admin moved (oldest first); each change keeps what the day line was before */
+  reschedules?: Array<{
+    at: Date | string;
+    by?: { id?: string; name?: string };
+    newDate?: string;
+    changes: Array<{ line: number; item: number; name: string; foodId?: string; quantity: number; menuDate: string; fromDeliveryDate: string; toDate: string }>;
+  }>;
+  /** When the customer was told about the new dates */
+  rescheduleEmail?: { sentAt: Date | string; by?: { id?: string; name?: string }; messageId?: string; count?: number };
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }

@@ -21,11 +21,12 @@ import {
   TableRow,
   Paper,
   CircularProgress,
+  Checkbox,
   Collapse,
   IconButton,
 } from '@mui/material';
 import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
@@ -35,6 +36,8 @@ import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
+import { MoveItemsBar, RescheduleBanner, shortDate } from './RescheduleControls';
+import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -42,6 +45,10 @@ interface OrderDetailsDialogProps {
   loading: boolean;
   onClose: () => void;
   onStatusUpdate: (orderId: string, newStatus: OrderStatus) => Promise<void>;
+  /** Login token, used to move the delivery date and to email the customer about it */
+  token?: string | null;
+  /** Reload the order after its delivery date was moved or the customer was emailed */
+  onOrderChanged?: () => Promise<void> | void;
 }
 
 export default function OrderDetailsDialog({
@@ -50,10 +57,17 @@ export default function OrderDetailsDialog({
   loading: _loading,
   onClose,
   onStatusUpdate,
+  token = null,
+  onOrderChanged,
 }: OrderDetailsDialogProps) {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('pending');
   const [updating, setUpdating] = useState(false);
   const [expandedCombos, setExpandedCombos] = useState<Set<string>>(new Set());
+  // items ticked to get a new delivery date (keys 'line:item')
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setSelected(new Set());
+  }, [order?.orderId, order?.updatedAt]);
 
   // Update selected status when order changes
   useState(() => {
@@ -84,6 +98,17 @@ export default function OrderDetailsDialog({
   };
 
   if (!order) return null;
+
+  const movable = whyNotReschedulable(order) === null;
+  const toggleItems = (keys: string[], on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const k of keys) {
+        if (on) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
 
   const handleStatusUpdate = async () => {
     if (!order._id) return;
@@ -142,6 +167,9 @@ export default function OrderDetailsDialog({
       </DialogTitle>
 
       <DialogContent sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 3 }}>
+        {/* The delivery date of this order was moved: what moved, by whom, and whether the customer was told */}
+        <RescheduleBanner order={order} token={token} onChanged={async () => { await onOrderChanged?.(); }} />
+
         {/* Order Header Info */}
         <Box sx={{ marginBottom: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
@@ -300,13 +328,31 @@ export default function OrderDetailsDialog({
 
         {/* Order Items by Day */}
         <Box sx={{ marginBottom: 3 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: movable ? 0.25 : 1.5, color: '#111827' }}>
             Order Items
           </Typography>
+          {movable && (
+            <Typography sx={{ fontSize: 12, color: '#6B7280', marginBottom: 1.5 }}>Tick items to change their delivery date.</Typography>
+          )}
           {order.items.map((dayOrder, dayIndex) => {
             const heading = orderDayHeading(dayOrder);
             return (
             <Box key={dayIndex} sx={{ marginBottom: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                {movable && (() => {
+                  const keys = dayOrder.items.map((_, i) => selectionKey(dayIndex, i));
+                  const count = keys.filter((k) => selected.has(k)).length;
+                  return (
+                    <Checkbox
+                      size="small"
+                      checked={count === keys.length && keys.length > 0}
+                      indeterminate={count > 0 && count < keys.length}
+                      onChange={(e) => toggleItems(keys, e.target.checked)}
+                      inputProps={{ 'aria-label': `Select all items of ${heading.menuDay}` }}
+                      sx={{ p: 0.25, mt: -0.25 }}
+                    />
+                  );
+                })()}
               <Box>
                 {/* the menu day with its own date; a day combined into a later delivery says so on the line below */}
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#4F8CFF', marginBottom: 0.5 }}>
@@ -317,6 +363,7 @@ export default function OrderDetailsDialog({
                     Delivered on {heading.deliveredOn.weekday}, {formatPSTDate(heading.deliveredOn.date)}
                   </Typography>
                 )}
+              </Box>
               </Box>
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E5E7EB', marginBottom: 1 }}>
                 <Table size="small" sx={{ '& .MuiTableCell-root': { px: { xs: 0.75, sm: 2 } } }}>
@@ -339,6 +386,15 @@ export default function OrderDetailsDialog({
                           <TableCell>
                             {/* Item name with veg indicator */}
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                              {movable && (
+                                <Checkbox
+                                  size="small"
+                                  checked={selected.has(selectionKey(dayIndex, itemIndex))}
+                                  onChange={(e) => toggleItems([selectionKey(dayIndex, itemIndex)], e.target.checked)}
+                                  inputProps={{ 'aria-label': `Select ${item.food.name}` }}
+                                  sx={{ p: 0.25, mt: -0.25, mr: 0.25 }}
+                                />
+                              )}
                               {item.food.veg !== undefined && (
                                 <Box sx={{
                                   mt: 0.5,
@@ -355,6 +411,11 @@ export default function OrderDetailsDialog({
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {item.food.name}
                                 </Typography>
+                                {item.originalDeliveryDate && item.originalDeliveryDate !== (dayOrder.actualDeliveryDate ? String(dayOrder.actualDeliveryDate).slice(0, 10) : String(dayOrder.deliveryDate).slice(0, 10)) && (
+                                  <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 600 }}>
+                                    Moved from {shortDate(item.originalDeliveryDate)}
+                                  </Typography>
+                                )}
                               </Box>
                             </Box>
 
@@ -696,6 +757,16 @@ export default function OrderDetailsDialog({
             </Select>
           </FormControl>
         </Box>
+        {/* appears while items are ticked: one new delivery date for all of them */}
+        <MoveItemsBar
+          order={order}
+          token={token}
+          selected={selected}
+          onClear={() => setSelected(new Set())}
+          onChanged={async () => {
+            await onOrderChanged?.();
+          }}
+        />
       </DialogContent>
 
       <DialogActions sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 2, borderTop: '1px solid #E5E7EB' }}>

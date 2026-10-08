@@ -17,7 +17,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { IconRefresh } from '@tabler/icons-react';
+import { IconRefresh, IconTruckDelivery } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ItemOrdersDialog from './ItemOrdersDialog';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
@@ -29,6 +29,7 @@ import {
   formatRangeLabel,
   getPresetRange,
   spiceLineText,
+  deliveryNote,
   validateRange,
   type DayRange,
   type KitchenBlock,
@@ -66,6 +67,18 @@ export function ecoText(item: Pick<KitchenItem, 'eco' | 'ecoBySize'>): string {
   const lines = item.ecoBySize ?? [];
   if (lines.length === 0 || (lines.length === 1 && lines[0].label === 'No size')) return `♻️ Eco × ${item.eco}`;
   return `♻️ Eco: ${lines.map((l) => `${l.label === 'No size' ? 'no size' : l.label} × ${l.quantity}`).join(', ')}`;
+}
+
+/** "Delivered Wed, Oct 14": shown under an item that stays on its kitchen day but goes out on a later day. */
+function DeliveryNote({ deliveries, total }: { deliveries: KitchenItem['deliveries']; total: number }) {
+  const text = deliveryNote(deliveries, total);
+  if (!text) return null;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, color: '#B45309' }}>
+      <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
+      <Typography sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, color: 'inherit' }}>{text}</Typography>
+    </Box>
+  );
 }
 
 function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void }) {
@@ -124,6 +137,7 @@ function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void 
             includes {item.inCombos} inside combos
           </Typography>
         )}
+        <DeliveryNote deliveries={item.deliveries} total={item.quantity} />
       </Box>
     </Box>
   );
@@ -180,6 +194,7 @@ function BlockBody({
               </Box>
               {combo.spice.length > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{spiceLineText(combo.spice)}</Typography>}
               {combo.eco > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>♻️ Eco × {combo.eco}</Typography>}
+              <DeliveryNote deliveries={combo.deliveries} total={combo.quantity} />
               {combo.parts.length > 0 && (
                 <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
                   {combo.parts
