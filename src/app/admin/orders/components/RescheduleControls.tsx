@@ -145,7 +145,7 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
 }
 
 /**
- * "Change date" for one day of an order: opens a small date picker. Any date from today on can be chosen, also one
+ * "Change date" for one day of an order: opens a small date picker for the DELIVERY date (the kitchen day stays). Any date from today on can be chosen, also one
  * that has already closed for ordering (an admin decision, so the order cutoff does not apply).
  */
 export function DayRescheduleEditor({ order, dayIndex, token, onChanged }: CommonProps & { dayIndex: number }) {
@@ -158,7 +158,8 @@ export function DayRescheduleEditor({ order, dayIndex, token, onChanged }: Commo
   const blocked = whyNotReschedulable(order);
   const day = order.items?.[dayIndex];
   if (!day) return null;
-  const current = dateText(day.actualDeliveryDate) || dateText(day.deliveryDate);
+  const kitchenDay = dateText(day.deliveryDate);
+  const current = dateText(day.actualDeliveryDate) || kitchenDay;
   const range = pickableRange();
 
   if (blocked) return null;
@@ -169,7 +170,7 @@ export function DayRescheduleEditor({ order, dayIndex, token, onChanged }: Commo
     try {
       const data = await post(token, order.orderId, 'reschedule', { changes: [{ index: dayIndex, newDate: value }] });
       const optimo = data.optimo as { mode?: string; removed?: number; added?: number; failed?: number } | undefined;
-      let note = `Moved to ${shortDate(value)}.`;
+      let note = `Delivery moved to ${shortDate(value)}.`;
       if (optimo?.mode === 'on') {
         note += optimo.failed ? ' OptimoRoute could not be updated right now; it retries by itself within 30 minutes.' : ` OptimoRoute updated (${optimo.removed ?? 0} removed, ${optimo.added ?? 0} added).`;
       } else if (optimo && (optimo.mode === 'timeout' || optimo.mode === 'error')) {
@@ -205,7 +206,7 @@ export function DayRescheduleEditor({ order, dayIndex, token, onChanged }: Commo
       {open && (
         <Box sx={{ mt: 0.5, p: 1.25, borderRadius: 2, border: '1px solid #E5E7EB', bgcolor: '#F9FAFB' }}>
           <Typography sx={{ fontSize: 12, color: '#4B5563', mb: 1 }}>
-            New date for this day. The kitchen and the delivery both move to it. Any date from today works, also one that has closed for orders.
+            New delivery date for this day. The kitchen day stays {shortDate(kitchenDay)}. Any date from today works, also one that has closed for orders.
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
             <TextField
@@ -227,7 +228,12 @@ export function DayRescheduleEditor({ order, dayIndex, token, onChanged }: Commo
             </Button>
             <Button size="small" onClick={() => setOpen(false)} disabled={busy} sx={{ textTransform: 'none' }}>Cancel</Button>
           </Box>
-          {value && value === current && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>That is the current date.</Typography>}
+          {value && value === current && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>That is the current delivery date.</Typography>}
+          {value && kitchenDay && value < kitchenDay && (
+            <Typography sx={{ fontSize: 12, color: '#B45309', fontWeight: 600, mt: 0.5 }}>
+              This is before the kitchen day ({shortDate(kitchenDay)}), so the food would be delivered before it is cooked.
+            </Typography>
+          )}
           {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
         </Box>
       )}

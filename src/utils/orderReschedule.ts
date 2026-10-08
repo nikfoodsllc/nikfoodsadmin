@@ -1,6 +1,7 @@
 /**
  * Moving an order's delivery dates (admin): what the screens show and which dates may be picked.
  * The live site does the moving (see livesite/src/lib/orderReschedule.ts: it keeps these rules, keep the two in step).
+ * Only the delivery date (actualDeliveryDate) moves; the kitchen day (deliveryDate) stays.
  * Dates are 'YYYY-MM-DD' strings.
  */
 export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready'] as const;
