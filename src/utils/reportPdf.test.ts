@@ -21,6 +21,7 @@ describe('cellText', () => {
     expect(cellText({ n: 24, unit: 'oz' })).toBe('24 oz');
     expect(cellText({ n: 1.5, unit: 'lb' })).toBe('1.5 lb');
     expect(cellText({ n: 17, unit: 'units' })).toBe('17 units');
+    expect(cellText({ n: 1, unit: 'units' })).toBe('1 unit');
     expect(cellText({ date: '2026-10-13' })).toBe('Tue, Oct 13');
     expect(cellText({ date: null })).toBe('');
     expect(cellText('')).toBe('');

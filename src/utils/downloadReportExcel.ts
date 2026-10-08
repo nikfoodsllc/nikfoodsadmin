@@ -61,7 +61,7 @@ export async function buildReportWorkbook(sheets: SheetModel[], title: string): 
           if (row.boldCells?.includes(c - first)) cell.font = { bold: true };
         }
         // the unit is part of the cell's number format, so the cell stays a number and still shows "24 oz" or "1.5 lb"
-        if (source && typeof source === 'object') cell.numFmt = 'n' in source ? `General" ${source.unit}"` : 'ddd, mmm d';
+        if (source && typeof source === 'object') cell.numFmt = 'n' in source ? (source.unit === 'units' ? '[=1]General" unit";General" units"' : `General" ${source.unit}"`) : 'ddd, mmm d';
         else if (typeof source === 'number' && !row.rightCells?.includes(c - first)) cell.alignment = { vertical: 'top', horizontal: 'center' };
       }
     }

@@ -143,3 +143,16 @@ describe('the Excel file', () => {
     expect(cell.formula).toBeUndefined();
   });
 });
+
+describe('units without sizes read "1 unit" and "4 units"', () => {
+  it('the cell format has a singular form', async () => {
+    const report = buildKitchenReport([row({ name: 'Chapati', orderId: '1', customerName: 'Amy', quantity: 1 }), row({ name: 'Chapati', orderId: '2', customerName: 'Bob', quantity: 4 })], byName);
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [], days: [] }), 'test');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await blob.arrayBuffer());
+    const prep = wb.getWorksheet('Kitchen Prep')!;
+    expect(prep.getRow(2).getCell(6).value).toBe(1);
+    expect(prep.getRow(2).getCell(6).numFmt).toBe('[=1]General" unit";General" units"');
+    expect(prep.getRow(3).getCell(6).value).toBe(4);
+  });
+});

@@ -133,7 +133,7 @@ export function cellText(cell: SheetCell | undefined): string {
   if (cell === undefined || cell === null || cell === '') return '';
   if (typeof cell === 'string') return cell;
   if (typeof cell === 'number') return String(cell);
-  if ('n' in cell) return `${cell.n} ${cell.unit}`;
+  if ('n' in cell) return `${cell.n} ${cell.unit === 'units' && cell.n === 1 ? 'unit' : cell.unit}`;
   return dateCellText(cell.date);
 }
 

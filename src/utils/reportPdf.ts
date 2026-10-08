@@ -95,10 +95,12 @@ export async function buildReportPdf(sheets: SheetModel[], title: string): Promi
       doc.setFontSize(11);
       doc.setTextColor(17, 24, 39);
       doc.text(`${span.name}`, margin.left, 24);
+      // measure the bold name before switching to the normal font, or the range would be written over its end
+      const nameWidth = doc.getTextWidth(span.name);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(75, 85, 99);
-      doc.text(title, margin.left + doc.getTextWidth(span.name) + 14, 24);
+      doc.text(title, margin.left + nameWidth + 14, 24);
       doc.text(`Page ${p} of ${total}`, pageWidth - margin.right, doc.internal.pageSize.getHeight() - 16, { align: 'right' });
     }
   }
