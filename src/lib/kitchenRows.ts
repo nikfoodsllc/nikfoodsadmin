@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
-import { formatPSTDateISO } from '@/utils/timezone';
-import { toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
+import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 
 /**
  * The order lines the kitchen has to produce within a date range, one per ordered item, flattened for
@@ -70,7 +69,7 @@ export async function fetchKitchenRows(range: DayRange): Promise<KitchenRow[]> {
       customerName: typeof raw.customerName === 'string' ? raw.customerName : null,
       deliveredOn: toDayString(raw.deliveredOn),
       orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
-      orderedOn: raw.orderedAt ? formatPSTDateISO(raw.orderedAt) || null : null,
+      orderedOn: pacificDayOf(raw.orderedAt),
     });
   }
   return rows;

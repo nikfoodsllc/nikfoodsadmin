@@ -10,6 +10,7 @@ import {
   filterBlockBySearch,
   formatAmount,
   matchesSearch,
+  pacificDayOf,
   shortSpiceLabel,
   sizeRank,
   spiceLineText,
@@ -719,5 +720,20 @@ describe('search', () => {
     expect(filterBlockBySearch(day, 'kale').combos.map((c) => c.name)).toEqual(['Veg Combo']);
     expect(filterBlockBySearch(day, '')).toBe(day);
     expect(filterBlockBySearch(day, 'zzz').items).toEqual([]);
+  });
+});
+
+describe('pacificDayOf', () => {
+  it('is the Pacific day, not the UTC day', () => {
+    expect(pacificDayOf(new Date('2026-10-09T06:30:00Z'))).toBe('2026-10-08'); // 11:30 PM PDT on the 8th
+    expect(pacificDayOf(new Date('2026-10-09T07:00:00Z'))).toBe('2026-10-09'); // midnight PDT
+    expect(pacificDayOf('2026-10-08T19:00:00Z')).toBe('2026-10-08');
+  });
+  it('follows daylight saving', () => {
+    expect(pacificDayOf(new Date('2026-11-02T07:30:00Z'))).toBe('2026-11-01'); // PST (UTC-8): 11:30 PM on Nov 1
+    expect(pacificDayOf(new Date('2026-11-02T08:00:00Z'))).toBe('2026-11-02');
+  });
+  it('is null for anything that is not a date', () => {
+    for (const v of [null, undefined, '', 'nope', {}, NaN]) expect(pacificDayOf(v)).toBeNull();
   });
 });
