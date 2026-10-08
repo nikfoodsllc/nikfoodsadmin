@@ -6,6 +6,7 @@ import {
   buildKitchenWeek,
   comboChoiceLines,
   comboParts,
+  deliveryNote,
   formatAmount,
   shortSpiceLabel,
   sizeRank,
@@ -641,5 +642,55 @@ describe('the spice line of a card', () => {
   });
   it('nothing when no spice level was ordered', () => {
     expect(spiceLineText([])).toBe('');
+  });
+});
+
+describe('items delivered on another day than they are cooked', () => {
+  const days = ['2026-10-13', '2026-10-14'];
+  it('stays on its kitchen day and carries the delivery date', () => {
+    const out = buildKitchenDays([row({ day: '2026-10-13', name: 'Dosa Batter (32Oz)', deliveredOn: '2026-10-14' }), row({ day: '2026-10-14', name: 'Dosa Batter (Saver Combo) 32Oz x 2', deliveredOn: '2026-10-14' })], days);
+    expect(out[0].items.map((i) => i.name)).toEqual(['Dosa Batter (32Oz)']);
+    expect(out[0].items[0].deliveries).toEqual([{ label: '2026-10-14', quantity: 1 }]);
+    expect(out[1].items[0].deliveries).toEqual([]); // delivered the same day: nothing to say
+    expect(out[0].totals.units).toBe(1);
+  });
+  it('counts only the units that are delivered later, by date, oldest first', () => {
+    const out = buildKitchenDays([
+      row({ day: '2026-10-13', name: 'Rajma', quantity: 2, deliveredOn: '2026-10-15' }),
+      row({ orderId: 'ORD-2', day: '2026-10-13', name: 'Rajma', quantity: 1, deliveredOn: '2026-10-14' }),
+      row({ orderId: 'ORD-3', day: '2026-10-13', name: 'Rajma', quantity: 4, deliveredOn: '2026-10-13' }),
+      row({ orderId: 'ORD-4', day: '2026-10-13', name: 'Rajma', quantity: 1 }),
+    ], days);
+    expect(out[0].items[0].quantity).toBe(8);
+    expect(out[0].items[0].deliveries).toEqual([{ label: '2026-10-14', quantity: 1 }, { label: '2026-10-15', quantity: 2 }]);
+  });
+  it('a combo and its parts are delivered with the combo', () => {
+    const combo2 = { name: 'Veg Combo', quantity: 2, deliveredOn: '2026-10-14', sections: [{ _id: 's1', title: 'Curry', selectedItems: [{ _id: 'a1', portion: '12Oz', item: { name: 'Kale Chane' } }] }], comboSelections: { s1: ['a1'] } };
+    const out = buildKitchenDays([row({ day: '2026-10-13', ...combo2 })], days);
+    expect(out[0].combos[0].deliveries).toEqual([{ label: '2026-10-14', quantity: 2 }]);
+    expect(out[0].items.find((i) => i.name === 'Kale Chane')?.deliveries).toEqual([{ label: '2026-10-14', quantity: 2 }]);
+  });
+  it('the week total keeps the notes', () => {
+    const week = buildKitchenWeek([row({ day: '2026-10-13', name: 'Pickle', deliveredOn: '2026-10-14' }), row({ day: '2026-10-14', name: 'Pickle', deliveredOn: '2026-10-14' })]);
+    expect(week.items[0].quantity).toBe(2);
+    expect(week.items[0].deliveries).toEqual([{ label: '2026-10-14', quantity: 1 }]);
+  });
+  it('rows without a delivery day add nothing', () => {
+    expect(buildKitchenDays([row({ day: '2026-10-13', deliveredOn: null }), row({ day: '2026-10-13', deliveredOn: '' })], days)[0].items[0].deliveries).toEqual([]);
+  });
+});
+
+describe('deliveryNote', () => {
+  it('says Delivered <day> when all of it is delivered later', () => {
+    expect(deliveryNote([{ label: '2026-10-14', quantity: 3 }], 3)).toBe('Delivered Wed, Oct 14');
+  });
+  it('says how many when only some is', () => {
+    expect(deliveryNote([{ label: '2026-10-14', quantity: 1 }], 3)).toBe('1 of 3 delivered Wed, Oct 14');
+    expect(deliveryNote([{ label: '2026-10-14', quantity: 1 }, { label: '2026-10-15', quantity: 2 }], 5)).toBe('1 of 5 delivered Wed, Oct 14 · 2 of 5 delivered Thu, Oct 15');
+  });
+  it('is empty when nothing is delivered later', () => {
+    expect(deliveryNote([], 3)).toBe('');
+    expect(deliveryNote(undefined, 3)).toBe('');
+    expect(deliveryNote([{ label: '2026-10-14', quantity: 0 }], 3)).toBe('');
   });
 });
