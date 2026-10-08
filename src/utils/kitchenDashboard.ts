@@ -639,3 +639,13 @@ export function filterBlockBySearch<T extends { items: KitchenItem[]; combos: Ki
     combos: block.combos.filter((c) => matchesSearch(c.name, query) || c.parts.some((p) => matchesSearch(p.name, query))),
   };
 }
+
+/**
+ * The calendar day ('YYYY-MM-DD') of a moment in Pacific time, whatever time zone the server runs in (an order placed at
+ * 11:30 PM Pacific is still that day, even though it is already the next day in UTC). Null for anything that is not a date.
+ */
+export function pacificDayOf(value: unknown): string | null {
+  const date = value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? new Date(value) : null;
+  if (!date || !Number.isFinite(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
