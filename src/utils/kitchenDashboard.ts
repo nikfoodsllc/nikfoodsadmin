@@ -150,6 +150,8 @@ export interface KitchenItem {
   totalText: string;
   /** Units of this item that carry no readable size, so they are not in `totalText`. */
   unsized: number;
+  /** Units that are cooked on this day but delivered on a LATER day (a small day combined into a later delivery, or moved by an admin): one line per delivery date ('YYYY-MM-DD'), oldest first. */
+  deliveries: CountLine[];
 }
 
 export interface KitchenCombo {
@@ -160,6 +162,8 @@ export interface KitchenCombo {
   eco: number;
   /** What the customers picked inside this combo (one part per combo ordered). */
   parts: Array<{ name: string; portion: string | null; quantity: number }>;
+  /** Combos cooked on this day but delivered on another day, by delivery date ('YYYY-MM-DD'), oldest first. */
+  deliveries: CountLine[];
 }
 
 export interface KitchenDay {
@@ -294,6 +298,29 @@ interface ItemAcc {
   ecoBySize: Map<string, number>;
   amount: Amount;
   sized: number;
+  /** units delivered on another day than the kitchen day, by delivery date */
+  deliveries: Map<string, number>;
+}
+
+/** The day a line is delivered on when that is later than the day it is cooked, otherwise null. */
+function laterDelivery(row: Pick<KitchenRow, 'day' | 'deliveredOn'>): string | null {
+  const delivered = clean(row.deliveredOn);
+  return delivered && delivered !== row.day ? delivered : null;
+}
+
+/** Delivery dates with their units, oldest date first. */
+function toDateLines(map: Map<string, number>): CountLine[] {
+  return [...map.entries()].map(([label, quantity]) => ({ label, quantity })).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * The line shown under an item (or combo) that is delivered on another day than it is cooked: "Delivered Wed, Oct 14"
+ * when all of it is, "1 of 3 delivered Wed, Oct 14" when only some of it is. '' when nothing is.
+ */
+export function deliveryNote(deliveries: CountLine[] | undefined, total: number): string {
+  const lines = (deliveries ?? []).filter((d) => d.quantity > 0);
+  if (lines.length === 0) return '';
+  return lines.map((d) => (d.quantity >= total ? `Delivered ${formatDayShort(d.label)}` : `${d.quantity} of ${total} delivered ${formatDayShort(d.label)}`)).join(' · ');
 }
 
 /**
@@ -333,14 +360,14 @@ export function buildKitchenWeek(rows: KitchenRow[]): KitchenBlock {
 
 function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
   const items = new Map<string, ItemAcc>();
-  const combos = new Map<string, { quantity: number; eco: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }> }>();
+  const combos = new Map<string, { quantity: number; eco: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }>; deliveries: Map<string, number> }>();
   const orderIds = new Set<string>();
   let ecoContainers = 0;
 
   const itemAcc = (name: string): ItemAcc => {
     let acc = items.get(name);
     if (!acc) {
-      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), eco: 0, ecoBySize: new Map(), amount: emptyAmount(), sized: 0 };
+      acc = { total: 0, inCombos: 0, portions: new Map(), spice: new Map(), eco: 0, ecoBySize: new Map(), amount: emptyAmount(), sized: 0, deliveries: new Map() };
       items.set(name, acc);
     }
     return acc;
@@ -352,15 +379,18 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
     const name = clean(row.name);
     const spice = clean(row.spiceLevel);
     const parts = comboParts(row);
+    // delivered on a different day than it is cooked: counted by delivery date
+    const later = laterDelivery(row);
 
     if (parts.length > 0) {
       // a combo: counted as a combo, and each chosen part is also something to cook
       let combo = combos.get(name);
       if (!combo) {
-        combo = { quantity: 0, eco: 0, spice: new Map(), parts: new Map() };
+        combo = { quantity: 0, eco: 0, spice: new Map(), parts: new Map(), deliveries: new Map() };
         combos.set(name, combo);
       }
       combo.quantity += row.quantity;
+      if (later) bump(combo.deliveries, later, row.quantity);
       if (row.isEco) combo.eco += row.quantity;
       if (spice) bump(combo.spice, spice, row.quantity);
       for (const part of parts) {
@@ -372,6 +402,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         const acc = itemAcc(part.name);
         acc.total += row.quantity;
         acc.inCombos += row.quantity;
+        if (later) bump(acc.deliveries, later, row.quantity);
         bump(acc.portions, part.portion ?? 'No size', row.quantity);
         const partSize = parsePortionAmount(part.portion);
         if (partSize) {
@@ -382,6 +413,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
     } else {
       const acc = itemAcc(name);
       acc.total += row.quantity;
+      if (later) bump(acc.deliveries, later, row.quantity);
       const portion = clean(row.portion);
       bump(acc.portions, portion || 'No size', row.quantity);
       if (spice) bump(acc.spice, spice, row.quantity);
@@ -412,6 +444,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         ecoBySize: toSizeLines(acc.ecoBySize),
         totalText: formatAmount(acc.amount),
         unsized: acc.sized > 0 ? acc.total - acc.sized : 0,
+        deliveries: toDateLines(acc.deliveries),
       };
     })
     .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
@@ -423,6 +456,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
       spice: toSpiceLines(c.spice),
       eco: c.eco,
       parts: [...c.parts.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)),
+      deliveries: toDateLines(c.deliveries),
     }))
     .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
 
