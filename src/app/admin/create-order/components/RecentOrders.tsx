@@ -56,6 +56,8 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
   const [notice, setNotice] = useState<{ orderId: string; text: string; error?: boolean } | null>(null);
   const [payDialog, setPayDialog] = useState<Row | null>(null);
   const [cancelDialog, setCancelDialog] = useState<Row | null>(null);
+  // an older order whose current link was never saved: ask before making a fresh one
+  const [refreshDialog, setRefreshDialog] = useState<{ row: Row; kind: 'remind' | 'copy' } | null>(null);
   const [payChoice, setPayChoice] = useState<PaidChoice>('Cash');
   const [payTyped, setPayTyped] = useState('');
   const [payNote, setPayNote] = useState('');
@@ -114,7 +116,7 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
       body: JSON.stringify(payload),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || !body.success) throw new Error(body.error || 'Something went wrong');
+    if (!res.ok || !body.success) throw Object.assign(new Error(body.error || 'Something went wrong'), { code: typeof body.code === 'string' ? body.code : undefined });
     return body.data;
   };
 
@@ -124,7 +126,9 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
     try {
       setNotice({ orderId: row.orderId, text: await action() });
     } catch (e) {
-      setNotice({ orderId: row.orderId, text: e instanceof Error ? e.message : 'Something went wrong', error: true });
+      const code = (e as { code?: string } | null)?.code;
+      if (code === 'LINK_NOT_SAVED' && (key === 'remind' || key === 'copyCurrent')) setRefreshDialog({ row, kind: key === 'remind' ? 'remind' : 'copy' });
+      else setNotice({ orderId: row.orderId, text: e instanceof Error ? e.message : 'Something went wrong', error: true });
     }
     setBusy(null);
     await load();
@@ -134,19 +138,35 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
   const emailLink = (row: Row) =>
     run(row, 'email', async () => {
       const d = await post(row.orderId, 'resend', { sendEmail: true });
-      return d.emailSent ? 'A new link was emailed to the customer. The previous link no longer works.' : `The email could not be sent (${d.emailError || 'unknown error'}). Use "Copy a new link" instead.`;
+      return d.emailSent ? 'A new link was emailed to the customer. The previous link no longer works.' : `The email could not be sent (${d.emailError || 'unknown error'}). Try again in a moment.`;
     });
 
-  const copyLink = (row: Row) =>
-    run(row, 'copy', async () => {
-      const d = await post(row.orderId, 'resend', { sendEmail: false });
+  // the same link again: emailed as a reminder, or copied (the link the customer already has keeps working)
+  const remind = (row: Row, allowRefresh = false) =>
+    run(row, 'remind', async () => {
+      const d = await post(row.orderId, 'resend', { sendEmail: true, keepCurrent: true, allowRefresh });
+      if (!d.emailSent) return `The reminder could not be sent (${d.emailError || 'unknown error'}).`;
+      return d.refreshed ? 'A reminder was emailed with a fresh link. The previous link no longer works.' : 'A reminder was emailed with the same link.';
+    });
+
+  const copyCurrent = (row: Row, allowRefresh = false) =>
+    run(row, 'copyCurrent', async () => {
+      const d = await post(row.orderId, 'resend', { sendEmail: false, keepCurrent: true, allowRefresh });
       try {
         await navigator.clipboard.writeText(d.payLink);
-        return 'A new link was copied. Any link sent before no longer works.';
+        return d.refreshed ? 'A fresh link was copied. The previous link no longer works.' : 'The current link was copied.';
       } catch {
         return `Copy this link: ${d.payLink}`;
       }
     });
+
+  const confirmRefresh = async () => {
+    const pending = refreshDialog;
+    if (!pending) return;
+    setRefreshDialog(null);
+    if (pending.kind === 'remind') await remind(pending.row, true);
+    else await copyCurrent(pending.row, true);
+  };
 
   const cancelOrder = async () => {
     const row = cancelDialog;
@@ -246,8 +266,9 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
                   </Typography>
                   <ActivityLines row={row} />
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void remind(row)} sx={{ textTransform: 'none' }}>Send a reminder</Button>
+                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void copyCurrent(row)} sx={{ textTransform: 'none' }}>Copy current link</Button>
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void emailLink(row)} sx={{ textTransform: 'none' }}>Email a new link</Button>
-                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void copyLink(row)} sx={{ textTransform: 'none' }}>Copy a new link</Button>
                     <Button size="small" variant="outlined" color="warning" disabled={Boolean(busy)} onClick={() => setPayDialog(row)} sx={{ textTransform: 'none' }}>Paid another way</Button>
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => onEdit(row.orderId)} sx={{ textTransform: 'none' }}>Edit</Button>
                     <Button size="small" variant="outlined" color="error" disabled={Boolean(busy)} onClick={() => setCancelDialog(row)} sx={{ textTransform: 'none' }}>Cancel order</Button>
@@ -276,6 +297,19 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
           );
         })}
       </Box>
+
+      <Dialog open={Boolean(refreshDialog)} onClose={() => setRefreshDialog(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Make a fresh link?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 14 }}>
+            {refreshDialog?.row.orderId} was made before links were saved, so its current link cannot be {refreshDialog?.kind === 'remind' ? 're-sent' : 'copied'}. A fresh link can be made{refreshDialog?.kind === 'remind' ? ' and emailed' : ''}, but the link the customer already has will stop working.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRefreshDialog(null)} sx={{ textTransform: 'none' }}>Back</Button>
+          <Button variant="contained" onClick={() => void confirmRefresh()} sx={{ textTransform: 'none', fontWeight: 700 }}>Make a fresh link</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(cancelDialog)} onClose={() => setCancelDialog(null)} fullWidth maxWidth="xs">
         <DialogTitle>Cancel this order?</DialogTitle>
