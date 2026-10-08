@@ -208,7 +208,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
 
 /** What to write as an item's total: the amount ('300 oz (18.75 lb)') or, without sizes, the number of pieces. */
 export function blockTotal(block: Pick<PrepBlock, 'totalText' | 'quantity'>): string {
-  return block.totalText || String(block.quantity);
+  return block.totalText || `${block.quantity} ${block.quantity === 1 ? 'unit' : 'units'}`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -247,19 +247,26 @@ function sumText(lines: PrepLine[]): string {
   return formatAmount(amount);
 }
 
+/** A number with the unit it is written in (oz, lb or units). */
+export interface Measured {
+  n: number;
+  unit: 'oz' | 'lb' | 'units';
+}
+
 /**
- * The numbers for an item's box in the Excel file, like Kunal's sheet: every line's amount in ounces and the item's total
- * in pounds when all sizes are ounces / pounds; the number of pieces for an item without sizes; otherwise the text.
+ * The numbers for an item's box in the Excel file, like Kunal's sheet but with the unit written next to every number:
+ * every line's amount in ounces and the item's total in pounds when all sizes are ounces / pounds; the number of
+ * units for an item without sizes; otherwise the text.
  */
-export function sheetAmounts(block: Pick<PrepBlock, 'lines' | 'totalText' | 'quantity'>): { values: Array<number | string>; total: number | string } {
+export function sheetAmounts(block: Pick<PrepBlock, 'lines' | 'totalText' | 'quantity'>): { values: Array<Measured | string>; total: Measured | string } {
   const sizes = block.lines.map((l) => parsePortionAmount(l.portion));
   const round = (n: number) => Math.round(n * 100) / 100;
   if (sizes.every((s) => s && s.oz > 0 && s.grams === 0 && s.pieces === 0)) {
-    const values = block.lines.map((l, i) => round((sizes[i] as { oz: number }).oz * l.quantity));
-    return { values, total: round(values.reduce((a, b) => a + (b as number), 0) / 16) };
+    const ounces = block.lines.map((l, k) => round((sizes[k] as { oz: number }).oz * l.quantity));
+    return { values: ounces.map((n) => ({ n, unit: 'oz' as const })), total: { n: round(ounces.reduce((a, b) => a + b, 0) / 16), unit: 'lb' } };
   }
   if (sizes.every((s) => !s)) {
-    return { values: block.lines.map((l) => l.quantity), total: block.quantity };
+    return { values: block.lines.map((l) => ({ n: l.quantity, unit: 'units' as const })), total: { n: block.quantity, unit: 'units' } };
   }
-  return { values: block.lines.map((l) => l.amountText || l.quantity), total: blockTotal(block) };
+  return { values: block.lines.map((l) => l.amountText || `${l.quantity} ${l.quantity === 1 ? 'unit' : 'units'}`), total: blockTotal(block) };
 }
