@@ -43,14 +43,38 @@ describe('buildKitchenReport', () => {
     expect(kale.lines[0]).toMatchObject({ viaCombo: 'Veg Combo', viaSpice: 'Medium', spice: 'Medium', customerName: 'Dev', portion: '12Oz' });
     expect(r.cooked.some((b) => b.name === 'Veg Combo')).toBe(false);
   });
-  it('a combo in an eco container marks every one of its parts ECO; a combo without one marks none', () => {
-    const r = buildKitchenReport([row({ ...combo, orderId: 'E1', quantity: 1, customerName: 'Eco', isEco: true }), row({ ...combo, orderId: 'E2', quantity: 1, customerName: 'Plain', isEco: false })], byName);
-    for (const name of ['Kale Chane', 'Chapati']) {
-      const block = r.cooked.find((b) => b.name === name)!;
-      expect(block.lines.find((l) => l.customerName === 'Eco')!.isEco).toBe(true);
-      expect(block.lines.find((l) => l.customerName === 'Plain')!.isEco).toBe(false);
-      expect(block.eco).toBe(1);
-    }
+  it('a combo in an eco container marks its curry and rice ECO but never the chapati; the spice goes on the main dish only', () => {
+    const full = {
+      name: 'Veg Combo',
+      spiceLevel: 'Spicy',
+      sections: [
+        { _id: 'c', title: 'Veg Curry of the Day', selectedItems: [{ _id: 'c1', portion: '12Oz', item: { _id: 'f1', name: 'Kale Chane' } }] },
+        { _id: 'v', title: 'Vegetable of the Day', selectedItems: [{ _id: 'v1', portion: '8Oz', item: { _id: 'f2', name: 'Palak Paneer' } }] },
+        { _id: 's', title: 'Choice of Staple', selectedItems: [{ _id: 's1', portion: null, item: { _id: 'f3', name: 'Chapati' } }, { _id: 's2', portion: '8Oz', item: { _id: 'f4', name: 'Jeera Rice' } }] },
+      ],
+    };
+    const r = buildKitchenReport([
+      row({ ...full, orderId: 'E1', customerName: 'Eco', isEco: true, comboSelections: { c: ['c1'], v: ['v1'], s: ['s1'] } }),
+      row({ ...full, orderId: 'E2', customerName: 'Rice', isEco: true, comboSelections: { c: ['c1'], v: ['v1'], s: ['s2'] } }),
+      row({ ...full, orderId: 'E3', customerName: 'Plain', isEco: false, comboSelections: { c: ['c1'], v: ['v1'], s: ['s1'] } }),
+    ], () => 'cooked');
+    const line = (item: string, who: string) => r.cooked.find((b) => b.name === item)!.lines.find((l) => l.customerName === who)!;
+    expect([line('Kale Chane', 'Eco').isEco, line('Palak Paneer', 'Eco').isEco, line('Chapati', 'Eco').isEco, line('Jeera Rice', 'Rice').isEco]).toEqual([true, true, false, true]);
+    expect([line('Kale Chane', 'Plain').isEco, line('Chapati', 'Plain').isEco]).toEqual([false, false]);
+    expect(r.cooked.find((b) => b.name === 'Chapati')!.eco).toBe(0);
+    expect([line('Kale Chane', 'Eco').spice, line('Palak Paneer', 'Eco').spice, line('Chapati', 'Eco').spice, line('Jeera Rice', 'Rice').spice]).toEqual(['Spicy', null, null, null]);
+  });
+  it('a non-veg combo puts the spice on its non-veg dish, and a combo with no curry-like section uses the first section', () => {
+    const nonVeg = { name: 'Non-Veg Combo', spiceLevel: 'Hot', sections: [
+      { _id: 'a', title: 'Non Veg dish of the day', selectedItems: [{ _id: 'a1', portion: '12Oz', item: { _id: 'g1', name: 'Chicken Rogan Josh' } }] },
+      { _id: 'b', title: 'Choice of Staples', selectedItems: [{ _id: 'b1', portion: '8Oz', item: { _id: 'g2', name: 'Jeera Rice' } }] }], comboSelections: { a: ['a1'], b: ['b1'] } };
+    const r = buildKitchenReport([row({ ...nonVeg, customerName: 'N' })], () => 'cooked');
+    expect(r.cooked.find((b) => b.name === 'Chicken Rogan Josh')!.lines[0].spice).toBe('Hot');
+    expect(r.cooked.find((b) => b.name === 'Jeera Rice')!.lines[0].spice).toBeNull();
+    const odd = { ...nonVeg, sections: [{ _id: 'x', title: 'Main', selectedItems: [{ _id: 'x1', portion: '8Oz', item: { _id: 'h1', name: 'Mystery Main' } }] }, { _id: 'y', title: 'Side', selectedItems: [{ _id: 'y1', portion: '8Oz', item: { _id: 'h2', name: 'Mystery Side' } }] }], comboSelections: { x: ['x1'], y: ['y1'] } };
+    const r2 = buildKitchenReport([row({ ...odd, customerName: 'O' })], () => 'cooked');
+    expect(r2.cooked.find((b) => b.name === 'Mystery Main')!.lines[0].spice).toBe('Hot');
+    expect(r2.cooked.find((b) => b.name === 'Mystery Side')!.lines[0].spice).toBeNull();
   });
   it('lines go spice mild to hot (none last), smallest size first like Kunal\'s sheet, then by customer', () => {
     const r = buildKitchenReport([
