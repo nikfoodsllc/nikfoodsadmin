@@ -100,6 +100,33 @@ interface Atom {
   line: PrepLine;
 }
 
+/**
+ * Breads are never packed in an eco container, so a combo's eco container does not mark them.
+ * (Rice and the curries are.)
+ */
+export function isEcoEligiblePart(name: string): boolean {
+  return !/chapati|chapathi|roti|naan|paratha|phulka/i.test(name);
+}
+
+/**
+ * The names of the picked options of a combo's main dish: the section called "... Curry of the Day" or "... dish of the day",
+ * or the first section when none is called that. The combo's spice level belongs to this part only (the vegetable of the day
+ * and the staples have no spice).
+ */
+export function mainPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Set<string> {
+  const names = new Set<string>();
+  const sections = row.sections ?? [];
+  if (!sections.length || !row.comboSelections) return names;
+  const main = sections.find((s) => /curry|dish/i.test(clean(s.title))) ?? sections[0];
+  const picked = (main._id && row.comboSelections[main._id]) || [];
+  for (const id of picked) {
+    const option = main.selectedItems?.find((si) => si._id === id);
+    const name = clean(option?.item?.name);
+    if (name) names.add(name);
+  }
+  return names;
+}
+
 /** Every thing to make or pack: the items ordered on their own and the parts chosen inside combos. */
 function atomsOf(rows: KitchenRow[]): Atom[] {
   const atoms: Atom[] = [];
@@ -117,11 +144,12 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
     };
     const parts = comboParts(row);
     if (parts.length > 0) {
+      const mainNames = mainPartNames(row);
       for (const part of parts) {
         atoms.push({
           name: part.name,
           id: part.id ?? null,
-          line: { ...base, quantity: row.quantity, portion: part.portion, spice: clean(row.spiceLevel) || null, isEco: Boolean(row.isEco), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity) },
+          line: { ...base, quantity: row.quantity, portion: part.portion, spice: mainNames.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity) },
         });
       }
     } else {
