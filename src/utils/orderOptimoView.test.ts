@@ -41,3 +41,22 @@ describe('orderOptimoView', () => {
     expect(orderOptimoView({ state: 'weird', stops: [] }).tone).toBe('warn');
   });
 });
+
+import { OPTIMO_FILTER_OPTIONS, optimoFilterFor } from './orderOptimoView';
+
+describe('optimoFilterFor', () => {
+  it('maps each choice to the matching database filter', () => {
+    expect(optimoFilterFor('in')).toEqual({ 'optimo.state': 'sent' });
+    expect(optimoFilterFor('failed')).toEqual({ 'optimo.state': 'failed' });
+    expect(optimoFilterFor('removed')).toEqual({ 'optimo.state': 'removed' });
+    expect(optimoFilterFor('none')).toEqual({ optimo: { $exists: false } });
+  });
+
+  it('means no filter for all, nothing or an unknown word', () => {
+    for (const v of ['all', '', undefined, null, 'x', '$ne']) expect(optimoFilterFor(v as never)).toBeNull();
+  });
+
+  it('every dropdown choice is handled', () => {
+    for (const o of OPTIMO_FILTER_OPTIONS) if (o.value !== 'all') expect(optimoFilterFor(o.value)).not.toBeNull();
+  });
+});
