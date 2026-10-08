@@ -30,6 +30,7 @@ import {
   type StickerLine,
 } from '@/utils/kitchenReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
+import { buildReportPdf } from '@/utils/reportPdf';
 import { buildReportSheets, rowTone, TONE_COLORS, type RowTone } from '@/utils/kitchenReportSheets';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
@@ -231,6 +232,7 @@ export default function KitchenReportPage() {
   // search: an item, a customer, an order number or a combo
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -292,6 +294,28 @@ export default function KitchenReportPage() {
 
   const customProblem = preset === 'custom' ? validateRange(custom) : null;
 
+  // Print: the PDF version of the Excel file, opened in a new tab (print or save it from there)
+  const printPdf = async () => {
+    if (!data || !range) return;
+    const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
+    // the tab is opened right now, while the click still counts, and filled when the PDF is ready
+    const tab = window.open('', '_blank');
+    tab?.document.write('<p style="font-family:sans-serif;padding:24px">Making the PDF...</p>');
+    setPrinting(true);
+    try {
+      const sheets = buildReportSheets({ cooked, notSet, stickers, days: dayBlocks });
+      const title = `${formatRangeLabel(range)}${searching ? ` · search: ${search.trim()}` : ''}`;
+      const blob = await buildReportPdf(sheets, title);
+      if (tab) tab.location.href = URL.createObjectURL(blob);
+      else downloadBlob(blob, `kitchen-report-${label}.pdf`); // the browser blocked the new tab: save the file instead
+    } catch (e) {
+      tab?.close();
+      setError(e instanceof Error ? `Could not make the PDF: ${e.message}` : 'Could not make the PDF');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   const download = async () => {
     if (!data || !range) return;
     const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
@@ -327,8 +351,8 @@ export default function KitchenReportPage() {
           <Button variant="outlined" size="small" startIcon={<IconFileSpreadsheet size={16} />} onClick={download} disabled={!data || loading || exporting} sx={{ textTransform: 'none', fontWeight: 600 }}>
             {exporting ? 'Making the file...' : 'Download Excel'}
           </Button>
-          <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} onClick={() => window.print()} disabled={!data || loading} sx={{ textTransform: 'none', fontWeight: 600 }}>
-            Print
+          <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} onClick={printPdf} disabled={!data || loading || printing} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            {printing ? 'Making the PDF...' : 'Print (PDF)'}
           </Button>
           <Tooltip title="Reload">
             <span>
