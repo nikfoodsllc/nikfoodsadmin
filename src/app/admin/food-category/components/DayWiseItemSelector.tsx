@@ -409,7 +409,7 @@ useEffect(() => {
               }
               label={
                 <Typography component="span" variant="caption" sx={{ color: '#555' }}>
-                  Lock row
+                  Lock row (repeats weekly)
                 </Typography>
               }
               sx={{
@@ -580,7 +580,7 @@ useEffect(() => {
           Date-wise Item Assignment
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Unchecks all date assignments except rows with Lock enabled">
+          <Tooltip title="Unchecks all date assignments except locked rows">
             <Chip
               label="Clear All"
               onClick={handleClearAll}
@@ -600,7 +600,7 @@ useEffect(() => {
       <Typography variant="body2" sx={{ color: '#666', marginBottom: 2 }}>
         Select items that will be available for each configured date. Items will only appear in the category on their assigned dates.
         Only dates with "Day-wise Category" enabled in the Availability Calendar are shown.
-        Use <strong>Lock</strong> on a row to keep its date selections when you click Clear All.
+        Use <strong>Lock</strong> on a row to repeat it every week: it keeps its date selections when you click Clear All, and it is switched on automatically for the same weekdays when you enable the next week&apos;s days in Manage Days. Press Save Changes after locking.
         {showSubCategoryGroups && (
           <>
             {' '}

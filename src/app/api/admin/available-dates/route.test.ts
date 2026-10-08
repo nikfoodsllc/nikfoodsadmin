@@ -7,6 +7,8 @@ vi.mock('@/lib/jwt', () => ({ jwtHandler: { verifyToken: (t: string) => verifyTo
 
 const invalidate = vi.fn();
 vi.mock('@/lib/invalidateHomeMenuCache', () => ({ invalidateLivesiteHomeMenuCacheAndWait: () => invalidate() }));
+const applyLocked = vi.fn();
+vi.mock('@/lib/server/lockedMenu', () => ({ applyLockedMenuToDates: (...a: unknown[]) => applyLocked(...a) }));
 
 const readOne = vi.fn();
 const read = vi.fn();
@@ -48,6 +50,8 @@ beforeEach(() => {
   createMany.mockResolvedValue({ success: true, ids: ['a'] });
   del.mockResolvedValue({ success: true, deletedCount: 0 });
   invalidate.mockResolvedValue(true);
+  applyLocked.mockReset();
+  applyLocked.mockResolvedValue({ added: 2, days: [] });
 });
 
 describe('POST: custom cutoff', () => {
@@ -238,5 +242,56 @@ describe('PUT (month-wide save: delete + reinsert)', () => {
     expect(res.status).toBe(500);
     expect(del).not.toHaveBeenCalled();
     expect(createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('locked rows repeat onto days that are switched on for day-wise ordering', () => {
+  it('POST: a brand new day with day-wise on', async () => {
+    readOne.mockResolvedValueOnce({ success: true, data: null }).mockResolvedValueOnce({ success: true, data: { ...existing } });
+    const res = await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true }));
+    expect(res.status).toBe(201);
+    expect(applyLocked).toHaveBeenCalledWith([DAY]);
+    expect((await res.json()).lockedItemsAdded).toBe(2);
+  });
+  it('POST: a brand new day with day-wise off does nothing', async () => {
+    readOne.mockResolvedValueOnce({ success: true, data: null }).mockResolvedValueOnce({ success: true, data: { ...existing } });
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: false }));
+    expect(applyLocked).not.toHaveBeenCalled();
+  });
+  it('POST: an existing day switched from off to on', async () => {
+    readOne.mockResolvedValueOnce({ success: true, data: { ...existing, dayWiseCategoryEnabled: false } }).mockResolvedValue({ success: true, data: existing });
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true }));
+    expect(applyLocked).toHaveBeenCalledWith([DAY]);
+  });
+  it('POST: a day that was already on (for example a cutoff change) is not touched again', async () => {
+    readOne.mockResolvedValueOnce({ success: true, data: { ...existing, dayWiseCategoryEnabled: true } }).mockResolvedValue({ success: true, data: existing });
+    await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true }));
+    expect(applyLocked).not.toHaveBeenCalled();
+  });
+  it('POST: a failure while repeating the rows never fails the day save', async () => {
+    applyLocked.mockRejectedValue(new Error('boom'));
+    readOne.mockResolvedValueOnce({ success: true, data: { ...existing, dayWiseCategoryEnabled: false } }).mockResolvedValue({ success: true, data: existing });
+    const res = await POST(req('POST', { date: DAY, flatCategoryEnabled: true, dayWiseCategoryEnabled: true }));
+    expect(res.status).toBe(200);
+  });
+  it('PUT: only the days switched on by this save', async () => {
+    // reads: (1) custom cutoffs in the range, (2) days already on, (3) the final list
+    read
+      .mockResolvedValueOnce({ success: true, data: [] })
+      .mockResolvedValueOnce({ success: true, data: [{ _id: 'k', date: '2026-10-08', dayWiseCategoryEnabled: true }] })
+      .mockResolvedValue({ success: true, data: [] });
+    const res = await PUT(
+      req('PUT', {
+        startDate: '2026-10-01',
+        endDate: '2026-10-31',
+        dates: [
+          { date: '2026-10-08', flatCategoryEnabled: true, dayWiseCategoryEnabled: true }, // already on
+          { date: '2026-10-15', flatCategoryEnabled: true, dayWiseCategoryEnabled: true }, // new
+          { date: '2026-10-16', flatCategoryEnabled: true, dayWiseCategoryEnabled: false }, // not day-wise
+        ],
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(applyLocked).toHaveBeenCalledWith(['2026-10-15']);
   });
 });
