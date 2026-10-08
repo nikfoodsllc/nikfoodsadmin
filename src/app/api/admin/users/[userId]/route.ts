@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { UserDocument } from '@/types/user';
 import { ObjectId } from 'mongodb';
+import { normalizeUsPhone } from '@/utils/userAdmin';
 
 function verifyAuth(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -83,7 +84,14 @@ export async function PUT(
     }
 
     if (phone !== undefined) {
-      updateData.phone = phone || '';
+      const typed = (phone ?? '').toString().trim();
+      if (typed) {
+        const normalized = normalizeUsPhone(typed);
+        if (!normalized) return NextResponse.json({ error: 'The phone number must be 10 digits' }, { status: 400 });
+        updateData.phone = normalized;
+      } else {
+        updateData.phone = '';
+      }
     }
 
     const updateResult = await db.updateOne<UserDocument>(
