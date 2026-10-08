@@ -9,6 +9,7 @@ import { safeFormatCurrency } from '@/utils/currency';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView, type EmailTone } from '@/utils/orderEmailStatus';
+import { orderOptimoView } from '@/utils/orderOptimoView';
 
 const EMAIL_TONES: Record<EmailTone, { bg: string; color: string }> = {
   good: { bg: '#DCFCE7', color: '#166534' },
@@ -40,6 +41,7 @@ export default function OrderTableRow({
   const refundedAmount = getRefundedAmount(order);
   const instructionToDriver = order.address?.floor || '-';
   const emailView = orderEmailStatusView(order.emailStatus, order.emailDelivery);
+  const optimoView = orderOptimoView(order.optimo);
 
   const cells: Record<string, ReactNode> = {
     // Select
@@ -157,6 +159,23 @@ export default function OrderTableRow({
             )}
             {emailView.detail && (
               <Typography sx={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>{emailView.detail}</Typography>
+            )}
+          </span>
+        </Tooltip>
+      </TableCell>
+    ),
+    // OptimoRoute (key optimo): whether the delivery stop is in the route planner (In OptimoRoute, Failed, Removed; a dash when nothing was sent)
+    optimo: (
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Tooltip title={optimoView.title} arrow>
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+            {optimoView.tone === 'none' ? (
+              <Typography variant="body2" sx={{ fontSize: '13px', color: '#9CA3AF' }}>{optimoView.label}</Typography>
+            ) : (
+              <Chip size="small" label={optimoView.label} sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: EMAIL_TONES[optimoView.tone].bg, color: EMAIL_TONES[optimoView.tone].color }} />
+            )}
+            {optimoView.detail && (
+              <Typography sx={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>{optimoView.detail}</Typography>
             )}
           </span>
         </Tooltip>

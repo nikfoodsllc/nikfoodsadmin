@@ -249,6 +249,12 @@ export interface Order {
     openCount?: number;
     filledFromHistory?: boolean;
   };
+  /** Where the delivery stop(s) stand in OptimoRoute, written by the live site when it sends them */
+  optimo?: {
+    state?: 'sent' | 'failed' | 'removed' | string;
+    at?: Date | string;
+    stops?: Array<{ date?: string; result?: string; orderNo?: string; error?: string }>;
+  };
   paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
   createdAt?: Date | string;
   updatedAt?: Date | string;
