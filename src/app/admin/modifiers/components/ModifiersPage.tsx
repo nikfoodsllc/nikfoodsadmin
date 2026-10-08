@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchBox } from '@/hooks/useSearchBox';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { Box, Button, Typography, Alert, Snackbar, CircularProgress } from '@mui/material';
 import { IconPlus } from '@tabler/icons-react';
 import { FoodModifier, ModifierItemType } from '@/types/modifier';
@@ -25,9 +27,12 @@ export default function ModifiersPage() {
   });
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('');
   const [itemTypeFilter, setItemTypeFilter] = useState<ModifierItemType | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  // what is typed vs what the list is filtered by (it follows the box after a typing pause); only the newest load may update the list
+  const searchBox = useSearchBox(() => setCurrentPage(1));
+  const searchQuery = searchBox.query;
+  const beginRequest = useLatestRequest();
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 10;
 
@@ -40,6 +45,7 @@ export default function ModifiersPage() {
   };
 
   const fetchModifiers = useCallback(async () => {
+    const request = beginRequest();
     try {
       if (!token || !isAuthenticated) {
         throw new Error('No authentication token found');
@@ -56,6 +62,7 @@ export default function ModifiersPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: request.signal,
       });
 
       if (!response.ok) {
@@ -63,15 +70,17 @@ export default function ModifiersPage() {
       }
 
       const data = await response.json();
+      if (!request.isCurrent()) return; // a newer search replaced this one
       setModifiers(data.data?.modifiers || []);
       setTotalItems(data.data?.total || 0);
     } catch (error) {
+      if (request.signal.aborted || !request.isCurrent()) return; // cancelled by a newer search
       console.error('Error fetching modifiers:', error);
       showSnackbar('Failed to load modifiers', 'error');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [token, isAuthenticated, searchQuery, itemTypeFilter, currentPage]);
+  }, [token, isAuthenticated, searchQuery, itemTypeFilter, currentPage, beginRequest]);
 
   useEffect(() => {
     fetchModifiers();
@@ -168,8 +177,7 @@ export default function ModifiersPage() {
   };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    setCurrentPage(1);
+    searchBox.setInput(query);
   };
 
   const handleItemTypeFilter = (itemType: ModifierItemType | 'all') => {
@@ -240,7 +248,7 @@ export default function ModifiersPage() {
         <ModifiersTable
           modifiers={modifiers}
           loading={loading}
-          searchQuery={searchQuery}
+          searchQuery={searchBox.input}
           itemTypeFilter={itemTypeFilter}
           currentPage={currentPage}
           totalPages={totalPages}

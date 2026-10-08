@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchBox } from '@/hooks/useSearchBox';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -50,7 +52,6 @@ export default function MinCartValuePage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedZipcode, setSelectedZipcode] = useState<Zipcode | null>(null);
   const [zipcodeToDelete, setZipcodeToDelete] = useState<Zipcode | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 20;
@@ -62,6 +63,16 @@ export default function MinCartValuePage() {
   // Inline editing state
   const [editingCellId, setEditingCellId] = useState<string | null>(null); // Format: "rowId-field"
   const [editedValues, setEditedValues] = useState<Map<string, EditedZipcode>>(new Map());
+
+  // what is typed vs what the list is filtered by (it follows the box after a typing pause); only the newest load may update the list
+  const searchBox = useSearchBox(() => {
+    setCurrentPage(1); // Reset to first page on search
+    setSelectedIds(new Set()); // Clear selection when searching
+    setBulkEditMode(false);
+    setEditedValues(new Map());
+  });
+  const searchQuery = searchBox.query;
+  const beginRequest = useLatestRequest();
 
   // Batch save state
   const [batchSaveLoading, setBatchSaveLoading] = useState(false);
@@ -108,6 +119,7 @@ export default function MinCartValuePage() {
 
   // Fetch zipcodes
   const fetchZipcodes = useCallback(async () => {
+    const request = beginRequest();
     try {
       setLoading(true);
       if (!token || !isAuthenticated) {
@@ -124,6 +136,7 @@ export default function MinCartValuePage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: request.signal,
       });
 
       if (!response.ok) {
@@ -131,15 +144,17 @@ export default function MinCartValuePage() {
       }
 
       const data = await response.json();
+      if (!request.isCurrent()) return; // a newer search replaced this one
       setZipcodes(data.data?.items || []);
       setTotalItems(data.data?.total || 0);
     } catch (error) {
+      if (request.signal.aborted || !request.isCurrent()) return; // cancelled by a newer search
       console.error('Error fetching zipcodes:', error);
       showSnackbar('Failed to load delivery zones', 'error');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [searchQuery, currentPage, token, isAuthenticated]);
+  }, [searchQuery, currentPage, token, isAuthenticated, beginRequest]);
 
   // Fetch zipcodes on mount and when dependencies change
   useEffect(() => {
@@ -246,12 +261,8 @@ export default function MinCartValuePage() {
       showSnackbar('Please save or discard changes before searching', 'error');
       return;
     }
-    setSearchQuery(query);
-    setCurrentPage(1); // Reset to first page on search
-    // Clear selection when searching
-    setSelectedIds(new Set());
-    setBulkEditMode(false);
-    setEditedValues(new Map());
+    // the list, page and selection follow after the typing pause (see useSearchBox above)
+    searchBox.setInput(query);
     setEditingCellId(null);
   };
 
@@ -809,7 +820,7 @@ export default function MinCartValuePage() {
       <Box sx={{ marginBottom: 3 }}>
         <TextField
           placeholder="Search by zipcode or label..."
-          value={searchQuery}
+          value={searchBox.input}
           onChange={(e) => handleSearch(e.target.value)}
           size="small"
           disabled={bulkEditMode && hasUnsavedChanges}

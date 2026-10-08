@@ -46,19 +46,24 @@ export default function CustomerSection({
     if (timer.current) clearTimeout(timer.current);
     if (query.trim().length < 2) {
       setResults([]);
+      setSearching(false);
       return;
     }
+    // an answer that arrives after a newer search started (or after the box changed) must not replace the list
+    let stale = false;
     timer.current = setTimeout(async () => {
       setSearching(true);
       try {
         const res = await fetch(`/api/admin/create-order/customers?q=${encodeURIComponent(query.trim())}`, { headers: { Authorization: `Bearer ${token}` } });
         const body = await res.json().catch(() => ({}));
+        if (stale) return;
         setResults(res.ok && body.success ? body.data : []);
       } finally {
-        setSearching(false);
+        if (!stale) setSearching(false);
       }
     }, 350);
     return () => {
+      stale = true;
       if (timer.current) clearTimeout(timer.current);
     };
   }, [query, token]);
