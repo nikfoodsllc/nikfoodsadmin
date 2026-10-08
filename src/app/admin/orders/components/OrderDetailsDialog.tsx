@@ -34,6 +34,7 @@ import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
+import { orderDayHeading } from '@/utils/orderDays';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -302,15 +303,18 @@ export default function OrderDetailsDialog({
           <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}>
             Order Items
           </Typography>
-          {order.items.map((dayOrder, dayIndex) => (
+          {order.items.map((dayOrder, dayIndex) => {
+            const heading = orderDayHeading(dayOrder);
+            return (
             <Box key={dayIndex} sx={{ marginBottom: 2 }}>
               <Box>
+                {/* the menu day with its own date; a day combined into a later delivery says so on the line below */}
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#4F8CFF', marginBottom: 0.5 }}>
-                  {dayOrder.day} - {dayOrder.actualDeliveryDate ? formatPSTDate(dayOrder.actualDeliveryDate) : formatPSTDate(dayOrder.deliveryDate)}
+                  {heading.menuDay} - {formatPSTDate(dayOrder.deliveryDate)}
                 </Typography>
-                {dayOrder.actualDeliveryDate && String(dayOrder.actualDeliveryDate) !== String(dayOrder.deliveryDate) && (
-                  <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                    (Original: {formatPSTDate(dayOrder.deliveryDate)})
+                {heading.deliveredOn && (
+                  <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 600 }}>
+                    Delivered on {heading.deliveredOn.weekday}, {formatPSTDate(heading.deliveredOn.date)}
                   </Typography>
                 )}
               </Box>
@@ -441,7 +445,8 @@ export default function OrderDetailsDialog({
                 </Table>
               </TableContainer>
             </Box>
-          ))}
+            );
+          })}
         </Box>
 
         <Divider sx={{ marginY: 2 }} />
