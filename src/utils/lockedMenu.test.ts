@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, isDateKey, kitchenWeekStart, lockedItemPlacement, weekdayIndex } from './lockedMenu';
+import { addDays, isDateKey, isTodayOrLater, kitchenWeekStart, lockedItemPlacement, weekdayIndex } from './lockedMenu';
 
 // Oct 8 2026 is a Thursday, Oct 9 a Friday
 const thuFri = [{ day: '2026-10-08', sequence: 3 }, { day: '2026-10-09', sequence: 5 }];
@@ -66,5 +66,23 @@ describe('lockedItemPlacement', () => {
   });
   it('a gap of weeks still uses the last week it was on', () => {
     expect(lockedItemPlacement('2026-11-05', thuFri)).toEqual({ sequence: 3 });
+  });
+});
+
+describe('isTodayOrLater (Pacific time)', () => {
+  const nineThirtyPm = new Date('2026-10-08T04:30:00Z'); // 9:30 PM on Wed Oct 7 in Seattle (already Oct 8 in UTC)
+  it('today counts, even late in the evening when it is already tomorrow in UTC', () => {
+    expect(isTodayOrLater('2026-10-07', nineThirtyPm)).toBe(true);
+  });
+  it('yesterday and earlier do not, tomorrow and later do', () => {
+    expect(isTodayOrLater('2026-10-06', nineThirtyPm)).toBe(false);
+    expect(isTodayOrLater('2026-10-08', nineThirtyPm)).toBe(true);
+    expect(isTodayOrLater('2026-12-31', nineThirtyPm)).toBe(true);
+  });
+  it('early morning Pacific is still the same Pacific day', () => {
+    expect(isTodayOrLater('2026-10-07', new Date('2026-10-07T08:00:00Z'))).toBe(true);
+  });
+  it('not a date', () => {
+    expect(isTodayOrLater('Thursday', nineThirtyPm)).toBe(false);
   });
 });
