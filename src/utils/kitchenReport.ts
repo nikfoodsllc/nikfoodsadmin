@@ -38,6 +38,8 @@ export interface PrepLine {
   deliveredOn: string | null;
   /** The day it is delivered: the kitchen day, or the later day it was combined into or moved to */
   deliveryDate: string;
+  /** Set when an admin moved this item to another date: the kitchen day it was first picked for */
+  movedFrom: string | null;
   quantity: number;
   portion: string | null;
   spice: string | null;
@@ -71,6 +73,7 @@ export interface StickerLine {
   day: string;
   deliveredOn: string | null;
   deliveryDate: string;
+  movedFrom: string | null;
   portion: string | null;
   quantity: number;
   spice: string | null;
@@ -110,6 +113,7 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
       day: row.day,
       deliveredOn: row.deliveredOn && row.deliveredOn !== row.day ? row.deliveredOn : null,
       deliveryDate: row.deliveredOn || row.day,
+      movedFrom: row.movedFrom && row.movedFrom !== row.day ? row.movedFrom : null,
     };
     const parts = comboParts(row);
     if (parts.length > 0) {
@@ -182,6 +186,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
         day: atom.line.day,
         deliveredOn: atom.line.deliveredOn,
         deliveryDate: atom.line.deliveryDate,
+        movedFrom: atom.line.movedFrom,
         portion: atom.line.portion,
         quantity: atom.line.quantity,
         spice: atom.line.spice,
