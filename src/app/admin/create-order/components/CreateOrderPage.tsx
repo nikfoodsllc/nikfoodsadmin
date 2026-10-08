@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, Typography, useMediaQuery, type Theme } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, Typography, useMediaQuery, type Theme } from '@mui/material';
 import { IconShoppingCart, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -271,7 +271,6 @@ export default function CreateOrderPage() {
     <Box sx={{ maxWidth: form && wide ? 1320 : 760, mx: 'auto', pb: form && !wide ? 11 : 6 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <Typography variant="h5" sx={{ fontWeight: 800 }}>Create Order</Typography>
-        <Chip label="BETA" size="small" color="warning" sx={{ fontWeight: 800 }} />
       </Box>
       <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 2 }}>
         Enter an order for a customer who ordered by phone or in person. Prices come from the live menu. This is a master tool: no cutoff, delivery area or day rules apply.

@@ -1,5 +1,5 @@
 /**
- * Helpers for the Create Order (BETA) screen: the menu as the customer site sends it, the lines the admin picks,
+ * Helpers for the Create Order screen: the menu as the customer site sends it, the lines the admin picks,
  * and the checks that run before anything is sent. Prices shown here are estimates; the customer site works out
  * the real ones (the screen always shows its numbers as the total).
  */
