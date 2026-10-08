@@ -47,6 +47,7 @@ export default function OrdersPage() {
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('all');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
   const [selectedOptimo, setSelectedOptimo] = useState('all');
+  const [selectedRescheduled, setSelectedRescheduled] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sortBy, setSortBy] = useState('date_desc');
@@ -130,6 +131,7 @@ export default function OrdersPage() {
       if (selectedPaymentStatus !== 'all') params.append('paymentStatus', selectedPaymentStatus);
       if (selectedPaymentMethod !== 'all') params.append('paymentMethod', selectedPaymentMethod);
       if (selectedOptimo !== 'all') params.append('optimo', selectedOptimo);
+      if (selectedRescheduled !== 'all') params.append('rescheduled', selectedRescheduled);
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       if (sortBy) params.append('sortBy', sortBy);
@@ -173,12 +175,27 @@ export default function OrdersPage() {
     } finally {
       if (seq === fetchSeq.current) setLoading(false);
     }
-  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, startDate, endDate, sortBy, currentPage, token]);
+  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedRescheduled, startDate, endDate, sortBy, currentPage, token]);
 
   // Fetch orders when filters change
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // After a delivery date was moved or the customer was emailed: reload the list and the open order
+  const handleOrderChanged = async () => {
+    const orderId = selectedOrder?.orderId;
+    await fetchOrders();
+    if (!orderId || !token) return;
+    try {
+      const response = await fetch(`/api/admin/orders?search=${encodeURIComponent(orderId)}&limit=5`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json();
+      const fresh = (data.data?.items || []).find((o: Order) => o.orderId === orderId);
+      if (fresh) setSelectedOrder(fresh);
+    } catch (error) {
+      console.error('Error reloading the order:', error);
+    }
+  };
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
@@ -281,6 +298,12 @@ export default function OrdersPage() {
     setSelectedOrderIds(new Set());
   };
 
+  const handleRescheduledChange = (value: string) => {
+    setSelectedRescheduled(value);
+    setCurrentPage(1);
+    setSelectedOrderIds(new Set());
+  };
+
   const handleClearFilters = () => {
     setSearchInput('');
     setSearchQuery('');
@@ -288,6 +311,7 @@ export default function OrdersPage() {
     setSelectedPaymentStatus('all');
     setSelectedPaymentMethod('all');
     setSelectedOptimo('all');
+    setSelectedRescheduled('all');
     setStartDate('');
     setEndDate('');
     setSortBy('date_desc');
@@ -529,6 +553,7 @@ export default function OrdersPage() {
           selectedPaymentStatus={selectedPaymentStatus}
           selectedPaymentMethod={selectedPaymentMethod}
           selectedOptimo={selectedOptimo}
+          selectedRescheduled={selectedRescheduled}
           startDate={startDate}
           endDate={endDate}
           sortBy={sortBy}
@@ -537,6 +562,7 @@ export default function OrdersPage() {
           onPaymentStatusChange={handlePaymentStatusChange}
           onPaymentMethodChange={handlePaymentMethodChange}
           onOptimoChange={handleOptimoChange}
+          onRescheduledChange={handleRescheduledChange}
           onStartDateChange={handleStartDateChange}
           onEndDateChange={handleEndDateChange}
           onSortByChange={handleSortByChange}
@@ -582,6 +608,8 @@ export default function OrdersPage() {
         loading={dialogLoading}
         onClose={handleDialogClose}
         onStatusUpdate={handleStatusUpdate}
+        token={token}
+        onOrderChanged={handleOrderChanged}
       />
 
       {/* Export to CSV Dialog */}
@@ -596,6 +624,7 @@ export default function OrdersPage() {
         selectedPaymentStatus={selectedPaymentStatus}
         selectedPaymentMethod={selectedPaymentMethod}
         selectedOptimo={selectedOptimo}
+        selectedRescheduled={selectedRescheduled}
           startDate={startDate}
           endDate={endDate}
           sortBy={sortBy}

@@ -32,6 +32,7 @@ interface ExportToCsvDialogProps {
   selectedPaymentStatus?: string;
   selectedPaymentMethod?: string;
   selectedOptimo?: string;
+  selectedRescheduled?: string;
   startDate?: string;
   endDate?: string;
   sortBy?: string;
@@ -48,6 +49,7 @@ export default function ExportToCsvDialog({
   selectedPaymentStatus = 'all',
   selectedPaymentMethod = 'all',
   selectedOptimo = 'all',
+  selectedRescheduled = 'all',
   startDate = '',
   endDate = '',
   sortBy = 'date_desc',
@@ -79,7 +81,7 @@ export default function ExportToCsvDialog({
     if (open && useCurrentFilters) {
       fetchOrdersForExport();
     }
-  }, [useCurrentFilters, open, searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, exportStartDate, exportEndDate, sortBy]);
+  }, [useCurrentFilters, open, searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedRescheduled, exportStartDate, exportEndDate, sortBy]);
 
   const fetchOrdersForExport = async () => {
     if (!token) return;
@@ -96,6 +98,7 @@ export default function ExportToCsvDialog({
       if (selectedPaymentStatus !== 'all') params.append('paymentStatus', selectedPaymentStatus);
       if (selectedPaymentMethod !== 'all') params.append('paymentMethod', selectedPaymentMethod);
       if (selectedOptimo !== 'all') params.append('optimo', selectedOptimo);
+      if (selectedRescheduled !== 'all') params.append('rescheduled', selectedRescheduled);
       
       // Use export dates if not using current filters, otherwise use the dates from props
       const effectiveStartDate = useCurrentFilters ? exportStartDate : exportStartDate;
@@ -177,7 +180,7 @@ export default function ExportToCsvDialog({
     }
   };
 
-  const hasActiveFilters = searchQuery || selectedStatus !== 'all' || selectedPaymentStatus !== 'all' || selectedPaymentMethod !== 'all' || selectedOptimo !== 'all' || startDate || endDate;
+  const hasActiveFilters = searchQuery || selectedStatus !== 'all' || selectedPaymentStatus !== 'all' || selectedPaymentMethod !== 'all' || selectedOptimo !== 'all' || selectedRescheduled !== 'all' || startDate || endDate;
 
   return (
     <Dialog

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { Order, OrderStatus } from '@/types/order';
 import { ObjectId } from 'mongodb';
 import { optimoFilterFor } from '@/utils/orderOptimoView';
+import { rescheduledFilterFor } from '@/utils/orderReschedule';
 
 const VALID_ORDER_STATUSES: OrderStatus[] = [
   'pending',
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
     const paymentStatus = searchParams.get('paymentStatus') || 'all';
     const paymentMethod = searchParams.get('paymentMethod') || 'all';
     const optimo = searchParams.get('optimo') || 'all';
+    const rescheduled = searchParams.get('rescheduled') || 'all';
     const startDate = searchParams.get('startDate') || '';
     const endDate = searchParams.get('endDate') || '';
     const sortBy = searchParams.get('sortBy') || 'date_desc';
@@ -111,6 +113,8 @@ export async function GET(request: NextRequest) {
     // Filter by OptimoRoute (In OptimoRoute, Failed, Removed, Not sent)
     const optimoFilter = optimoFilterFor(optimo);
     if (optimoFilter) Object.assign(filter, optimoFilter);
+    const rescheduledFilter = rescheduledFilterFor(rescheduled);
+    if (rescheduledFilter) Object.assign(filter, rescheduledFilter);
 
     // Filter by date range
     if (startDate || endDate) {

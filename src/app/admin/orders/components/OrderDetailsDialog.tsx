@@ -35,6 +35,7 @@ import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
+import { DayRescheduleEditor, RescheduleBanner } from './RescheduleControls';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -42,6 +43,10 @@ interface OrderDetailsDialogProps {
   loading: boolean;
   onClose: () => void;
   onStatusUpdate: (orderId: string, newStatus: OrderStatus) => Promise<void>;
+  /** Login token, used to move the delivery date and to email the customer about it */
+  token?: string | null;
+  /** Reload the order after its delivery date was moved or the customer was emailed */
+  onOrderChanged?: () => Promise<void> | void;
 }
 
 export default function OrderDetailsDialog({
@@ -50,6 +55,8 @@ export default function OrderDetailsDialog({
   loading: _loading,
   onClose,
   onStatusUpdate,
+  token = null,
+  onOrderChanged,
 }: OrderDetailsDialogProps) {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('pending');
   const [updating, setUpdating] = useState(false);
@@ -142,6 +149,9 @@ export default function OrderDetailsDialog({
       </DialogTitle>
 
       <DialogContent sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 3 }}>
+        {/* The delivery date of this order was moved: what moved, by whom, and whether the customer was told */}
+        <RescheduleBanner order={order} token={token} onChanged={async () => { await onOrderChanged?.(); }} />
+
         {/* Order Header Info */}
         <Box sx={{ marginBottom: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
@@ -317,6 +327,7 @@ export default function OrderDetailsDialog({
                     Delivered on {heading.deliveredOn.weekday}, {formatPSTDate(heading.deliveredOn.date)}
                   </Typography>
                 )}
+                <DayRescheduleEditor order={order} dayIndex={dayIndex} token={token} onChanged={async () => { await onOrderChanged?.(); }} />
               </Box>
               <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #E5E7EB', marginBottom: 1 }}>
                 <Table size="small" sx={{ '& .MuiTableCell-root': { px: { xs: 0.75, sm: 2 } } }}>
