@@ -127,6 +127,8 @@ export interface KitchenRow {
   /** The day the items are finally delivered (it can differ from `day` when a day was combined into another). */
   deliveredOn?: string | null;
   orderStatus?: string | null;
+  /** The day the order was placed (Pacific time), 'YYYY-MM-DD'. */
+  orderedOn?: string | null;
 }
 
 export interface CountLine {

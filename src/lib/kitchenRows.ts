@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { formatPSTDateISO } from '@/utils/timezone';
 import { toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 
 /**
@@ -30,6 +31,7 @@ export async function fetchKitchenRows(range: DayRange): Promise<KitchenRow[]> {
         _id: 0,
         orderId: 1,
         orderStatus: '$status',
+        orderedAt: '$createdAt',
         customerName: '$customerInfo.name',
         day: '$items.deliveryDate',
         deliveredOn: '$items.actualDeliveryDate',
@@ -68,6 +70,7 @@ export async function fetchKitchenRows(range: DayRange): Promise<KitchenRow[]> {
       customerName: typeof raw.customerName === 'string' ? raw.customerName : null,
       deliveredOn: toDayString(raw.deliveredOn),
       orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
+      orderedOn: raw.orderedAt ? formatPSTDateISO(raw.orderedAt) || null : null,
     });
   }
   return rows;

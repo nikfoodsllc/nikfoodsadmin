@@ -30,10 +30,14 @@ export type PrepGroup = 'cooked' | 'ready_to_eat' | 'not_set';
 export interface PrepLine {
   orderId: string;
   customerName: string;
+  /** The day the order was placed */
+  orderedOn: string | null;
   /** The menu (kitchen) day */
   day: string;
   /** The day it is delivered, when that is later than the kitchen day */
   deliveredOn: string | null;
+  /** The day it is delivered: the kitchen day, or the later day it was combined into or moved to */
+  deliveryDate: string;
   quantity: number;
   portion: string | null;
   spice: string | null;
@@ -63,8 +67,10 @@ export interface StickerLine {
   item: string;
   customerName: string;
   orderId: string;
+  orderedOn: string | null;
   day: string;
   deliveredOn: string | null;
+  deliveryDate: string;
   portion: string | null;
   quantity: number;
   spice: string | null;
@@ -100,8 +106,10 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
     const base = {
       orderId: row.orderId,
       customerName: clean(row.customerName) || 'Unknown customer',
+      orderedOn: row.orderedOn ?? null,
       day: row.day,
       deliveredOn: row.deliveredOn && row.deliveredOn !== row.day ? row.deliveredOn : null,
+      deliveryDate: row.deliveredOn || row.day,
     };
     const parts = comboParts(row);
     if (parts.length > 0) {
@@ -170,8 +178,10 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
         item: atom.name,
         customerName: atom.line.customerName,
         orderId: atom.line.orderId,
+        orderedOn: atom.line.orderedOn,
         day: atom.line.day,
         deliveredOn: atom.line.deliveredOn,
+        deliveryDate: atom.line.deliveryDate,
         portion: atom.line.portion,
         quantity: atom.line.quantity,
         spice: atom.line.spice,
@@ -183,7 +193,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
   const blocks = [...groups.values()].map((g) => blockOf(g.name, g.group, g.lines)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   stickers.sort(
     (a, b) =>
-      (a.deliveredOn ?? a.day).localeCompare(b.deliveredOn ?? b.day) ||
+      a.deliveryDate.localeCompare(b.deliveryDate) ||
       a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
       a.item.localeCompare(b.item, undefined, { sensitivity: 'base' }) ||
       a.orderId.localeCompare(b.orderId)
@@ -207,7 +217,7 @@ export function blockTotal(block: Pick<PrepBlock, 'totalText' | 'quantity'>): st
 
 /** Kunal's sheet as rows: one block per item separated by a blank row, the item's total and eco count on its first row. */
 export function prepCsvRows(blocks: PrepBlock[]): string[][] {
-  const rows: string[][] = [['Item', 'Item total', 'Eco containers', 'Customer', 'Spice', 'Size', 'Qty', 'Amount', 'Eco', 'With combo', 'Kitchen day', 'Delivered']];
+  const rows: string[][] = [['Item', 'Item total', 'Eco containers', 'Customer', 'Spice', 'Size', 'Qty', 'Amount', 'Eco', 'With combo', 'Order date', 'Kitchen date', 'Delivery date']];
   blocks.forEach((block, bi) => {
     if (bi > 0) rows.push([]);
     block.lines.forEach((line, li) => {
@@ -222,8 +232,9 @@ export function prepCsvRows(blocks: PrepBlock[]): string[][] {
         line.amountText,
         line.isEco ? 'ECO' : '',
         line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '',
+        line.orderedOn ?? '',
         line.day,
-        line.deliveredOn ?? '',
+        line.deliveryDate,
       ]);
     });
   });
@@ -232,8 +243,8 @@ export function prepCsvRows(blocks: PrepBlock[]): string[][] {
 
 export function stickersCsvRows(stickers: StickerLine[]): string[][] {
   return [
-    ['Delivery day', 'Customer', 'Item', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Order'],
-    ...stickers.map((s) => [s.deliveredOn ?? s.day, s.customerName, s.item, s.portion ?? '', String(s.quantity), s.spice ?? '', s.isEco ? 'ECO' : '', s.viaCombo ?? '', s.orderId]),
+    ['Delivery date', 'Customer', 'Item', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Order', 'Order date', 'Kitchen date'],
+    ...stickers.map((s) => [s.deliveryDate, s.customerName, s.item, s.portion ?? '', String(s.quantity), s.spice ?? '', s.isEco ? 'ECO' : '', s.viaCombo ?? '', s.orderId, s.orderedOn ?? '', s.day]),
   ];
 }
 

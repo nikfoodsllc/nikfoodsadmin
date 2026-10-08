@@ -59,7 +59,22 @@ const PRINT_CSS = `
 
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
-function LineRow({ line, showDay }: { line: PrepLine; showDay: boolean }) {
+/** When the order was placed, the day the kitchen cooks it and the day it is delivered (amber when that is a later day). */
+function DatesLine({ orderedOn, kitchenDay, deliveryDate }: { orderedOn: string | null; kitchenDay: string; deliveryDate: string }) {
+  const later = deliveryDate !== kitchenDay;
+  return (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.25, rowGap: 0, fontSize: 12, color: '#6B7280', lineHeight: 1.45, mt: 0.15 }}>
+      {orderedOn && <span>Ordered {formatDayShort(orderedOn)}</span>}
+      <span>Kitchen {formatDayShort(kitchenDay)}</span>
+      <Box component="span" sx={later ? { color: '#B45309', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 0.4 } : undefined}>
+        {later && <IconTruckDelivery size={13} style={{ flexShrink: 0 }} />}
+        Delivery {formatDayShort(deliveryDate)}
+      </Box>
+    </Box>
+  );
+}
+
+function LineRow({ line }: { line: PrepLine }) {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, py: 0.9, borderTop: '1px solid #F3F4F6' }}>
       <Box sx={{ minWidth: 0 }}>
@@ -70,13 +85,7 @@ function LineRow({ line, showDay }: { line: PrepLine; showDay: boolean }) {
             {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
           </Typography>
         )}
-        {showDay && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{formatDayShort(line.day)}</Typography>}
-        {line.deliveredOn && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#B45309' }}>
-            <IconTruckDelivery size={13} style={{ flexShrink: 0 }} />
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'inherit' }}>Delivered {formatDayShort(line.deliveredOn)}</Typography>
-          </Box>
-        )}
+        <DatesLine orderedOn={line.orderedOn} kitchenDay={line.day} deliveryDate={line.deliveryDate} />
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '62%' }}>
         {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
@@ -90,7 +99,7 @@ function LineRow({ line, showDay }: { line: PrepLine; showDay: boolean }) {
   );
 }
 
-function PrepCard({ block, showDay, warn }: { block: PrepBlock; showDay: boolean; warn?: boolean }) {
+function PrepCard({ block, warn }: { block: PrepBlock; warn?: boolean }) {
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
@@ -106,7 +115,7 @@ function PrepCard({ block, showDay, warn }: { block: PrepBlock; showDay: boolean
       </Box>
       <Box sx={{ px: 2, pb: 0.25 }}>
         {block.lines.map((line, i) => (
-          <LineRow key={`${line.orderId}-${i}`} line={line} showDay={showDay} />
+          <LineRow key={`${line.orderId}-${i}`} line={line} />
         ))}
       </Box>
     </Paper>
@@ -117,7 +126,7 @@ function StickersTab({ stickers }: { stickers: StickerLine[] }) {
   const groups = useMemo(() => {
     const map = new Map<string, StickerLine[]>();
     for (const s of stickers) {
-      const key = s.deliveredOn ?? s.day;
+      const key = s.deliveryDate;
       map.set(key, [...(map.get(key) ?? []), s]);
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -138,6 +147,7 @@ function StickersTab({ stickers }: { stickers: StickerLine[] }) {
                   <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.customerName}</Typography>
                   <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{s.item}</Typography>
                   {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
+                  <DatesLine orderedOn={s.orderedOn} kitchenDay={s.day} deliveryDate={s.deliveryDate} />
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '55%' }}>
                   {s.spice && <Chip size="small" label={shortSpiceLabel(s.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
@@ -255,7 +265,6 @@ export default function KitchenReportPage() {
   }
 
   const customProblem = preset === 'custom' ? validateRange(custom) : null;
-  const multiDay = range ? range.startDate !== range.endDate : false;
   const cookedCount = data?.cooked.length ?? 0;
   const notSetCount = data?.notSet.length ?? 0;
 
@@ -360,13 +369,13 @@ export default function KitchenReportPage() {
           )}
           {cookedCount === 0 && notSetCount === 0 && <Typography sx={{ color: '#9CA3AF', py: 3 }}>Nothing to cook for these days.</Typography>}
           {data.cooked.map((block) => (
-            <PrepCard key={block.name} block={block} showDay={multiDay} />
+            <PrepCard key={block.name} block={block} />
           ))}
           {notSetCount > 0 && (
             <>
               <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mt: 3, mb: 1 }}>Preparation type not set yet</Typography>
               {data.notSet.map((block) => (
-                <PrepCard key={`notset-${block.name}`} block={block} showDay={multiDay} warn />
+                <PrepCard key={`notset-${block.name}`} block={block} warn />
               ))}
             </>
           )}
