@@ -256,6 +256,14 @@ export interface Order {
     stops?: Array<{ date?: string; result?: string; orderNo?: string; error?: string }>;
   };
   paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
+  /** Delivery dates an admin moved (oldest first); each change keeps what the day line was before */
+  reschedules?: Array<{
+    at: Date | string;
+    by?: { id?: string; name?: string };
+    changes: Array<{ index: number; fromDay: string; toDay: string; fromMenuDate: string; fromDeliveryDate: string; toDate: string }>;
+  }>;
+  /** When the customer was told about the new dates */
+  rescheduleEmail?: { sentAt: Date | string; by?: { id?: string; name?: string }; messageId?: string; count?: number };
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }

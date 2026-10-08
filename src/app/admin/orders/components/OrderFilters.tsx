@@ -10,6 +10,7 @@ interface OrderFiltersProps {
   selectedPaymentStatus: string;
   selectedPaymentMethod: string;
   selectedOptimo: string;
+  selectedRescheduled: string;
   startDate: string;
   endDate: string;
   sortBy: string;
@@ -18,6 +19,7 @@ interface OrderFiltersProps {
   onPaymentStatusChange: (value: string) => void;
   onPaymentMethodChange: (value: string) => void;
   onOptimoChange: (value: string) => void;
+  onRescheduledChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onSortByChange: (value: string) => void;
@@ -30,6 +32,7 @@ export default function OrderFilters({
   selectedPaymentStatus,
   selectedPaymentMethod,
   selectedOptimo,
+  selectedRescheduled,
   startDate,
   endDate,
   sortBy,
@@ -38,6 +41,7 @@ export default function OrderFilters({
   onPaymentStatusChange,
   onPaymentMethodChange,
   onOptimoChange,
+  onRescheduledChange,
   onStartDateChange,
   onEndDateChange,
   onSortByChange,
@@ -49,6 +53,7 @@ export default function OrderFilters({
     selectedPaymentStatus !== 'all' ||
     selectedPaymentMethod !== 'all' ||
     selectedOptimo !== 'all' ||
+    selectedRescheduled !== 'all' ||
     startDate ||
     endDate ||
     sortBy !== 'date_desc';
@@ -188,6 +193,21 @@ export default function OrderFilters({
                 {option.value === 'all' ? 'All' : option.label}
               </MenuItem>
             ))}
+          </Select>
+        </FormControl>
+
+        {/* Rescheduled Filter (an admin moved the delivery date) */}
+        <FormControl size="small" sx={{ minWidth: 170 }}>
+          <InputLabel>Rescheduled</InputLabel>
+          <Select
+            value={selectedRescheduled}
+            label="Rescheduled"
+            onChange={(e) => onRescheduledChange(e.target.value)}
+            sx={{ backgroundColor: '#fff' }}
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="yes">Rescheduled</MenuItem>
+            <MenuItem value="no">Not rescheduled</MenuItem>
           </Select>
         </FormControl>
 

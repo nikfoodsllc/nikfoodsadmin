@@ -21,6 +21,7 @@ export const ORDERS_COLUMNS: OrdersColumnDef[] = [
   { key: 'orderId', label: 'Order ID', defaultWidth: 200, skeleton: 'text', skeletonWidth: 130 },
   { key: 'customerName', label: 'Customer Name', defaultWidth: 160, skeleton: 'text', skeletonWidth: 100 },
   { key: 'orderStatus', label: 'Order Status', defaultWidth: 115, skeleton: 'pill', skeletonWidth: 85 },
+  { key: 'rescheduled', label: 'Rescheduled', defaultWidth: 150, skeleton: 'pill', skeletonWidth: 90 },
   { key: 'paymentStatus', label: 'Payment Status', defaultWidth: 150, skeleton: 'pill', skeletonWidth: 80 },
   { key: 'instruction', label: 'Instruction to Driver', defaultWidth: 150, skeleton: 'text', skeletonWidth: 100 },
   { key: 'paymentMethod', label: 'Payment Method', defaultWidth: 135, skeleton: 'text', skeletonWidth: 75 },

@@ -25,6 +25,7 @@ export const GLOSSARY_SECTIONS = [
   'Orders: payment method',
   'Orders: Confirmation Email column',
   'Orders: OptimoRoute column',
+  'Orders: moving a delivery date',
   'Orders: money columns',
   'Orders: card payment problems',
   'Create Order and Recent orders',
@@ -88,6 +89,14 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: OptimoRoute column', 'Remove failed', 'Orders table, OptimoRoute; order details', 'The order was cancelled or fully refunded but its stop could not be removed from OptimoRoute (for example the day is being planned). Delete the stop in OptimoRoute by hand.', 'bad'),
   e('Orders: OptimoRoute column', 'Removed', 'Orders table, OptimoRoute', 'The order was cancelled or fully refunded, so its stop was taken out of OptimoRoute.', 'warn'),
   e('Orders: OptimoRoute column', '- (dash)', 'Orders table, OptimoRoute', 'Nothing was sent to OptimoRoute: the order is unpaid, pending or cancelled, is older than the sync (before Oct 8), or its delivery day had already passed.', 'none', 'dash empty blank'),
+
+  // ---- moving a delivery date
+  e('Orders: moving a delivery date', 'Change date', 'Order details, under each day', 'Moves one day of a paid order to another delivery date. The kitchen day and the delivery date both move to the new date (the Kitchen Dashboard and the reports follow), and the stop in OptimoRoute moves with it. Any date from today to 120 days ahead can be picked, also one that has already closed for ordering. Only paid orders that are confirmed, preparing or ready can be moved.', undefined, 'reschedule move delivery date'),
+  e('Orders: moving a delivery date', 'Rescheduled', 'Orders table, Rescheduled column; Rescheduled filter', 'This order has had a delivery date moved by an admin. The row is tinted amber with an amber edge. Hover for what moved, who did it and whether the customer was emailed.', 'warn', 'reschedule moved'),
+  e('Orders: moving a delivery date', 'Customer not told', 'Orders table, Rescheduled column', 'The date was moved but the customer has not been emailed since. Open the order and press "Send email to customer".', 'bad'),
+  e('Orders: moving a delivery date', 'Customer emailed', 'Orders table, Rescheduled column; order details', 'The customer was sent the "delivery date updated" email after the last move. If the date is moved again, it goes back to "Customer not told".', 'good'),
+  e('Orders: moving a delivery date', 'Send email to customer', 'Order details, amber banner', 'Sends the customer an email with the new delivery date(s) and what is on each day. Support gets an identical copy. It is never sent by itself; press it when you are ready (after all moves).'),
+  e('Orders: moving a delivery date', 'Delivery date moved', 'Order details, amber banner', 'Shows the original and the new dates, who moved them and when. If an order is moved back to its original date, it says so and no email is needed.'),
 
   // ---- money columns
   e('Orders: money columns', 'Subtotal', 'Orders table, order details', 'The food total before taxes, fees and tip.'),
