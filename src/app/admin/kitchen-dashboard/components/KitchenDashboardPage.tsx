@@ -9,6 +9,7 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  InputAdornment,
   Paper,
   Skeleton,
   Tab,
@@ -17,7 +18,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { IconRefresh, IconTruckDelivery } from '@tabler/icons-react';
+import { IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ItemOrdersDialog from './ItemOrdersDialog';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
@@ -30,6 +31,7 @@ import {
   getPresetRange,
   spiceLineText,
   deliveryNote,
+  filterBlockBySearch,
   validateRange,
   type DayRange,
   type KitchenBlock,
@@ -286,6 +288,8 @@ export default function KitchenDashboardPage() {
   const [week, setWeek] = useState<KitchenBlock | null>(null);
   // 'days' = one card per day, 'week' = the whole range added up
   const [tab, setTab] = useState<'days' | 'week'>('days');
+  // search by item name (a combo also by the parts chosen in it)
+  const [search, setSearch] = useState('');
   // the item whose orders are shown (day null = every day of the range)
   const [trace, setTrace] = useState<{ item: string; day: string | null } | null>(null);
   // which weekdays to show and in what order; saved per admin (same mechanism as the table columns)
@@ -348,7 +352,14 @@ export default function KitchenDashboardPage() {
   }
   if (!isAuthenticated) return null;
 
-  const days = arrangeKitchenDays(allDays, dayLayout.allColumns.map((c) => c.key), dayLayout.hiddenKeys);
+  const arrangedDays = arrangeKitchenDays(allDays, dayLayout.allColumns.map((c) => c.key), dayLayout.hiddenKeys);
+  const searching = search.trim().length > 0;
+  // while searching, a day with nothing that matches is left out and the others show only what matches
+  const days = searching
+    ? arrangedDays.map((d) => filterBlockBySearch(d, search)).filter((d) => d.items.length > 0 || d.combos.length > 0)
+    : arrangedDays;
+  const weekShown = week && searching ? filterBlockBySearch(week, search) : week;
+  const matchCount = tab === 'week' ? (weekShown ? weekShown.items.length + weekShown.combos.length : 0) : days.reduce((n, d) => n + d.items.length + d.combos.length, 0);
   const hiddenDays = allDays.length - days.length;
   const totalUnits = days.reduce((sum, d) => sum + d.totals.units, 0);
   const busyDays = days.filter((d) => d.items.length > 0 || d.combos.length > 0).length;
@@ -445,8 +456,34 @@ export default function KitchenDashboardPage() {
           <Tab value="week" label={preset === 'custom' ? 'Total for these dates' : 'Week total'} sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40 }} />
         </Tabs>
       )}
+      {range && !error && (
+        <TextField
+          size="small"
+          fullWidth
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search items, for example rajma or paneer"
+          inputProps={{ 'aria-label': 'Search items' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <IconSearch size={18} />
+              </InputAdornment>
+            ),
+            endAdornment: searching ? (
+              <InputAdornment position="end">
+                <IconButton size="small" aria-label="Clear the search" onClick={() => setSearch('')}>
+                  <IconX size={16} />
+                </IconButton>
+              </InputAdornment>
+            ) : undefined,
+          }}
+          sx={{ maxWidth: 520, mb: 1.5, bgcolor: '#fff' }}
+        />
+      )}
       {range && !loading && !error && (
         <Typography sx={{ fontSize: 13, color: '#6B7280', mb: 1.5 }}>
+          {searching ? `${matchCount} ${matchCount === 1 ? 'match' : 'matches'} for “${search.trim()}”. ` : ''}
           Tap an item to see who ordered it.
           {tab === 'week' && hiddenDays > 0 ? ' Days you hide under “By day” are still counted here.' : ''}
         </Typography>
@@ -465,9 +502,11 @@ export default function KitchenDashboardPage() {
       {tab === 'week' && range ? (
         loading ? (
           <Skeleton variant="rounded" height={320} sx={{ maxWidth: 760 }} />
-        ) : week ? (
+        ) : weekShown && searching && weekShown.items.length === 0 && weekShown.combos.length === 0 ? (
+          <Typography sx={{ color: '#6B7280' }}>No item matches “{search.trim()}” in these dates.</Typography>
+        ) : weekShown ? (
           <WeekCard
-            block={week}
+            block={weekShown}
             title={preset === 'custom' ? 'Total for these dates' : 'Week total'}
             subtitle={formatRangeLabel(range)}
             onSelectItem={(name) => setTrace({ item: name, day: null })}
@@ -480,6 +519,9 @@ export default function KitchenDashboardPage() {
             : days.map((day) => (
                 <DayCard key={day.day} day={day} isToday={day.day === today} onSelectItem={(name) => setTrace({ item: name, day: day.day })} />
               ))}
+          {!loading && searching && days.length === 0 && (
+            <Typography sx={{ color: '#6B7280', gridColumn: '1 / -1' }}>No item matches “{search.trim()}” on these days.</Typography>
+          )}
         </Box>
       )}
 

@@ -607,3 +607,35 @@ export function toDayString(value: unknown): string | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   return null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------------------------
+
+/** Lower case, accents removed, extra spaces gone, so 'Paneer  Tikka' and 'paneer tikka' compare equal. */
+function normalizeSearch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** True when every word of the query appears somewhere in the text (any order, any case); an empty query matches everything. */
+export function matchesSearch(text: string | null | undefined, query: string): boolean {
+  const words = normalizeSearch(query).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  const haystack = normalizeSearch(text ?? '');
+  return words.every((w) => haystack.includes(w));
+}
+
+/** A day (or the week) reduced to the items and combos that match a search; a combo also matches by the parts chosen in it. */
+export function filterBlockBySearch<T extends { items: KitchenItem[]; combos: KitchenCombo[] }>(block: T, query: string): T {
+  if (!normalizeSearch(query)) return block;
+  return {
+    ...block,
+    items: block.items.filter((i) => matchesSearch(i.name, query)),
+    combos: block.combos.filter((c) => matchesSearch(c.name, query) || c.parts.some((p) => matchesSearch(p.name, query))),
+  };
+}
