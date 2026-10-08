@@ -22,7 +22,6 @@ import {
   spiceRank,
   type KitchenRow,
 } from './kitchenDashboard';
-import { escapeCSVValue } from './csv';
 import type { PreparationType } from './preparationType';
 
 export type PrepGroup = 'cooked' | 'ready_to_eat' | 'not_set';
@@ -210,52 +209,6 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
 /** What to write as an item's total: the amount ('300 oz (18.75 lb)') or, without sizes, the number of pieces. */
 export function blockTotal(block: Pick<PrepBlock, 'totalText' | 'quantity'>): string {
   return block.totalText || String(block.quantity);
-}
-
-// ---------------------------------------------------------------------------------------------
-// CSV (rows of cells; the page turns them into a file)
-// ---------------------------------------------------------------------------------------------
-
-/** Kunal's sheet as rows: one block per item separated by a blank row, the item's total and eco count on its first row. */
-export function prepCsvRows(blocks: PrepBlock[]): string[][] {
-  const rows: string[][] = [['Item', 'Item total', 'Eco containers', 'Customer', 'Spice', 'Size', 'Qty', 'Amount', 'Eco', 'With combo', 'Order date', 'Kitchen date', 'Delivery date']];
-  blocks.forEach((block, bi) => {
-    if (bi > 0) rows.push([]);
-    block.lines.forEach((line, li) => {
-      rows.push([
-        block.name,
-        li === 0 ? blockTotal(block) : '',
-        li === 0 ? (block.eco ? String(block.eco) : '') : '',
-        line.customerName,
-        line.spice ?? '',
-        line.portion ?? '',
-        String(line.quantity),
-        line.amountText,
-        line.isEco ? 'ECO' : '',
-        line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '',
-        line.orderedOn ?? '',
-        line.day,
-        line.deliveryDate,
-      ]);
-    });
-  });
-  return rows;
-}
-
-export function stickersCsvRows(stickers: StickerLine[]): string[][] {
-  return [
-    ['Delivery date', 'Customer', 'Item', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Order', 'Order date', 'Kitchen date'],
-    ...stickers.map((s) => [s.deliveryDate, s.customerName, s.item, s.portion ?? '', String(s.quantity), s.spice ?? '', s.isEco ? 'ECO' : '', s.viaCombo ?? '', s.orderId, s.orderedOn ?? '', s.day]),
-  ];
-}
-
-/**
- * Rows of cells as the text of a CSV file (Excel-friendly: a byte order mark first, Windows line endings). A cell that
- * starts with = + - or @ gets a quote in front so a spreadsheet never runs it as a formula.
- */
-export function toCsvText(rows: string[][]): string {
-  const cell = (value: string) => escapeCSVValue(/^[=+\-@]/.test(value) ? `'${value}` : value);
-  return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
 // ---------------------------------------------------------------------------------------------
