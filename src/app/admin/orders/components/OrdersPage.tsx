@@ -41,6 +41,7 @@ export default function OrdersPage() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('all');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
+  const [selectedOptimo, setSelectedOptimo] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sortBy, setSortBy] = useState('date_desc');
@@ -108,6 +109,7 @@ export default function OrdersPage() {
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
       if (selectedPaymentStatus !== 'all') params.append('paymentStatus', selectedPaymentStatus);
       if (selectedPaymentMethod !== 'all') params.append('paymentMethod', selectedPaymentMethod);
+      if (selectedOptimo !== 'all') params.append('optimo', selectedOptimo);
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
       if (sortBy) params.append('sortBy', sortBy);
@@ -148,7 +150,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, startDate, endDate, sortBy, currentPage, token]);
+  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, startDate, endDate, sortBy, currentPage, token]);
 
   // Fetch orders when filters change
   useEffect(() => {
@@ -234,6 +236,12 @@ export default function OrdersPage() {
     setSelectedOrderIds(new Set());
   };
 
+  const handleOptimoChange = (value: string) => {
+    setSelectedOptimo(value);
+    setCurrentPage(1);
+    setSelectedOrderIds(new Set());
+  };
+
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
     setCurrentPage(1);
@@ -257,6 +265,7 @@ export default function OrdersPage() {
     setSelectedStatus('all');
     setSelectedPaymentStatus('all');
     setSelectedPaymentMethod('all');
+    setSelectedOptimo('all');
     setStartDate('');
     setEndDate('');
     setSortBy('date_desc');
@@ -497,6 +506,7 @@ export default function OrdersPage() {
           selectedStatus={selectedStatus}
           selectedPaymentStatus={selectedPaymentStatus}
           selectedPaymentMethod={selectedPaymentMethod}
+          selectedOptimo={selectedOptimo}
           startDate={startDate}
           endDate={endDate}
           sortBy={sortBy}
@@ -504,6 +514,7 @@ export default function OrdersPage() {
           onStatusChange={handleStatusChange}
           onPaymentStatusChange={handlePaymentStatusChange}
           onPaymentMethodChange={handlePaymentMethodChange}
+          onOptimoChange={handleOptimoChange}
           onStartDateChange={handleStartDateChange}
           onEndDateChange={handleEndDateChange}
           onSortByChange={handleSortByChange}
@@ -562,6 +573,7 @@ export default function OrdersPage() {
         selectedStatus={selectedStatus}
         selectedPaymentStatus={selectedPaymentStatus}
         selectedPaymentMethod={selectedPaymentMethod}
+        selectedOptimo={selectedOptimo}
           startDate={startDate}
           endDate={endDate}
           sortBy={sortBy}

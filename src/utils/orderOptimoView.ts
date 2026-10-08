@@ -38,6 +38,31 @@ function datesOf(stops: OptimoStopLike[]): string {
   return [...new Set(stops.map((s) => shortDate(s.date)).filter(Boolean))].join(' · ');
 }
 
+/** The OptimoRoute filter on the Orders page: what each choice means in the database (see orderOptimoView for the labels). */
+export const OPTIMO_FILTER_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'in', label: 'In OptimoRoute' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'removed', label: 'Removed' },
+  { value: 'none', label: 'Not sent (-)' },
+] as const;
+
+/** The database filter for a choice ('all' or an unknown word means no filter). 'Failed' includes a stop that could not be removed. */
+export function optimoFilterFor(value: string | null | undefined): Record<string, unknown> | null {
+  switch (value) {
+    case 'in':
+      return { 'optimo.state': 'sent' };
+    case 'failed':
+      return { 'optimo.state': 'failed' };
+    case 'removed':
+      return { 'optimo.state': 'removed' };
+    case 'none':
+      return { optimo: { $exists: false } };
+    default:
+      return null;
+  }
+}
+
 export function orderOptimoView(optimo: OptimoLike | null | undefined): OptimoView {
   const stops = (optimo?.stops ?? []).filter((s): s is OptimoStopLike => Boolean(s));
   if (!optimo || (!optimo.state && stops.length === 0)) return NONE;
