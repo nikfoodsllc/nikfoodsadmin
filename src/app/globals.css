@@ -41,6 +41,15 @@ body {
   overflow-x: hidden;
 }
 
+/*
+ * <html> already clips sideways overflow. Left as "hidden" on <body> too, body becomes its own (never scrolling) scroll
+ * container, and then position: sticky inside the page (the Create Order "Order & payment" panel) cannot follow the page
+ * scroll. "clip" clips the same way without making a scroll container.
+ */
+body {
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--font-inter);
   color: var(--text);

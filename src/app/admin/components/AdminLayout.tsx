@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from './Sidebar';
@@ -14,6 +14,10 @@ interface AdminLayoutProps {
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, loading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  // The content area scrolls its own overflow (overflowY auto), which turns it into a scroll container that never scrolls and
+  // stops position: sticky from following the page. Create Order has a sticky 'Order & payment' panel, so it opts out.
+  const keepsStickyPanel = pathname?.startsWith('/admin/create-order') ?? false;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -118,7 +122,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             flex: 1,
             padding: { xs: 2, sm: 3, md: 4 },
             backgroundColor: '#f5f5f5',
-            overflowY: 'auto',
+            overflowY: keepsStickyPanel ? 'visible' : 'auto',
           }}
         >
           {children}
