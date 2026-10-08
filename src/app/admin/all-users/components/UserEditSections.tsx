@@ -101,7 +101,7 @@ export function AddressEditor({ user, address, token, onSaved, onCancel }: { use
         {text('City', 'city')}
         {text('Zip code', 'postal_code', { inputProps: { inputMode: 'numeric', maxLength: 10 } })}
         {text('Gate / entrance code (optional)', 'entrance', { inputProps: { maxLength: 30 } })}
-        <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{text('Delivery instructions (optional)', 'floor', { inputProps: { maxLength: 30 } })}</Box>
+        <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{text('Delivery instructions (optional)', 'floor', { inputProps: { maxLength: 100 } })}</Box>
         {text('Contact name', 'name')}
         {text('Contact phone (10 digits, optional)', 'phone', { inputProps: { inputMode: 'tel' } })}
         <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{text('Contact email', 'email', { type: 'email' })}</Box>

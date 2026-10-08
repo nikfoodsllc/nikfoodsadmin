@@ -161,7 +161,7 @@ export default function CustomerSection({
           {field('City', address.city, (v) => onAddress({ ...address, city: v }))}
           {field('Zip code', address.postal_code, (v) => onAddress({ ...address, postal_code: v.replace(/[^\d-]/g, '').slice(0, 10) }), { inputProps: { inputMode: 'numeric' } })}
           {field('Gate / entrance code (optional)', address.entrance, (v) => onAddress({ ...address, entrance: v }))}
-          <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{field('Delivery instructions (optional)', address.floor, (v) => onAddress({ ...address, floor: v.slice(0, 30) }))}</Box>
+          <Box sx={{ gridColumn: { sm: '1 / -1' } }}>{field('Delivery instructions (optional)', address.floor, (v) => onAddress({ ...address, floor: v.slice(0, 100) }))}</Box>
         </Box>
         </>
       )}
