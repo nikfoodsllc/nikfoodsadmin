@@ -10,6 +10,8 @@ import ChangePasswordDialog from './ChangePasswordDialog';
 import { UserDocument } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useSearchBox } from '@/hooks/useSearchBox';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 
 type AdminUserWithoutPassword = Omit<UserDocument, 'password'>;
 
@@ -27,7 +29,10 @@ export default function AdminUsersPage() {
   const [adminForPasswordReset, setAdminForPasswordReset] = useState<AdminUserWithoutPassword | null>(null);
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('');
+  // what is typed vs what the list is filtered by (it follows the box after a typing pause); only the newest load may update the list
+  const searchBox = useSearchBox();
+  const searchQuery = searchBox.query;
+  const beginRequest = useLatestRequest();
   const [includeInactive, _setIncludeInactive] = useState(true);
 
   const [snackbar, setSnackbar] = useState<{
@@ -67,6 +72,7 @@ export default function AdminUsersPage() {
       return;
     }
 
+    const request = beginRequest();
     try {
       setLoading(true);
 
@@ -79,6 +85,7 @@ export default function AdminUsersPage() {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: request.signal,
       });
 
       if (!response.ok) {
@@ -86,14 +93,16 @@ export default function AdminUsersPage() {
       }
 
       const data = await response.json();
+      if (!request.isCurrent()) return; // a newer search replaced this one
       setAdmins(data.data || []);
     } catch (error) {
+      if (request.signal.aborted || !request.isCurrent()) return; // cancelled by a newer search
       console.error('Error fetching admins:', error);
       showSnackbar('Failed to load admin users', 'error');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [searchQuery, includeInactive, isAuthenticated, token]);
+  }, [searchQuery, includeInactive, isAuthenticated, token, beginRequest]);
 
   // Fetch admins when filters change
   useEffect(() => {
@@ -206,7 +215,7 @@ export default function AdminUsersPage() {
   };
 
   const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
+    searchBox.setInput(value);
   };
 
   const activeAdmins = admins.filter(admin => admin.isActive !== false).length;
@@ -295,7 +304,7 @@ export default function AdminUsersPage() {
         <AdminUsersTable
           admins={admins}
           loading={loading}
-          searchQuery={searchQuery}
+          searchQuery={searchBox.input}
           onSearchChange={handleSearchChange}
           onEditAdmin={handleEditAdmin}
           onDeactivateAdmin={handleDeactivateAdmin}

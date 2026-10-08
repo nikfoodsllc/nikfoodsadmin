@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useSearchBox } from '@/hooks/useSearchBox';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -220,14 +222,17 @@ export default function FoodItemsPage() {
   const [addMenuAnchor, setAddMenuAnchor] =
     useState<null | HTMLElement>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
-
   // Column filters (veg, available, type, preparation type) + the rows ticked for the bulk update
   const [filters, setFilters] = useState<FoodItemFilters>(DEFAULT_FOOD_ITEM_FILTERS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
+
+  // what is typed vs what the list is filtered by (it follows the box after a typing pause); only the newest load may update the list
+  const searchBox = useSearchBox(() => setCurrentPage(1));
+  const searchQuery = searchBox.query;
+  const beginRequest = useLatestRequest();
 
   const [totalItems, setTotalItems] = useState(0);
 
@@ -333,6 +338,7 @@ export default function FoodItemsPage() {
   }, [token]);
 
   const fetchItems = useCallback(async () => {
+    const request = beginRequest();
     try {
       setLoading(true);
 
@@ -355,25 +361,29 @@ export default function FoodItemsPage() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          signal: request.signal,
         }
       );
 
       const data = await response.json();
+      if (!request.isCurrent()) return; // a newer search replaced this one
 
       setItems(data.data?.items || []);
       setTotalItems(data.data?.total || 0);
     } catch (error) {
+      if (request.signal.aborted || !request.isCurrent()) return; // cancelled by a newer search
       console.error(error);
 
       showSnackbar('Failed to fetch items', 'error');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
   }, [
     token,
     searchQuery,
     filters,
     currentPage,
+    beginRequest,
   ]);
 
   useEffect(() => {
@@ -724,11 +734,8 @@ export default function FoodItemsPage() {
       {/* FILTERS */}
 
       <TableFilters
-        searchValue={searchQuery}
-        onSearchChange={(value) => {
-          setSearchQuery(value);
-          setCurrentPage(1);
-        }}
+        searchValue={searchBox.input}
+        onSearchChange={(value) => searchBox.setInput(value)}
         filters={filters}
         onFilterChange={(key, value) => {
           setFilters((prev) => ({ ...prev, [key]: value }));
