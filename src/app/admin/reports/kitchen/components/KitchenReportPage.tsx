@@ -79,7 +79,8 @@ function DatesLine({ orderedOn, kitchenDay, deliveryDate }: { orderedOn: string 
 
 function LineRow({ line }: { line: PrepLine }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, py: 0.9, borderTop: '1px solid #F3F4F6' }}>
+    <Box sx={{ py: 0.9, borderTop: '1px solid #F3F4F6' }}>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
       <Box sx={{ minWidth: 0 }}>
         <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{line.customerName}</Typography>
         {line.viaCombo && (
@@ -88,7 +89,6 @@ function LineRow({ line }: { line: PrepLine }) {
             {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
           </Typography>
         )}
-        <DatesLine orderedOn={line.orderedOn} kitchenDay={line.day} deliveryDate={line.deliveryDate} />
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '62%' }}>
         {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
@@ -98,6 +98,8 @@ function LineRow({ line }: { line: PrepLine }) {
         {line.amountText && <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', whiteSpace: 'nowrap' }}>{line.amountText}</Typography>}
         {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
       </Box>
+    </Box>
+    <DatesLine orderedOn={line.orderedOn} kitchenDay={line.day} deliveryDate={line.deliveryDate} />
     </Box>
   );
 }
@@ -145,18 +147,20 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
           </Box>
           <Box sx={{ px: 2, pb: 0.25 }}>
             {list.map((s, i) => (
-              <Box key={`${s.orderId}-${i}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, py: 0.9, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
+              <Box key={`${s.orderId}-${i}`} sx={{ py: 0.9, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.customerName}</Typography>
                   <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{s.item}</Typography>
                   {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
-                  <DatesLine orderedOn={s.orderedOn} kitchenDay={s.day} deliveryDate={s.deliveryDate} />
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '55%' }}>
                   {s.spice && <Chip size="small" label={shortSpiceLabel(s.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
                   <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>{s.portion ? `${s.portion} × ${s.quantity}` : `× ${s.quantity}`}</Typography>
                   {s.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
                 </Box>
+              </Box>
+              <DatesLine orderedOn={s.orderedOn} kitchenDay={s.day} deliveryDate={s.deliveryDate} />
               </Box>
             ))}
           </Box>
