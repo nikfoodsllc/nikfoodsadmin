@@ -31,7 +31,8 @@ describe('prep sheet (Kunal\'s layout)', () => {
   it('two margin columns, Kunal\'s five columns first, then the dates', () => {
     expect(sheet.margin).toBe(2);
     expect(sheet.rows[0].cells.slice(0, 5)).toEqual(['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty (oz)', 'Item total (lb) / ECO']);
-    expect(sheet.rows[0].cells.slice(5, 8)).toEqual(['Order date', 'Kitchen date', 'Delivery date']);
+    expect(sheet.rows[0].cells.slice(5, 7)).toEqual(['Kitchen date', 'Delivery date']);
+    expect(sheet.rows[0].cells).not.toContain('Order date');
   });
   it('one box per item: blocks separated by a blank row, header joined to the first box', () => {
     const kinds = sheet.rows.map((r) => r.kind);
@@ -60,7 +61,7 @@ describe('prep sheet (Kunal\'s layout)', () => {
   });
   it('dates are date cells', () => {
     const cat = rajma()[0];
-    expect(cat.cells.slice(5, 8)).toEqual([{ date: '2026-10-06' }, { date: '2026-10-13' }, { date: '2026-10-14' }]);
+    expect(cat.cells.slice(5, 7)).toEqual([{ date: '2026-10-13' }, { date: '2026-10-14' }]);
   });
   it('items without a type are listed under their own heading, each in its own box', () => {
     const i = sheet.rows.findIndex((r) => r.kind === 'section');
@@ -118,12 +119,14 @@ describe('the Excel file', () => {
     expect(prep.getRow(3).getCell(4).value).toBe('Amy');
     expect(fill(3)).toBe(`FF${TONE_COLORS.eco}`); // ECO row green
     expect(prep.getRow(3).getCell(7).value).toBe('ECO');
-    const orderDate = prep.getRow(2).getCell(8).value as Date;
-    expect(orderDate instanceof Date && orderDate.toISOString().slice(0, 10)).toBe('2026-10-06');
+    const kitchenDate = prep.getRow(2).getCell(8).value as Date;
+    expect(kitchenDate instanceof Date && kitchenDate.toISOString().slice(0, 10)).toBe('2026-10-13');
+    const deliveryDate = prep.getRow(2).getCell(9).value as Date;
+    expect(deliveryDate instanceof Date && deliveryDate.toISOString().slice(0, 10)).toBe('2026-10-13');
     // the outline: thick left edge on C, thick right edge on the last column, thick bottom on the last row of the box
     expect(prep.getRow(2).getCell(3).border?.left?.style).toBe('medium');
     expect(prep.getRow(3).getCell(3).border?.bottom?.style).toBe('medium');
-    expect(prep.getRow(2).getCell(11).border?.right?.style).toBe('medium');
+    expect(prep.getRow(2).getCell(10).border?.right?.style).toBe('medium'); // the last column of the box
     expect(prep.getRow(2).getCell(3).border?.bottom).toBeUndefined();
     expect(prep.getRow(1).getCell(3).border?.top?.style).toBe('medium');
     expect(prep.getRow(1).getCell(3).value).toBe('Item Name');

@@ -45,9 +45,9 @@ export interface SheetModel {
 
 const date = (value: string | null | undefined): SheetCell => ({ date: value || null });
 
-/** Kunal's columns first (Item Name, Customer Name, Spice Level, Total Ordered Qty, and the item total / ECO column), then the dates. */
-const PREP_HEADER = ['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty (oz)', 'Item total (lb) / ECO', 'Order date', 'Kitchen date', 'Delivery date', 'With combo'];
-const PREP_WIDTHS = [30, 24, 16, 22, 20, 15, 15, 15, 28];
+/** Kunal's columns first (Item Name, Customer Name, Spice Level, Total Ordered Qty, and the item total / ECO column), then the kitchen and delivery dates (the day the order was placed is not needed here). */
+const PREP_HEADER = ['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty (oz)', 'Item total (lb) / ECO', 'Kitchen date', 'Delivery date', 'With combo'];
+const PREP_WIDTHS = [30, 24, 16, 22, 20, 15, 15, 28];
 
 /**
  * One box per item, like Kunal's Kitchen Prep sheet: a thick outline round the block, the item's total (pounds, or pieces
@@ -73,7 +73,6 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
           amounts.values[li],
           // the item's total on its first row; an eco row says ECO (a first row that is also eco is marked by its green)
           li === 0 ? amounts.total : eco ? 'ECO' : '',
-          date(line.orderedOn),
           date(line.day),
           date(line.deliveryDate),
           line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '',
@@ -84,7 +83,7 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
 }
 
 export function prepSheet(cooked: PrepBlock[], notSet: PrepBlock[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: [0, 1, 2, 3, 4, 5, 6, 7, 8], rightCells: [3, 4] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: [0, 1, 2, 3, 4, 5, 6, 7], rightCells: [3, 4] }];
   prepRows(cooked, rows, true);
   if (notSet.length > 0) {
     if (cooked.length > 0) rows.push({ kind: 'blank', cells: [] });
