@@ -2,12 +2,14 @@
 
 import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment, Button } from '@mui/material';
 import { IconSearch, IconFilterOff } from '@tabler/icons-react';
+import { OPTIMO_FILTER_OPTIONS } from '@/utils/orderOptimoView';
 
 interface OrderFiltersProps {
   searchValue: string;
   selectedStatus: string;
   selectedPaymentStatus: string;
   selectedPaymentMethod: string;
+  selectedOptimo: string;
   startDate: string;
   endDate: string;
   sortBy: string;
@@ -15,6 +17,7 @@ interface OrderFiltersProps {
   onStatusChange: (value: string) => void;
   onPaymentStatusChange: (value: string) => void;
   onPaymentMethodChange: (value: string) => void;
+  onOptimoChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onSortByChange: (value: string) => void;
@@ -26,6 +29,7 @@ export default function OrderFilters({
   selectedStatus,
   selectedPaymentStatus,
   selectedPaymentMethod,
+  selectedOptimo,
   startDate,
   endDate,
   sortBy,
@@ -33,6 +37,7 @@ export default function OrderFilters({
   onStatusChange,
   onPaymentStatusChange,
   onPaymentMethodChange,
+  onOptimoChange,
   onStartDateChange,
   onEndDateChange,
   onSortByChange,
@@ -43,6 +48,7 @@ export default function OrderFilters({
     selectedStatus !== 'all' ||
     selectedPaymentStatus !== 'all' ||
     selectedPaymentMethod !== 'all' ||
+    selectedOptimo !== 'all' ||
     startDate ||
     endDate ||
     sortBy !== 'date_desc';
@@ -165,6 +171,23 @@ export default function OrderFilters({
             <MenuItem value="Zelle">Zelle</MenuItem>
             <MenuItem value="Other">Other</MenuItem>
             <MenuItem value="Cash on Delivery">Cash on Delivery</MenuItem>
+          </Select>
+        </FormControl>
+
+        {/* OptimoRoute Filter (is the delivery stop in the route planner) */}
+        <FormControl size="small" sx={{ minWidth: 170 }}>
+          <InputLabel>OptimoRoute</InputLabel>
+          <Select
+            value={selectedOptimo}
+            label="OptimoRoute"
+            onChange={(e) => onOptimoChange(e.target.value)}
+            sx={{ backgroundColor: '#fff' }}
+          >
+            {OPTIMO_FILTER_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.value === 'all' ? 'All' : option.label}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
 

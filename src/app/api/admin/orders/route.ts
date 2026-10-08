@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { Order, OrderStatus } from '@/types/order';
 import { ObjectId } from 'mongodb';
+import { optimoFilterFor } from '@/utils/orderOptimoView';
 
 const VALID_ORDER_STATUSES: OrderStatus[] = [
   'pending',
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'all';
     const paymentStatus = searchParams.get('paymentStatus') || 'all';
     const paymentMethod = searchParams.get('paymentMethod') || 'all';
+    const optimo = searchParams.get('optimo') || 'all';
     const startDate = searchParams.get('startDate') || '';
     const endDate = searchParams.get('endDate') || '';
     const sortBy = searchParams.get('sortBy') || 'date_desc';
@@ -103,6 +105,10 @@ export async function GET(request: NextRequest) {
     if (paymentMethod && paymentMethod !== 'all') {
       filter.paymentMethod = paymentMethod;
     }
+
+    // Filter by OptimoRoute (In OptimoRoute, Failed, Removed, Not sent)
+    const optimoFilter = optimoFilterFor(optimo);
+    if (optimoFilter) Object.assign(filter, optimoFilter);
 
     // Filter by date range
     if (startDate || endDate) {
