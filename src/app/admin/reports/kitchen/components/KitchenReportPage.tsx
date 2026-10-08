@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
-import { IconDownload, IconPrinter, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
+import { IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { formatPSTDateISO } from '@/utils/timezone';
@@ -23,15 +23,13 @@ import {
   blockTotal,
   filterBlocksBySearch,
   filterStickersBySearch,
-  prepCsvRows,
-  stickersCsvRows,
-  toCsvText,
   type KitchenReport,
   type PrepBlock,
   type PrepLine,
   type StickerLine,
 } from '@/utils/kitchenReport';
-import { downloadCSV } from '@/utils/csv';
+import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
+import { buildReportSheets, rowTone, TONE_COLORS, type RowTone } from '@/utils/kitchenReportSheets';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
 type TabId = 'prep' | 'stickers' | 'days';
@@ -57,8 +55,12 @@ const PRINT_CSS = `
   main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
   body { background: #fff !important; }
   .print-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; }
+  .print-card, .print-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 `;
+
+/** The row colour: red and white take turns so no row is missed, an ECO row is green (same as the Excel file). */
+const toneBg = (tone: RowTone) => `#${TONE_COLORS[tone]}`;
 
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
@@ -77,9 +79,9 @@ function DatesLine({ orderedOn, kitchenDay, deliveryDate }: { orderedOn: string 
   );
 }
 
-function LineRow({ line }: { line: PrepLine }) {
+function LineRow({ line, index }: { line: PrepLine; index: number }) {
   return (
-    <Box sx={{ py: 0.9, borderTop: '1px solid #F3F4F6' }}>
+    <Box sx={{ py: 0.9, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(index, line.isEco)) }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
       <Box sx={{ minWidth: 0 }}>
         <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{line.customerName}</Typography>
@@ -118,9 +120,9 @@ function PrepCard({ block, warn }: { block: PrepBlock; warn?: boolean }) {
         </Box>
         <Typography sx={{ fontWeight: 800, fontSize: block.totalText ? 18 : 22, color: '#92400E', textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>{blockTotal(block)}</Typography>
       </Box>
-      <Box sx={{ px: 2, pb: 0.25 }}>
+      <Box>
         {block.lines.map((line, i) => (
-          <LineRow key={`${line.orderId}-${i}`} line={line} />
+          <LineRow key={`${line.orderId}-${i}`} line={line} index={i} />
         ))}
       </Box>
     </Paper>
@@ -145,9 +147,9 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
             <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Delivery {formatDayShort(day)}</Typography>
             <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{list.length} sticker{list.length === 1 ? '' : 's'}</Typography>
           </Box>
-          <Box sx={{ px: 2, pb: 0.25 }}>
+          <Box>
             {list.map((s, i) => (
-              <Box key={`${s.orderId}-${i}`} sx={{ py: 0.9, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
+              <Box key={`${s.orderId}-${i}`} sx={{ py: 0.9, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: toneBg(rowTone(i, s.isEco)) }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.customerName}</Typography>
@@ -183,11 +185,11 @@ function DayTotalsTab({ days, searching }: { days: KitchenDay[]; searching: bool
             </Typography>
             <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{day.totals.units} units · {day.totals.orders} orders</Typography>
           </Box>
-          <Box sx={{ px: 2, pb: 0.25 }}>
+          <Box>
             {day.items.map((item, i) => {
               const note = deliveryNote(item.deliveries, item.quantity);
               return (
-                <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, py: 0.8, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
+                <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, py: 0.8, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: toneBg(rowTone(i, false)) }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.name}</Typography>
                     {note && <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#B45309' }}>{note}</Typography>}
@@ -199,8 +201,8 @@ function DayTotalsTab({ days, searching }: { days: KitchenDay[]; searching: bool
                 </Box>
               );
             })}
-            {day.combos.map((combo) => (
-              <Box key={combo.name} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.8, borderTop: '1px solid #F3F4F6', bgcolor: '#FFFBEB', mx: -2, px: 2 }}>
+            {day.combos.map((combo, ci) => (
+              <Box key={combo.name} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.8, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(day.items.length + ci, false)) }}>
                 <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{combo.name} <Typography component="span" sx={{ fontSize: 12, color: '#6B7280' }}>(combo)</Typography></Typography>
                 <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{combo.quantity}</Typography>
               </Box>
@@ -222,6 +224,7 @@ export default function KitchenReportPage() {
   const [tab, setTab] = useState<TabId>('prep');
   // search: an item, a customer, an order number or a combo
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -283,18 +286,19 @@ export default function KitchenReportPage() {
 
   const customProblem = preset === 'custom' ? validateRange(custom) : null;
 
-  const download = () => {
+  const download = async () => {
     if (!data || !range) return;
     const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
-    if (tab === 'prep') downloadCSV(toCsvText(prepCsvRows([...cooked, ...notSet])), `kitchen-prep-${label}.csv`);
-    else if (tab === 'stickers') downloadCSV(toCsvText(stickersCsvRows(stickers)), `stickers-${label}.csv`);
-    else {
-      const rows: string[][] = [['Day', 'Item', 'Quantity', 'Total amount', 'Delivered later']];
-      for (const d of dayBlocks) {
-        for (const i of d.items) rows.push([d.day, i.name, String(i.quantity), i.totalText, deliveryNote(i.deliveries, i.quantity)]);
-        for (const c of d.combos) rows.push([d.day, `${c.name} (combo)`, String(c.quantity), '', deliveryNote(c.deliveries, c.quantity)]);
-      }
-      downloadCSV(toCsvText(rows), `day-totals-${label}.csv`);
+    setExporting(true);
+    try {
+      // the file has all three sheets and follows the search, like the screen
+      const sheets = buildReportSheets({ cooked, notSet, stickers, days: dayBlocks });
+      const blob = await buildReportWorkbook(sheets, `Kitchen report ${label}`);
+      downloadBlob(blob, `kitchen-report-${label}.xlsx`);
+    } catch (e) {
+      setError(e instanceof Error ? `Could not make the Excel file: ${e.message}` : 'Could not make the Excel file');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -311,8 +315,8 @@ export default function KitchenReportPage() {
           </Typography>
         </Box>
         <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Button variant="outlined" size="small" startIcon={<IconDownload size={16} />} onClick={download} disabled={!data || loading} sx={{ textTransform: 'none', fontWeight: 600 }}>
-            Download CSV
+          <Button variant="outlined" size="small" startIcon={<IconFileSpreadsheet size={16} />} onClick={download} disabled={!data || loading || exporting} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            {exporting ? 'Making the file...' : 'Download Excel'}
           </Button>
           <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} onClick={() => window.print()} disabled={!data || loading} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Print
