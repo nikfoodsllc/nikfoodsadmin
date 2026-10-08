@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 
 /**
- * Create Order (BETA): the admin screen talks to these routes, which pass the request on to the customer
+ * Create Order: the admin screen talks to these routes, which pass the request on to the customer
  * site (where the menu, prices, accounts, Stripe and emails live) with the admin's own login attached. The site
  * checks that login itself (admins only) and does all the pricing, so nothing here can set a price.
  */
