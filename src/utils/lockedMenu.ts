@@ -3,6 +3,8 @@
  * is put on the same weekdays it was on in the most recent week. Pure helpers (the database part is in lib/server/lockedMenu.ts).
  */
 
+import { pacificToday } from '@/utils/abandonedCheckouts';
+
 const DAY_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 export function isDateKey(day: unknown): day is string {
@@ -53,4 +55,12 @@ export function lockedItemPlacement(target: string, assigned: AssignedDay[]): { 
   if (!weekdays.has(wanted)) return null;
   const sameWeekday = before.filter((a) => weekdayIndex(a.day) === wanted).sort((a, b) => (a.day < b.day ? 1 : -1));
   return { sequence: sameWeekday[0]?.sequence ?? 0 };
+}
+
+/**
+ * Is this calendar day today (Pacific time) or later? The day-wise item page lists only these days. Comparing the
+ * 'YYYY-MM-DD' text with today's Pacific date avoids the time-zone shift of parsing the text as a date, which used to hide today.
+ */
+export function isTodayOrLater(day: string, now: Date = new Date()): boolean {
+  return isDateKey(day) && day >= pacificToday(now);
 }

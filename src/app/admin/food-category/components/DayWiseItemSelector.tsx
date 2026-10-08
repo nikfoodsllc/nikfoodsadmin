@@ -30,6 +30,7 @@ import {
   isDayName
 } from '@/utils/days';
 import { safeFormatCurrency } from '@/utils/currency';
+import { isTodayOrLater } from '@/utils/lockedMenu';
 
 interface FoodItem {
   _id: string;
@@ -135,17 +136,9 @@ export default function DayWiseItemSelector({
 
   // Create date labels array for display
 const allDateLabels = useMemo(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   return availableDates
-    .filter((date) => {
-      const itemDate = new Date(date.date);
-      itemDate.setHours(0, 0, 0, 0);
-
-      // Only show today and future dates
-      return itemDate >= today;
-    })
+    // Only show today and future dates (compared as Pacific calendar days, so today is not hidden)
+    .filter((date) => isTodayOrLater(date.date))
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((date) => ({
       label: formatDateLabel(date.date),
