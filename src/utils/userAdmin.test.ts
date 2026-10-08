@@ -104,8 +104,8 @@ describe('validateAddressInput', () => {
     expect(validateAddressInput({ ...good, postal_code: '9810' })).toMatchObject({ ok: false });
     expect(validateAddressInput({ ...good, postal_code: '98109-1234' })).toMatchObject({ ok: true });
     expect(validateAddressInput({ ...good, apartment: '12345678901' })).toMatchObject({ ok: false });
-    expect(validateAddressInput({ ...good, floor: 'x'.repeat(100) })).toMatchObject({ ok: true });
-    expect(validateAddressInput({ ...good, floor: 'x'.repeat(101) })).toMatchObject({ ok: false });
+    expect(validateAddressInput({ ...good, floor: 'x'.repeat(30) })).toMatchObject({ ok: true });
+    expect(validateAddressInput({ ...good, floor: 'x'.repeat(31) })).toMatchObject({ ok: false });
     expect(validateAddressInput({ ...good, phone: '123' })).toMatchObject({ ok: false, error: 'The phone number must be 10 digits' });
     expect(validateAddressInput(null)).toMatchObject({ ok: false });
   });

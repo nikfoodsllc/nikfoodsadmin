@@ -116,7 +116,7 @@ export function validateAddressInput(body: unknown): { ok: true; value: AddressI
   if (city.length < 2) return { ok: false, error: 'Enter the city' };
   if (!/^\d{5}(-\d{4})?$/.test(zip)) return { ok: false, error: 'The zip code must be 5 digits (12345) or 12345-6789' };
   if (apartment.length > 10) return { ok: false, error: 'The apartment can be at most 10 characters' };
-  if (floor.length > 100) return { ok: false, error: 'The delivery instructions can be at most 100 characters' };
+  if (floor.length > 30) return { ok: false, error: 'The delivery instructions can be at most 30 characters' };
   if (entrance.length > 30) return { ok: false, error: 'The gate / entrance code can be at most 30 characters' };
   let phone = '';
   if (rawPhone) {
