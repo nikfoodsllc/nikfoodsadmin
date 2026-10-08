@@ -149,6 +149,8 @@ export interface OrderDayItem {
   food: FoodItemSnapshot;
   quantity: number;
   price: number;
+  /** Set when an admin moved this item to another delivery date: the date it started with */
+  originalDeliveryDate?: string;
   spiceLevel?: string;
   selectedPortion?: string; // Portion name (e.g., "Full", "Half")
   portions?: number; // Portion index for backwards compatibility
@@ -260,7 +262,8 @@ export interface Order {
   reschedules?: Array<{
     at: Date | string;
     by?: { id?: string; name?: string };
-    changes: Array<{ index: number; fromDay: string; toDay: string; fromMenuDate: string; fromDeliveryDate: string; toDate: string }>;
+    newDate?: string;
+    changes: Array<{ line: number; item: number; name: string; foodId?: string; quantity: number; menuDate: string; fromDeliveryDate: string; toDate: string }>;
   }>;
   /** When the customer was told about the new dates */
   rescheduleEmail?: { sentAt: Date | string; by?: { id?: string; name?: string }; messageId?: string; count?: number };

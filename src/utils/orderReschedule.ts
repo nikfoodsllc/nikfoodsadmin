@@ -7,20 +7,16 @@
 export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready'] as const;
 export const MAX_DAYS_AHEAD = 120;
 
-export interface RescheduleChangeLike {
-  index: number;
-  fromDay?: string;
-  toDay?: string;
-  fromMenuDate: string;
-  fromDeliveryDate: string;
-  toDate: string;
-}
-
 export interface OrderRescheduleLike {
   status?: string | null;
   paymentStatus?: string | null;
-  items?: Array<{ deliveryDate?: unknown; actualDeliveryDate?: unknown; day?: string | null }> | null;
-  reschedules?: Array<{ at?: unknown; by?: { name?: string } | null; changes?: RescheduleChangeLike[] | null }> | null;
+  items?: Array<{
+    deliveryDate?: unknown;
+    actualDeliveryDate?: unknown;
+    day?: string | null;
+    items?: Array<{ quantity?: number | null; originalDeliveryDate?: string | null; food?: { name?: string | null } | null }> | null;
+  }> | null;
+  reschedules?: Array<{ at?: unknown; by?: { name?: string } | null }> | null;
   rescheduleEmail?: { sentAt?: unknown; by?: { name?: string } | null; count?: number | null } | null;
 }
 
@@ -65,15 +61,23 @@ export function pickableRange(now: Date = new Date()): { min: string; max: strin
   return { min: today, max: addDays(today, MAX_DAYS_AHEAD) };
 }
 
+export interface MovedGroup {
+  /** Where the items started and where they are now (delivery dates) */
+  from: string;
+  to: string;
+  /** What moved, e.g. '2 x Dosa Batter' */
+  items: string[];
+}
+
 export interface RescheduleView {
   rescheduled: boolean;
-  /** How many times an admin moved a delivery */
+  /** How many times an admin moved items */
   moves: number;
   lastAt: Date | null;
   lastBy: string;
-  /** Per day line that is not on its original date now: original delivery date to the current one */
-  lines: Array<{ index: number; from: string; to: string }>;
-  /** none = never moved or back on the original dates; pending = the customer has not been told; sent = told after the last move */
+  /** Items that are not on the delivery date they started with, grouped by from and to */
+  groups: MovedGroup[];
+  /** none = never moved or everything back on its original date; pending = the customer has not been told; sent = told after the last move */
   email: 'none' | 'pending' | 'sent';
   emailSentAt: Date | null;
   emailCount: number;
@@ -81,40 +85,45 @@ export interface RescheduleView {
   summary: string;
 }
 
-const NOT: RescheduleView = { rescheduled: false, moves: 0, lastAt: null, lastBy: '', lines: [], email: 'none', emailSentAt: null, emailCount: 0, summary: '' };
+const NOT: RescheduleView = { rescheduled: false, moves: 0, lastAt: null, lastBy: '', groups: [], email: 'none', emailSentAt: null, emailCount: 0, summary: '' };
 
 function shortDate(date: string): string {
   const d = new Date(`${date}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-/** What an order's moved-date history says: is it rescheduled, from what to what, and has the customer been told. */
+/** What an order's moved items say: is it rescheduled, from what to what, and has the customer been told. */
 export function rescheduleView(order: OrderRescheduleLike | null | undefined): RescheduleView {
   const history = order?.reschedules ?? [];
   if (!order || history.length === 0) return NOT;
 
-  const firstFrom = new Map<number, string>();
-  for (const record of history) for (const change of record.changes ?? []) if (!firstFrom.has(change.index)) firstFrom.set(change.index, change.fromDeliveryDate);
-
-  const lines: RescheduleView['lines'] = [];
-  for (const [index, from] of [...firstFrom.entries()].sort((a, b) => a[0] - b[0])) {
-    const line = order.items?.[index];
-    const to = line ? dateText(line.actualDeliveryDate) || dateText(line.deliveryDate) : '';
-    if (to && from && to !== from) lines.push({ index, from, to });
+  const byKey = new Map<string, MovedGroup>();
+  for (const line of order.items ?? []) {
+    const to = dateText(line.actualDeliveryDate) || dateText(line.deliveryDate);
+    for (const item of line.items ?? []) {
+      const from = dateText(item.originalDeliveryDate);
+      if (!from || !to || from === to) continue;
+      const key = `${from}>${to}`;
+      const group = byKey.get(key) ?? { from, to, items: [] };
+      const name = item.food?.name?.trim() || 'Item';
+      group.items.push((item.quantity ?? 1) > 1 ? `${item.quantity} x ${name}` : name);
+      byKey.set(key, group);
+    }
   }
+  const groups = [...byKey.values()].sort((a, b) => a.to.localeCompare(b.to) || a.from.localeCompare(b.from));
 
   const last = history[history.length - 1];
   const lastAt = timeOf(last.at) ? new Date(timeOf(last.at)) : null;
   const sentAtMs = timeOf(order.rescheduleEmail?.sentAt);
-  const email: RescheduleView['email'] = lines.length === 0 ? 'none' : sentAtMs && sentAtMs >= timeOf(last.at) ? 'sent' : 'pending';
-  const shown = lines.length > 0 ? lines.map((l) => `${shortDate(l.from)} → ${shortDate(l.to)}`).join(', ') : 'Back on the original dates';
+  const email: RescheduleView['email'] = groups.length === 0 ? 'none' : sentAtMs && sentAtMs >= timeOf(last.at) ? 'sent' : 'pending';
+  const shown = groups.length > 0 ? groups.map((g) => `${shortDate(g.from)} \u2192 ${shortDate(g.to)}`).join(', ') : 'Back on the original dates';
 
   return {
     rescheduled: true,
     moves: history.length,
     lastAt,
     lastBy: last.by?.name ?? '',
-    lines,
+    groups,
     email,
     emailSentAt: sentAtMs ? new Date(sentAtMs) : null,
     emailCount: order.rescheduleEmail?.count ?? (sentAtMs ? 1 : 0),
@@ -127,4 +136,29 @@ export function rescheduledFilterFor(value: string | null | undefined): Record<s
   if (value === 'yes') return { 'reschedules.0': { $exists: true } };
   if (value === 'no') return { 'reschedules.0': { $exists: false } };
   return null;
+}
+
+/** An item picked in the order details, by its line and its position in it. */
+export function selectionKey(line: number, item: number): string {
+  return `${line}:${item}`;
+}
+
+/** The picked items as the {line, item} list the live site wants. */
+export function selectionList(selected: Iterable<string>): Array<{ line: number; item: number }> {
+  const out: Array<{ line: number; item: number }> = [];
+  for (const key of selected) {
+    if (!/^\d+:\d+$/.test(key)) continue;
+    const [line, item] = key.split(':').map(Number);
+    out.push({ line, item });
+  }
+  return out.sort((a, b) => a.line - b.line || a.item - b.item);
+}
+
+/** True when moving to `date` puts some picked item's delivery before its kitchen day (the food would arrive before it is cooked). */
+export function deliversBeforeKitchen(order: OrderRescheduleLike, selected: Iterable<string>, date: string): boolean {
+  for (const { line } of selectionList(selected)) {
+    const kitchen = dateText(order.items?.[line]?.deliveryDate);
+    if (kitchen && date && date < kitchen) return true;
+  }
+  return false;
 }
