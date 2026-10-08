@@ -121,7 +121,7 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
         atoms.push({
           name: part.name,
           id: part.id ?? null,
-          line: { ...base, quantity: row.quantity, portion: part.portion, spice: null, isEco: false, viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity) },
+          line: { ...base, quantity: row.quantity, portion: part.portion, spice: null, isEco: Boolean(row.isEco), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity) },
         });
       }
     } else {

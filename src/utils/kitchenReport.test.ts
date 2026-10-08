@@ -43,6 +43,15 @@ describe('buildKitchenReport', () => {
     expect(kale.lines[0]).toMatchObject({ viaCombo: 'Veg Combo', viaSpice: 'Medium', spice: null, customerName: 'Dev', portion: '12Oz' });
     expect(r.cooked.some((b) => b.name === 'Veg Combo')).toBe(false);
   });
+  it('a combo in an eco container marks every one of its parts ECO; a combo without one marks none', () => {
+    const r = buildKitchenReport([row({ ...combo, orderId: 'E1', quantity: 1, customerName: 'Eco', isEco: true }), row({ ...combo, orderId: 'E2', quantity: 1, customerName: 'Plain', isEco: false })], byName);
+    for (const name of ['Kale Chane', 'Chapati']) {
+      const block = r.cooked.find((b) => b.name === name)!;
+      expect(block.lines.find((l) => l.customerName === 'Eco')!.isEco).toBe(true);
+      expect(block.lines.find((l) => l.customerName === 'Plain')!.isEco).toBe(false);
+      expect(block.eco).toBe(1);
+    }
+  });
   it('lines go spice mild to hot (none last), smallest size first like Kunal\'s sheet, then by customer', () => {
     const r = buildKitchenReport([
       row({ orderId: '1', customerName: 'Zed', spiceLevel: 'Hot', portion: '8Oz' }),
