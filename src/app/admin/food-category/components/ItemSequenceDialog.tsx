@@ -28,6 +28,7 @@ import { IconGripVertical } from '@tabler/icons-react';
 import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDateWithDay } from '@/utils/days';
+import { isTodayOrLater } from '@/utils/lockedMenu';
 import { safeFormatCurrency } from '@/utils/currency';
 
 interface FoodItem {
@@ -208,7 +209,7 @@ export default function ItemSequenceDialog({
         category.dayWiseItems.length > 0
       ) {
         const firstDayWithItems = category.dayWiseItems.find(
-          (d) => d.items && d.items.length > 0
+          (d) => d.items && d.items.length > 0 && isTodayOrLater(d.day)
         );
 
         if (firstDayWithItems) {
@@ -399,8 +400,9 @@ export default function ItemSequenceDialog({
   const getAvailableDays = () => {
     if (!category?.dayWiseItems) return [];
 
+    // past days are over: nothing to reorder for them
     return category.dayWiseItems.filter(
-      (d) => d.items && d.items.length > 0
+      (d) => d.items && d.items.length > 0 && isTodayOrLater(d.day)
     );
   };
 
