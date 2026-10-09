@@ -12,6 +12,7 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
+  Checkbox,
   Chip,
   Divider,
   Dialog,
@@ -125,6 +126,9 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [confirmDisableAll, setConfirmDisableAll] = useState(false);
+  // days ticked for a bulk change (YYYY-MM-DD)
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -198,16 +202,19 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
   // Navigate to previous month
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => subMonths(prev, 1));
+    setSelectedDays(new Set());
   };
 
   // Navigate to next month
   const handleNextMonth = () => {
     setCurrentMonth((prev) => addMonths(prev, 1));
+    setSelectedDays(new Set());
   };
 
   // Navigate to today
   const handleToday = () => {
     setCurrentMonth(new Date());
+    setSelectedDays(new Set());
   };
 
   // Handle date cell click
@@ -297,54 +304,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
     setSelectedDate(null);
   };
 
-  // Bulk enable all for month
-  const handleEnableAllForMonth = async () => {
-    if (!token || !isAuthenticated) return;
-
-    try {
-      setBulkSaving(true);
-
-      const monthStart = startOfMonth(currentMonth);
-      const monthEnd = endOfMonth(currentMonth);
-      const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-      const dates = daysInMonth.map((day) => ({
-        date: formatInPST(day, 'yyyy-MM-dd'),
-        flatCategoryEnabled: true,
-        dayWiseCategoryEnabled: true,
-      }));
-
-      const startDate = formatInPST(monthStart, 'yyyy-MM-dd');
-      const endDate = formatInPST(monthEnd, 'yyyy-MM-dd');
-
-      const response = await fetch('/api/admin/available-dates', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          dates,
-          startDate,
-          endDate,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to enable all dates');
-      }
-
-      await fetchDatesData();
-      showSnackbar('All dates enabled for this month');
-    } catch (err) {
-      console.error('Error enabling all:', err);
-      showSnackbar('Failed to enable all dates', 'error');
-    } finally {
-      setBulkSaving(false);
-    }
-  };
-
-  // Bulk disable all for month
+  // Switch every day of the month off (the emergency button)
   const handleDisableAllForMonth = async () => {
     if (!token || !isAuthenticated) return;
 
@@ -370,17 +330,14 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          dates,
-          startDate,
-          endDate,
-        }),
+        body: JSON.stringify({ dates, startDate, endDate }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to disable all dates');
       }
 
+      setSelectedDays(new Set());
       await fetchDatesData();
       showSnackbar('All dates disabled for this month');
     } catch (err) {
@@ -388,6 +345,62 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
       showSnackbar('Failed to disable all dates', 'error');
     } finally {
       setBulkSaving(false);
+    }
+  };
+
+  const toggleDay = (date: string) => {
+    setSelectedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  // Turn flat or day-wise ordering on or off for every ticked day. Each day is saved on its own (cutoffs and the other kind stay as they are).
+  const applyToSelectedDays = async (kind: ItemKind, enabled: boolean) => {
+    if (!token || !isAuthenticated || selectedDays.size === 0) return;
+    setBulkSaving(true);
+    const dates = Array.from(selectedDays).sort();
+    let changed = 0;
+    let unchanged = 0;
+    const failed: string[] = [];
+    const latest: Record<string, AvailableDate> = {};
+    for (const date of dates) {
+      const current = datesData[date];
+      const flat = current?.flatCategoryEnabled ?? false;
+      const dayWise = current?.dayWiseCategoryEnabled ?? false;
+      if ((kind === 'flat' ? flat : dayWise) === enabled && current) {
+        unchanged += 1;
+        continue;
+      }
+      try {
+        const response = await fetch('/api/admin/available-dates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            date,
+            flatCategoryEnabled: kind === 'flat' ? enabled : flat,
+            dayWiseCategoryEnabled: kind === 'day-wise' ? enabled : dayWise,
+          }),
+        });
+        if (!response.ok) throw new Error('save failed');
+        const result = await response.json();
+        if (result.data) latest[date] = result.data;
+        changed += 1;
+      } catch {
+        failed.push(date);
+      }
+    }
+    setDatesData((prev) => ({ ...prev, ...latest }));
+    // keep only the days that failed ticked, so one press retries them
+    setSelectedDays(new Set(failed));
+    setBulkSaving(false);
+    const what = `${ITEM_KIND_LABEL[kind]} ${enabled ? 'on' : 'off'}`;
+    if (failed.length > 0) {
+      showSnackbar(`${what}: ${changed} saved, ${failed.length} failed (still ticked, press again)`, 'error');
+    } else {
+      showSnackbar(`${what} for ${changed} day${changed === 1 ? '' : 's'}${unchanged ? ` (${unchanged} already ${enabled ? 'on' : 'off'})` : ''}`);
     }
   };
 
@@ -495,41 +508,73 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
             </Button>
           </Box>
 
-          {/* Bulk Actions */}
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={bulkSaving ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <IconCheck size={18} />}
-              onClick={handleEnableAllForMonth}
-              disabled={bulkSaving || loading}
-              sx={{
-                backgroundColor: '#10B981',
-                '&:hover': { backgroundColor: '#059669' },
-                textTransform: 'none',
-              }}
-            >
-              Enable All
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={bulkSaving ? <CircularProgress size={16} /> : <IconX size={18} />}
-              onClick={handleDisableAllForMonth}
-              disabled={bulkSaving || loading}
-              sx={{
-                borderColor: '#EF4444',
-                color: '#EF4444',
-                '&:hover': {
-                  borderColor: '#DC2626',
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                },
-                textTransform: 'none',
-              }}
-            >
-              Disable All
-            </Button>
-          </Box>
+          {/* Emergency button */}
+          <Button
+            variant="outlined"
+            startIcon={bulkSaving ? <CircularProgress size={16} /> : <IconX size={18} />}
+            onClick={() => setConfirmDisableAll(true)}
+            disabled={bulkSaving || loading}
+            sx={{
+              borderColor: '#EF4444',
+              color: '#EF4444',
+              '&:hover': { borderColor: '#DC2626', backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+              textTransform: 'none',
+            }}
+          >
+            Disable All
+          </Button>
         </Box>
       </Card>
+
+      {/* Bulk change for the ticked days */}
+      {selectedDays.size > 0 && (
+        <Card
+          sx={{
+            mb: 3,
+            p: 1.5,
+            borderRadius: 3,
+            position: 'sticky',
+            top: 77,
+            zIndex: 5,
+            border: '2px solid #6366F1',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mr: 'auto' }}>
+              {selectedDays.size} day{selectedDays.size === 1 ? '' : 's'} selected
+            </Typography>
+            {ITEM_KINDS.map((kind) => (
+              <Box key={kind} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>
+                  {ITEM_KIND_LABEL[kind]}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={bulkSaving}
+                  onClick={() => applyToSelectedDays(kind, true)}
+                  sx={{ textTransform: 'none', backgroundColor: '#10B981', '&:hover': { backgroundColor: '#059669' } }}
+                >
+                  On
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={bulkSaving}
+                  onClick={() => applyToSelectedDays(kind, false)}
+                  sx={{ textTransform: 'none', borderColor: '#EF4444', color: '#EF4444', '&:hover': { borderColor: '#DC2626', backgroundColor: 'rgba(239, 68, 68, 0.1)' } }}
+                >
+                  Off
+                </Button>
+              </Box>
+            ))}
+            <Button size="small" disabled={bulkSaving} onClick={() => setSelectedDays(new Set())} sx={{ textTransform: 'none' }}>
+              Clear
+            </Button>
+            {bulkSaving && <CircularProgress size={18} />}
+          </Box>
+        </Card>
+      )}
 
       {/* Legend */}
       <Card sx={{ mb: 3, px: 1.5, py: 1, borderRadius: 3 }}>
@@ -694,6 +739,18 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     >
                       {formatInPST(dateObj, 'd')}
                     </Typography>
+
+                    {!dateData.isPadding && (
+                      <Checkbox
+                        size="small"
+                        checked={selectedDays.has(dateData.date)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleDay(dateData.date)}
+                        disabled={bulkSaving}
+                        inputProps={{ 'aria-label': `Select ${dateData.date}` }}
+                        sx={{ position: 'absolute', top: 0, right: 0, p: 0.5 }}
+                      />
+                    )}
 
                     {/* Status Indicators - only show for current month */}
                     {!dateData.isPadding && (
@@ -999,6 +1056,28 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
         </DialogContent>
         <DialogActions sx={{ p: 2, pt: 0 }}>
           <Button onClick={() => setDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmDisableAll} onClose={() => setConfirmDisableAll(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Disable every day in {formatInPST(currentMonth, 'MMMM yyyy')}?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Flat and day-wise ordering will be switched off for all days of this month. Customers will not see those days.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setConfirmDisableAll(false)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setConfirmDisableAll(false);
+              handleDisableAllForMonth();
+            }}
+          >
+            Disable all
+          </Button>
         </DialogActions>
       </Dialog>
 
