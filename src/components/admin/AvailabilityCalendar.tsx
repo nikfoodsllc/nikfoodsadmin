@@ -534,7 +534,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
             p: 1.5,
             borderRadius: 3,
             position: 'sticky',
-            top: 77,
+            top: { xs: 69, sm: 77 },
             zIndex: 5,
             border: '2px solid #6366F1',
           }}
