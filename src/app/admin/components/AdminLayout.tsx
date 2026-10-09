@@ -17,7 +17,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   // The content area scrolls its own overflow (overflowY auto), which turns it into a scroll container that never scrolls and
   // stops position: sticky from following the page. Create Order has a sticky 'Order & payment' panel, so it opts out.
-  const keepsStickyPanel = pathname?.startsWith('/admin/create-order') ?? false;
+  const keepsStickyPanel = (pathname?.startsWith('/admin/create-order') || pathname?.startsWith('/admin/manage-days')) ?? false;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
