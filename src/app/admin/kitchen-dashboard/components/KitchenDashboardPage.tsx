@@ -43,6 +43,7 @@ import {
 
 const PRESETS: Array<{ id: WeekPreset; label: string }> = [
   { id: 'thisWeek', label: 'This week' },
+  { id: 'nextWeek', label: 'Next week' },
   { id: 'lastWeek', label: 'Last week' },
   { id: 'weekBeforeLast', label: 'Week before last' },
   { id: 'custom', label: 'Custom dates' },

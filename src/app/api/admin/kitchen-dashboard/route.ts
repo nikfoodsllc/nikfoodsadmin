@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
-import { fetchKitchenRows } from '@/lib/kitchenRows';
+import { fetchDashboardRows } from '@/lib/kitchenRows';
 import { buildKitchenDays, buildKitchenWeek, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
 
 /**
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     }
     const days = enumerateDays(range);
 
-    const rows = await fetchKitchenRows(range);
+    const rows = await fetchDashboardRows(range);
 
     return NextResponse.json({
       data: {

@@ -6,7 +6,7 @@ const verifyToken = vi.fn();
 vi.mock('@/lib/jwt', () => ({ jwtHandler: { verifyToken: (t: string) => verifyToken(t) } }));
 
 const fetchKitchenRows = vi.fn();
-vi.mock('@/lib/kitchenRows', () => ({ fetchKitchenRows: (...a: unknown[]) => fetchKitchenRows(...a) }));
+vi.mock('@/lib/kitchenRows', () => ({ fetchDashboardRows: (...a: unknown[]) => fetchKitchenRows(...a) }));
 
 import { GET } from './route';
 
