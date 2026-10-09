@@ -93,7 +93,7 @@ function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): Kit
  * Moved earlier: they leave their old kitchen day (fetchKitchenRows with `report` drops them) and are cooked on the new date.
  * Moved later: they stay on their kitchen day too; they are added on the new date only when that kitchen day is outside the range.
  */
-export async function fetchMovedKitchenRows(range: DayRange): Promise<KitchenRow[]> {
+export async function fetchMovedKitchenRows(range: DayRange, options: { earlierOnly?: boolean } = {}): Promise<KitchenRow[]> {
   const within = { $gte: range.startDate, $lte: `${range.endDate}\uffff` };
   const pipeline = [
     {
@@ -137,7 +137,21 @@ export async function fetchMovedKitchenRows(range: DayRange): Promise<KitchenRow
     const delivered = toDayString(raw.deliveredOn);
     if (!kitchen || !delivered || kitchen === delivered) return false;
     if (delivered < kitchen) return true; // moved earlier
+    if (options.earlierOnly) return false;
     return kitchen < range.startDate || kitchen > range.endDate; // moved later: only when its kitchen day is not in the range
   });
   return mapRows(keep, true);
+}
+
+/**
+ * The rows the Kitchen Dashboard counts: like fetchKitchenRows, but an item an admin moved to a delivery date
+ * EARLIER than its kitchen day is cooked on that earlier date, so it leaves its old day and is counted on the
+ * new one. Items moved later and cart-clubbed items stay on their kitchen day (the day card notes the delivery).
+ */
+export async function fetchDashboardRows(range: DayRange): Promise<KitchenRow[]> {
+  const [base, movedEarlier] = await Promise.all([
+    fetchKitchenRows(range, { report: true }),
+    fetchMovedKitchenRows(range, { earlierOnly: true }),
+  ]);
+  return [...base, ...movedEarlier];
 }

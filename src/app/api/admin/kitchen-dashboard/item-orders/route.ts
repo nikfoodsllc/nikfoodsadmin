@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
-import { fetchKitchenRows } from '@/lib/kitchenRows';
+import { fetchDashboardRows } from '@/lib/kitchenRows';
 import { buildItemOrders, isDayString, validateRange } from '@/utils/kitchenDashboard';
 
 const MAX_ITEM_NAME_CHARS = 200;
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const rows = await fetchKitchenRows(range);
+    const rows = await fetchDashboardRows(range);
     const all = buildItemOrders(rows, item, day || undefined);
     const lines = all.slice(0, MAX_LINES);
 
