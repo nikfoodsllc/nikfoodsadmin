@@ -22,6 +22,7 @@ import { IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons
 import { useAuth } from '@/contexts/AuthContext';
 import ItemOrdersDialog from './ItemOrdersDialog';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
+import { useLatestRequest } from '@/hooks/useLatestRequest';
 import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
 import { KITCHEN_DAY_DEFS, arrangeKitchenDays } from '@/utils/kitchenDayLayout';
 import { formatPSTDateISO } from '@/utils/timezone';
@@ -43,6 +44,7 @@ import {
 
 const PRESETS: Array<{ id: WeekPreset; label: string }> = [
   { id: 'thisWeek', label: 'This week' },
+  { id: 'nextWeek', label: 'Next week' },
   { id: 'lastWeek', label: 'Last week' },
   { id: 'weekBeforeLast', label: 'Week before last' },
   { id: 'custom', label: 'Custom dates' },
@@ -306,27 +308,34 @@ export default function KitchenDashboardPage() {
     if (!authLoading && !isAuthenticated) router.push('/login');
   }, [authLoading, isAuthenticated, router]);
 
+  const beginRequest = useLatestRequest();
+
   const load = useCallback(async () => {
     if (!token || !range) return;
+    // a slow earlier answer (for example the first week) must never replace the newest one
+    const request = beginRequest();
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
       const response = await fetch(`/api/admin/kitchen-dashboard?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: request.signal,
       });
       const body = await response.json().catch(() => ({}));
+      if (!request.isCurrent()) return;
       if (!response.ok) throw new Error(body?.error || 'Could not load the kitchen dashboard');
       setAllDays(body.data?.days ?? []);
       setWeek(body.data?.week ?? null);
     } catch (e) {
+      if (!request.isCurrent()) return;
       setAllDays([]);
       setWeek(null);
       setError(e instanceof Error ? e.message : 'Could not load the kitchen dashboard');
     } finally {
-      setLoading(false);
+      if (request.isCurrent()) setLoading(false);
     }
-  }, [token, range]);
+  }, [token, range, beginRequest]);
 
   useEffect(() => {
     load();

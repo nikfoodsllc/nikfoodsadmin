@@ -7,7 +7,7 @@
  * later combined into another delivery day.
  */
 
-export type WeekPreset = 'thisWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
+export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
 
 export interface DayRange {
   startDate: string; // inclusive
@@ -56,7 +56,7 @@ export function getWeekRange(today: string, weeksAgo = 0): DayRange {
 }
 
 export function getPresetRange(preset: Exclude<WeekPreset, 'custom'>, today: string): DayRange {
-  const weeksAgo = preset === 'thisWeek' ? 0 : preset === 'lastWeek' ? 1 : 2;
+  const weeksAgo = preset === 'nextWeek' ? -1 : preset === 'thisWeek' ? 0 : preset === 'lastWeek' ? 1 : 2;
   return getWeekRange(today, weeksAgo);
 }
 
