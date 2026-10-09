@@ -150,7 +150,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Manage Days and cutoffs', 'Day-wise', 'Manage Days', 'The Food Menu: items chosen for each delivery day. Their standard cutoff is 1 PM Pacific the day before delivery.', undefined, 'food menu 1 pm'),
   e('Manage Days and cutoffs', 'Enabled', 'Manage Days, day dialog', 'The on/off switch for a kind on a day. It does not change by itself when the cutoff passes.'),
   e('Manage Days and cutoffs', 'Custom cutoff / Extend', 'Manage Days, day dialog', 'Move the closing time of one kind on one day. Extending a day that has already closed reopens it from now. The dialog shows when and by whom a custom cutoff was set.', undefined, 'extend cutoff'),
-  e('Manage Days and cutoffs', 'Lock row (repeats weekly)', 'Food Menu items page', 'Locks an item row so that, when you switch on next week\'s days, the item is added again on the same weekdays it had last week. Nothing is ever removed, and a day that already has items is left alone.', undefined, 'lock repeat weekly'),
+  e('Manage Days and cutoffs', 'Lock row (repeats weekly)', 'Food Menu items page', 'Locks an item row. When you press Save Changes, the item is added at once to the later days that are already switched on, on the same weekdays it has now (a Friday item goes onto the next Fridays). When you switch on new days in Manage Days later, it is added there too, unless that day already has items. Nothing is ever removed.', undefined, 'lock repeat weekly'),
 
   // ---- abandoned checkout
   e('Abandoned Checkout', 'To contact', 'Abandoned Checkout tab', 'People who started a checkout and left without ordering, and have not been contacted. Anyone who ordered afterwards is not listed.', 'warn'),
