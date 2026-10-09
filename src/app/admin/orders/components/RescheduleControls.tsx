@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material';
-import { IconCalendarEvent, IconMail } from '@tabler/icons-react';
+import { IconCalendarEvent, IconMail, IconMessage } from '@tabler/icons-react';
 import { Order } from '@/types/order';
 import { deliversBeforeKitchen, pickableRange, rescheduleView, selectionList, whyNotReschedulable } from '@/utils/orderReschedule';
 
@@ -17,7 +17,7 @@ function whenText(date: Date | null): string {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) + ' PT';
 }
 
-async function post(token: string | null, orderId: string, action: 'reschedule' | 'reschedule-email', body: unknown) {
+async function post(token: string | null, orderId: string, action: 'reschedule' | 'reschedule-email' | 'reschedule-sms', body: unknown) {
   const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` },
@@ -45,7 +45,12 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [sentNote, setSentNote] = useState('');
+  const [textOpen, setTextOpen] = useState(false);
+  const [texting, setTexting] = useState(false);
+  const [textError, setTextError] = useState('');
   if (!view.rescheduled) return null;
+  const textedAt = order.rescheduleSms?.sentAt ? new Date(order.rescheduleSms.sentAt) : null;
+  const textCount = order.rescheduleSms?.count ?? (textedAt ? 1 : 0);
 
   const customerEmail = order.customerInfo?.email || '';
   const canEmail = view.email !== 'none' && order.status !== 'cancelled';
@@ -62,6 +67,21 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
       setError(e instanceof Error ? e.message : 'The email could not be sent.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const sendText = async () => {
+    setTexting(true);
+    setTextError('');
+    try {
+      const result = await post(token, order.orderId, 'reschedule-sms', {});
+      setTextOpen(false);
+      setSentNote(result.mode === 'dry' ? 'Text recorded (test mode, nothing was sent).' : 'Text sent to the customer.');
+      await onChanged();
+    } catch (e) {
+      setTextError(e instanceof Error ? e.message : 'The text could not be sent.');
+    } finally {
+      setTexting(false);
     }
   };
 
@@ -113,7 +133,46 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
           )}
         </Box>
       )}
+      {view.email !== 'none' && order.status !== 'cancelled' && (
+        <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+          {textedAt && (
+            <Typography sx={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
+              Customer texted {whenText(textedAt)}
+              {textCount > 1 ? ` (${textCount} texts)` : ''}
+            </Typography>
+          )}
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<IconMessage size={16} />}
+            onClick={() => {
+              setTextError('');
+              setTextOpen(true);
+            }}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            {textedAt ? 'Text again' : 'Send text to customer'}
+          </Button>
+        </Box>
+      )}
       {sentNote && <Alert severity="success" sx={{ mt: 1, py: 0 }}>{sentNote}</Alert>}
+
+      <Dialog open={textOpen} onClose={() => !texting && setTextOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Text the new delivery date?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 14, mb: 1 }}>
+            The customer gets a short text with the new delivery date{view.groups.length > 1 ? 's' : ''} and a link to the order. Only customers who agreed to text messages can be texted.
+          </Typography>
+          {groupLines}
+          {textError && <Alert severity="error" sx={{ mt: 1.5 }}>{textError}</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setTextOpen(false)} disabled={texting} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={sendText} disabled={texting} variant="contained" sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {texting ? <CircularProgress size={20} color="inherit" /> : 'Send text'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={confirmOpen} onClose={() => !sending && setConfirmOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Email the new delivery date?</DialogTitle>
