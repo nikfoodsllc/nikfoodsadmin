@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo, type ReactNode } from 'react';
 import {
   Box,
   Table,
@@ -61,6 +61,8 @@ interface DayWiseItemSelectorProps {
   disabled?: boolean;
   categoryId?: string;
   categoryName?: string;
+  /** shown on the right of the search box (the page puts Save Changes here) */
+  actions?: ReactNode;
 }
 
 export default function DayWiseItemSelector({
@@ -71,6 +73,7 @@ export default function DayWiseItemSelector({
   disabled = false,
   categoryId = '',
   categoryName = '',
+  actions,
 }: DayWiseItemSelectorProps) {
   const { token, isAuthenticated } = useAuth();
   const { availableDates, loading: datesLoading, error: datesError } = useAvailableDates({
@@ -655,7 +658,7 @@ useEffect(() => {
       <Typography variant="body2" sx={{ color: '#666', marginBottom: 2 }}>
         Select items that will be available for each configured date. Items will only appear in the category on their assigned dates.
         Only dates with "Day-wise Category" enabled in the Availability Calendar are shown.
-        Use <strong>Lock</strong> on a row to repeat it every week: it keeps its date selections when you click Clear All, and it is switched on automatically for the same weekdays when you enable the next week&apos;s days in Manage Days. Press Save Changes after locking.
+        Use <strong>Lock</strong> on a row to repeat it every week: it keeps its date selections when you click Clear All. When you press Save Changes it is also added to the later days that are already switched on, on the same weekdays (a Friday item goes onto the next Fridays), and again when you enable new days in Manage Days.
         {showSubCategoryGroups && (
           <>
             {' '}
@@ -664,29 +667,32 @@ useEffect(() => {
         )}
       </Typography>
 
-      <TextField
-        size="small"
-        fullWidth
-        placeholder="Search food items"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        inputProps={{ 'aria-label': 'Search food items' }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <IconSearch size={18} />
-            </InputAdornment>
-          ),
-          endAdornment: searching ? (
-            <InputAdornment position="end">
-              <IconButton size="small" aria-label="Clear search" onClick={() => setSearch('')}>
-                <IconX size={16} />
-              </IconButton>
-            </InputAdornment>
-          ) : undefined,
-        }}
-        sx={{ mb: 1.5, maxWidth: 420 }}
-      />
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="Search food items"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          inputProps={{ 'aria-label': 'Search food items' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <IconSearch size={18} />
+              </InputAdornment>
+            ),
+            endAdornment: searching ? (
+              <InputAdornment position="end">
+                <IconButton size="small" aria-label="Clear search" onClick={() => setSearch('')}>
+                  <IconX size={16} />
+                </IconButton>
+              </InputAdornment>
+            ) : undefined,
+          }}
+          sx={{ flex: '1 1 260px', maxWidth: 420 }}
+        />
+        {actions}
+      </Box>
       {showSubCategoryGroups && !searching && (
         <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
           <Chip

@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
-import { isDateKey, lockedItemPlacement, type AssignedDay } from '@/utils/lockedMenu';
+import { isDateKey, isTodayOrLater, lockedItemPlacement, type AssignedDay } from '@/utils/lockedMenu';
 
 /**
  * Locked rows repeat every week. When day-wise ordering is switched on for a day, every day-wise category that has
@@ -52,6 +52,55 @@ export async function applyLockedMenuToDates(dates: string[]): Promise<{ added: 
       await mappings.insertMany(toInsert as never);
       for (const row of toInsert) assigned.get(String(row.foodItemId))?.push({ day: target, sequence: Number(row.sequence) });
       added += toInsert.length;
+      touched.add(target);
+    }
+  }
+
+  if (added > 0) invalidateLivesiteHomeMenuCache();
+  return { added, days: [...touched] };
+}
+
+/**
+ * Locking an item (Save Changes on the items page) puts it straight onto the later days that are ALREADY switched on for
+ * day-wise ordering, by the same weekday pattern as above. Unlike the switch-on case, a day that already has other items
+ * is not skipped: the act of locking is the instruction, and only this item is added (at the end of a day that has items),
+ * never anything removed. Best effort: the caller must not fail because of this.
+ */
+export async function applyLockedItemsToUpcomingDays(categoryId: ObjectId, itemIds: string[]): Promise<{ added: number; days: string[] }> {
+  const ids = [...new Set(itemIds)].filter((id) => ObjectId.isValid(id));
+  if (ids.length === 0) return { added: 0, days: [] };
+
+  const database = await db.getDb();
+  const enabled = await database
+    .collection('availableDates')
+    .find({ dayWiseCategoryEnabled: true }, { projection: { date: 1 } })
+    .toArray();
+  const targets = enabled
+    .map((d) => String(d.date))
+    .filter((d) => isDateKey(d) && isTodayOrLater(d))
+    .sort();
+  if (targets.length === 0) return { added: 0, days: [] };
+
+  const mappings = database.collection('categoryfoodmapping');
+  const items = database.collection('fooditems');
+  let added = 0;
+  const touched = new Set<string>();
+
+  for (const id of ids) {
+    if (!(await items.countDocuments({ _id: new ObjectId(id) }, { limit: 1 }))) continue; // the item was deleted
+    const rows = await mappings.find({ categoryId, foodItemId: new ObjectId(id), mappingType: 'DAY_WISE' }, { projection: { day: 1, sequence: 1 } }).toArray();
+    const assigned: AssignedDay[] = rows.map((r) => ({ day: String(r.day), sequence: Number(r.sequence) || 0 }));
+
+    // earliest day first, so a day added here can in turn be the pattern for the week after it
+    for (const target of targets) {
+      const placement = lockedItemPlacement(target, assigned);
+      if (!placement) continue;
+      const last = await mappings.find({ categoryId, mappingType: 'DAY_WISE', day: target }, { projection: { sequence: 1 } }).sort({ sequence: -1 }).limit(1).toArray();
+      const sequence = last.length > 0 ? (Number(last[0].sequence) || 0) + 1 : placement.sequence;
+      const now = new Date();
+      await mappings.insertOne({ foodItemId: new ObjectId(id), categoryId, sequence, mappingType: 'DAY_WISE', day: target, createdAt: now, updatedAt: now } as never);
+      assigned.push({ day: target, sequence });
+      added += 1;
       touched.add(target);
     }
   }
