@@ -7,14 +7,10 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Select,
-  MenuItem,
   Typography,
   Box,
   CircularProgress,
   Alert,
-  FormControl,
-  InputLabel,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -27,7 +23,7 @@ import {
 import { IconGripVertical } from '@tabler/icons-react';
 import { FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDateWithDay } from '@/utils/days';
+import { isTodayOrLater } from '@/utils/lockedMenu';
 import { safeFormatCurrency } from '@/utils/currency';
 
 interface FoodItem {
@@ -45,6 +41,12 @@ interface ItemGroup {
   categoryName: string;
   isSubCategory: boolean;
   items: FoodItem[];
+}
+
+/** One day of a day-wise category (day is null for a flat category, which has a single list). */
+interface DaySection {
+  day: string | null;
+  groups: ItemGroup[];
 }
 
 interface ItemSequenceDialogProps {
@@ -122,13 +124,15 @@ function reorderFlatItems(
 }
 
 function parseDroppableId(droppableId: string): {
+  sectionIndex: number;
   groupIndex: number;
   rowIndex: number;
 } {
-  const match = droppableId.match(/^group-(\d+)-row-(\d+)$/);
+  const match = droppableId.match(/^s(\d+)-group-(\d+)-row-(\d+)$/);
   return {
-    groupIndex: match ? Number.parseInt(match[1], 10) : 0,
-    rowIndex: match ? Number.parseInt(match[2], 10) : 0,
+    sectionIndex: match ? Number.parseInt(match[1], 10) : 0,
+    groupIndex: match ? Number.parseInt(match[2], 10) : 0,
+    rowIndex: match ? Number.parseInt(match[3], 10) : 0,
   };
 }
 
@@ -153,6 +157,13 @@ function buildSequenceUpdates(
   }
 
   return updates;
+}
+
+/** 'Wednesday, Oct 14' for a YYYY-MM-DD day */
+function longDayLabel(day: string): string {
+  const d = new Date(`${day}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 function getTotalItemCount(groups: ItemGroup[]): number {
@@ -189,129 +200,121 @@ export default function ItemSequenceDialog({
   const isXl = useMediaQuery(theme.breakpoints.up('xl'));
   const gridColumns = getGridColumnCount(isXl, isLg, isMd, isSm);
 
-  const [selectedDay, setSelectedDay] = useState<string>('');
-  const [itemGroups, setItemGroups] = useState<ItemGroup[]>([]);
+  const [sections, setSections] = useState<DaySection[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const includeSubCategories = category ? !categoryHasParent(category) : false;
-  const totalItems = getTotalItemCount(itemGroups);
+  const totalItems = sections.reduce((sum, section) => sum + getTotalItemCount(section.groups), 0);
 
+  // Day-wise categories show every upcoming day one under the other, so all days are reordered and saved in one go
   useEffect(() => {
-    if (open && category) {
-      setError('');
-
-      if (
-        category.listingType === 'day-wise' &&
-        category.dayWiseItems &&
-        category.dayWiseItems.length > 0
-      ) {
-        const firstDayWithItems = category.dayWiseItems.find(
-          (d) => d.items && d.items.length > 0
-        );
-
-        if (firstDayWithItems) {
-          setSelectedDay(firstDayWithItems.day);
-        } else {
-          setSelectedDay('');
-        }
-      } else {
-        setSelectedDay('');
-      }
-
-      setItemGroups([]);
-    }
-  }, [open, category]);
-
-  useEffect(() => {
-    if (open && category && token) {
-      fetchItems();
-    }
-  }, [open, category, selectedDay, token]);
-
-  const fetchItems = async () => {
-    if (!category || !token) return;
-
-    setLoading(true);
+    if (!open || !category || !token) return;
+    let cancelled = false;
     setError('');
+    setSections([]);
+    setLoading(true);
 
-    try {
-      const params = new URLSearchParams({
-        categoryId: category._id?.toString() || '',
+    const days: (string | null)[] =
+      category.listingType === 'day-wise'
+        ? (category.dayWiseItems ?? [])
+            .filter((d) => d.items && d.items.length > 0 && isTodayOrLater(d.day))
+            .map((d) => d.day)
+            .sort()
+        : [null];
+
+    Promise.all(days.map((day) => fetchGroups(day)))
+      .then((all) => {
+        if (cancelled) return;
+        setSections(
+          days
+            .map((day, index) => ({ day, groups: all[index] }))
+            .filter((section) => getTotalItemCount(section.groups) > 0)
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Error fetching items:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch food items');
+        setSections([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
 
-      if (category.listingType === 'day-wise') {
-        params.append('mappingType', 'DAY_WISE');
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, category, token]);
 
-        if (!selectedDay) {
-          setItemGroups([]);
-          setLoading(false);
-          return;
-        }
+  const fetchGroups = async (day: string | null): Promise<ItemGroup[]> => {
+    if (!category || !token) return [];
 
-        params.append('day', selectedDay);
-      } else {
-        params.append('mappingType', 'FLAT');
-      }
+    const params = new URLSearchParams({
+      categoryId: category._id?.toString() || '',
+    });
 
-      if (includeSubCategories) {
-        params.append('includeSubCategories', 'true');
-      }
-
-      const response = await fetch(
-        `/api/admin/category-food-mapping/items?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch category items');
-      }
-
-      const data = await response.json();
-
-      if (includeSubCategories && data.data?.groups?.length) {
-        setItemGroups(data.data.groups);
-      } else {
-        const fetchedItems: FoodItem[] = data.data?.items || [];
-
-        setItemGroups([
-          {
-            categoryId: category._id?.toString() || '',
-            categoryName: category.name,
-            isSubCategory: false,
-            items: fetchedItems,
-          },
-        ]);
-      }
-    } catch (err) {
-      console.error('Error fetching items:', err);
-
-      setError(
-        err instanceof Error ? err.message : 'Failed to fetch food items'
-      );
-
-      setItemGroups([]);
-    } finally {
-      setLoading(false);
+    if (day) {
+      params.append('mappingType', 'DAY_WISE');
+      params.append('day', day);
+    } else {
+      params.append('mappingType', 'FLAT');
     }
+
+    if (includeSubCategories) {
+      params.append('includeSubCategories', 'true');
+    }
+
+    const response = await fetch(
+      `/api/admin/category-food-mapping/items?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch category items');
+    }
+
+    const data = await response.json();
+
+    if (includeSubCategories && data.data?.groups?.length) {
+      return data.data.groups;
+    }
+
+    return [
+      {
+        categoryId: category._id?.toString() || '',
+        categoryName: category.name,
+        isSubCategory: false,
+        items: data.data?.items || [],
+      },
+    ];
   };
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
 
-    const { groupIndex: sourceGroupIndex, rowIndex: sourceRowIndex } =
-      parseDroppableId(result.source.droppableId);
     const {
+      sectionIndex: sourceSectionIndex,
+      groupIndex: sourceGroupIndex,
+      rowIndex: sourceRowIndex,
+    } = parseDroppableId(result.source.droppableId);
+    const {
+      sectionIndex: destinationSectionIndex,
       groupIndex: destinationGroupIndex,
       rowIndex: destinationRowIndex,
     } = parseDroppableId(result.destination.droppableId);
 
-    if (sourceGroupIndex !== destinationGroupIndex) {
+    // an item stays in its own day and category
+    if (
+      sourceSectionIndex !== destinationSectionIndex ||
+      sourceGroupIndex !== destinationGroupIndex
+    ) {
       return;
     }
 
@@ -324,22 +327,31 @@ export default function ItemSequenceDialog({
 
     const destinationIndex = result.destination.index;
 
-    setItemGroups((prevGroups) =>
-      prevGroups.map((group, index) => {
-        if (index !== sourceGroupIndex) {
-          return group;
+    setSections((prevSections) =>
+      prevSections.map((section, sectionIndex) => {
+        if (sectionIndex !== sourceSectionIndex) {
+          return section;
         }
 
         return {
-          ...group,
-          items: reorderFlatItems(
-            group.items,
-            sourceRowIndex,
-            result.source.index,
-            destinationRowIndex,
-            destinationIndex,
-            gridColumns
-          ),
+          ...section,
+          groups: section.groups.map((group, index) => {
+            if (index !== sourceGroupIndex) {
+              return group;
+            }
+
+            return {
+              ...group,
+              items: reorderFlatItems(
+                group.items,
+                sourceRowIndex,
+                result.source.index,
+                destinationRowIndex,
+                destinationIndex,
+                gridColumns
+              ),
+            };
+          }),
         };
       })
     );
@@ -352,7 +364,8 @@ export default function ItemSequenceDialog({
     setError('');
 
     try {
-      const updates = buildSequenceUpdates(itemGroups);
+      // sequences count from 0 inside each day, so every day is numbered on its own
+      const updates = sections.flatMap((section) => buildSequenceUpdates(section.groups));
       const missingMappingId = updates.find((update) => !update.mappingId);
 
       if (missingMappingId) {
@@ -396,14 +409,6 @@ export default function ItemSequenceDialog({
     }
   };
 
-  const getAvailableDays = () => {
-    if (!category?.dayWiseItems) return [];
-
-    return category.dayWiseItems.filter(
-      (d) => d.items && d.items.length > 0
-    );
-  };
-
   return (
     <Dialog
       open={open}
@@ -442,32 +447,6 @@ export default function ItemSequenceDialog({
             </Alert>
           )}
 
-          {category?.listingType === 'day-wise' && (
-            <FormControl fullWidth>
-              <InputLabel id="day-select-label">
-                Select Day
-              </InputLabel>
-
-              <Select
-                labelId="day-select-label"
-                value={selectedDay}
-                label="Select Day"
-                onChange={(e) => setSelectedDay(e.target.value)}
-                disabled={loading || saving}
-              >
-                {getAvailableDays().map((dayItem) => (
-                  <MenuItem
-                    key={dayItem.day}
-                    value={dayItem.day}
-                  >
-                    {formatDateWithDay(dayItem.day)} (
-                    {dayItem.items.length} items)
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-
           {loading ? (
             <Box
               sx={{
@@ -495,7 +474,7 @@ export default function ItemSequenceDialog({
             <>
               <Typography variant="body2" color="text.secondary">
                 Drag items left or right within a row, or drag up/down to move
-                them into another row. Items are grouped by category.
+                them into another row. Items are grouped by day and category, and one Save keeps every day.
               </Typography>
 
               <DragDropContext onDragEnd={handleDragEnd}>
@@ -503,10 +482,39 @@ export default function ItemSequenceDialog({
                   sx={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 4,
+                    gap: 5,
                   }}
                 >
-                  {itemGroups.map((group, groupIndex) => {
+                  {sections.map((section, sectionIndex) => (
+                    <Box key={section.day ?? 'flat'}>
+                      {section.day && (
+                        <Box
+                          sx={{
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 3,
+                            mb: 2,
+                            px: 2,
+                            py: 1.25,
+                            borderRadius: 2,
+                            backgroundColor: '#1E3A5F',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'baseline',
+                            justifyContent: 'space-between',
+                            gap: 1,
+                          }}
+                        >
+                          <Typography sx={{ fontWeight: 700, fontSize: { xs: '1rem', sm: '1.15rem' } }}>
+                            {longDayLabel(section.day)}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.85rem', opacity: 0.85 }}>
+                            {getTotalItemCount(section.groups)} items
+                          </Typography>
+                        </Box>
+                      )}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {section.groups.map((group, groupIndex) => {
                     const itemRows = chunkIntoRows(group.items, gridColumns);
 
                     if (group.items.length === 0) {
@@ -557,8 +565,8 @@ export default function ItemSequenceDialog({
                         >
                           {itemRows.map((rowItems, rowIndex) => (
                             <Droppable
-                              key={`group-${groupIndex}-row-${rowIndex}`}
-                              droppableId={`group-${groupIndex}-row-${rowIndex}`}
+                              key={`s${sectionIndex}-group-${groupIndex}-row-${rowIndex}`}
+                              droppableId={`s${sectionIndex}-group-${groupIndex}-row-${rowIndex}`}
                               direction="horizontal"
                             >
                               {(provided, snapshot) => (
@@ -582,7 +590,7 @@ export default function ItemSequenceDialog({
                                 >
                                   {rowItems.map((item, columnIndex) => {
                                     const globalIndex = getGlobalItemIndex(
-                                      itemGroups,
+                                      section.groups,
                                       groupIndex,
                                       gridColumns,
                                       rowIndex,
@@ -591,8 +599,8 @@ export default function ItemSequenceDialog({
 
                                     return (
                                       <Draggable
-                                        key={`${group.categoryId}-${item._id}`}
-                                        draggableId={`${group.categoryId}-${item._id}`}
+                                        key={`${section.day ?? 'flat'}-${group.categoryId}-${item._id}`}
+                                        draggableId={`${section.day ?? 'flat'}-${group.categoryId}-${item._id}`}
                                         index={columnIndex}
                                       >
                                         {(provided, snapshot) => (
@@ -739,7 +747,7 @@ export default function ItemSequenceDialog({
                                     ),
                                   }).map((_, spacerIndex) => (
                                     <Box
-                                      key={`spacer-${groupIndex}-${rowIndex}-${spacerIndex}`}
+                                      key={`spacer-${sectionIndex}-${groupIndex}-${rowIndex}-${spacerIndex}`}
                                       sx={{
                                         flex: '1 1 0',
                                         minWidth: 0,
@@ -756,6 +764,9 @@ export default function ItemSequenceDialog({
                       </Box>
                     );
                   })}
+                      </Box>
+                    </Box>
+                  ))}
                 </Box>
               </DragDropContext>
             </>
