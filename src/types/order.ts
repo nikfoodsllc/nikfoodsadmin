@@ -266,6 +266,7 @@ export interface Order {
     changes: Array<{ line: number; item: number; name: string; foodId?: string; quantity: number; menuDate: string; fromDeliveryDate: string; toDate: string }>;
   }>;
   /** When the customer was told about the new dates */
+  rescheduleSms?: { sentAt: Date | string; by?: { id?: string; name?: string }; providerSid?: string; mode?: 'dry' | 'on'; count?: number };
   rescheduleEmail?: { sentAt: Date | string; by?: { id?: string; name?: string }; messageId?: string; count?: number };
   createdAt?: Date | string;
   updatedAt?: Date | string;

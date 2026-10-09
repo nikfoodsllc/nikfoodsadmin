@@ -108,6 +108,15 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // text messages were agreed for the old number: a different number has to agree again
+    if (updateData.phone !== undefined) {
+      await db.updateOne(
+        'users',
+        { _id: new ObjectId(userId), 'smsConsent.optedIn': true, 'smsConsent.phone': { $ne: updateData.phone } } as never,
+        { $set: { 'smsConsent.optedIn': false, 'smsConsent.optedOutAt': new Date(), 'smsConsent.optedOutVia': 'profile' } } as never
+      );
+    }
+
     const updatedUserResult = await db.read<UserDocument>(
       'users',
       { _id: new ObjectId(userId) },
