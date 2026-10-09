@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDate } from '@/utils/timezone';
 import { AddressEditor, ProfileEditor } from './UserEditSections';
+import SmsConsentSection from './SmsConsentSection';
 
 interface UserDetailsDialogProps {
   open: boolean;
@@ -288,6 +289,11 @@ export default function UserDetailsDialog({ open, user, onClose, startEditing, o
               </Box>
             </Box>
           </Box>
+
+          <Divider sx={{ marginY: 2 }} />
+
+          {/* Text messages */}
+          {userKey && <SmsConsentSection userId={userKey} token={token} />}
 
           <Divider sx={{ marginY: 2 }} />
 
