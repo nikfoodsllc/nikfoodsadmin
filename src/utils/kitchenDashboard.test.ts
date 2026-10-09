@@ -54,6 +54,8 @@ describe('week math (weeks run Saturday to Friday)', () => {
   it('gives this week, last week and the week before last', () => {
     // today is Wednesday Oct 7, 2026
     expect(getPresetRange('thisWeek', '2026-10-07')).toEqual({ startDate: '2026-10-03', endDate: '2026-10-09' });
+    expect(getPresetRange('nextWeek', '2026-10-07')).toEqual({ startDate: '2026-10-10', endDate: '2026-10-16' });
+    expect(getPresetRange('nextWeek', '2026-10-10')).toEqual({ startDate: '2026-10-17', endDate: '2026-10-23' });
     expect(getPresetRange('lastWeek', '2026-10-07')).toEqual({ startDate: '2026-09-26', endDate: '2026-10-02' });
     expect(getPresetRange('weekBeforeLast', '2026-10-07')).toEqual({ startDate: '2026-09-19', endDate: '2026-09-25' });
   });
