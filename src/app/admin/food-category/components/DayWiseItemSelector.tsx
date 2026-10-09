@@ -17,7 +17,11 @@ import {
   Alert,
   Chip,
   Tooltip,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
+import { IconSearch, IconX, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { CategoryDayWiseItem, FoodCategory } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAvailableDates } from '@/hooks/useAvailableDates';
@@ -31,6 +35,7 @@ import {
 } from '@/utils/days';
 import { safeFormatCurrency } from '@/utils/currency';
 import { isTodayOrLater } from '@/utils/lockedMenu';
+import { nameMatchesSearch } from '@/utils/itemSearch';
 
 interface FoodItem {
   _id: string;
@@ -285,7 +290,7 @@ useEffect(() => {
     subCategoryIds,
   ]);
 
-  const itemGroups = useMemo((): ItemGroup[] => {
+  const baseGroups = useMemo((): ItemGroup[] => {
     if (!showSubCategoryGroups) {
       return [
         {
@@ -364,6 +369,32 @@ useEffect(() => {
     assignedItemIds,
   ]);
 
+  const [search, setSearch] = useState('');
+  // sub-category sections start folded; a search opens the ones that have matches
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const searching = search.trim().length > 0;
+  const isGroupOpen = (group: ItemGroup) =>
+    !showSubCategoryGroups || searching || expandedGroups.has(group.categoryId);
+  const toggleGroup = (groupId: string) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+
+  // the search only hides rows: ticks, locks and what is saved are untouched
+  const itemGroups = useMemo(
+    () =>
+      searching
+        ? baseGroups
+            .map((group) => ({ ...group, items: group.items.filter((item) => nameMatchesSearch(item.name, search)) }))
+            .filter((group) => group.items.length > 0)
+        : baseGroups,
+    [baseGroups, search, searching]
+  );
+
+  const baseItemCount = baseGroups.reduce((count, group) => count + group.items.length, 0);
   const totalDisplayItems = itemGroups.reduce(
     (count, group) => count + group.items.length,
     0
@@ -464,7 +495,23 @@ useEffect(() => {
   );
 
   const renderGroupHeader = (group: ItemGroup) => (
-    <TableRow key={`header-${group.categoryId}`}>
+    <TableRow
+      key={`header-${group.categoryId}`}
+      hover
+      role="button"
+      tabIndex={0}
+      aria-expanded={isGroupOpen(group)}
+      onClick={() => {
+        if (!searching) toggleGroup(group.categoryId);
+      }}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && !searching) {
+          e.preventDefault();
+          toggleGroup(group.categoryId);
+        }
+      }}
+      sx={{ cursor: searching ? 'default' : 'pointer' }}
+    >
       <TableCell
         colSpan={allDateLabels.length + 1}
         sx={{
@@ -484,8 +531,14 @@ useEffect(() => {
             pl: 1,
             borderLeft: '4px solid',
             borderColor: group.isSubCategory ? '#8B5CF6' : '#4F8CFF',
+            // the header row spans every date column: keep its text in view while the table is scrolled sideways
+            position: 'sticky',
+            left: 16,
+            width: 'max-content',
+            maxWidth: 'calc(100vw - 96px)',
           }}
         >
+          {isGroupOpen(group) ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
           <Typography
             component="span"
             sx={{
@@ -502,6 +555,7 @@ useEffect(() => {
               size="small"
               sx={{
                 height: 22,
+                display: { xs: 'none', sm: 'inline-flex' },
                 backgroundColor: '#8B5CF6',
                 color: 'white',
                 fontWeight: 500,
@@ -512,6 +566,14 @@ useEffect(() => {
           <Typography component="span" sx={{ color: '#666', fontSize: '0.85rem' }}>
             ({group.items.length} {group.items.length === 1 ? 'item' : 'items'})
           </Typography>
+          {group.items.some((item) => assignedItemIds.has(item._id)) && (
+            <Chip
+              label={`${group.items.filter((item) => assignedItemIds.has(item._id)).length} picked`}
+              size="small"
+              color="primary"
+              sx={{ height: 20, fontSize: '0.7rem' }}
+            />
+          )}
         </Box>
       </TableCell>
     </TableRow>
@@ -602,6 +664,46 @@ useEffect(() => {
         )}
       </Typography>
 
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="Search food items"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        inputProps={{ 'aria-label': 'Search food items' }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <IconSearch size={18} />
+            </InputAdornment>
+          ),
+          endAdornment: searching ? (
+            <InputAdornment position="end">
+              <IconButton size="small" aria-label="Clear search" onClick={() => setSearch('')}>
+                <IconX size={16} />
+              </IconButton>
+            </InputAdornment>
+          ) : undefined,
+        }}
+        sx={{ mb: 1.5, maxWidth: 420 }}
+      />
+      {showSubCategoryGroups && !searching && (
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+          <Chip
+            label="Expand all"
+            size="small"
+            variant="outlined"
+            onClick={() => setExpandedGroups(new Set(baseGroups.map((group) => group.categoryId)))}
+          />
+          <Chip label="Collapse all" size="small" variant="outlined" onClick={() => setExpandedGroups(new Set())} />
+        </Box>
+      )}
+      {searching && (
+        <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 1 }}>
+          {totalDisplayItems} of {baseItemCount} items
+        </Typography>
+      )}
+
       <Box sx={{ overflowX: 'auto' }}>
         <TableContainer
           component={Paper}
@@ -675,7 +777,9 @@ useEffect(() => {
                 <TableRow>
                   <TableCell colSpan={allDateLabels.length + 1} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" sx={{ color: '#666' }}>
-                      {showSubCategoryGroups
+                      {searching
+                        ? 'No food items match your search'
+                        : showSubCategoryGroups
                         ? 'No food items are assigned to this category or its sub-categories yet'
                         : 'No food items available'}
                     </Typography>
@@ -685,7 +789,7 @@ useEffect(() => {
                 itemGroups.map((group) => (
                   <Fragment key={group.categoryId}>
                     {showSubCategoryGroups && renderGroupHeader(group)}
-                    {group.items.map((item) => renderItemRow(item))}
+                    {isGroupOpen(group) && group.items.map((item) => renderItemRow(item))}
                   </Fragment>
                 ))
               )}
