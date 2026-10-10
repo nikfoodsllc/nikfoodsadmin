@@ -65,11 +65,11 @@ interface DayWiseItemSelectorProps {
   actions?: ReactNode;
 }
 
-// Row tints: locked = amber, on for any day = green, on for no day = red
+// Row tints: locked = amber, on for any day = green, on for no day = plain white
 const ROW_TINTS = {
   locked: { bg: '#FFF1D6', hover: '#FFE8BA' },
   on: { bg: '#E6F6EA', hover: '#D5EFDC' },
-  off: { bg: '#FDE7E7', hover: '#FAD5D5' },
+  off: { bg: '#FFFFFF', hover: 'rgba(79, 140, 255, 0.06)' },
 };
 
 export default function DayWiseItemSelector({
