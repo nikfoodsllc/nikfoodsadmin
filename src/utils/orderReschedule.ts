@@ -17,7 +17,13 @@ export interface OrderRescheduleLike {
     items?: Array<{ quantity?: number | null; originalDeliveryDate?: string | null; food?: { name?: string | null } | null }> | null;
   }> | null;
   reschedules?: Array<{ at?: unknown; by?: { name?: string } | null }> | null;
-  rescheduleEmail?: { sentAt?: unknown; by?: { name?: string } | null; count?: number | null } | null;
+  rescheduleEmail?: {
+    sentAt?: unknown;
+    by?: { name?: string } | null;
+    count?: number | null;
+    /** What the email provider reported (livesite webhook): delivered, opened, bounced ... */
+    delivery?: { status?: string | null; deliveredAt?: unknown; bouncedAt?: unknown; firstOpenedAt?: unknown; openCount?: number | null } | null;
+  } | null;
 }
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
@@ -69,6 +75,30 @@ export interface MovedGroup {
   items: string[];
 }
 
+/** What happened to the moved-date email after it was sent (an open is only a hint: it comes from a tracking pixel). */
+export type EmailEventState = 'sent' | 'delivered' | 'opened' | 'delayed' | 'bounced' | 'complained';
+
+export interface EmailEventView {
+  state: EmailEventState;
+  /** When that happened (the send time for 'sent') */
+  at: Date | null;
+  opens: number;
+}
+
+export function emailEventOf(email: OrderRescheduleLike['rescheduleEmail']): EmailEventView | null {
+  const sentAt = timeOf(email?.sentAt);
+  if (!email || !sentAt) return null;
+  const d = email.delivery;
+  const at = (v: unknown) => (timeOf(v) ? new Date(timeOf(v)) : null);
+  const opens = Math.max(0, Number(d?.openCount ?? 0) || 0);
+  if (d?.status === 'bounced') return { state: 'bounced', at: at(d.bouncedAt), opens };
+  if (d?.status === 'complained') return { state: 'complained', at: null, opens };
+  if (timeOf(d?.firstOpenedAt)) return { state: 'opened', at: at(d?.firstOpenedAt), opens: opens || 1 };
+  if (d?.status === 'delivered') return { state: 'delivered', at: at(d.deliveredAt), opens };
+  if (d?.status === 'delayed') return { state: 'delayed', at: null, opens };
+  return { state: 'sent', at: new Date(sentAt), opens };
+}
+
 export interface RescheduleView {
   rescheduled: boolean;
   /** How many times an admin moved items */
@@ -81,11 +111,13 @@ export interface RescheduleView {
   email: 'none' | 'pending' | 'sent';
   emailSentAt: Date | null;
   emailCount: number;
+  /** What the provider reported about that email (null until one was sent) */
+  emailEvent: EmailEventView | null;
   /** One line for a tooltip */
   summary: string;
 }
 
-const NOT: RescheduleView = { rescheduled: false, moves: 0, lastAt: null, lastBy: '', groups: [], email: 'none', emailSentAt: null, emailCount: 0, summary: '' };
+const NOT: RescheduleView = { rescheduled: false, moves: 0, lastAt: null, lastBy: '', groups: [], email: 'none', emailSentAt: null, emailCount: 0, emailEvent: null, summary: '' };
 
 function shortDate(date: string): string {
   const d = new Date(`${date}T12:00:00Z`);
@@ -127,6 +159,7 @@ export function rescheduleView(order: OrderRescheduleLike | null | undefined): R
     email,
     emailSentAt: sentAtMs ? new Date(sentAtMs) : null,
     emailCount: order.rescheduleEmail?.count ?? (sentAtMs ? 1 : 0),
+    emailEvent: email === 'sent' ? emailEventOf(order.rescheduleEmail) : null,
     summary: shown,
   };
 }

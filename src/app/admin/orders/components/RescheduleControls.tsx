@@ -4,12 +4,33 @@ import { useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material';
 import { IconCalendarEvent, IconMail, IconMessage } from '@tabler/icons-react';
 import { Order } from '@/types/order';
-import { deliversBeforeKitchen, pickableRange, rescheduleView, selectionList, whyNotReschedulable } from '@/utils/orderReschedule';
+import { type EmailEventView, deliversBeforeKitchen, pickableRange, rescheduleView, selectionList, whyNotReschedulable } from '@/utils/orderReschedule';
 
 /** 'Fri, Oct 9' for '2026-10-09' */
 export function shortDate(date: string): string {
   const d = new Date(`${date}T12:00:00Z`);
   return Number.isNaN(d.getTime()) ? date : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+/** The line under the moved-date box about the email: sent, delivered, opened (green) or bounced (red). */
+export function emailStatusLine(event: EmailEventView | null, sentAt: Date | null): { text: string; color: string } {
+  const green = '#166534';
+  if (!event) return { text: `Customer emailed ${whenText(sentAt)}`, color: green };
+  const when = whenText(event.at);
+  switch (event.state) {
+    case 'opened':
+      return { text: `Customer opened the email ${when}${event.opens > 1 ? ` (${event.opens} opens)` : ''}`, color: green };
+    case 'delivered':
+      return { text: `Customer email delivered ${when}`, color: green };
+    case 'delayed':
+      return { text: `Customer emailed ${whenText(sentAt)} (delivery delayed)`, color: '#B45309' };
+    case 'bounced':
+      return { text: `Customer email bounced ${when}`.trim(), color: '#B91C1C' };
+    case 'complained':
+      return { text: 'Customer marked the email as spam', color: '#B91C1C' };
+    default:
+      return { text: `Customer emailed ${whenText(sentAt)}`, color: green };
+  }
 }
 
 function whenText(date: Date | null): string {
@@ -54,6 +75,7 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
 
   const customerEmail = order.customerInfo?.email || '';
   const canEmail = view.email !== 'none' && order.status !== 'cancelled';
+  const emailLine = emailStatusLine(view.emailEvent, view.emailSentAt);
 
   const send = async () => {
     setSending(true);
@@ -112,8 +134,8 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
           {view.email === 'pending' ? (
             <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#B91C1C' }}>The customer has not been told yet.</Typography>
           ) : (
-            <Typography sx={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
-              Customer emailed {whenText(view.emailSentAt)}
+            <Typography sx={{ fontSize: 13, color: emailLine.color, fontWeight: 600 }}>
+              {emailLine.text}
               {view.emailCount > 1 ? ` (${view.emailCount} emails)` : ''}
             </Typography>
           )}
