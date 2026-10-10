@@ -141,7 +141,7 @@ describe('rowsForTab', () => {
   });
 });
 
-import { totalsLines, unitCount, searchRows, phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
+import { orderLinePayload, totalsLines, unitCount, searchRows, phoneNote, linkActivity, elapsed, uniqueIds, allMenuNodes, dayMenuNodes, filterNodes, isValidDate, paidMethodValue, quantityFor, removeOne, allNodeIds, type CatalogPayload, type CartLine } from './createOrder';
 
 describe('whole menu helpers', () => {
   const item = (id: string, name: string) => ({ _id: id, name, price: 5 });
@@ -497,5 +497,39 @@ describe('replaceLine (changing a line that is already in the order)', () => {
     const next = replaceLine(lines, lines[1].key, mk({ notes: 'less salt' }));
     expect(next[1].notes).toBe('less salt');
     expect(next).toHaveLength(2);
+  });
+});
+
+describe('typed item price', () => {
+  const base = { date: '2026-10-14', foodItemId: 'f1', quantity: 2 };
+  it('travels as unitPrice only when it was typed', () => {
+    expect(orderLinePayload(base)).not.toHaveProperty('unitPrice');
+    expect(orderLinePayload({ ...base, unitPriceEdited: 15 })).toMatchObject({ unitPrice: 15, quantity: 2, foodItemId: 'f1' });
+    expect(orderLinePayload({ ...base, unitPriceEdited: 0 })).toMatchObject({ unitPrice: 0 });
+  });
+  it('two prices of the same item are two lines', () => {
+    expect(lineSignature({ ...base, unitPriceEdited: 15 })).not.toBe(lineSignature(base));
+    expect(lineSignature({ ...base, unitPriceEdited: 15 })).not.toBe(lineSignature({ ...base, unitPriceEdited: 16 }));
+    expect(lineSignature({ ...base, unitPriceEdited: 15 })).toBe(lineSignature({ ...base, unitPriceEdited: 15 }));
+  });
+});
+
+describe('Zelle orders in Recent orders', () => {
+  const now = new Date('2026-10-12T12:00:00Z');
+  const row = (extra: object) => ({ linkOrder: false, payKind: 'zelle' as const, paymentStatus: 'unpaid', awaitingPayment: true, linkSentAt: '2026-10-11T12:00:00Z', linkEmail: { status: 'delivered', sentAt: '2026-10-11T12:00:00Z' }, ...extra });
+  it('says it is waiting for the Zelle payment, with no pay-page lines', () => {
+    const lines = linkActivity(row({}), now);
+    expect(lines.some((l) => /Waiting for the Zelle payment/.test(l.text))).toBe(true);
+    expect(lines.some((l) => /payment page/i.test(l.text))).toBe(false);
+  });
+  it('warns after two days', () => {
+    expect(linkActivity(row({ linkSentAt: '2026-10-09T12:00:00Z' }), now).some((l) => l.tone === 'warn' && /Zelle payment has not been marked received/.test(l.text))).toBe(true);
+  });
+  it('shows a bounce and says nothing when paid', () => {
+    expect(linkActivity(row({ linkEmail: { status: 'bounced', sentAt: '2026-10-11T12:00:00Z' } }), now).some((l) => l.tone === 'bad')).toBe(true);
+    expect(linkActivity(row({ awaitingPayment: false, paymentStatus: 'paid' }), now).some((l) => /Waiting for the Zelle/.test(l.text))).toBe(false);
+  });
+  it('a link order is unchanged', () => {
+    expect(linkActivity({ linkOrder: true, paymentStatus: 'unpaid', awaitingPayment: true, linkSentAt: '2026-10-11T12:00:00Z', linkEmail: { status: 'delivered', sentAt: '2026-10-11T12:00:00Z' } }, now).some((l) => /payment page/.test(l.text))).toBe(true);
   });
 });

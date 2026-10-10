@@ -54,7 +54,7 @@ const navItems: NavItem[] = [
     icon: IconShoppingCart,
     children: [
       { title: 'Order', href: '/admin/orders', icon: IconShoppingCart },
-      { title: 'Create Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
+      { title: 'Create Offline Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
     ],
   },
   {
