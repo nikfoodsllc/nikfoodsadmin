@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') || '10', 10) || 10));
+    const limit = Math.min(100000, Math.max(1, parseInt(searchParams.get('limit') || '10', 10) || 10));
     const skip = (page - 1) * limit;
 
     // Build filter query

@@ -17,9 +17,10 @@ import {
   InputLabel,
   IconButton,
   Chip,
-  Button,
 } from '@mui/material';
 import { IconSearch, IconEdit, IconTrash } from '@tabler/icons-react';
+import TablePagination from '../../food-items/components/TablePagination';
+import type { PageSize } from '@/utils/pageSize';
 import { FoodModifier, ModifierItemType } from '@/types/modifier';
 
 interface ModifiersTableProps {
@@ -30,7 +31,8 @@ interface ModifiersTableProps {
   currentPage: number;
   totalPages: number;
   totalItems: number;
-  itemsPerPage: number;
+  pageSize: PageSize;
+  onPageSizeChange: (size: PageSize) => void;
   onSearch: (query: string) => void;
   onItemTypeFilter: (itemType: ModifierItemType | 'all') => void;
   onPageChange: (page: number) => void;
@@ -78,7 +80,8 @@ export default function ModifiersTable({
   currentPage,
   totalPages,
   totalItems,
-  itemsPerPage,
+  pageSize,
+  onPageSizeChange,
   onSearch,
   onItemTypeFilter,
   onPageChange,
@@ -309,37 +312,14 @@ export default function ModifiersTable({
 
       {/* Pagination */}
       {!loading && totalItems > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 3, gap: 2 }}>
-          <Button
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            size="small"
-            variant="outlined"
-            sx={{
-              textTransform: 'none',
-              minWidth: 80,
-            }}
-          >
-            Previous
-          </Button>
-
-          <Typography variant="body2" sx={{ color: '#6B7280' }}>
-            Page {currentPage} of {totalPages} ({totalItems} total)
-          </Typography>
-
-          <Button
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            size="small"
-            variant="outlined"
-            sx={{
-              textTransform: 'none',
-              minWidth: 80,
-            }}
-          >
-            Next
-          </Button>
-        </Box>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          pageSize={pageSize}
+          onPageSizeChange={onPageSizeChange}
+          totalItems={totalItems}
+        />
       )}
     </Box>
   );

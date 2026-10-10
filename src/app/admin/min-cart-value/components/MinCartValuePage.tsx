@@ -20,7 +20,6 @@ import {
   IconButton,
   TextField,
   InputAdornment,
-  Pagination,
   Checkbox,
   Chip,
   CircularProgress,
@@ -35,6 +34,9 @@ import ZipcodeDialog from './ZipcodeDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import MinCartValueSkeleton from './MinCartValueSkeleton';
 import EditableTableCell from './EditableTableCell';
+import TablePagination from '../../food-items/components/TablePagination';
+import { usePageSize } from '@/hooks/usePageSize';
+import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 
 // Type for tracking edited values
 interface EditedZipcode {
@@ -54,7 +56,9 @@ export default function MinCartValuePage() {
   const [zipcodeToDelete, setZipcodeToDelete] = useState<Zipcode | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const itemsPerPage = 20;
+  // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
+  const [pageSize, setPageSize] = usePageSize('min-cart-value');
+  const itemsPerPage = pageSizeToLimit(pageSize);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -154,7 +158,7 @@ export default function MinCartValuePage() {
     } finally {
       if (request.isCurrent()) setLoading(false);
     }
-  }, [searchQuery, currentPage, token, isAuthenticated, beginRequest]);
+  }, [searchQuery, currentPage, itemsPerPage, token, isAuthenticated, beginRequest]);
 
   // Fetch zipcodes on mount and when dependencies change
   useEffect(() => {
@@ -266,7 +270,7 @@ export default function MinCartValuePage() {
     setEditingCellId(null);
   };
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+  const handlePageChange = (page: number) => {
     // Block page change if there are unsaved changes in bulk edit mode
     if (bulkEditMode && editedValues.size > 0) {
       showSnackbar('Please save or discard changes before changing pages', 'error');
@@ -280,7 +284,21 @@ export default function MinCartValuePage() {
     setEditingCellId(null);
   };
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const handlePageSizeChange = (size: PageSize) => {
+    // same guard as changing page: unsaved bulk edits are not thrown away silently
+    if (bulkEditMode && editedValues.size > 0) {
+      showSnackbar('Please save or discard changes before changing the rows per page', 'error');
+      return;
+    }
+    setPageSize(size);
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+    setBulkEditMode(false);
+    setEditedValues(new Map());
+    setEditingCellId(null);
+  };
+
+  const totalPages = totalPagesFor(totalItems, pageSize);
 
   // Bulk selection handlers
   const handleSelectAll = useCallback(() => {
@@ -1057,26 +1075,16 @@ export default function MinCartValuePage() {
       </TableContainer>
 
       {/* Pagination */}
-      {!loading && totalItems > 0 && totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            disabled={bulkEditMode && hasUnsavedChanges}
-            color="primary"
-            sx={{
-              '& .MuiPaginationItem-root': {
-                '&.Mui-selected': {
-                  backgroundColor: '#4F8CFF',
-                  '&:hover': {
-                    backgroundColor: '#3B7AE8',
-                  },
-                },
-              },
-            }}
-          />
-        </Box>
+      {!loading && totalItems > 0 && (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          pageSize={pageSize}
+          onPageSizeChange={handlePageSizeChange}
+          totalItems={totalItems}
+          disabled={bulkEditMode && hasUnsavedChanges}
+        />
       )}
 
       {/* Zipcode Dialog */}

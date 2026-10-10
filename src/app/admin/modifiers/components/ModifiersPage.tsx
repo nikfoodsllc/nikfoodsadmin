@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import ModifiersTable from './ModifiersTable';
 import ModifierDialog from './ModifierDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
+import { usePageSize } from '@/hooks/usePageSize';
+import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 
 export default function ModifiersPage() {
   const { token, isAuthenticated, loading: authLoading } = useAuth();
@@ -34,7 +36,9 @@ export default function ModifiersPage() {
   const searchQuery = searchBox.query;
   const beginRequest = useLatestRequest();
   const [totalItems, setTotalItems] = useState(0);
-  const itemsPerPage = 10;
+  // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
+  const [pageSize, setPageSize] = usePageSize('modifiers');
+  const itemsPerPage = pageSizeToLimit(pageSize);
 
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -80,7 +84,7 @@ export default function ModifiersPage() {
     } finally {
       if (request.isCurrent()) setLoading(false);
     }
-  }, [token, isAuthenticated, searchQuery, itemTypeFilter, currentPage, beginRequest]);
+  }, [token, isAuthenticated, searchQuery, itemTypeFilter, currentPage, itemsPerPage, beginRequest]);
 
   useEffect(() => {
     fetchModifiers();
@@ -189,7 +193,12 @@ export default function ModifiersPage() {
     setCurrentPage(page);
   };
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const handlePageSizeChange = (size: PageSize) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  const totalPages = totalPagesFor(totalItems, pageSize);
 
   if (authLoading) {
     return (
@@ -253,7 +262,8 @@ export default function ModifiersPage() {
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
+          pageSize={pageSize}
+          onPageSizeChange={handlePageSizeChange}
           onSearch={handleSearch}
           onItemTypeFilter={handleItemTypeFilter}
           onPageChange={handlePageChange}

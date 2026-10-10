@@ -229,7 +229,8 @@ const foodItemSchema = z.object({
   url: z.string().optional(),
   public_id: z.string().optional(),
   itemType: z.enum(['simple', 'portions', 'combo']).default('simple'),
-  // How the item is prepared for the kitchen. null (or leaving it out on create) means "not set yet".
+  // How the item is prepared for the kitchen. Required when CREATING an item (POST checks it); on update, null means
+  // "back to not set yet" and leaving it out leaves the stored value alone.
   preparationType: z.enum(['cooked', 'ready_to_eat']).nullish(),
 
   // Portions type fields
@@ -677,6 +678,14 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validationResult.data;
+
+    // A new food item must say how it is prepared (updates may leave it as it is)
+    if (!isPreparationType(data.preparationType)) {
+      return NextResponse.json(
+        { error: 'Preparation type is required (Cooked or Ready to eat)' },
+        { status: 400 }
+      );
+    }
 
     // Check duplicate food item
     const escapedName = data.name
