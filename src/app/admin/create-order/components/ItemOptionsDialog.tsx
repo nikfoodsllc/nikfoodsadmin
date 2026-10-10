@@ -109,6 +109,8 @@ export default function ItemOptionsDialog({
   const [combo, setCombo] = useState<Record<string, string[]>>({});
   const [notes, setNotes] = useState('');
   const [quantity, setQuantity] = useState(1);
+  // another price for one item, as typed ('' = the menu price)
+  const [priceText, setPriceText] = useState('');
 
   useEffect(() => {
     if (!open || !item) return;
@@ -119,6 +121,7 @@ export default function ItemOptionsDialog({
       setCombo(editing.comboSelections ?? {});
       setNotes(editing.notes ?? '');
       setQuantity(editing.quantity);
+      setPriceText(editing.unitPriceEdited !== undefined ? String(editing.unitPriceEdited) : '');
       return;
     }
     const d = defaultsFor(item);
@@ -128,6 +131,7 @@ export default function ItemOptionsDialog({
     setCombo(d.combo);
     setNotes('');
     setQuantity(1);
+    setPriceText('');
   }, [open, item, editing]);
 
   const pick = useMemo(
@@ -137,10 +141,16 @@ export default function ItemOptionsDialog({
   if (!item) return null;
 
   const problem = pickProblem(item, pick);
-  const unit = estimateUnitPrice(item, pick);
+  // the menu price of one item for this pick, without the eco container (the eco charge is added on top of any typed price)
+  const menuPrice = estimateUnitPrice(item, { ...pick, isEcoFriendlyContainer: false });
+  const eco_ = eco ? Number(item.ecoContainerCharge) || 0 : 0;
+  const typed = priceText.trim() === '' ? null : Number(priceText);
+  const priceBad = typed !== null && (!Number.isFinite(typed) || typed < 0 || typed > 1000);
+  const edited = typed !== null && !priceBad && Math.round(typed * 100) !== Math.round(menuPrice * 100) ? Math.round(typed * 100) / 100 : undefined;
+  const unit = Math.round(((edited ?? menuPrice) + eco_) * 100) / 100;
 
   const add = () => {
-    if (problem) return;
+    if (problem || priceBad) return;
     const comboSelections = Object.fromEntries(Object.entries(combo).filter(([, ids]) => ids.length > 0));
     onAdd({
       date,
@@ -153,6 +163,7 @@ export default function ItemOptionsDialog({
       notes: notes.trim() || undefined,
       name: item.name,
       unitPrice: unit,
+      ...(edited !== undefined ? { unitPriceEdited: edited } : {}),
       tags: lineTags(item, { ...pick, comboSelections }),
     });
   };
@@ -201,6 +212,18 @@ export default function ItemOptionsDialog({
           />
         )}
         <TextField label="Note for the kitchen (optional)" value={notes} onChange={(e) => setNotes(e.target.value.slice(0, 300))} fullWidth size="small" multiline maxRows={3} sx={{ mb: 2 }} />
+        <TextField
+          label="Price for one (optional)"
+          value={priceText}
+          onChange={(e) => setPriceText(e.target.value.replace(/[^0-9.]/g, '').slice(0, 7))}
+          size="small"
+          fullWidth
+          placeholder={menuPrice.toFixed(2)}
+          error={priceBad}
+          helperText={priceBad ? 'Enter a price from $0 to $1000' : `Menu price ${money(menuPrice)}${item.isEcoFriendlyContainer && eco ? ' (eco container is added on top)' : ''}. Type another price to change it for this order.`}
+          slotProps={{ input: { startAdornment: <Typography sx={{ mr: 0.5, color: '#6B7280' }}>$</Typography>, inputMode: 'decimal' } }}
+          sx={{ mb: 2 }}
+        />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 14, flex: 1 }}>Quantity</Typography>
           <IconButton aria-label="One less" size="small" onClick={() => setQuantity((q) => Math.max(1, q - 1))}><IconMinus size={18} /></IconButton>
@@ -211,7 +234,7 @@ export default function ItemOptionsDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 1.5 }}>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
-        <Button variant="contained" onClick={add} disabled={Boolean(problem)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+        <Button variant="contained" onClick={add} disabled={Boolean(problem) || priceBad} sx={{ textTransform: 'none', fontWeight: 700 }}>
           {editing ? 'Save changes' : 'Add'} · {money(unit * quantity)}
         </Button>
       </DialogActions>
