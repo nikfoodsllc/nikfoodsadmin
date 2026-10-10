@@ -65,8 +65,12 @@ interface DayWiseItemSelectorProps {
   actions?: ReactNode;
 }
 
-// Locked rows use amber boxes so they stand out from the blue ones
-const LOCKED_COLOR = '#E8890C';
+// Row tints: locked = amber, on for any day = green, on for no day = red
+const ROW_TINTS = {
+  locked: { bg: '#FFF1D6', hover: '#FFE8BA' },
+  on: { bg: '#E6F6EA', hover: '#D5EFDC' },
+  off: { bg: '#FDE7E7', hover: '#FAD5D5' },
+};
 
 export default function DayWiseItemSelector({
   value,
@@ -406,12 +410,19 @@ useEffect(() => {
     0
   );
 
-  const renderItemRow = (item: FoodItem) => (
+  const renderItemRow = (item: FoodItem) => {
+    const tint = lockedItemIdSet.has(item._id)
+      ? ROW_TINTS.locked
+      : allDateLabels.some((_, dateIndex) => isItemSelectedForDay(dateIndex, item._id))
+        ? ROW_TINTS.on
+        : ROW_TINTS.off;
+    return (
     <TableRow
       key={item._id}
       sx={{
+        backgroundColor: tint.bg,
         '&:hover': {
-          backgroundColor: 'rgba(79, 140, 255, 0.04)',
+          backgroundColor: tint.hover,
         },
       }}
     >
@@ -434,7 +445,7 @@ useEffect(() => {
                   onChange={() => toggleRowLock(item._id)}
                   disabled={disabled}
                   size="small"
-                  sx={{ py: 0, '&.Mui-checked': { color: LOCKED_COLOR } }}
+                  sx={{ py: 0 }}
                 />
               }
               label={
@@ -488,9 +499,9 @@ useEffect(() => {
               disabled={disabled}
               size="small"
               sx={{
-                color: lockedItemIdSet.has(item._id) ? LOCKED_COLOR : '#4F8CFF',
+                color: '#4F8CFF',
                 '&.Mui-checked': {
-                  color: lockedItemIdSet.has(item._id) ? LOCKED_COLOR : '#4F8CFF',
+                  color: '#4F8CFF',
                 },
               }}
             />
@@ -498,7 +509,8 @@ useEffect(() => {
         </TableCell>
       ))}
     </TableRow>
-  );
+    );
+  };
 
   const renderGroupHeader = (group: ItemGroup) => (
     <TableRow
