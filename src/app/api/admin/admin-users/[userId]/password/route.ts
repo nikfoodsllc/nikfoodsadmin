@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { UserDocument } from '@/types/user';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { passwordProblem } from '@/lib/passwordRules';
 
 /**
  * Verify JWT token and check admin role
@@ -31,11 +32,9 @@ function verifyAuth(request: NextRequest) {
 /**
  * Validate password strength
  */
-function isValidPassword(password: string): { valid: boolean; error?: string } {
-  if (password.length < 6) {
-    return { valid: false, error: 'Password must be at least 6 characters long' };
-  }
-  return { valid: true };
+function isValidPassword(password: unknown): { valid: boolean; error?: string } {
+  const problem = passwordProblem(password);
+  return problem ? { valid: false, error: problem } : { valid: true };
 }
 
 /**

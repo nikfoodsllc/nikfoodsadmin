@@ -74,8 +74,8 @@ export default function ChangePasswordDialog({
       return false;
     }
 
-    if (formData.newPassword.length < 6) {
-      setFormState(prev => ({ ...prev, error: 'New password must be at least 6 characters long' }));
+    if (formData.newPassword.length < 8) {
+      setFormState(prev => ({ ...prev, error: 'New password must be at least 8 characters long' }));
       return false;
     }
 
@@ -185,7 +185,7 @@ export default function ChangePasswordDialog({
               fullWidth
               size="small"
               type="password"
-              placeholder="Enter new password (min 6 characters)"
+              placeholder="Enter new password (min 8 characters)"
               value={formData.newPassword}
               onChange={handleChange('newPassword')}
               disabled={loading}
