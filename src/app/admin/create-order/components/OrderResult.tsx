@@ -8,7 +8,7 @@ import PaidMethodPicker from './PaidMethodPicker';
 export interface CreatedOrder {
   orderId: string;
   totalPaid: number;
-  mode: 'link' | 'offline';
+  mode: 'link' | 'offline' | 'zelle';
   accountCreated: boolean;
   payLink?: string;
   emailSent: boolean;
@@ -84,11 +84,18 @@ export default function OrderResult({ result, token, onAnother, onChanged, liste
     <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4', borderRadius: 2 }}>
       <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{cancelled ? 'Order cancelled' : 'Order created'}</Typography>
       <Typography sx={{ fontSize: 15, mt: 0.5 }}>
-        Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {cancelled ? 'cancelled' : result.mode === 'link' && !paid ? 'waiting for payment' : 'paid'}
+        Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {cancelled ? 'cancelled' : result.mode !== 'offline' && !paid ? 'waiting for payment' : 'paid'}
       </Typography>
       {result.accountCreated && <Alert severity="info" sx={{ mt: 1.5 }}>A new customer account was created for this email (the customer sets a password with Forgot password).</Alert>}
       {cancelled ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>This order was cancelled. Its payment link no longer works.</Alert>
+      ) : result.mode === 'zelle' ? (
+        <>
+          <Alert severity={result.emailSent ? 'success' : 'warning'} sx={{ mt: 1.5 }}>
+            {result.emailSent ? 'The Zelle instructions were emailed to the customer.' : `The email could not be sent (${result.emailError || 'unknown error'}). Send the Zelle instructions to the customer yourself, or use Send a reminder in Recent orders.`}
+          </Alert>
+          {!paid && <Typography sx={{ fontSize: 13, color: '#4B5563', mt: 1 }}>When the Zelle arrives, press “Zelle received” in Recent orders below: the order is confirmed and the customer gets the confirmation email.</Typography>}
+        </>
       ) : result.mode === 'link' ? (
         <>
           <Alert severity={result.emailSent ? 'success' : 'warning'} sx={{ mt: 1.5 }}>
