@@ -191,6 +191,8 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Food Items', 'Preparation Type: Cooked', 'Food Items table and edit dialog', 'Made fresh for the day\'s menu. It is for admin reporting only: customers never see it.', 'info'),
   e('Food Items', 'Preparation Type: Ready to eat', 'Food Items table and edit dialog', 'Already made, only packed (for example sweets or pickles). Admin reporting only.', 'info'),
   e('Food Items', '(not set yet)', 'Food Items, Preparation Type', 'Nobody has chosen Cooked or Ready to eat for this item yet.', 'none'),
+  e('Food Items', 'Preparation Type is required', 'Add Food Item dialogs (Simple, Portions, Combo)', 'A new food item cannot be saved until Cooked or Ready to eat is chosen. Items that already exist may stay (not set yet), and editing them does not force a choice.', 'info'),
+  e('Food Items', 'Rows per page (10 / 50 / 100 / All)', 'Bottom of Food Items, Orders, All Users, Modifiers and Delivery Zones', 'How many rows each page shows. It starts at 100. All shows every record on one page, which is easiest for bulk edits but slow to load on big lists such as Orders. Each table remembers its own choice in this browser. Changing it goes back to page 1; on Delivery Zones it is blocked while there are unsaved edits.', 'info'),
   e('Food Items', 'Available', 'Food Items table', 'Whether the item can be ordered at all. An unavailable item is hidden on the website.'),
 ];
 
