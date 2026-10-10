@@ -86,8 +86,8 @@ export default function AdminUserDialog({
       return false;
     }
 
-    if (formData.password && formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (formData.password && formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
       return false;
     }
 
@@ -233,7 +233,7 @@ export default function AdminUserDialog({
                 fullWidth
                 size="small"
                 type="password"
-                placeholder="Enter password (min 6 characters)"
+                placeholder="Enter password (min 8 characters)"
                 value={formData.password}
                 onChange={handleChange('password')}
                 disabled={loading}

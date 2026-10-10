@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { UserDocument } from '@/types/user';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { passwordProblem } from '@/lib/passwordRules';
+import { clearCounter, isBlocked, recordFailure, tooManyMessage, type RateLimit } from '@/lib/authRateLimit';
 
 /**
  * Verify JWT token and check admin role
@@ -31,11 +33,9 @@ function verifyAuth(request: NextRequest) {
 /**
  * Validate password strength
  */
-function isValidPassword(password: string): { valid: boolean; error?: string } {
-  if (password.length < 6) {
-    return { valid: false, error: 'Password must be at least 6 characters long' };
-  }
-  return { valid: true };
+function isValidPassword(password: unknown): { valid: boolean; error?: string } {
+  const problem = passwordProblem(password);
+  return problem ? { valid: false, error: problem } : { valid: true };
 }
 
 /**
@@ -73,6 +73,16 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Wrong "current password" tries are limited like a login
+    const limits: RateLimit[] = [{ key: `admin-change-password:${currentUserId}`, max: 5, windowSec: 15 * 60 }];
+    const blocked = await isBlocked(limits);
+    if (!blocked.ok) {
+      return NextResponse.json(
+        { error: tooManyMessage(blocked.retryAfterSec) },
+        { status: 429, headers: { 'Retry-After': String(blocked.retryAfterSec) } }
+      );
+    }
+
     // Fetch current user with password
     const userResult = await db.read<UserDocument>(
       'users',
@@ -91,11 +101,14 @@ export async function PUT(request: NextRequest) {
     // Verify current password
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isPasswordValid) {
+      await recordFailure(limits);
       return NextResponse.json(
         { error: 'Current password is incorrect' },
         { status: 401 }
       );
     }
+
+    await clearCounter(limits[0].key);
 
     // Check if new password is same as current
     const isSamePassword = await bcrypt.compare(newPassword, user.password);

@@ -58,8 +58,8 @@ export default function PasswordResetDialog({
       return false;
     }
 
-    if (newPassword.length < 6) {
-      setFormState(prev => ({ ...prev, error: 'Password must be at least 6 characters long' }));
+    if (newPassword.length < 8) {
+      setFormState(prev => ({ ...prev, error: 'Password must be at least 8 characters long' }));
       return false;
     }
 
@@ -152,7 +152,7 @@ export default function PasswordResetDialog({
               fullWidth
               size="small"
               type="password"
-              placeholder="Enter new password (min 6 characters)"
+              placeholder="Enter new password (min 8 characters)"
               value={newPassword}
               onChange={(e) => {
                 setFormState(prev => ({
