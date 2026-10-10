@@ -267,7 +267,7 @@ export interface Order {
   }>;
   /** When the customer was told about the new dates */
   rescheduleSms?: { sentAt: Date | string; by?: { id?: string; name?: string }; providerSid?: string; mode?: 'dry' | 'on'; count?: number };
-  rescheduleEmail?: { sentAt: Date | string; by?: { id?: string; name?: string }; messageId?: string; count?: number };
+  rescheduleEmail?: { sentAt: Date | string; by?: { id?: string; name?: string }; messageId?: string; count?: number; delivery?: { status?: string; deliveredAt?: Date | string; bouncedAt?: Date | string; bounceReason?: string; firstOpenedAt?: Date | string; lastOpenedAt?: Date | string; openCount?: number } };
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
