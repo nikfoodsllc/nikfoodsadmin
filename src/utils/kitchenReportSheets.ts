@@ -7,6 +7,7 @@
  */
 import { deliveryNote, formatDayShort, type KitchenDay } from './kitchenDashboard';
 import { sheetAmounts, type PrepBlock, type StickerLine } from './kitchenReport';
+import type { ColumnDef } from './columnPreferences';
 
 export type RowTone = 'red' | 'white' | 'eco';
 
@@ -34,7 +35,13 @@ export interface SheetRow {
   box?: { top: boolean; bottom: boolean };
 }
 
+export type SheetKey = 'prep' | 'ready' | 'stickers' | 'totals';
+
 export interface SheetModel {
+  /** Which sheet this is (the admin's chosen columns are saved per key) */
+  key: SheetKey;
+  /** One key per column, in the same order as `widths` and every row's cells (see the *_COLUMNS lists) */
+  columnKeys: string[];
   name: string;
   /** Column widths in characters (of the cells, not counting the margin) */
   widths: number[];
@@ -45,9 +52,51 @@ export interface SheetModel {
 
 const date = (value: string | null | undefined): SheetCell => ({ date: value || null });
 
+const col = (key: string, label: string, defaultWidth: number): ColumnDef => ({ key, label, defaultWidth });
+
+/** The columns the admin can switch on and off for each sheet (the order here is the order in the file). */
+export const PREP_COLUMNS: ColumnDef[] = [
+  col('item', 'Item Name', 28),
+  col('customer', 'Customer Name', 22),
+  col('spice', 'Spice Level', 18),
+  col('qty', 'Total Ordered Qty (oz)', 22),
+  col('total', 'Item total (lb) / ECO', 20),
+  col('kitchenDate', 'Kitchen date', 17),
+  col('deliveryDate', 'Delivery date', 17),
+  col('combo', 'With combo', 24),
+];
+export const STICKER_COLUMNS: ColumnDef[] = [
+  col('deliveryDate', 'Delivery date', 17),
+  col('customer', 'Customer', 22),
+  col('item', 'Item', 30),
+  col('size', 'Size', 9),
+  col('qty', 'Qty', 6),
+  col('spice', 'Spice', 14),
+  col('eco', 'Eco', 6),
+  col('combo', 'With combo', 24),
+  col('order', 'Order', 24),
+  col('orderDate', 'Order date', 17),
+  col('kitchenDate', 'Kitchen date', 17),
+];
+export const TOTALS_COLUMNS: ColumnDef[] = [
+  col('day', 'Day', 17),
+  col('item', 'Item', 40),
+  col('quantity', 'Quantity', 10),
+  col('amount', 'Total amount', 18),
+  col('later', 'Delivered later', 28),
+];
+
+/** The sheets whose columns the admin can choose, with the name shown in the dialog and the table the choice is saved under. */
+export const SHEET_CHOICES: Array<{ key: SheetKey; title: string; serverTable: string; columns: ColumnDef[] }> = [
+  { key: 'prep', title: 'Kitchen Prep', serverTable: 'kitchen-report-prep', columns: PREP_COLUMNS },
+  { key: 'ready', title: 'Ready to Eat', serverTable: 'kitchen-report-ready', columns: PREP_COLUMNS },
+  { key: 'stickers', title: 'Stickers', serverTable: 'kitchen-report-stickers', columns: STICKER_COLUMNS },
+  { key: 'totals', title: 'Day totals', serverTable: 'kitchen-report-totals', columns: TOTALS_COLUMNS },
+];
+
 /** Kunal's columns first (Item Name, Customer Name, Spice Level, Total Ordered Qty, and the item total / ECO column), then the kitchen and delivery dates (the day the order was placed is not needed here). */
-const PREP_HEADER = ['Item Name', 'Customer Name', 'Spice Level', 'Total Ordered Qty (oz)', 'Item total (lb) / ECO', 'Kitchen date', 'Delivery date', 'With combo'];
-const PREP_WIDTHS = [30, 24, 16, 22, 20, 15, 15, 28];
+const PREP_HEADER = PREP_COLUMNS.map((c) => c.label);
+const PREP_WIDTHS = PREP_COLUMNS.map((c) => c.defaultWidth);
 
 /**
  * One box per item, like Kunal's Kitchen Prep sheet: a thick outline round the block, the item's total (pounds, or pieces
@@ -82,15 +131,26 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
   });
 }
 
-export function prepSheet(cooked: PrepBlock[], notSet: PrepBlock[]): SheetModel {
+/** A sheet of boxes (one per item): the Kitchen Prep sheet (cooked items) and the Ready to Eat sheet (the rest, with the items that have no type yet at the end). */
+function boxSheet(key: SheetKey, name: string, main: PrepBlock[], notSet: PrepBlock[]): SheetModel {
   const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: [0, 1, 2, 3, 4, 5, 6, 7], rightCells: [3, 4] }];
-  prepRows(cooked, rows, true);
+  prepRows(main, rows, true);
   if (notSet.length > 0) {
-    if (cooked.length > 0) rows.push({ kind: 'blank', cells: [] });
+    if (main.length > 0) rows.push({ kind: 'blank', cells: [] });
     rows.push({ kind: 'section', cells: ['Preparation type not set yet (set Cooked or Ready to eat in Food Items)'] });
     prepRows(notSet, rows, false);
   }
-  return { name: 'Kitchen Prep', widths: PREP_WIDTHS, margin: 2, rows };
+  return { key, columnKeys: PREP_COLUMNS.map((c) => c.key), name, widths: PREP_WIDTHS, margin: 2, rows };
+}
+
+/** Kitchen Prep: only the items marked Cooked. */
+export function prepSheet(cooked: PrepBlock[]): SheetModel {
+  return boxSheet('prep', 'Kitchen Prep', cooked, []);
+}
+
+/** Ready to Eat: every item that is not cooked (ready-to-eat items, then the ones with no preparation type yet). */
+export function readyToEatSheet(readyToEat: PrepBlock[], notSet: PrepBlock[]): SheetModel {
+  return boxSheet('ready', 'Ready to Eat', readyToEat, notSet);
 }
 
 export function stickersSheet(stickers: StickerLine[]): SheetModel {
@@ -102,7 +162,7 @@ export function stickersSheet(stickers: StickerLine[]): SheetModel {
       cells: [date(s.deliveryDate), s.customerName, s.item, s.portion ?? '', s.quantity, s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.orderedOn), date(s.day)],
     });
   });
-  return { name: 'Stickers', widths: [15, 22, 30, 9, 6, 14, 6, 24, 24, 15, 15], rows };
+  return { key: 'stickers', columnKeys: STICKER_COLUMNS.map((c) => c.key), name: 'Stickers', widths: STICKER_COLUMNS.map((c) => c.defaultWidth), rows };
 }
 
 export function dayTotalsSheet(days: KitchenDay[]): SheetModel {
@@ -112,11 +172,38 @@ export function dayTotalsSheet(days: KitchenDay[]): SheetModel {
     for (const item of day.items) rows.push({ kind: 'data', tone: rowTone(n++, false), cells: [date(day.day), item.name, item.quantity, item.totalText, deliveryNote(item.deliveries, item.quantity)] });
     for (const combo of day.combos) rows.push({ kind: 'data', tone: rowTone(n++, false), cells: [date(day.day), `${combo.name} (combo)`, combo.quantity, '', deliveryNote(combo.deliveries, combo.quantity)] });
   }
-  return { name: 'Day totals', widths: [15, 40, 10, 18, 28], rows };
+  return { key: 'totals', columnKeys: TOTALS_COLUMNS.map((c) => c.key), name: 'Day totals', widths: TOTALS_COLUMNS.map((c) => c.defaultWidth), rows };
 }
 
-export function buildReportSheets(input: { cooked: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[]; days: KitchenDay[] }): SheetModel[] {
-  return [prepSheet(input.cooked, input.notSet), stickersSheet(input.stickers), dayTotalsSheet(input.days)];
+export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[]; days: KitchenDay[] }): SheetModel[] {
+  return [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers), dayTotalsSheet(input.days)];
+}
+
+/**
+ * Keeps only the columns the admin chose: `hidden` lists, per sheet, the column keys to leave out. A sheet always keeps at
+ * least one column (if every column were hidden, the first one stays), and the section / blank rows are left alone.
+ */
+export function applyColumnChoice(sheets: SheetModel[], hidden: Partial<Record<SheetKey, string[]>>): SheetModel[] {
+  return sheets.map((sheet) => {
+    const off = new Set(hidden[sheet.key] ?? []);
+    let keep = sheet.columnKeys.map((k) => !off.has(k));
+    if (!keep.some(Boolean)) keep = keep.map((_, i) => i === 0);
+    if (keep.every(Boolean)) return sheet;
+    const newIndex: number[] = [];
+    let next = 0;
+    keep.forEach((k, i) => { newIndex[i] = k ? next++ : -1; });
+    const remap = (list?: number[]) => list?.map((i) => newIndex[i]).filter((i) => i >= 0);
+    return {
+      ...sheet,
+      columnKeys: sheet.columnKeys.filter((_, i) => keep[i]),
+      widths: sheet.widths.filter((_, i) => keep[i]),
+      rows: sheet.rows.map((row) =>
+        row.kind === 'section' || row.kind === 'blank'
+          ? row
+          : { ...row, cells: row.cells.filter((_, i) => keep[i]), boldCells: remap(row.boldCells), rightCells: remap(row.rightCells) }
+      ),
+    };
+  });
 }
 
 /** The text of a date cell: "Tue, Oct 13", or '' when there is no date. */

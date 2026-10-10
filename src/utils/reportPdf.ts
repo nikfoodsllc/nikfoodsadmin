@@ -7,6 +7,8 @@ const THICK = 1;
 const THIN = 0.3;
 /** A box with this many rows or fewer is kept on one page; a longer one flows on from where the last box ended, so no page is left half empty. */
 const KEEP_TOGETHER_ROWS = 8;
+/** The text size of the tables (the page title and numbers are smaller). */
+export const PDF_FONT_SIZE = 12;
 
 /**
  * The PDF version of the Excel file: the same sheets, drawn as tables with the same boxes (a thick outline round each item),
@@ -26,7 +28,7 @@ export async function buildReportPdf(sheets: SheetModel[], title: string): Promi
   sheets.forEach((sheet, si) => {
     if (si > 0) doc.addPage();
     const from = doc.getNumberOfPages();
-    const scale = Math.min(usable / sheet.widths.reduce((a, b) => a + b, 0), 5.2);
+    const scale = Math.min(usable / sheet.widths.reduce((a, b) => a + b, 0), 7);
     const widths = sheet.widths.map((w) => w * scale);
     const last = widths.length - 1;
     let y = margin.top;
@@ -43,7 +45,7 @@ export async function buildReportPdf(sheets: SheetModel[], title: string): Promi
         body: isSection ? table.rows.map((r) => [{ content: r.cells[0], colSpan: widths.length }]) : table.rows.map((r) => r.cells),
         pageBreak: table.rows.length <= KEEP_TOGETHER_ROWS ? 'avoid' : 'auto',
         rowPageBreak: 'avoid',
-        styles: { fontSize: 8, cellPadding: { top: 2.6, bottom: 2.6, left: 3.5, right: 3.5 }, textColor: [17, 24, 39], lineColor: [0, 0, 0], valign: 'top', overflow: 'linebreak' },
+        styles: { fontSize: PDF_FONT_SIZE, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, textColor: [17, 24, 39], lineColor: [0, 0, 0], valign: 'top', overflow: 'linebreak' },
         columnStyles: Object.fromEntries(widths.map((w, i) => [i, { cellWidth: w }])),
         didParseCell: (data) => {
           const c = data.column.index;

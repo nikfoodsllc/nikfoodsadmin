@@ -14,7 +14,7 @@ import { isDefaultColumnPrefs, validateColumnPrefsPayload, ColumnPrefs } from '@
  */
 
 const COLLECTION = 'adminTablePreferences';
-const TABLES = ['orders', 'food-items', 'kitchen-days'];
+const TABLES = ['orders', 'food-items', 'kitchen-days', 'kitchen-report-prep', 'kitchen-report-ready', 'kitchen-report-stickers', 'kitchen-report-totals'];
 const MAX_BODY_CHARS = 8 * 1024;
 
 interface TablePreferencesDoc {

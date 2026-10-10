@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
-import { IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
+import { IconColumns3, IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import { formatPSTDateISO } from '@/utils/timezone';
 import {
   addDays,
@@ -31,10 +32,11 @@ import {
 } from '@/utils/kitchenReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
-import { buildReportSheets, rowTone, TONE_COLORS, type RowTone } from '@/utils/kitchenReportSheets';
+import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, rowTone, STICKER_COLUMNS, TONE_COLORS, TOTALS_COLUMNS, type RowTone } from '@/utils/kitchenReportSheets';
+import ReportColumnsDialog from './ReportColumnsDialog';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
-type TabId = 'prep' | 'stickers' | 'days';
+type TabId = 'prep' | 'ready' | 'stickers' | 'days';
 
 /** The range buttons. The first two show the day and the date ("Thu, Oct 8"), so there is no doubt which day they mean. */
 function presetsFor(today: string): Array<{ id: Preset; label: string }> {
@@ -234,6 +236,12 @@ export default function KitchenReportPage() {
   // search: an item, a customer, an order number or a combo
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  // which columns go into the Excel file and the PDF, per sheet (saved in the admin's account)
+  const prepCols = useColumnPreferences('admin_kitchen_report_prep_columns', PREP_COLUMNS, 'kitchen-report-prep');
+  const readyCols = useColumnPreferences('admin_kitchen_report_ready_columns', PREP_COLUMNS, 'kitchen-report-ready');
+  const stickerCols = useColumnPreferences('admin_kitchen_report_stickers_columns', STICKER_COLUMNS, 'kitchen-report-stickers');
+  const totalCols = useColumnPreferences('admin_kitchen_report_totals_columns', TOTALS_COLUMNS, 'kitchen-report-totals');
   const [printing, setPrinting] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -281,10 +289,21 @@ export default function KitchenReportPage() {
   const searching = search.trim().length > 0;
   const cooked = useMemo(() => (data ? filterBlocksBySearch(data.cooked, search) : []), [data, search]);
   const notSet = useMemo(() => (data ? filterBlocksBySearch(data.notSet, search) : []), [data, search]);
+  const readyToEat = useMemo(() => (data ? filterBlocksBySearch(data.readyToEat, search) : []), [data, search]);
   const stickers = useMemo(() => (data ? filterStickersBySearch(data.stickers, search) : []), [data, search]);
   const dayBlocks = useMemo(() => (data ? data.days.map((d) => (searching ? filterBlockBySearch(d, search) : d)) : []), [data, search, searching]);
   const cookedCount = cooked.length;
   const notSetCount = notSet.length;
+  const readyCount = readyToEat.length + notSetCount;
+
+  // the sheets for the Excel file and the PDF, with only the columns this admin chose
+  const buildSheets = () =>
+    applyColumnChoice(buildReportSheets({ cooked, readyToEat, notSet, stickers, days: dayBlocks }), {
+      prep: [...prepCols.hiddenKeys],
+      ready: [...readyCols.hiddenKeys],
+      stickers: [...stickerCols.hiddenKeys],
+      totals: [...totalCols.hiddenKeys],
+    });
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -305,7 +324,7 @@ export default function KitchenReportPage() {
     tab?.document.write('<p style="font-family:sans-serif;padding:24px">Making the PDF...</p>');
     setPrinting(true);
     try {
-      const sheets = buildReportSheets({ cooked, notSet, stickers, days: dayBlocks });
+      const sheets = buildSheets();
       const title = `${formatRangeLabel(range)}${searching ? ` · search: ${search.trim()}` : ''}`;
       const blob = await buildReportPdf(sheets, title);
       if (tab) tab.location.href = URL.createObjectURL(blob);
@@ -324,7 +343,7 @@ export default function KitchenReportPage() {
     setExporting(true);
     try {
       // the file has all three sheets and follows the search, like the screen
-      const sheets = buildReportSheets({ cooked, notSet, stickers, days: dayBlocks });
+      const sheets = buildSheets();
       const blob = await buildReportWorkbook(sheets, `Kitchen report ${label}`);
       downloadBlob(blob, `kitchen-report-${label}.xlsx`);
     } catch (e) {
@@ -350,6 +369,9 @@ export default function KitchenReportPage() {
           </Typography>
         </Box>
         <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Button variant="outlined" size="small" startIcon={<IconColumns3 size={16} />} onClick={() => setColumnsOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Columns
+          </Button>
           <Button variant="outlined" size="small" startIcon={<IconFileSpreadsheet size={16} />} onClick={download} disabled={!data || loading || exporting} sx={{ textTransform: 'none', fontWeight: 600 }}>
             {exporting ? 'Making the file...' : 'Download Excel'}
           </Button>
@@ -429,6 +451,7 @@ export default function KitchenReportPage() {
 
       <Tabs className="no-print" value={tab} onChange={(_, v: TabId) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ borderBottom: '1px solid #E5E7EB', mb: 2 }}>
         <Tab value="prep" label={`Kitchen Prep${data ? ` (${cookedCount})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab value="ready" label={`Ready to Eat${data ? ` (${readyCount})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
         <Tab value="stickers" label={`Stickers${data ? ` (${stickers.length})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
         <Tab value="days" label="Day totals" sx={{ textTransform: 'none', fontWeight: 600 }} />
       </Tabs>
@@ -441,16 +464,26 @@ export default function KitchenReportPage() {
 
       {!loading && data && tab === 'prep' && (
         <>
-          {notSetCount > 0 && (
-            <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
-              {notSetCount} item{notSetCount === 1 ? ' has' : 's have'} no preparation type yet ({notSet.map((b) => b.name).join(', ')}). They are listed at the end. Set Cooked or Ready to eat in Food Items so they go to the right list.
-            </Alert>
-          )}
-          {cookedCount === 0 && notSetCount === 0 && (
+          {cookedCount === 0 && (
             <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? `Nothing matches “${search.trim()}”.` : 'Nothing to cook for these days.'}</Typography>
           )}
           {cooked.map((block) => (
             <PrepCard key={block.name} block={block} />
+          ))}
+        </>
+      )}
+      {!loading && data && tab === 'ready' && (
+        <>
+          {notSetCount > 0 && (
+            <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
+              {notSetCount} item{notSetCount === 1 ? ' has' : 's have'} no preparation type yet ({notSet.map((b) => b.name).join(', ')}). They are listed at the end. Set Cooked or Ready to eat in Food Items.
+            </Alert>
+          )}
+          {readyCount === 0 && (
+            <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? `Nothing matches “${search.trim()}”.` : 'No ready-to-eat items for these days.'}</Typography>
+          )}
+          {readyToEat.map((block) => (
+            <PrepCard key={`ready-${block.name}`} block={block} />
           ))}
           {notSetCount > 0 && (
             <>
@@ -464,6 +497,16 @@ export default function KitchenReportPage() {
       )}
       {!loading && data && tab === 'stickers' && <StickersTab stickers={stickers} searching={searching} />}
       {!loading && data && tab === 'days' && <DayTotalsTab days={dayBlocks} searching={searching} />}
+      <ReportColumnsDialog
+        open={columnsOpen}
+        onClose={() => setColumnsOpen(false)}
+        groups={[
+          { key: 'prep', title: 'Kitchen Prep', columns: prepCols.allColumns, hidden: prepCols.hiddenKeys, syncStatus: prepCols.syncStatus, onToggle: prepCols.toggleColumn, onReset: prepCols.showAll },
+          { key: 'ready', title: 'Ready to Eat', columns: readyCols.allColumns, hidden: readyCols.hiddenKeys, syncStatus: readyCols.syncStatus, onToggle: readyCols.toggleColumn, onReset: readyCols.showAll },
+          { key: 'stickers', title: 'Stickers', columns: stickerCols.allColumns, hidden: stickerCols.hiddenKeys, syncStatus: stickerCols.syncStatus, onToggle: stickerCols.toggleColumn, onReset: stickerCols.showAll },
+          { key: 'totals', title: 'Day totals', columns: totalCols.allColumns, hidden: totalCols.hiddenKeys, syncStatus: totalCols.syncStatus, onToggle: totalCols.toggleColumn, onReset: totalCols.showAll },
+        ]}
+      />
     </Box>
   );
 }
