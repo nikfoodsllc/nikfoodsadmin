@@ -65,6 +65,9 @@ interface DayWiseItemSelectorProps {
   actions?: ReactNode;
 }
 
+// Locked rows use amber boxes so they stand out from the blue ones
+const LOCKED_COLOR = '#E8890C';
+
 export default function DayWiseItemSelector({
   value,
   onChange,
@@ -431,7 +434,7 @@ useEffect(() => {
                   onChange={() => toggleRowLock(item._id)}
                   disabled={disabled}
                   size="small"
-                  sx={{ py: 0 }}
+                  sx={{ py: 0, '&.Mui-checked': { color: LOCKED_COLOR } }}
                 />
               }
               label={
@@ -485,9 +488,9 @@ useEffect(() => {
               disabled={disabled}
               size="small"
               sx={{
-                color: '#4F8CFF',
+                color: lockedItemIdSet.has(item._id) ? LOCKED_COLOR : '#4F8CFF',
                 '&.Mui-checked': {
-                  color: '#4F8CFF',
+                  color: lockedItemIdSet.has(item._id) ? LOCKED_COLOR : '#4F8CFF',
                 },
               }}
             />
