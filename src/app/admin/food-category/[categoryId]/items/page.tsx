@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -12,6 +12,10 @@ import {
   Chip,
   Paper,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { IconArrowLeft, IconCheck, IconPlus, IconTrash } from '@tabler/icons-react';
 import { FoodCategory, CategoryDayWiseItem } from '@/types/order';
@@ -65,7 +69,7 @@ export default function CategoryItemsPage() {
   const categoryId = params.categoryId as string;
 
   // Fetch available dates to filter out disabled dates
-  const { availableDates } = useAvailableDates({
+  const { availableDates, loading: datesLoading } = useAvailableDates({
     dayWiseCategoryEnabledOnly: true
   });
 
@@ -76,6 +80,13 @@ export default function CategoryItemsPage() {
   const [lockedItemIds, setLockedItemIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Save is only allowed once this page has really loaded the saved assignments: saving replaces them all, so saving
+  // from a half-loaded (all zeros) page would wipe the category
+  const [dataReady, setDataReady] = useState(false);
+  const [loadedAssignmentCount, setLoadedAssignmentCount] = useState(0);
+  const [bigDropConfirm, setBigDropConfirm] = useState<{ from: number; to: number } | null>(null);
+  // a newer load makes any older, slower one stop writing to the page
+  const loadSeq = useRef(0);
   const [error, setError] = useState('');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -94,6 +105,8 @@ export default function CategoryItemsPage() {
 
   // Fetch category details
   const fetchCategory = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    setDataReady(false);
     try {
       if (!token || !isAuthenticated) {
         throw new Error('No authentication token found');
@@ -118,6 +131,7 @@ export default function CategoryItemsPage() {
         throw new Error('Category not found');
       }
 
+      if (seq !== loadSeq.current) return;
       setCategory(foundCategory);
       setLockedItemIds(
         Array.isArray(foundCategory.dayWiseLockedItemIds)
@@ -164,15 +178,21 @@ export default function CategoryItemsPage() {
                 .map((mapping) => mapping.foodItemId.toString())
             }));
 
+          if (seq !== loadSeq.current) return;
           setDayWiseItems(transformedDayWiseItems);
+          setLoadedAssignmentCount(transformedDayWiseItems.reduce((n, d) => n + d.items.length, 0));
+          setDataReady(true);
         } catch (err) {
           console.error('Error fetching day-wise items:', err);
-          // Set empty array on error to prevent UI from breaking
+          if (seq !== loadSeq.current) return;
+          // Show an empty table so the page does not break, but never allow saving it (dataReady stays false)
           setDayWiseItems([]);
+          setError('Could not load the saved assignments. Reload the page before saving, or nothing will be saved.');
         }
       } else {
         setItemGroups([]);
         setSelectedItemIds([]);
+        setDataReady(true);
       }
     } catch (err) {
       console.error('Error fetching category:', err);
@@ -330,14 +350,29 @@ export default function CategoryItemsPage() {
       }
     };
 
-    if (token && isAuthenticated) {
+    // wait for the enabled dates: loading the assignments before them filters every assignment out (the all-zeros page)
+    if (token && isAuthenticated && !datesLoading) {
       loadData();
     }
-  }, [token, isAuthenticated, fetchCategory, fetchFoodItems]);
+  }, [token, isAuthenticated, datesLoading, fetchCategory, fetchFoodItems]);
 
   // Handle save
+  // Saving replaces every assignment of this category. Refuse while the page is not fully loaded, and ask first when
+  // the save would remove most of what was loaded.
+  const requestSave = () => {
+    if (!category || !dataReady || loading || saving) return;
+    if (category.listingType === 'day-wise') {
+      const now = dayWiseItems.reduce((n, d) => n + d.items.length, 0);
+      if (loadedAssignmentCount >= 4 && now < loadedAssignmentCount / 2) {
+        setBigDropConfirm({ from: loadedAssignmentCount, to: now });
+        return;
+      }
+    }
+    handleSave();
+  };
+
   const handleSave = async () => {
-    if (!category) return;
+    if (!category || !dataReady) return;
 
     setSaving(true);
     setError('');
@@ -415,7 +450,18 @@ export default function CategoryItemsPage() {
           throw new Error(errorData.error || 'Failed to save locked rows');
         }
 
-        if (mappings.length > 0) {
+        // Newly locked rows were also put on the later days that are already on: reload so the next save keeps them
+        const lockResult = await lockResponse.json().catch(() => null);
+        setLoadedAssignmentCount(mappings.length);
+        const lockedItemsAdded = Number(lockResult?.lockedItemsAdded) || 0;
+        const lockedDaysAdded = Number(lockResult?.lockedDaysAdded) || 0;
+        if (lockedItemsAdded > 0) {
+          await fetchCategory();
+        }
+
+        if (lockedItemsAdded > 0) {
+          showSnackbar(`Saved. Locked rows were also added to ${lockedDaysAdded} later day${lockedDaysAdded === 1 ? '' : 's'}`);
+        } else if (mappings.length > 0) {
           showSnackbar('Day-wise items updated successfully');
         } else {
           showSnackbar('Day-wise items cleared successfully');
@@ -621,6 +667,28 @@ export default function CategoryItemsPage() {
     </Box>
   );
 
+  // day-wise categories show Save Changes next to the search box (inside the table section); flat ones keep it in the header
+  const saveButton = (
+  <Button
+    variant="contained"
+    startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <IconCheck size={20} />}
+    onClick={requestSave}
+    disabled={saving || loading || !dataReady}
+    sx={{
+      textTransform: 'none',
+      backgroundColor: '#4F8CFF',
+      paddingX: 3,
+      paddingY: 1.5,
+      minWidth: 120,
+      '&:hover': {
+        backgroundColor: '#3B7AE8',
+      },
+    }}
+  >
+    {saving ? 'Saving...' : 'Save Changes'}
+  </Button>
+  );
+
   return (
     <Box
       sx={{
@@ -705,24 +773,7 @@ export default function CategoryItemsPage() {
           </Box>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <IconCheck size={20} />}
-          onClick={handleSave}
-          disabled={saving}
-          sx={{
-            textTransform: 'none',
-            backgroundColor: '#4F8CFF',
-            paddingX: 3,
-            paddingY: 1.5,
-            minWidth: 120,
-            '&:hover': {
-              backgroundColor: '#3B7AE8',
-            },
-          }}
-        >
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
+        {category.listingType !== 'day-wise' && saveButton}
       </Box>
 
       {/* Error Alert */}
@@ -756,6 +807,7 @@ export default function CategoryItemsPage() {
               disabled={saving}
               categoryId={categoryId}
               categoryName={category.name}
+              actions={saveButton}
             />
           ) : (
             // Flat Category: Show items with add/remove functionality
@@ -904,6 +956,29 @@ export default function CategoryItemsPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <Dialog open={bigDropConfirm !== null} onClose={() => setBigDropConfirm(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Remove most of the assignments?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            This category had {bigDropConfirm?.from} item assignments when the page opened, and you are about to save{' '}
+            {bigDropConfirm?.to}. Saving replaces everything with what is on screen. If you did not clear them on purpose, press Cancel and reload the page.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={() => setBigDropConfirm(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setBigDropConfirm(null);
+              handleSave();
+            }}
+          >
+            Save anyway
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Add Item Dialog */}
       <AddItemDialog

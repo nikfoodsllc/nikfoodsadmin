@@ -5,6 +5,7 @@ import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { ObjectId, UpdateFilter } from 'mongodb';
 import { FoodCategory, CategoryListingType, CategoryDayWiseItem, CategoryFoodMapping } from '@/types/order';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
+import { applyLockedItemsToUpcomingDays } from '@/lib/server/lockedMenu';
 
 /**
  * Validate listing type
@@ -1007,6 +1008,25 @@ export async function PUT(request: NextRequest) {
 
     console.log('✅ [PUT] Category updated successfully');
 
+    // Items locked by this save go straight onto the later days that are already on (best effort, never fails the save)
+    let lockedItemsAdded = 0;
+    let lockedDaysAdded = 0;
+    if (inputDayWiseLockedItemIds !== undefined && finalListingType === 'day-wise') {
+      try {
+        const before = new Set(
+          ((existingCategory.dayWiseLockedItemIds as unknown[]) ?? []).filter((id): id is string => typeof id === 'string')
+        );
+        const newlyLocked = (inputDayWiseLockedItemIds as string[]).filter((id) => !before.has(id));
+        if (newlyLocked.length > 0) {
+          const applied = await applyLockedItemsToUpcomingDays(categoryId, newlyLocked);
+          lockedItemsAdded = applied.added;
+          lockedDaysAdded = applied.days.length;
+        }
+      } catch (lockError) {
+        console.error('Failed to apply locked items to upcoming days:', lockError);
+      }
+    }
+
     // If image was updated and there was an old image, delete it from Cloudinary
     if (isImageUpdated && oldPublicId) {
       await deleteFromCloudinary(oldPublicId);
@@ -1037,6 +1057,8 @@ export async function PUT(request: NextRequest) {
       listingType: updatedCategory.data?.listingType ?? 'flat',
       dayWiseItems: updatedDayWiseItems,
       itemCount,
+      lockedItemsAdded,
+      lockedDaysAdded,
     };
 
     invalidateLivesiteHomeMenuCache();
