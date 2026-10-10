@@ -22,6 +22,8 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import UserDetailsDialog from './UserDetailsDialog';
 import ExportCustomersDialog from './ExportCustomersDialog';
 import TablePagination from '../../food-items/components/TablePagination';
+import { usePageSize } from '@/hooks/usePageSize';
+import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 import { UserWithAddresses } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -47,7 +49,9 @@ export default function UsersPage() {
   const searchQuery = searchBox.query;
   const beginRequest = useLatestRequest();
   const [totalUsers, setTotalUsers] = useState(0);
-  const itemsPerPage = 100;
+  // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
+  const [pageSize, setPageSize] = usePageSize('all-users');
+  const itemsPerPage = pageSizeToLimit(pageSize);
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -107,7 +111,7 @@ export default function UsersPage() {
     } finally {
       if (request.isCurrent()) setLoading(false);
     }
-  }, [token, isAuthenticated, router, searchQuery, currentPage, beginRequest]);
+  }, [token, isAuthenticated, router, searchQuery, currentPage, itemsPerPage, beginRequest]);
 
   // Fetch users when filters change
   useEffect(() => {
@@ -221,7 +225,12 @@ export default function UsersPage() {
     setCurrentPage(page);
   };
 
-  const totalPages = Math.ceil(totalUsers / itemsPerPage);
+  const handlePageSizeChange = (size: PageSize) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  const totalPages = totalPagesFor(totalUsers, pageSize);
 
   return (
     <Box>
@@ -278,6 +287,9 @@ export default function UsersPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={handlePageChange}
+            pageSize={pageSize}
+            onPageSizeChange={handlePageSizeChange}
+            totalItems={totalUsers}
           />
         </Box>
       )}

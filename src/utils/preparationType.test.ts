@@ -4,6 +4,7 @@ import {
   isPreparationType,
   matchesPreparationFilter,
   normalizePreparationType,
+  preparationTypeError,
   preparationTypeLabel,
 } from './preparationType';
 
@@ -31,6 +32,17 @@ describe('preparation type', () => {
     expect(normalizePreparationType('ready_to_eat')).toBe('ready_to_eat');
     expect(normalizePreparationType('x')).toBeNull();
     expect(normalizePreparationType(undefined)).toBeNull();
+  });
+
+  it('makes the type mandatory for NEW items only', () => {
+    expect(preparationTypeError(true, undefined)).toBe('Choose Cooked or Ready to eat');
+    expect(preparationTypeError(true, null)).toBe('Choose Cooked or Ready to eat');
+    expect(preparationTypeError(true, 'nope')).toBe('Choose Cooked or Ready to eat');
+    expect(preparationTypeError(true, 'cooked')).toBeNull();
+    expect(preparationTypeError(true, 'ready_to_eat')).toBeNull();
+    // an existing item may stay not set
+    expect(preparationTypeError(false, undefined)).toBeNull();
+    expect(preparationTypeError(false, null)).toBeNull();
   });
 
   it('filters', () => {

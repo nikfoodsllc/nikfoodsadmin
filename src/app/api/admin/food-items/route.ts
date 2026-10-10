@@ -678,6 +678,14 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
+    // A new food item must say how it is prepared (updates may leave it as it is)
+    if (!isPreparationType(data.preparationType)) {
+      return NextResponse.json(
+        { error: 'Preparation type is required (Cooked or Ready to eat)' },
+        { status: 400 }
+      );
+    }
+
     // Check duplicate food item
     const escapedName = data.name
       .trim()
