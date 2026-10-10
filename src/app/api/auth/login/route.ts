@@ -5,14 +5,16 @@ import { validateLoginForm } from '@/lib/validation';
 import type { LoginRequest, LoginResponse, ApiErrorResponse } from '@/types/auth';
 import type { UserDocument } from '@/types/user';
 import bcrypt from 'bcryptjs';
+import { clearCounter, clientIp, isBlocked, recordFailure, tooManyMessage, type RateLimit } from '@/lib/authRateLimit';
+
+// a real hash of nothing in particular: an unknown email costs the same time as a wrong password
+const DUMMY_HASH = bcrypt.hashSync('no-such-account', 10);
 
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body: LoginRequest = await request.json();
     const { email, password } = body;
-
-    console.log('🔐 [Admin Login] Attempting login for email:', email);
 
     // Validate input
     const validation = validateLoginForm(email, password);
@@ -27,18 +29,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Slow down password guessing: failed tries count per email + address, and per address
+    const ip = clientIp(request);
+    const pairKey = `admin-login:pair:${String(email).toLowerCase().trim()}:${ip}`;
+    const limits: RateLimit[] = [
+      { key: pairKey, max: 8, windowSec: 15 * 60 },
+      { key: `admin-login:ip:${ip}`, max: 40, windowSec: 15 * 60 },
+    ];
+    const blocked = await isBlocked(limits);
+    if (!blocked.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many attempts',
+          message: tooManyMessage(blocked.retryAfterSec),
+        } as ApiErrorResponse,
+        { status: 429, headers: { 'Retry-After': String(blocked.retryAfterSec) } }
+      );
+    }
+
     // Find user by email
     const userResult = await db.readOne<UserDocument>('users', { email });
+    const user = userResult.success ? userResult.data : null;
 
-    console.log('📊 [Admin Login] Database query result:', {
-      success: userResult.success,
-      userFound: !!userResult.data,
-      error: userResult.error
-    });
+    // Always run one password check, so an unknown email takes as long as a wrong password
+    const isPasswordValid = await bcrypt.compare(password, user?.password || DUMMY_HASH);
 
-    if (!userResult.success || !userResult.data) {
-      console.log('❌ [Admin Login] User not found in database');
-
+    if (!user || !isPasswordValid) {
+      await recordFailure(limits);
       return NextResponse.json(
         {
           success: false,
@@ -48,43 +66,10 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-
-    const user = userResult.data;
-
-    console.log('👤 [Admin Login] User found:', {
-      email: user.email,
-      role: user.role,
-      hasPassword: !!user.password,
-      isCompleted: user.isCompleted
-    });
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    console.log('🔑 [Admin Login] Password comparison result:', isPasswordValid);
-
-    if (!isPasswordValid) {
-      console.log('❌ [Admin Login] Password mismatch');
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid credentials',
-          message: 'Email or password is incorrect',
-        } as ApiErrorResponse,
-        { status: 401 }
-      );
-    }
+    await clearCounter(pairKey);
 
     // Check if user is admin
-    console.log('🛡️ [Admin Login] Checking role:', {
-      userRole: user.role,
-      isAdmin: user.role === 'ADMIN'
-    });
-
     if (user.role !== 'ADMIN') {
-      console.log('❌ [Admin Login] User does not have ADMIN role');
-
       return NextResponse.json(
         {
           success: false,
@@ -96,13 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if admin account is active
-    console.log('🔍 [Admin Login] Checking active status:', {
-      isActive: user.isActive
-    });
-
     if (user.isActive === false) {
-      console.log('❌ [Admin Login] Admin account is deactivated');
-
       return NextResponse.json(
         {
           success: false,
@@ -113,8 +92,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ [Admin Login] All checks passed, generating token');
-
     // Generate JWT token
     const tokenResult = jwtHandler.generateToken(
       user._id!.toString(),
@@ -123,8 +100,6 @@ export async function POST(request: NextRequest) {
     );
 
     if (!tokenResult.success || !tokenResult.token) {
-      console.log('❌ [Admin Login] Token generation failed:', tokenResult.error);
-
       return NextResponse.json(
         {
           success: false,
@@ -151,8 +126,6 @@ export async function POST(request: NextRequest) {
       },
       expiresAt,
     };
-
-    console.log('🎉 [Admin Login] Login successful for:', user.email);
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
