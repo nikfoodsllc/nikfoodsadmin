@@ -2,6 +2,9 @@ import { dateCellText, TONE_COLORS, type SheetCell, type SheetModel } from './ki
 
 const BORDER = { style: 'thin' as const, color: { argb: 'FFE5E7EB' } };
 const THICK = { style: 'medium' as const, color: { argb: 'FF000000' } };
+/** The text size of every cell, and the factor that makes the columns wide enough for it (the widths are set for 11 point). */
+export const EXCEL_FONT_SIZE = 12;
+const WIDTH_FACTOR = 1.15;
 
 function cellValue(cell: SheetCell): string | number | Date | null {
   if (typeof cell === 'string' || typeof cell === 'number') return cell === '' ? null : cell;
@@ -23,7 +26,7 @@ export async function buildReportWorkbook(sheets: SheetModel[], title: string): 
       pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     });
     const margin = sheet.margin ?? 0;
-    ws.columns = [...Array.from({ length: margin }, () => ({ width: 2 })), ...sheet.widths.map((width) => ({ width }))];
+    ws.columns = [...Array.from({ length: margin }, () => ({ width: 2 })), ...sheet.widths.map((width) => ({ width: Math.round(width * WIDTH_FACTOR) }))];
     const first = margin + 1;
     const last = margin + sheet.widths.length;
     for (const row of sheet.rows) {
@@ -31,7 +34,7 @@ export async function buildReportWorkbook(sheets: SheetModel[], title: string): 
       if (row.kind === 'blank') continue;
       if (row.kind === 'section') {
         ws.mergeCells(excelRow.number, first, excelRow.number, last);
-        excelRow.getCell(first).font = { bold: true, color: { argb: 'FF92400E' } };
+        excelRow.getCell(first).font = { size: EXCEL_FONT_SIZE, bold: true, color: { argb: 'FF92400E' } };
         excelRow.getCell(first).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
         continue;
       }
@@ -52,13 +55,13 @@ export async function buildReportWorkbook(sheets: SheetModel[], title: string): 
         }
         cell.alignment = { vertical: 'top', wrapText: true, ...(row.rightCells?.includes(c - first) ? { horizontal: 'right' as const } : {}) };
         if (isHeader && !row.box) {
-          cell.font = { bold: true, color: { argb: 'FF1A1106' } };
+          cell.font = { size: EXCEL_FONT_SIZE, bold: true, color: { argb: 'FF1A1106' } };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF89C35' } };
         } else if (isHeader) {
-          cell.font = { bold: true };
+          cell.font = { size: EXCEL_FONT_SIZE, bold: true };
         } else {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TONE_COLORS[row.tone ?? 'white']}` } };
-          if (row.boldCells?.includes(c - first)) cell.font = { bold: true };
+          cell.font = { size: EXCEL_FONT_SIZE, bold: Boolean(row.boldCells?.includes(c - first)) };
         }
         // the unit is part of the cell's number format, so the cell stays a number and still shows "24 oz" or "1.5 lb"
         if (source && typeof source === 'object') cell.numFmt = 'n' in source ? (source.unit === 'units' ? '[=1]General" unit";General" units"' : `General" ${source.unit}"`) : 'ddd, mmm d';

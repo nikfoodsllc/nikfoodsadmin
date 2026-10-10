@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildKitchenReport, type TypeLookup } from './kitchenReport';
 import { buildKitchenDays, type KitchenRow } from './kitchenDashboard';
-import { buildReportSheets, cellText, prepSheet, sheetToPdfTables, stickersSheet } from './kitchenReportSheets';
+import { buildReportSheets, cellText, prepSheet, readyToEatSheet, sheetToPdfTables, stickersSheet } from './kitchenReportSheets';
 import { buildReportPdf } from './reportPdf';
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
@@ -33,15 +33,18 @@ describe('cellText', () => {
 describe('sheetToPdfTables', () => {
   const report = buildKitchenReport(rows, lookup);
   it('one table per box, the header on the first, a band for the not-set section', () => {
-    const tables = sheetToPdfTables(prepSheet(report.cooked, report.notSet));
-    expect(tables.map((t) => t.kind)).toEqual(['box', 'box', 'section', 'box']);
+    const tables = sheetToPdfTables(readyToEatSheet(report.readyToEat, report.notSet));
+    expect(tables.map((t) => t.kind)).toEqual(['box', 'section', 'box']);
     expect(tables[0].head?.slice(0, 2)).toEqual(['Item Name', 'Customer Name']);
     expect(tables.slice(1).every((t) => !t.head)).toBe(true);
-    expect(tables[0].rows[0].cells[0]).toBe('Chapati');
-    expect(tables[1].rows.map((r) => r.cells[1])).toEqual(['Amy', 'Bob']); // Rajma: mild before hot
+    expect(tables[0].rows[0].cells[0]).toBe('Pickle');
+    expect(tables[2].rows[0].cells[0]).toBe('Mystery');
+    // Kitchen Prep itself has cooked items only: two boxes, no band
+    expect(sheetToPdfTables(prepSheet(report.cooked)).map((t) => t.kind)).toEqual(['box', 'box']);
+    expect(sheetToPdfTables(prepSheet(report.cooked))[1].rows.map((r) => r.cells[1])).toEqual(['Amy', 'Bob']); // Rajma: mild before hot
   });
   it('rows carry their colour, their box edges and the unit text', () => {
-    const tables = sheetToPdfTables(prepSheet(report.cooked, report.notSet));
+    const tables = sheetToPdfTables(prepSheet(report.cooked));
     const rajma = tables[1];
     expect(rajma.rows.map((r) => r.tone)).toEqual(['eco', 'white']);
     expect(rajma.rows[0].box).toEqual({ top: true, bottom: false });
@@ -60,13 +63,13 @@ describe('buildReportPdf', () => {
   const sheets = buildReportSheets({ cooked: report.cooked, notSet: report.notSet, stickers: report.stickers, days: buildKitchenDays(rows, ['2026-10-13']) });
   const text = async (blob: Blob) => Buffer.from(await blob.arrayBuffer()).toString('latin1');
 
-  it('makes a PDF with the three sheets, the item names, the units and page numbers', async () => {
+  it('makes a PDF with the four sheets, the item names, the units and page numbers', async () => {
     const blob = await buildReportPdf(sheets, 'Oct 13, 2026');
     const pdf = await text(blob);
     expect(blob.type).toBe('application/pdf');
     expect(pdf.startsWith('%PDF')).toBe(true);
-    for (const needle of ['Kitchen Prep', 'Stickers', 'Day totals', 'Rajma', 'Chapati', 'Amy', '12 oz', 'Page 1 of 3', 'Tue, Oct 13']) expect(pdf).toContain(needle);
-    expect((pdf.match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(3); // one page per sheet here
+    for (const needle of ['Kitchen Prep', 'Ready to Eat', 'Stickers', 'Day totals', 'Rajma', 'Chapati', 'Amy', '12 oz', 'Page 1 of 4', 'Tue, Oct 13']) expect(pdf).toContain(needle);
+    expect((pdf.match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(4); // one page per sheet here
   });
   it('a long report runs over several pages and every page has a number', async () => {
     const many: KitchenRow[] = [];
@@ -85,7 +88,7 @@ describe('buildReportPdf', () => {
     const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: small.cooked, notSet: [], stickers: [], days: [] }), 'singles'));
     const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
     // Kitchen Prep (40 boxes of one row), plus one page each for the two empty sheets: a handful of pages, not 40
-    expect(pages).toBeLessThanOrEqual(2 + 3);
+    expect(pages).toBeLessThanOrEqual(4 + 3);
   });
   it('a long box starts right after the previous one and runs over the page break instead of jumping to a new page', async () => {
     const mixed: KitchenRow[] = [row({ orderId: 'a', name: 'A short item', customerName: 'Amy', portion: '12Oz' })];
@@ -93,7 +96,7 @@ describe('buildReportPdf', () => {
     const rep = buildKitchenReport(mixed, () => 'cooked');
     const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: rep.cooked, notSet: [], stickers: [], days: [] }), 'mixed'));
     const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
-    expect(pages).toBeLessThanOrEqual(2 + 2); // the 46 lines fit on two pages of Kitchen Prep
+    expect(pages).toBeLessThanOrEqual(4 + 3); // the 46 lines fit on two pages of Kitchen Prep
   });
   it('handles an empty report', async () => {
     const blob = await buildReportPdf(buildReportSheets({ cooked: [], notSet: [], stickers: [], days: [] }), 'empty');

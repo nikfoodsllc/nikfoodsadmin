@@ -3,7 +3,7 @@ import ExcelJS from 'exceljs';
 import { buildKitchenReport, type TypeLookup } from './kitchenReport';
 import type { KitchenRow } from './kitchenDashboard';
 import { buildKitchenDays } from './kitchenDashboard';
-import { buildReportSheets, dayTotalsSheet, prepSheet, rowTone, stickersSheet, TONE_COLORS } from './kitchenReportSheets';
+import { applyColumnChoice, buildReportSheets, dayTotalsSheet, prepSheet, readyToEatSheet, rowTone, stickersSheet, TONE_COLORS } from './kitchenReportSheets';
 import { sheetAmounts } from './kitchenReport';
 import { buildReportWorkbook } from './downloadReportExcel';
 
@@ -26,7 +26,7 @@ describe('prep sheet (Kunal\'s layout)', () => {
     row({ orderId: '4', name: 'Chapati', quantity: 4, customerName: 'Dev' }),
     row({ orderId: '5', name: 'Mystery', customerName: 'Eve' }),
   ], byName);
-  const sheet = prepSheet(report.cooked, report.notSet);
+  const sheet = prepSheet(report.cooked);
   const rajma = () => sheet.rows.filter((r) => r.kind === 'data' && r.cells[0] === 'Rajma');
   it('two margin columns, Kunal\'s five columns first, then the dates', () => {
     expect(sheet.margin).toBe(2);
@@ -36,7 +36,7 @@ describe('prep sheet (Kunal\'s layout)', () => {
   });
   it('one box per item: blocks separated by a blank row, header joined to the first box', () => {
     const kinds = sheet.rows.map((r) => r.kind);
-    expect(kinds.filter((k) => k === 'blank')).toHaveLength(2);
+    expect(kinds.filter((k) => k === 'blank')).toHaveLength(1); // Chapati and Rajma: two boxes (only cooked items are on this sheet)
     expect(sheet.rows[0].box).toEqual({ top: true, bottom: false });
     const first = sheet.rows[1]; expect(first.box?.top).toBe(false); // continues the header, like his sheet
     const chapati = sheet.rows.filter((r) => r.kind === 'data' && r.cells[0] === 'Chapati');
@@ -63,10 +63,17 @@ describe('prep sheet (Kunal\'s layout)', () => {
     const cat = rajma()[0];
     expect(cat.cells.slice(5, 7)).toEqual([{ date: '2026-10-13' }, { date: '2026-10-14' }]);
   });
-  it('items without a type are listed under their own heading, each in its own box', () => {
-    const i = sheet.rows.findIndex((r) => r.kind === 'section');
+  it('Kitchen Prep has only cooked items: no section, no ready-to-eat or not-set items', () => {
+    expect(sheet.rows.some((r) => r.kind === 'section')).toBe(false);
+    expect(sheet.rows.some((r) => r.kind === 'data' && (r.cells[0] === 'Mystery' || r.cells[0] === 'Pickle'))).toBe(false);
+  });
+  it('the Ready to Eat sheet holds the rest: ready-to-eat items, then the ones without a type under their own heading', () => {
+    const ready = readyToEatSheet(report.readyToEat, report.notSet);
+    expect(ready.name).toBe('Ready to Eat');
+    const i = ready.rows.findIndex((r) => r.kind === 'section');
     expect(i).toBeGreaterThan(0);
-    expect(sheet.rows[i + 1].cells[0]).toBe('Mystery'); expect(sheet.rows[i + 1].box).toEqual({ top: true, bottom: true });
+    expect(ready.rows[i + 1].cells[0]).toBe('Mystery'); expect(ready.rows[i + 1].box).toEqual({ top: true, bottom: true });
+    expect(ready.rows.some((r) => r.kind === 'data' && r.cells[0] === 'Rajma')).toBe(false);
   });
 });
 
@@ -97,13 +104,13 @@ describe('stickers and day totals', () => {
 });
 
 describe('the Excel file', () => {
-  it('has the three sheets with real fills, bold totals, frozen header and date cells', async () => {
+  it('has the four sheets with real fills, bold totals, frozen header and date cells', async () => {
     const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz', isEco: true }), row({ orderId: '2', customerName: 'Bob', portion: '8Oz' }), row({ orderId: '3', name: 'Pickle', customerName: 'Cat' })], byName);
     const days = buildKitchenDays([row({ portion: '12Oz' })], ['2026-10-13']);
-    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: report.notSet, stickers: report.stickers, days }), 'test');
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers, days }), 'test');
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
-    expect(wb.worksheets.map((w) => w.name)).toEqual(['Kitchen Prep', 'Stickers', 'Day totals']);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Kitchen Prep', 'Ready to Eat', 'Stickers', 'Day totals']);
     const prep = wb.getWorksheet('Kitchen Prep')!;
     expect(prep.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
     // columns: A and B are the empty margin, C = Item Name, D = Customer, E = Spice, F = Total Ordered Qty, G = Total / ECO, H..J = dates
@@ -154,5 +161,57 @@ describe('units without sizes read "1 unit" and "4 units"', () => {
     expect(prep.getRow(2).getCell(6).value).toBe(1);
     expect(prep.getRow(2).getCell(6).numFmt).toBe('[=1]General" unit";General" units"');
     expect(prep.getRow(3).getCell(6).value).toBe(4);
+  });
+});
+
+describe('applyColumnChoice (the columns an admin picked)', () => {
+  const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz', isEco: true }), row({ orderId: '2', customerName: 'Bob', portion: '8Oz' })], byName);
+  const sheets = buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers, days: [] });
+  const prep = sheets[0];
+
+  it('nothing hidden: the same sheets come back', () => {
+    expect(applyColumnChoice(sheets, {})).toEqual(sheets);
+  });
+  it('hidden columns leave every row, the widths and the keys, and bold / right-aligned cells follow their column', () => {
+    const [cut] = applyColumnChoice(sheets, { prep: ['customer', 'qty'] });
+    expect(cut.columnKeys).toEqual(['item', 'spice', 'total', 'kitchenDate', 'deliveryDate', 'combo']);
+    expect(cut.widths).toHaveLength(6);
+    expect(cut.rows[0].cells).toEqual(['Item Name', 'Spice Level', 'Item total (lb) / ECO', 'Kitchen date', 'Delivery date', 'With combo']);
+    const first = cut.rows[1];
+    expect(first.cells).toHaveLength(6);
+    expect(first.cells[2]).toEqual(prep.rows[1].cells[4]); // the item total moved from column 5 to column 3
+    expect(first.boldCells).toEqual([2]);
+    expect(first.rightCells).toEqual([2]); // the total is still right-aligned, the removed Qty column is gone
+    expect(first.box).toEqual(prep.rows[1].box);
+  });
+  it('only the chosen sheet changes', () => {
+    const cut = applyColumnChoice(sheets, { stickers: ['order'] });
+    expect(cut[0]).toBe(sheets[0]);
+    expect(cut[2].columnKeys).not.toContain('order');
+    expect(cut[2].rows[0].cells).not.toContain('Order');
+  });
+  it('a sheet always keeps at least one column', () => {
+    const [cut] = applyColumnChoice(sheets, { prep: prep.columnKeys });
+    expect(cut.columnKeys).toEqual(['item']);
+  });
+  it('the Ready to Eat sheet and the section band survive a column choice', () => {
+    const report2 = buildKitchenReport([row({ orderId: '5', name: 'Mystery', customerName: 'Eve' })], byName);
+    const ready = buildReportSheets({ cooked: [], readyToEat: report2.readyToEat, notSet: report2.notSet, stickers: [], days: [] })[1];
+    const [, cut] = applyColumnChoice([prep, ready], { ready: ['customer'] });
+    expect(cut.rows.some((r) => r.kind === 'section')).toBe(true);
+    expect(cut.columnKeys).not.toContain('customer');
+  });
+});
+
+describe('Excel text size', () => {
+  it('every cell of the table is 12 point', async () => {
+    const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz' })], byName);
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [], days: buildKitchenDays([row({ portion: '12Oz' })], ['2026-10-13']) }), 'test');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await blob.arrayBuffer());
+    for (const name of ['Kitchen Prep', 'Day totals']) {
+      const ws = wb.getWorksheet(name)!;
+      for (let r = 1; r <= 2; r++) for (let c = 3; c <= 5; c++) expect(ws.getRow(r).getCell(name === 'Day totals' ? c - 2 : c).font?.size).toBe(12);
+    }
   });
 });
