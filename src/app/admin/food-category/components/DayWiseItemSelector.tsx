@@ -65,6 +65,13 @@ interface DayWiseItemSelectorProps {
   actions?: ReactNode;
 }
 
+// Row tints: locked = amber, on for any day = green, on for no day = red
+const ROW_TINTS = {
+  locked: { bg: '#FFF1D6', hover: '#FFE8BA' },
+  on: { bg: '#E6F6EA', hover: '#D5EFDC' },
+  off: { bg: '#FDE7E7', hover: '#FAD5D5' },
+};
+
 export default function DayWiseItemSelector({
   value,
   onChange,
@@ -403,12 +410,19 @@ useEffect(() => {
     0
   );
 
-  const renderItemRow = (item: FoodItem) => (
+  const renderItemRow = (item: FoodItem) => {
+    const tint = lockedItemIdSet.has(item._id)
+      ? ROW_TINTS.locked
+      : allDateLabels.some((_, dateIndex) => isItemSelectedForDay(dateIndex, item._id))
+        ? ROW_TINTS.on
+        : ROW_TINTS.off;
+    return (
     <TableRow
       key={item._id}
       sx={{
+        backgroundColor: tint.bg,
         '&:hover': {
-          backgroundColor: 'rgba(79, 140, 255, 0.04)',
+          backgroundColor: tint.hover,
         },
       }}
     >
@@ -495,7 +509,8 @@ useEffect(() => {
         </TableCell>
       ))}
     </TableRow>
-  );
+    );
+  };
 
   const renderGroupHeader = (group: ItemGroup) => (
     <TableRow
