@@ -181,7 +181,17 @@ export default function OrderTableRow({
                   <Typography sx={{ fontSize: '11px', color: '#B91C1C', fontWeight: 600, whiteSpace: 'nowrap' }}>Customer not told</Typography>
                 )}
                 {resched.email === 'sent' && (
-                  <Typography sx={{ fontSize: '11px', color: '#6B7280', whiteSpace: 'nowrap' }}>Customer emailed</Typography>
+                  <Typography sx={{ fontSize: '11px', color: resched.emailEvent?.state === 'opened' ? '#166534' : resched.emailEvent?.state === 'bounced' || resched.emailEvent?.state === 'complained' ? '#B91C1C' : '#6B7280', fontWeight: resched.emailEvent?.state === 'opened' || resched.emailEvent?.state === 'bounced' ? 600 : 400, whiteSpace: 'nowrap' }}>
+                    {resched.emailEvent?.state === 'opened'
+                      ? 'Customer opened email'
+                      : resched.emailEvent?.state === 'delivered'
+                        ? 'Email delivered'
+                        : resched.emailEvent?.state === 'bounced'
+                          ? 'Email bounced'
+                          : resched.emailEvent?.state === 'complained'
+                            ? 'Marked as spam'
+                            : 'Customer emailed'}
+                  </Typography>
                 )}
               </>
             ) : (
