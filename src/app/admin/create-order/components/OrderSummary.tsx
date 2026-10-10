@@ -135,7 +135,7 @@ export default function OrderSummary(props: {
         helperText="Dollars off the items. The fee, tax and tip are worked out on what is left."
         sx={{ mb: 1 }}
       />
-      <FormControlLabel sx={{ display: 'flex' }} control={<Checkbox size="small" color="warning" checked={props.waiveFee} onChange={(e) => props.onWaiveFee(e.target.checked)} />} label={<Typography sx={{ fontSize: 14 }}>Waive the Platform Fee</Typography>} />
+      <FormControlLabel sx={{ display: 'flex' }} control={<Checkbox size="small" color="warning" checked={props.waiveFee} onChange={(e) => props.onWaiveFee(e.target.checked)} />} label={<Typography sx={{ fontSize: 14 }}>Waive the Platform Fee{props.payment === 'zelle' ? <Box component="span" sx={{ color: '#6B7280' }}> (on for Zelle: the fee only covers card fees)</Box> : null}</Typography>} />
 
       {props.previewError && <Alert severity="warning" sx={{ my: 1 }}>{props.previewError}</Alert>}
       {!preview && !props.previewError && lines.length > 0 && (
