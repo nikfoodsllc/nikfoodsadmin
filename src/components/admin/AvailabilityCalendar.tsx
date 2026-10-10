@@ -13,6 +13,7 @@ import {
   Alert,
   CircularProgress,
   Checkbox,
+  Switch,
   Chip,
   Divider,
   Dialog,
@@ -348,6 +349,9 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
     }
   };
 
+  // how many of the ticked days have each kind on (days without a saved row count as off)
+  const selectedOn = (kind: ItemKind): number => Array.from(selectedDays).filter((d) => (kind === 'flat' ? datesData[d]?.flatCategoryEnabled : datesData[d]?.dayWiseCategoryEnabled)).length;
+
   const toggleDay = (date: string) => {
     setSelectedDays((prev) => {
       const next = new Set(prev);
@@ -358,7 +362,7 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
   };
 
   // Turn flat or day-wise ordering on or off for every ticked day. Each day is saved on its own (cutoffs and the other kind stay as they are).
-  const applyToSelectedDays = async (kind: ItemKind, enabled: boolean) => {
+  const applyToSelectedDays = async (change: { flat?: boolean; dayWise?: boolean }) => {
     if (!token || !isAuthenticated || selectedDays.size === 0) return;
     setBulkSaving(true);
     const dates = Array.from(selectedDays).sort();
@@ -370,7 +374,9 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
       const current = datesData[date];
       const flat = current?.flatCategoryEnabled ?? false;
       const dayWise = current?.dayWiseCategoryEnabled ?? false;
-      if ((kind === 'flat' ? flat : dayWise) === enabled && current) {
+      const nextFlat = change.flat ?? flat;
+      const nextDayWise = change.dayWise ?? dayWise;
+      if (current && nextFlat === flat && nextDayWise === dayWise) {
         unchanged += 1;
         continue;
       }
@@ -380,8 +386,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             date,
-            flatCategoryEnabled: kind === 'flat' ? enabled : flat,
-            dayWiseCategoryEnabled: kind === 'day-wise' ? enabled : dayWise,
+            flatCategoryEnabled: nextFlat,
+            dayWiseCategoryEnabled: nextDayWise,
           }),
         });
         if (!response.ok) throw new Error('save failed');
@@ -396,11 +402,13 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
     // keep only the days that failed ticked, so one press retries them
     setSelectedDays(new Set(failed));
     setBulkSaving(false);
-    const what = `${ITEM_KIND_LABEL[kind]} ${enabled ? 'on' : 'off'}`;
+    const kinds = [change.flat !== undefined ? `${ITEM_KIND_LABEL.flat}` : '', change.dayWise !== undefined ? `${ITEM_KIND_LABEL['day-wise']}` : ''].filter(Boolean);
+    const turnedOn = change.flat ?? change.dayWise;
+    const what = `${kinds.length === 2 ? 'Flat and Day-wise' : kinds[0]} ${turnedOn ? 'on' : 'off'}`;
     if (failed.length > 0) {
       showSnackbar(`${what}: ${changed} saved, ${failed.length} failed (still ticked, press again)`, 'error');
     } else {
-      showSnackbar(`${what} for ${changed} day${changed === 1 ? '' : 's'}${unchanged ? ` (${unchanged} already ${enabled ? 'on' : 'off'})` : ''}`);
+      showSnackbar(`${what} for ${changed} day${changed === 1 ? '' : 's'}${unchanged ? ` (${unchanged} already ${turnedOn ? 'on' : 'off'})` : ''}`);
     }
   };
 
@@ -543,31 +551,52 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mr: 'auto' }}>
               {selectedDays.size} day{selectedDays.size === 1 ? '' : 's'} selected
             </Typography>
-            {ITEM_KINDS.map((kind) => (
-              <Box key={kind} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>
-                  {ITEM_KIND_LABEL[kind]}
-                </Typography>
-                <Button
-                  size="small"
-                  variant="contained"
-                  disabled={bulkSaving}
-                  onClick={() => applyToSelectedDays(kind, true)}
-                  sx={{ textTransform: 'none', backgroundColor: '#10B981', '&:hover': { backgroundColor: '#059669' } }}
-                >
-                  On
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  disabled={bulkSaving}
-                  onClick={() => applyToSelectedDays(kind, false)}
-                  sx={{ textTransform: 'none', borderColor: '#EF4444', color: '#EF4444', '&:hover': { borderColor: '#DC2626', backgroundColor: 'rgba(239, 68, 68, 0.1)' } }}
-                >
-                  Off
-                </Button>
-              </Box>
-            ))}
+            {ITEM_KINDS.map((kind) => {
+              const on = selectedOn(kind);
+              const all = on === selectedDays.size;
+              const mixed = on > 0 && !all;
+              return (
+                <Box key={kind} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>
+                    {ITEM_KIND_LABEL[kind]}
+                  </Typography>
+                  <Switch
+                    size="small"
+                    checked={all}
+                    disabled={bulkSaving}
+                    onChange={() => applyToSelectedDays(kind === 'flat' ? { flat: !all } : { dayWise: !all })}
+                    slotProps={{ input: { role: 'switch', 'aria-label': `${ITEM_KIND_LABEL[kind]} for the selected days` } }}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#10B981' },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10B981' },
+                    }}
+                  />
+                  {mixed && (
+                    <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 600 }}>
+                      {on} of {selectedDays.size} on
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+            <Button
+              size="small"
+              variant="contained"
+              disabled={bulkSaving}
+              onClick={() => applyToSelectedDays({ flat: true, dayWise: true })}
+              sx={{ textTransform: 'none', backgroundColor: '#10B981', '&:hover': { backgroundColor: '#059669' } }}
+            >
+              Enable both
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={bulkSaving}
+              onClick={() => applyToSelectedDays({ flat: false, dayWise: false })}
+              sx={{ textTransform: 'none', borderColor: '#EF4444', color: '#EF4444', '&:hover': { borderColor: '#DC2626', backgroundColor: 'rgba(239, 68, 68, 0.1)' } }}
+            >
+              Disable both
+            </Button>
             <Button size="small" disabled={bulkSaving} onClick={() => setSelectedDays(new Set())} sx={{ textTransform: 'none' }}>
               Clear
             </Button>
