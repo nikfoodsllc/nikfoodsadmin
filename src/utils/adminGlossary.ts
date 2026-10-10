@@ -34,7 +34,9 @@ export const GLOSSARY_SECTIONS = [
   'Kitchen Dashboard',
   'Kitchen Report',
   'Food Items',
+  'Food Category',
   'All Users',
+  'Tables (all pages)',
 ] as const;
 
 const e = (
@@ -99,6 +101,10 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: moving a delivery date', 'Customer emailed', 'Orders table, Rescheduled column; order details', 'The customer was sent the "delivery date updated" email after the last move. If the date is moved again, it goes back to "Customer not told".', 'good'),
   e('All Users', 'Export CSV (new customers)', 'All Users, Export CSV button', 'Downloads the customers who registered in the dates you pick (Pacific days, either end can be left empty). Customers only: admins and switched-off accounts are left out. The file opens in Excel.'),
   e('All Users', 'Text messages (customer details)', 'All Users > customer details', 'Shows whether the customer agreed to text messages: "Agreed to texts" (with the number, the date, where they ticked the box and the wording version), "Stopped" (they turned it off or replied STOP) or "Not asked / no" (nothing on record, so no texts are sent). Also lists the last texts we sent them. Read only; the customer changes it in My Account or by replying STOP.'),
+  e('All Users', 'Edit details / Add address', 'All Users > customer details', 'Edit details changes the customer name, login email and phone (10 digits). Edit or Add address saves an address on the customer account the same way the customer site does, and the address search fills street, city and zip for you. Delivery instructions are limited to 30 characters. Changes show on the customer site straight away.'),
+  e('Food Category', 'Drag to reorder', 'Food Category table', 'Drag a category or sub-category by its handle to change the order customers see on the website. A sub-category stays inside its category. The order is saved when you drop it; if saving fails it jumps back. While a search or filter is on, dragging is switched off.'),
+  e('Tables (all pages)', 'Columns menu (show, hide, reorder, Reset layout)', 'Orders and Food Items tables, Columns button', 'Tick or untick a column to show or hide it, drag a column in the list to move it, and drag the edge of a header to resize it. Your layout is saved on your admin login, so you see the same on another computer. Show all brings back hidden columns; Reset layout returns to the standard layout.', undefined, 'resize reorder hide layout'),
+  e('Tables (all pages)', 'Search boxes', 'Orders, All Users, Food Items, Admin Users, Delivery Zones, Modifiers, Create Order customer search', 'Results update about a third of a second after you stop typing, and a slow earlier answer can no longer replace the newest one. Special characters such as ( + [ are searched as typed.'),
   e('Orders: moving a delivery date', 'Customer opened the email', 'Order details, moved-date box; Rescheduled column ("Customer opened email")', 'The customer opened the moved-date email (green). Other states in order: "Customer emailed" (sent), "Customer email delivered", "Customer email bounced" / "marked the email as spam" (red). An open is only a hint: it comes from a tracking pixel, so a mail app that loads images by itself can show it too.', 'good'),
   e('Orders: moving a delivery date', 'Customer texted', 'Order details, moved-date box', 'A text with the new delivery date was sent to the customer. Only customers who ticked "Text me order updates" (checkout or My Account) can be texted, and only at the number they agreed for. If they reply STOP they cannot be texted again until they opt in.', 'good'),
   e('Orders: moving a delivery date', 'Send email to customer', 'Order details, amber banner', 'Sends the customer an email with the new delivery date(s) and what is on each day. Support gets an identical copy. It is never sent by itself; press it when you are ready (after all moves).'),
