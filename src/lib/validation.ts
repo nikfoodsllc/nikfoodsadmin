@@ -1,3 +1,4 @@
+import { passwordProblem } from '@/lib/passwordRules';
 export interface ValidationResult {
   isValid: boolean;
   error?: string;
@@ -16,16 +17,10 @@ export function validateEmail(email: string): ValidationResult {
   return { isValid: true };
 }
 
+/** Rule for a NEW password. Login does not use it: any non-empty password may try to sign in. */
 export function validatePassword(password: string): ValidationResult {
-  if (!password) {
-    return { isValid: false, error: 'Password is required' };
-  }
-
-  if (password.length < 8) {
-    return { isValid: false, error: 'Password must be at least 8 characters' };
-  }
-
-  return { isValid: true };
+  const problem = passwordProblem(password);
+  return problem ? { isValid: false, error: problem } : { isValid: true };
 }
 
 export function validateLoginForm(email: string, password: string): {
@@ -36,7 +31,9 @@ export function validateLoginForm(email: string, password: string): {
   };
 } {
   const emailValidation = validateEmail(email);
-  const passwordValidation = validatePassword(password);
+  const passwordValidation: ValidationResult = password
+    ? { isValid: true }
+    : { isValid: false, error: 'Password is required' };
 
   const errors: { email?: string; password?: string } = {};
 
