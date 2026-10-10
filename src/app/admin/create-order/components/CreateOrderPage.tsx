@@ -63,6 +63,16 @@ export default function CreateOrderPage() {
 
   const [tip, setTip] = useState(0);
   const [waiveFee, setWaiveFee] = useState(false);
+  // the Platform Fee only covers Stripe's fee, so a Zelle order starts with it waived; once the admin touches the box, their choice stays
+  const feeTouched = useRef(false);
+  const changeWaiveFee = (value: boolean) => {
+    feeTouched.current = true;
+    setWaiveFee(value);
+  };
+  const changePayment = (next: PaymentChoice) => {
+    setPayment(next);
+    if (!feeTouched.current) setWaiveFee(next === 'zelle');
+  };
   // dollars off, as typed
   const [discount, setDiscount] = useState('');
   const discountValue = Math.max(0, Math.round((Number(discount) || 0) * 100) / 100);
@@ -195,6 +205,7 @@ export default function CreateOrderPage() {
     setLines([]);
     setTip(0);
     setWaiveFee(false);
+    feeTouched.current = false;
     setDiscount('');
     setPayment('link');
     setPaidChoice('Cash');
@@ -230,6 +241,7 @@ export default function CreateOrderPage() {
     );
     setTip(o.tipPercentage);
     setWaiveFee(o.waivePlatformFee);
+    feeTouched.current = true; // an order being changed keeps the fee choice it was saved with
     setDiscount(o.discount > 0 ? String(o.discount) : '');
     setPayment(o.payKind === 'zelle' ? 'zelle' : 'link');
     setNote('');
@@ -254,11 +266,11 @@ export default function CreateOrderPage() {
       tip={tip}
       onTip={setTip}
       waiveFee={waiveFee}
-      onWaiveFee={setWaiveFee}
+      onWaiveFee={changeWaiveFee}
       discount={discount}
       onDiscount={setDiscount}
       payment={payment}
-      onPayment={setPayment}
+      onPayment={changePayment}
       paidChoice={paidChoice}
       onPaidChoice={setPaidChoice}
       paidTyped={paidTyped}
