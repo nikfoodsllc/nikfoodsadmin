@@ -24,6 +24,8 @@ import OrderDetailsDialog from './OrderDetailsDialog';
 import ExportToCsvDialog from './ExportToCsvDialog';
 import { IconDownload } from '@tabler/icons-react';
 import TablePagination from '../../food-items/components/TablePagination';
+import { usePageSize } from '@/hooks/usePageSize';
+import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 import { Order, OrderStatus } from '@/types/order';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -68,7 +70,9 @@ export default function OrdersPage() {
     }, 350);
     return () => clearTimeout(timer);
   }, [searchInput, searchQuery]);
-  const itemsPerPage = 100;
+  // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
+  const [pageSize, setPageSize] = usePageSize('orders');
+  const itemsPerPage = pageSizeToLimit(pageSize);
 
   // Column order, widths and hidden columns, saved to this admin's account
   const columnPrefs = useColumnPreferences(ORDERS_COLUMNS_STORAGE_KEY, ORDERS_COLUMNS, 'orders');
@@ -175,7 +179,7 @@ export default function OrdersPage() {
     } finally {
       if (seq === fetchSeq.current) setLoading(false);
     }
-  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedRescheduled, startDate, endDate, sortBy, currentPage, token]);
+  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedRescheduled, startDate, endDate, sortBy, currentPage, itemsPerPage, token]);
 
   // Fetch orders when filters change
   useEffect(() => {
@@ -324,6 +328,12 @@ export default function OrdersPage() {
     setSelectedOrderIds(new Set());
   };
 
+  const handlePageSizeChange = (size: PageSize) => {
+    setPageSize(size);
+    setCurrentPage(1);
+    setSelectedOrderIds(new Set());
+  };
+
   const handleExportClick = () => {
     setExportDialogOpen(true);
   };
@@ -422,7 +432,7 @@ export default function OrdersPage() {
 
   // Calculate maximum unique delivery days across all orders using new utility
 
-  const totalPages = Math.ceil(totalOrders / itemsPerPage);
+  const totalPages = totalPagesFor(totalOrders, pageSize);
 
   return (
     <Box>
@@ -597,6 +607,9 @@ export default function OrdersPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={handlePageChange}
+            pageSize={pageSize}
+            onPageSizeChange={handlePageSizeChange}
+            totalItems={totalOrders}
           />
         </Box>
       )}

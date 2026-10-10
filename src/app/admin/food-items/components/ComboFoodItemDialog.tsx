@@ -24,7 +24,7 @@ import {
   Divider,
 } from '@mui/material';
 import PreparationTypeField from './PreparationTypeField';
-import { PreparationType } from '@/utils/preparationType';
+import { PreparationType, preparationTypeError } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
 import ComboSectionManager from './ComboSectionManager';
@@ -207,6 +207,10 @@ export default function ComboFoodItemDialog({
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     }
+
+    // a NEW item must say how it is prepared (existing items may stay not set)
+    const preparationError = preparationTypeError(!item?._id, formData.preparationType);
+    if (preparationError) newErrors.preparationType = preparationError;
 
     if (formData.price == null || formData.price < 0) {
       newErrors.price = 'Price must be non-negative';
@@ -507,11 +511,22 @@ export default function ComboFoodItemDialog({
             />
           </Box>
 
-          {/* Preparation Type: Cooked / Ready to eat / Not set yet */}
+          {/* Preparation Type: Cooked / Ready to eat (required for a new item; existing items may stay not set) */}
           <PreparationTypeField
             value={formData.preparationType}
-            onChange={(value) => setFormData((prev) => ({ ...prev, preparationType: value }))}
+            onChange={(value) => {
+              setFormData((prev) => ({ ...prev, preparationType: value }));
+              if (errors.preparationType) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.preparationType;
+                  return next;
+                });
+              }
+            }}
             disabled={loading}
+            required={!item?._id}
+            error={errors.preparationType}
           />
 
           <Divider />

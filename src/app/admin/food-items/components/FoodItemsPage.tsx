@@ -34,6 +34,8 @@ import TableFilters from './TableFilters';
 import { PreparationType } from '@/utils/preparationType';
 import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, foodItemFilterParams } from './foodItemFilters';
 import TablePagination from './TablePagination';
+import { usePageSize } from '@/hooks/usePageSize';
+import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import {
   buildSubCategoryOptions,
@@ -236,7 +238,13 @@ export default function FoodItemsPage() {
 
   const [totalItems, setTotalItems] = useState(0);
 
-  const itemsPerPage = 7;
+  // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
+  const [pageSize, setPageSize] = usePageSize('food-items');
+  const itemsPerPage = pageSizeToLimit(pageSize);
+  const changePageSize = (size: PageSize) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   // Column order, widths and hidden columns, saved to this admin's account
   const columnPrefs = useColumnPreferences(FOOD_ITEMS_COLUMNS_STORAGE_KEY, FOOD_ITEMS_COLUMNS, 'food-items');
@@ -383,6 +391,7 @@ export default function FoodItemsPage() {
     searchQuery,
     filters,
     currentPage,
+    itemsPerPage,
     beginRequest,
   ]);
 
@@ -667,7 +676,7 @@ export default function FoodItemsPage() {
     }
   };
 
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = totalPagesFor(totalItems, pageSize);
 
   return (
     <Box>
@@ -828,6 +837,9 @@ export default function FoodItemsPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={changePageSize}
+            totalItems={totalItems}
           />
         </Box>
       )}

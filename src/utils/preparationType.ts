@@ -29,6 +29,14 @@ export function normalizePreparationType(value: unknown): PreparationType | null
   return isPreparationType(value) ? value : null;
 }
 
+/**
+ * A NEW food item must have a preparation type (Cooked or Ready to eat), so the kitchen reports are complete from
+ * day one. Items that already exist may stay "not set yet". Returns the message to show, or null when fine.
+ */
+export function preparationTypeError(isNew: boolean, value: unknown): string | null {
+  return isNew && !isPreparationType(value) ? 'Choose Cooked or Ready to eat' : null;
+}
+
 /** The list filter on the Food Items page: everything, one type, or only items still to be classified. */
 export type PreparationFilter = 'all' | PreparationType | 'not_set';
 
