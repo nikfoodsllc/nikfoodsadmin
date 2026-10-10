@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addDays, deliversBeforeKitchen, pacificToday, pickableRange, rescheduledFilterFor, rescheduleView, selectionKey, selectionList, whyNotReschedulable } from './orderReschedule';
+import { addDays, emailEventOf, deliversBeforeKitchen, pacificToday, pickableRange, rescheduledFilterFor, rescheduleView, selectionKey, selectionList, whyNotReschedulable } from './orderReschedule';
 
 const item = (name: string, quantity = 1, original?: string) => ({ quantity, originalDeliveryDate: original, food: { name } });
 const order = (over: Record<string, unknown> = {}) => ({
@@ -33,6 +33,32 @@ describe('dates', () => {
     expect(r.min).toBe('2026-10-08'); expect(r.max).toBe(addDays('2026-10-08', 120));
   });
   it('addDays crosses month and year ends', () => { expect(addDays('2026-12-31', 1)).toBe('2027-01-01'); expect(addDays('2026-10-31', 1)).toBe('2026-11-01'); });
+});
+
+describe('emailEventOf', () => {
+  const sent = '2026-10-08T21:17:00Z';
+  it('null until an email was sent', () => {
+    expect(emailEventOf(null)).toBeNull();
+    expect(emailEventOf({})).toBeNull();
+  });
+  it('sent, delivered, opened in order of what we know', () => {
+    expect(emailEventOf({ sentAt: sent })?.state).toBe('sent');
+    expect(emailEventOf({ sentAt: sent, delivery: { status: 'delivered', deliveredAt: '2026-10-08T21:18:00Z' } })?.state).toBe('delivered');
+    const opened = emailEventOf({ sentAt: sent, delivery: { status: 'delivered', firstOpenedAt: '2026-10-08T22:00:00Z', openCount: 2 } });
+    expect(opened).toMatchObject({ state: 'opened', opens: 2 });
+    expect(opened?.at?.toISOString()).toBe('2026-10-08T22:00:00.000Z');
+  });
+  it('an open without a delivered receipt still counts as opened', () => {
+    expect(emailEventOf({ sentAt: sent, delivery: { firstOpenedAt: '2026-10-08T22:00:00Z' } })).toMatchObject({ state: 'opened', opens: 1 });
+  });
+  it('bounce and spam win over everything', () => {
+    expect(emailEventOf({ sentAt: sent, delivery: { status: 'bounced', bouncedAt: '2026-10-08T21:18:00Z', firstOpenedAt: '2026-10-08T22:00:00Z' } })?.state).toBe('bounced');
+    expect(emailEventOf({ sentAt: sent, delivery: { status: 'complained' } })?.state).toBe('complained');
+  });
+  it('delayed, and junk values do not throw', () => {
+    expect(emailEventOf({ sentAt: sent, delivery: { status: 'delayed' } })?.state).toBe('delayed');
+    expect(emailEventOf({ sentAt: sent, delivery: { status: 'weird', openCount: 'x' as unknown as number, firstOpenedAt: 'nope' } })?.state).toBe('sent');
+  });
 });
 
 describe('rescheduleView', () => {
