@@ -94,6 +94,23 @@ export interface OrderLine {
   isEcoFriendlyContainer?: boolean;
   comboSelections?: Record<string, string[]>;
   notes?: string;
+  /** The price typed for ONE of this item, when it is not the menu price (the eco container charge is added on top by the site) */
+  unitPriceEdited?: number;
+}
+
+/** The line as the customer site expects it (the typed price travels as `unitPrice`). */
+export function orderLinePayload(l: OrderLine) {
+  return {
+    date: l.date,
+    foodItemId: l.foodItemId,
+    quantity: l.quantity,
+    selectedPortion: l.selectedPortion,
+    selectedSpiceLevel: l.selectedSpiceLevel,
+    isEcoFriendlyContainer: l.isEcoFriendlyContainer,
+    comboSelections: l.comboSelections,
+    notes: l.notes,
+    ...(l.unitPriceEdited !== undefined ? { unitPrice: l.unitPriceEdited } : {}),
+  };
 }
 
 /** A line in the screen's list: the pick plus what is needed to show it. */
@@ -111,7 +128,7 @@ export function lineSignature(line: OrderLine): string {
     .sort()
     .map((k) => `${k}:${[...(line.comboSelections?.[k] ?? [])].sort().join('+')}`)
     .join('|');
-  return [line.date, line.foodItemId, line.selectedPortion ?? '', line.selectedSpiceLevel ?? '', line.isEcoFriendlyContainer ? 'eco' : '', combo, (line.notes ?? '').trim()].join('~');
+  return [line.date, line.foodItemId, line.selectedPortion ?? '', line.selectedSpiceLevel ?? '', line.isEcoFriendlyContainer ? 'eco' : '', combo, (line.notes ?? '').trim(), line.unitPriceEdited !== undefined ? `price:${line.unitPriceEdited}` : ''].join('~');
 }
 
 export function addLine(lines: CartLine[], incoming: Omit<CartLine, 'key'>): CartLine[] {
@@ -258,7 +275,9 @@ export interface OrderListRow {
   paymentStatus: string;
   paymentMethod: string;
   linkOrder: boolean;
-  /** A payment link order the customer has not paid yet */
+  /** link = card through a pay link, zelle = waits for a Zelle payment, offline = recorded as paid outside the website (missing from an older server) */
+  payKind?: 'link' | 'zelle' | 'offline';
+  /** An order (payment link or Zelle) the customer has not paid yet */
   awaitingPayment: boolean;
   linkSentAt?: string;
   /** What the email provider reported about the latest pay-link email */
@@ -517,8 +536,9 @@ export function elapsed(fromIso: string, now: Date = new Date()): string {
  * opening is the reliable sign; an email "open" is only a hint (Apple Mail and some scanners load images by themselves).
  * Only for link orders that were emailed.
  */
-export function linkActivity(row: Pick<OrderListRow, 'linkOrder' | 'paymentStatus' | 'awaitingPayment' | 'linkSentAt' | 'linkEmail' | 'linkViews'>, now: Date = new Date()): ActivityLine[] {
-  if (!row.linkOrder || !row.linkSentAt) return [];
+export function linkActivity(row: Pick<OrderListRow, 'linkOrder' | 'paymentStatus' | 'awaitingPayment' | 'linkSentAt' | 'linkEmail' | 'linkViews'> & { payKind?: OrderListRow['payKind'] }, now: Date = new Date()): ActivityLine[] {
+  const zelle = row.payKind === 'zelle';
+  if ((!row.linkOrder && !zelle) || !row.linkSentAt) return [];
   // a link sent before tracking existed has no email record: we cannot say it was not opened, so say nothing about it
   if (!row.linkEmail && !row.linkViews) return [];
   const lines: ActivityLine[] = [];
@@ -532,6 +552,15 @@ export function linkActivity(row: Pick<OrderListRow, 'linkOrder' | 'paymentStatu
     lines.push({ tone: 'info', text: `Email opened ${e.opened.count > 1 ? `${e.opened.count} times, last ` : ''}${clock(e.opened.lastAt)} (can happen automatically, so it is only a hint)` });
   }
   const v = row.linkViews;
+  // a Zelle order has no pay page: only whether the instructions email arrived and whether Zelle has come in
+  if (zelle) {
+    if (row.awaitingPayment) {
+      const waited = elapsed(row.linkSentAt, now);
+      const long = now.getTime() - new Date(row.linkSentAt).getTime() >= 48 * 3600 * 1000;
+      lines.push(long ? { tone: 'warn', text: `The Zelle payment has not been marked received after ${waited}. Check Zelle, send a reminder or call them.` } : { tone: 'info', text: `Waiting for the Zelle payment (instructions sent ${waited} ago)` });
+    }
+    return lines;
+  }
   if (v) {
     lines.push({ tone: 'good', text: `Opened the payment page ${v.count > 1 ? `${v.count} times, last ` : ''}${clock(v.lastAt)}${row.paymentStatus === 'paid' ? ' and paid' : ''}` });
   } else if (row.awaitingPayment) {

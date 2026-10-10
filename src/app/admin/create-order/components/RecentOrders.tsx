@@ -160,6 +160,20 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
       }
     });
 
+  // Zelle order: the same instructions email again
+  const sendZelle = (row: Row) =>
+    run(row, 'remind', async () => {
+      const d = await post(row.orderId, 'resend', { sendEmail: true });
+      return d.emailSent ? 'The Zelle instructions were emailed again.' : `The email could not be sent (${d.emailError || 'unknown error'}).`;
+    });
+
+  // Zelle order: the money arrived, so mark it paid (Zelle is preselected)
+  const openZellePaid = (row: Row) => {
+    setPayChoice('Zelle');
+    setPayTyped('');
+    setPayDialog(row);
+  };
+
   const confirmRefresh = async () => {
     const pending = refreshDialog;
     if (!pending) return;
@@ -174,7 +188,7 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
     setCancelDialog(null);
     await run(row, 'cancel', async () => {
       await post(row.orderId, 'cancel', {});
-      return 'Order cancelled. Its payment link no longer works.';
+      return row.payKind === 'zelle' ? 'Order cancelled.' : 'Order cancelled. Its payment link no longer works.';
     });
   };
 
@@ -262,14 +276,25 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
               {row.awaitingPayment && (
                 <>
                   <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>
-                    {row.linkSentAt ? `Link emailed ${when(row.linkSentAt)}` : 'The payment link has not been emailed yet'}
+                    {row.payKind === 'zelle'
+                      ? row.linkSentAt ? `Zelle instructions emailed ${when(row.linkSentAt)}` : 'The Zelle instructions have not been emailed yet'
+                      : row.linkSentAt ? `Link emailed ${when(row.linkSentAt)}` : 'The payment link has not been emailed yet'}
                   </Typography>
                   <ActivityLines row={row} />
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void remind(row)} sx={{ textTransform: 'none' }}>Send a reminder</Button>
-                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void copyCurrent(row)} sx={{ textTransform: 'none' }}>Copy current link</Button>
-                    <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void emailLink(row)} sx={{ textTransform: 'none' }}>Email a new link</Button>
-                    <Button size="small" variant="outlined" color="warning" disabled={Boolean(busy)} onClick={() => setPayDialog(row)} sx={{ textTransform: 'none' }}>Paid another way</Button>
+                    {row.payKind === 'zelle' ? (
+                      <>
+                        <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void sendZelle(row)} sx={{ textTransform: 'none' }}>Send a reminder</Button>
+                        <Button size="small" variant="contained" color="warning" disabled={Boolean(busy)} onClick={() => openZellePaid(row)} sx={{ textTransform: 'none', fontWeight: 700 }}>Zelle received</Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void remind(row)} sx={{ textTransform: 'none' }}>Send a reminder</Button>
+                        <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void copyCurrent(row)} sx={{ textTransform: 'none' }}>Copy current link</Button>
+                        <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => void emailLink(row)} sx={{ textTransform: 'none' }}>Email a new link</Button>
+                        <Button size="small" variant="outlined" color="warning" disabled={Boolean(busy)} onClick={() => setPayDialog(row)} sx={{ textTransform: 'none' }}>Paid another way</Button>
+                      </>
+                    )}
                     <Button size="small" variant="outlined" disabled={Boolean(busy)} onClick={() => onEdit(row.orderId)} sx={{ textTransform: 'none' }}>Edit</Button>
                     <Button size="small" variant="outlined" color="error" disabled={Boolean(busy)} onClick={() => setCancelDialog(row)} sx={{ textTransform: 'none' }}>Cancel order</Button>
                     {busy?.startsWith(`${row.orderId}:`) && <CircularProgress size={20} />}
@@ -315,7 +340,7 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
         <DialogTitle>Cancel this order?</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14 }}>
-            {cancelDialog?.orderId} · {cancelDialog ? money(cancelDialog.total) : ''} for {cancelDialog?.customerName}. The payment link stops working and the order is cancelled. The customer is not emailed. If they already paid, this is refused.
+            {cancelDialog?.orderId} · {cancelDialog ? money(cancelDialog.total) : ''} for {cancelDialog?.customerName}. {cancelDialog?.payKind === 'zelle' ? 'The order is cancelled.' : 'The payment link stops working and the order is cancelled.'} The customer is not emailed. If they already paid, this is refused.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -325,9 +350,9 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
       </Dialog>
 
       <Dialog open={Boolean(payDialog)} onClose={() => setPayDialog(null)} fullWidth maxWidth="xs">
-        <DialogTitle>The customer paid another way</DialogTitle>
+        <DialogTitle>{payDialog?.payKind === 'zelle' ? 'Zelle received' : 'The customer paid another way'}</DialogTitle>
         <DialogContent>
-          <Typography sx={{ fontSize: 14, mb: 1 }}>{payDialog?.orderId} · {payDialog ? money(payDialog.total) : ''}. The order is confirmed, the pay link stops working and the customer gets the confirmation email.</Typography>
+          <Typography sx={{ fontSize: 14, mb: 1 }}>{payDialog?.orderId} · {payDialog ? money(payDialog.total) : ''}. The order is confirmed{payDialog?.payKind === 'zelle' ? '' : ', the pay link stops working'} and the customer gets the confirmation email.</Typography>
           <PaidMethodPicker choice={payChoice} typed={payTyped} onChoice={setPayChoice} onTyped={setPayTyped} />
           <TextField label="Note (optional)" value={payNote} onChange={(e) => setPayNote(e.target.value.slice(0, 200))} size="small" fullWidth sx={{ mt: 1 }} />
         </DialogContent>

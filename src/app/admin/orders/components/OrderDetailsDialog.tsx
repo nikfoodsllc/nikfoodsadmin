@@ -545,7 +545,7 @@ export default function OrderDetailsDialog({
             {order.discount && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" sx={{ color: '#10B981' }}>
-                  Discount ({order.discount.code})
+                  Discount{order.discount.code && order.discount.code !== 'ADMIN' ? ` (${order.discount.code})` : ''}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500, color: '#10B981' }}>
                   -{safeFormatCurrency(order.discount.amount)}

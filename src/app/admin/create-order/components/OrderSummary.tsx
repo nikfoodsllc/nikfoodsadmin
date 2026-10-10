@@ -23,14 +23,14 @@ import PaidMethodPicker from './PaidMethodPicker';
 
 export interface PreviewData {
   days: Array<{ date: string; weekday: string; actualDeliveryDate?: string; message?: string; dayTotal: number; items: Array<{ name: string; quantity: number; unitPrice: number; lineTotal: number }> }>;
-  totals: { subtotal: number; platformFee: number; deliveryFee: number; tax: number; tip: number; total: number };
+  totals: { subtotal: number; discount?: number; platformFee: number; deliveryFee: number; tax: number; tip: number; total: number };
   minOrderValue: number;
   canCheckout: boolean;
   belowMinimum?: Array<{ date: string; total: number }>;
   deliveryMessages: string[];
 }
 
-export type PaymentChoice = 'link' | 'paid';
+export type PaymentChoice = 'link' | 'zelle' | 'paid';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -56,6 +56,9 @@ export default function OrderSummary(props: {
   onTip: (t: number) => void;
   waiveFee: boolean;
   onWaiveFee: (v: boolean) => void;
+  /** Dollars off the order, as typed ('' = none) */
+  discount: string;
+  onDiscount: (v: string) => void;
   payment: PaymentChoice;
   onPayment: (p: PaymentChoice) => void;
   paidChoice: PaidChoice;
@@ -102,7 +105,10 @@ export default function OrderSummary(props: {
                 </Typography>
                 {l.tags.length > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{l.tags.join(' · ')}</Typography>}
                 {l.notes && <Typography sx={{ fontSize: 12, color: '#6B7280', fontStyle: 'italic' }}>Note: {l.notes}</Typography>}
-                <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{money(l.unitPrice)} each</Typography>
+                <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
+                  {money(l.unitPrice)} each
+                  {l.unitPriceEdited !== undefined && <Box component="span" sx={{ color: '#B45309', fontWeight: 600 }}> · price changed</Box>}
+                </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                 <IconButton size="small" aria-label="One less" onClick={() => props.onQuantity(l.key, l.quantity - 1)}>{l.quantity === 1 ? <IconTrash size={16} /> : <IconMinus size={16} />}</IconButton>
@@ -118,7 +124,18 @@ export default function OrderSummary(props: {
       <TextField select label="Tip" value={props.tip} onChange={(e) => props.onTip(Number(e.target.value))} size="small" fullWidth sx={{ mb: 1 }}>
         {[0, 5, 10, 15].map((t) => <MenuItem key={t} value={t}>{t === 0 ? 'No tip' : `${t}% of the subtotal`}</MenuItem>)}
       </TextField>
-      <FormControlLabel sx={{ display: 'flex' }} control={<Checkbox size="small" color="warning" checked={props.waiveFee} onChange={(e) => props.onWaiveFee(e.target.checked)} />} label={<Typography sx={{ fontSize: 14 }}>Waive the Platform Fee</Typography>} />
+      <TextField
+        label="Discount (optional)"
+        value={props.discount}
+        onChange={(e) => props.onDiscount(e.target.value.replace(/[^0-9.]/g, '').slice(0, 8))}
+        size="small"
+        fullWidth
+        placeholder="0.00"
+        slotProps={{ input: { startAdornment: <Typography sx={{ mr: 0.5, color: '#6B7280' }}>$</Typography>, inputMode: 'decimal' } }}
+        helperText="Dollars off the items. The fee, tax and tip are worked out on what is left."
+        sx={{ mb: 1 }}
+      />
+      <FormControlLabel sx={{ display: 'flex' }} control={<Checkbox size="small" color="warning" checked={props.waiveFee} onChange={(e) => props.onWaiveFee(e.target.checked)} />} label={<Typography sx={{ fontSize: 14 }}>Waive the Platform Fee{props.payment === 'zelle' ? <Box component="span" sx={{ color: '#6B7280' }}> (on for Zelle: the fee only covers card fees)</Box> : null}</Typography>} />
 
       {props.previewError && <Alert severity="warning" sx={{ my: 1 }}>{props.previewError}</Alert>}
       {!preview && !props.previewError && lines.length > 0 && (
@@ -127,6 +144,7 @@ export default function OrderSummary(props: {
       {preview && (
         <Box sx={{ my: 1.5, opacity: props.previewLoading ? 0.6 : 1 }}>
           <Row label="Subtotal" value={money(preview.totals.subtotal)} />
+          {(preview.totals.discount ?? 0) > 0 && <Row label="Discount" value={`-${money(preview.totals.discount ?? 0)}`} />}
           <Row label="Platform Fee" value={money(preview.totals.platformFee)} />
           <Row label="Tax" value={money(preview.totals.tax)} />
           {preview.totals.tip > 0 && <Row label="Tip" value={money(preview.totals.tip)} />}
@@ -143,6 +161,7 @@ export default function OrderSummary(props: {
       <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 0.5 }}>How does the customer pay?</Typography>
       <RadioGroup value={props.payment} onChange={(e) => props.onPayment(e.target.value as PaymentChoice)}>
         <FormControlLabel value="link" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email a payment link (card or Apple Pay)</Typography>} />
+        <FormControlLabel value="zelle" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email Zelle instructions (the customer pays by Zelle)</Typography>} />
         <FormControlLabel value="paid" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid (cash, Zelle, other…)</Typography>} />
       </RadioGroup>
       {props.payment === 'paid' && (
@@ -155,7 +174,9 @@ export default function OrderSummary(props: {
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 1 }}>
         {props.payment === 'link'
           ? 'The customer gets an email with a secure pay link. The order is confirmed (and the confirmation email sent) once they pay.'
-          : 'The order is saved as paid with the method you chose, and the customer gets the usual order confirmation email.'}
+          : props.payment === 'zelle'
+            ? 'The customer gets an email asking them to pay by Zelle. The order waits for payment: when the Zelle arrives, press “Zelle received” in Recent orders and the customer gets the confirmation email.'
+            : 'The order is saved as paid with the method you chose, and the customer gets the usual order confirmation email.'}
       </Typography>
 
       {props.missing.length > 0 && lines.length > 0 && (
@@ -170,7 +191,7 @@ export default function OrderSummary(props: {
         onClick={props.onSubmit}
         sx={{ mt: 2, textTransform: 'none', fontWeight: 800, bgcolor: '#F59E0B', color: '#111', '&:hover': { bgcolor: '#D97706' } }}
       >
-        {props.submitting ? <CircularProgress size={22} sx={{ color: '#111' }} /> : props.payment === 'link' ? 'Create order and email the payment link' : 'Create order as paid'}
+        {props.submitting ? <CircularProgress size={22} sx={{ color: '#111' }} /> : props.payment === 'link' ? 'Create order and email the payment link' : props.payment === 'zelle' ? 'Create order and email Zelle instructions' : 'Create order as paid'}
       </Button>
     </Paper>
   );

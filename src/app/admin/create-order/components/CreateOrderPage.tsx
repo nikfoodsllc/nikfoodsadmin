@@ -12,6 +12,7 @@ import {
   lineTags,
   missingForCreate,
   needsOptions,
+  orderLinePayload,
   paidMethodValue,
   removeOne,
   replaceLine,
@@ -62,6 +63,19 @@ export default function CreateOrderPage() {
 
   const [tip, setTip] = useState(0);
   const [waiveFee, setWaiveFee] = useState(false);
+  // the Platform Fee only covers Stripe's fee, so a Zelle order starts with it waived; once the admin touches the box, their choice stays
+  const feeTouched = useRef(false);
+  const changeWaiveFee = (value: boolean) => {
+    feeTouched.current = true;
+    setWaiveFee(value);
+  };
+  const changePayment = (next: PaymentChoice) => {
+    setPayment(next);
+    if (!feeTouched.current) setWaiveFee(next === 'zelle');
+  };
+  // dollars off, as typed
+  const [discount, setDiscount] = useState('');
+  const discountValue = Math.max(0, Math.round((Number(discount) || 0) * 100) / 100);
   const [payment, setPayment] = useState<PaymentChoice>('link');
   const [paidChoice, setPaidChoice] = useState<PaidChoice>('Cash');
   const [paidTyped, setPaidTyped] = useState('');
@@ -110,7 +124,7 @@ export default function CreateOrderPage() {
   }, [token]);
 
   const orderLines = useCallback(
-    () => lines.map((l) => ({ date: l.date, foodItemId: l.foodItemId, quantity: l.quantity, selectedPortion: l.selectedPortion, selectedSpiceLevel: l.selectedSpiceLevel, isEcoFriendlyContainer: l.isEcoFriendlyContainer, comboSelections: l.comboSelections, notes: l.notes })),
+    () => lines.map(orderLinePayload),
     [lines]
   );
 
@@ -128,7 +142,7 @@ export default function CreateOrderPage() {
     const timer = setTimeout(async () => {
       const r = await callApi(token, 'preview', {
         method: 'POST',
-        body: JSON.stringify({ lines: orderLines(), address: { ...address, street_address: address.street_address || 'x' }, tipPercentage: tip, waivePlatformFee: waiveFee }),
+        body: JSON.stringify({ lines: orderLines(), address: { ...address, street_address: address.street_address || 'x' }, tipPercentage: tip, waivePlatformFee: waiveFee, discount: discountValue }),
       });
       if (seq !== previewSeq.current) return;
       setPreviewLoading(false);
@@ -141,7 +155,7 @@ export default function CreateOrderPage() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [token, lines, zipOk, address, tip, waiveFee, orderLines]);
+  }, [token, lines, zipOk, address, tip, waiveFee, discountValue, orderLines]);
 
   const counts = useMemo(() => lines.reduce<Record<string, number>>((acc, l) => ({ ...acc, [l.date]: (acc[l.date] ?? 0) + l.quantity }), {}), [lines]);
   const missing = missingForCreate(customer, address, lines.length);
@@ -167,7 +181,8 @@ export default function CreateOrderPage() {
       lines: orderLines(),
       tipPercentage: tip,
       waivePlatformFee: waiveFee,
-      payment: payment === 'link' ? { mode: 'link' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
+      discount: discountValue,
+      payment: payment === 'link' ? { mode: 'link' } : payment === 'zelle' ? { mode: 'zelle' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
       ...(editing ? { replacesOrderId: editing } : {}),
     };
@@ -190,6 +205,8 @@ export default function CreateOrderPage() {
     setLines([]);
     setTip(0);
     setWaiveFee(false);
+    feeTouched.current = false;
+    setDiscount('');
     setPayment('link');
     setPaidChoice('Cash');
     setPaidTyped('');
@@ -217,13 +234,16 @@ export default function CreateOrderPage() {
     setExisting(null);
     setLines(
       o.lines.map((l: CartLine) => {
-        const { name, unitPrice, tags, ...pick } = l;
+        const { name, unitPrice, tags, unitPriceEdited, ...rest } = l as CartLine & { unitPriceEdited?: number };
+        const pick = { ...rest, ...(unitPriceEdited !== undefined ? { unitPriceEdited } : {}) };
         return { ...pick, name, unitPrice, tags, key: lineSignature(pick) };
       })
     );
     setTip(o.tipPercentage);
     setWaiveFee(o.waivePlatformFee);
-    setPayment('link');
+    feeTouched.current = true; // an order being changed keeps the fee choice it was saved with
+    setDiscount(o.discount > 0 ? String(o.discount) : '');
+    setPayment(o.payKind === 'zelle' ? 'zelle' : 'link');
     setNote('');
     setSubmitError('');
     setDate((d) => o.lines[0]?.date || d);
@@ -246,9 +266,11 @@ export default function CreateOrderPage() {
       tip={tip}
       onTip={setTip}
       waiveFee={waiveFee}
-      onWaiveFee={setWaiveFee}
+      onWaiveFee={changeWaiveFee}
+      discount={discount}
+      onDiscount={setDiscount}
       payment={payment}
-      onPayment={setPayment}
+      onPayment={changePayment}
       paidChoice={paidChoice}
       onPaidChoice={setPaidChoice}
       paidTyped={paidTyped}
@@ -270,7 +292,7 @@ export default function CreateOrderPage() {
   return (
     <Box sx={{ maxWidth: form && wide ? 1320 : 760, mx: 'auto', pb: form && !wide ? 11 : 6 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>Create Order</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 800 }}>Create Offline Order</Typography>
       </Box>
       <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 2 }}>
         Enter an order for a customer who ordered by phone or in person. Prices come from the live menu. This is a master tool: no cutoff, delivery area or day rules apply.
@@ -279,7 +301,7 @@ export default function CreateOrderPage() {
       {editError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError('')}>{editError}</Alert>}
       {editing && !result && (
         <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>Stop editing</Button>}>
-          Editing {editing}. Change anything, then press Create: the new order replaces it, the old payment link stops working and the customer gets a new link by email.
+          Editing {editing}. Change anything, then press Create: the new order replaces it, the old payment link stops working and the customer gets a new email.
         </Alert>
       )}
       {result?.replaced && (
@@ -352,7 +374,9 @@ export default function CreateOrderPage() {
             {editing ? `This replaces ${editing}: that order is cancelled and its link stops working. ` : ''}
             {payment === 'link'
               ? `A payment link will be emailed to ${customer.email}.`
-              : `It will be saved as paid (${paidMethodValue(paidChoice, paidTyped) ?? '?'}) and a confirmation emailed to ${customer.email}.`}
+              : payment === 'zelle'
+                ? `Zelle instructions will be emailed to ${customer.email}. The order waits until you mark the Zelle as received.`
+                : `It will be saved as paid (${paidMethodValue(paidChoice, paidTyped) ?? '?'}) and a confirmation emailed to ${customer.email}.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
