@@ -819,6 +819,82 @@ useEffect(() => {
         </TableContainer>
       </Box>
 
+      {/* What is picked for each day (names, grouped like the table) */}
+      {allDateLabels.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#333', mb: 1.5 }}>
+            Picked for each day
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+              gap: 2,
+            }}
+          >
+            {allDateLabels.map((dateInfo, dayIndex) => {
+              const picked = baseGroups
+                .map((group) => ({
+                  group,
+                  items: group.items.filter((item) => isItemSelectedForDay(dayIndex, item._id)),
+                }))
+                .filter((entry) => entry.items.length > 0);
+              return (
+                <Box
+                  key={dateInfo.date}
+                  sx={{ border: '1px solid #E0E0E0', borderRadius: 2, p: 1.5, minWidth: 0, backgroundColor: '#fff' }}
+                >
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#333' }}>
+                      {dateInfo.displayLabel}
+                    </Typography>
+                    <Chip
+                      label={getSelectedItemsCount(dayIndex)}
+                      size="small"
+                      sx={{ backgroundColor: '#FF9F2E', color: '#fff', fontWeight: 600, height: 20 }}
+                    />
+                  </Box>
+                  {picked.length === 0 ? (
+                    <Typography variant="caption" sx={{ color: '#999' }}>
+                      Nothing picked yet
+                    </Typography>
+                  ) : (
+                    picked.map(({ group, items }) => (
+                      <Box key={group.categoryId} sx={{ mb: 1 }}>
+                        {showSubCategoryGroups && (
+                          <Typography
+                            variant="caption"
+                            sx={{ display: 'block', color: '#7C3AED', fontWeight: 600, mb: 0.25 }}
+                          >
+                            {group.categoryName}
+                          </Typography>
+                        )}
+                        {items.map((item) => (
+                          <Box key={item._id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.25 }}>
+                            <Box
+                              sx={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                flexShrink: 0,
+                                backgroundColor: item.veg ? '#4CAF50' : '#F44336',
+                              }}
+                            />
+                            <Typography variant="body2" sx={{ color: '#333', lineHeight: 1.3, overflowWrap: 'anywhere' }}>
+                              {item.name}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      )}
+
       {/* Mobile Responsive Summary */}
       <Box sx={{ display: { xs: 'block', sm: 'none' }, mt: 2 }}>
         <Typography variant="body2" sx={{ color: '#666', textAlign: 'center' }}>
