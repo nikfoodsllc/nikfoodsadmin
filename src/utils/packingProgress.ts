@@ -11,8 +11,18 @@ import type { PackLine, PackRoute, PackStop } from './packingReport';
 /** The route that holds customers who are on no driver's route */
 export const UNROUTED_KEY = 'unrouted';
 
+/** What was on screen for a customer when it was opened: kept so the times can be reported later (the report cannot rebuild it once orders change). */
+export interface StopMeta {
+  name: string;
+  units: number;
+  /** Number of item lines to tick */
+  lines: number;
+  orderIds: string[];
+}
+
 export interface StopProgress {
   checked?: string[];
+  meta?: StopMeta;
   /** Time already spent on this customer when the packer left it (milliseconds) */
   timeMs?: number;
   /** Set while this customer is the one being packed: when the packer arrived (ISO) */
@@ -28,6 +38,8 @@ export interface PackingRun {
   startedBy?: string | null;
   finishedAt?: string | null;
   currentStopKey?: string | null;
+  /** The whole route when packing started */
+  totals?: { customers: number; units: number } | null;
   stops?: Record<string, StopProgress>;
 }
 
@@ -56,6 +68,10 @@ export function packableRoutes(routes: PackRoute[], unrouted: PackStop[]): Packa
   const loose = unrouted.filter((s) => s.lines.length > 0);
   if (loose.length > 0) list.push({ key: UNROUTED_KEY, title: 'Not on a route', driverName: '', stops: loose });
   return list;
+}
+
+export function stopMetaOf(stop: PackStop): StopMeta {
+  return { name: clean(stop.customerName), units: stop.lines.reduce((n, l) => n + l.quantity, 0), lines: stop.lines.length, orderIds: stop.orderIds.slice(0, 10) };
 }
 
 /** The name shown on the driver button: the driver, else "Route 1". */

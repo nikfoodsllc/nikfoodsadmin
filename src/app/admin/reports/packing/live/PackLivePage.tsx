@@ -19,6 +19,7 @@ import {
   runStatus,
   startIndex,
   stopCounts,
+  stopMetaOf,
   stopElapsedMs,
   stopKeyOf,
   summarizeRoute,
@@ -182,7 +183,8 @@ export default function PackLivePage() {
   const start = async () => {
     if (!route || stops.length === 0) return;
     setBusy(true);
-    await send({ action: 'start', routeKey: route.key, driverName: routeLabel(route), firstStopKey: stopKeyOf(stops[index] ?? stops[0]) });
+    const first = stops[index] ?? stops[0];
+    await send({ action: 'start', routeKey: route.key, driverName: routeLabel(route), firstStopKey: stopKeyOf(first), firstMeta: stopMetaOf(first), totals: { customers: stops.length, units: summary?.units ?? 0 } });
     setBusy(false);
   };
 
@@ -191,7 +193,7 @@ export default function PackLivePage() {
     setConfirm(null);
     // show it at once, the answer confirms it
     setRuns((prev) => prev.map((r) => (r.routeKey === route.key ? { ...r, currentStopKey: stopKeyOf(stops[target]) } : r)));
-    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]) });
+    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]), meta: stopMetaOf(stops[target]) });
   };
 
   const finish = async () => {
