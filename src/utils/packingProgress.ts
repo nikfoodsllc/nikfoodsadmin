@@ -37,6 +37,10 @@ export interface PackingRun {
   startedAt?: string | null;
   startedBy?: string | null;
   finishedAt?: string | null;
+  /** Set while packing is paused (Stop packing): when it was paused (ISO) */
+  pausedAt?: string | null;
+  /** Time spent paused so far, earlier pauses included (milliseconds) */
+  pausedMs?: number;
   currentStopKey?: string | null;
   /** The whole route when packing started */
   totals?: { customers: number; units: number } | null;
@@ -131,12 +135,14 @@ export function stopElapsedMs(progress: StopProgress | undefined, nowMs: number)
   return saved + (Number.isFinite(since) ? Math.max(0, nowMs - since) : 0);
 }
 
-/** Time since the packing of the route started, stopped at the end time once finished. */
+/** Time since the packing of the route started, without the time it was paused, stopped at the end time once finished. */
 export function runElapsedMs(run: PackingRun | undefined | null, nowMs: number): number {
   const start = run?.startedAt ? new Date(run.startedAt).getTime() : NaN;
   if (!Number.isFinite(start)) return 0;
   const end = run?.finishedAt ? new Date(run.finishedAt).getTime() : nowMs;
-  return Math.max(0, end - start);
+  const pausedSince = !run?.finishedAt && run?.pausedAt ? new Date(run.pausedAt).getTime() : NaN;
+  const runningPause = Number.isFinite(pausedSince) ? Math.max(0, nowMs - pausedSince) : 0;
+  return Math.max(0, end - start - Math.max(0, Number(run?.pausedMs) || 0) - runningPause);
 }
 
 /** 65000 -> "1:05", 3725000 -> "1:02:05" */
@@ -149,11 +155,12 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
 }
 
-export type RunStatus = 'not_started' | 'packing' | 'done';
+export type RunStatus = 'not_started' | 'packing' | 'paused' | 'done';
 
 export function runStatus(run: PackingRun | undefined | null): RunStatus {
   if (!run?.startedAt) return 'not_started';
-  return run.finishedAt ? 'done' : 'packing';
+  if (run.finishedAt) return 'done';
+  return run.pausedAt ? 'paused' : 'packing';
 }
 
 export interface RouteSummary {
