@@ -5,7 +5,8 @@
  * Pure functions, no database and no network. The inputs are the order lines delivered that day, the roster (drivers and
  * their stops, copied from OptimoRoute once it has planned the routes) and our record of which orders sit in which stop.
  */
-import { comboChoiceLines, type KitchenRow } from './kitchenDashboard';
+import { comboChoiceLines, comboParts, spicedPartNames, type KitchenRow } from './kitchenDashboard';
+import { isEcoEligiblePart } from './kitchenReport';
 
 /** One ordered line delivered on the report's date. */
 export interface PackingRow extends KitchenRow {
@@ -35,6 +36,14 @@ export interface StopRecord {
   optimoOrderNo?: string;
 }
 
+/** One picked option of a combo, as its own item to pack (the combo's spice goes on the curries, its eco container on everything but the bread). */
+export interface PackPart {
+  name: string;
+  portion: string | null;
+  spice: string | null;
+  isEco: boolean;
+}
+
 export interface PackLine {
   orderId: string;
   name: string;
@@ -48,6 +57,8 @@ export interface PackLine {
   pickedFor: string | null;
   /** The menu day of the line (always set), used to group a customer's items by day */
   day: string;
+  /** A combo's picked options as separate items (empty / missing for a plain item or a combo with no picks saved) */
+  parts?: PackPart[];
 }
 
 export interface PackStop {
@@ -96,6 +107,9 @@ const streetKey = (v: unknown) => norm(clean(v).split(',')[0]);
 
 function toLine(row: PackingRow, date: string): PackLine {
   const choices = comboChoiceLines(row);
+  const picked = comboParts(row);
+  const spiced = spicedPartNames(row);
+  const parts: PackPart[] = picked.map((part) => ({ name: clean(part.name), portion: clean(part.portion) || null, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name) }));
   return {
     orderId: row.orderId,
     name: clean(row.name),
@@ -106,6 +120,7 @@ function toLine(row: PackingRow, date: string): PackLine {
     choices,
     pickedFor: row.day && row.day !== date ? row.day : null,
     day: row.day,
+    ...(parts.length > 0 ? { parts } : {}),
   };
 }
 
