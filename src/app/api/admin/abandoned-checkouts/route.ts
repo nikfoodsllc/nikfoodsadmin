@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     if ('error' in range) return NextResponse.json({ error: range.error }, { status: 400 });
     const since = range.since;
 
-    const draftsResult = await db.read<DraftDoc>('checkoutDrafts', { status: 'open', createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, { sort: { lastActivityAt: -1 }, limit: 2000 });
+    const draftsResult = await db.read<DraftDoc>('checkoutDrafts', { status: 'open', createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, { sort: { lastActivityAt: -1 }, limit: 2000, projection: { cartLines: 0 } });
     if (!draftsResult.success) throw new Error(draftsResult.error || 'Could not read the checkouts');
     const drafts = draftsResult.data ?? [];
 
