@@ -24,6 +24,8 @@ import {
 } from '@mui/material';
 import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
+import AbandonedMetricsPanel from './AbandonedMetricsPanel';
+import type { AbandonedMetrics } from '@/utils/abandonedMetrics';
 import { addDaysToDay, CONTACT_NOTES, pacificToday, QUIET_MINUTES, reachOutEmail, resolveRange, RETENTION_DAYS, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
@@ -54,6 +56,7 @@ interface Data {
   contacted: number;
   valueToContact: number;
   orderedSince: number;
+  metrics?: AbandonedMetrics;
 }
 
 /** What one person left in their cart, in short lines ("2 × Veg Combo · Medium · Eco"). */
@@ -342,6 +345,7 @@ export default function AbandonedCheckoutsPage() {
 
       {data && (
         <>
+          {data.metrics && <AbandonedMetricsPanel metrics={data.metrics} />}
           <Paper elevation={0} sx={{ p: 1.5, mb: 1.5, border: '1px solid #FBD38D', bgcolor: '#FFF8EC', borderRadius: 2 }}>
             <Typography sx={{ fontWeight: 800, fontSize: 16 }}>
               {data.to_contact === 0 ? 'No one is waiting to be contacted' : `${data.to_contact} ${data.to_contact === 1 ? 'person' : 'people'} to contact · ${money(data.valueToContact)} in their carts`}
