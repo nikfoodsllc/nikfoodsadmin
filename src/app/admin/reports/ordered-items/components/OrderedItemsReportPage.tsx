@@ -55,6 +55,8 @@ interface OrderedItem {
   isComboSelection?: boolean;
   comboSectionTitle?: string;
   comboItemName?: string;
+  /** On a combo's option row: how many of this item come with one combo (missing = 1) */
+  partQuantity?: number;
 }
 
 interface OrderedItemsReportData {
@@ -318,9 +320,17 @@ export default function OrderedItemsReportPage() {
     return item.ecoContainer ? item.ecoContainerPrice * item.quantity : 0;
   };
 
-  const calculateTotalOrderedQty = (portionQuantity: string, quantity: number): number => {
+  const calculateTotalOrderedQty = (portionQuantity: string, quantity: number, partQuantity = 1): number => {
+    // a combo item that comes several to a combo (Chapati x 4): the pieces of every combo ordered
+    if (partQuantity > 1) return (portionQuantity ? extractPortionQuantity(portionQuantity) : 1) * partQuantity * quantity;
     const portionQty = extractPortionQuantity(portionQuantity);
     return portionQty * quantity;
+  };
+
+  /** The Portion column: the size, with "× 4" when four of this item come with one combo. */
+  const portionLabel = (item: OrderedItem): string => {
+    const part = item.partQuantity && item.partQuantity > 1 ? `× ${item.partQuantity}` : '';
+    return [item.portionQuantity, part].filter(Boolean).join(' ');
   };
 
   const exportToCSV = () => {
@@ -353,14 +363,14 @@ export default function OrderedItemsReportPage() {
         getStatusLabel(item.orderStatus),
         item.customerName,
         item.itemName,
-        item.portionQuantity,
+        portionLabel(item),
         item.quantity.toString(),
         item.spiceLevel,
         formatCurrency(item.itemPrice),
         item.ecoContainer ? 'Yes' : 'No',
         formatCurrency(item.ecoContainerPrice),
         formatCurrency(calculateItemTotalPrice(item)),
-        calculateTotalOrderedQty(item.portionQuantity, item.quantity).toString(),
+        calculateTotalOrderedQty(item.portionQuantity, item.quantity, item.partQuantity).toString(),
       ];
 
       return row.map(cell => {
@@ -918,7 +928,7 @@ export default function OrderedItemsReportPage() {
                         {item.itemName}
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#6B7280' }}>
-                        {item.portionQuantity || '-'}
+                        {portionLabel(item) || '-'}
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#374151' }}>
                         <Chip
@@ -946,7 +956,7 @@ export default function OrderedItemsReportPage() {
                         {formatCurrency(calculateItemTotalPrice(item))}
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                        {calculateTotalOrderedQty(item.portionQuantity, item.quantity)}
+                        {calculateTotalOrderedQty(item.portionQuantity, item.quantity, item.partQuantity)}
                       </TableCell>
 
                     </TableRow>

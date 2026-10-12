@@ -102,22 +102,22 @@ describe('summarizeRoute and startIndex', () => {
 
 describe('combos are split into their own items', () => {
   const combo = line({ name: 'Veg Combo', quantity: 2, portion: null, spice: 'Medium', isEco: true, choices: ['Curry: Kale Chane (12Oz)'], parts: [
-    { name: 'Kale Chane', portion: '12Oz', spice: 'Medium', isEco: true },
-    { name: 'Chapati', portion: null, spice: null, isEco: false },
+    { name: 'Kale Chane', portion: '12Oz', quantity: 1, spice: 'Medium', isEco: true },
+    { name: 'Chapati', portion: null, quantity: 4, spice: null, isEco: false },
   ] });
   const s = stop(1, { lines: [line({ name: 'Rajma' }), combo] });
   it('each option is an item with the combo quantity, keyed under the combo', () => {
     const items = lineKeys(s);
     expect(items.map((i) => i.line.name)).toEqual(['Rajma', 'Kale Chane', 'Chapati']);
     expect(items[1]).toMatchObject({ viaCombo: 'Veg Combo', line: { quantity: 2, portion: '12Oz', spice: 'Medium', isEco: true } });
-    expect(items[2].line).toMatchObject({ quantity: 2, spice: null, isEco: false });
+    expect(items[2].line).toMatchObject({ quantity: 8, spice: null, isEco: false }); // 2 combos x 4 Chapati
     expect(items[1].parentKey).toBeDefined();
     expect(items[1].key.startsWith(items[1].parentKey!)).toBe(true);
     expect(new Set(items.map((i) => i.key)).size).toBe(3);
   });
   it('counts, units and snapshot use the split items', () => {
     expect(stopCounts(s, undefined)).toEqual({ total: 3, done: 0, complete: false });
-    expect(stopMetaOf(s)).toMatchObject({ lines: 3, units: 1 + 2 + 2 });
+    expect(stopMetaOf(s)).toMatchObject({ lines: 3, units: 1 + 2 + 8 });
   });
   it('a combo ticked as one line before the split counts its options as ticked', () => {
     const items = lineKeys(s);

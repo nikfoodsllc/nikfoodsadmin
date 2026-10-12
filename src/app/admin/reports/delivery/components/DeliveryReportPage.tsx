@@ -31,6 +31,7 @@ import { escapeCSVValue } from '@/utils/csv';
 import { getDisplayPaymentStatus } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
 import type { PaymentStatus } from '@/types/order';
+import { comboQuantityText } from '@/utils/comboQuantity';
 
 interface DeliveryOrder {
   orderId: string;
@@ -311,7 +312,7 @@ export default function DeliveryReportPage() {
                   selectedItemIds.includes(si._id)
                 );
                 if (selectedItems.length === 0) return '';
-                return `${section.title}: ${selectedItems.map(si => si.item.name).join(', ')}`;
+                return `${section.title}: ${selectedItems.map(si => `${si.item.name}${comboQuantityText(si.quantity)}`).join(', ')}`;
               })
               .filter(Boolean)
               .join(' | ');
@@ -533,7 +534,7 @@ export default function DeliveryReportPage() {
                           </Typography>
                           {selectedItems.map(si => (
                             <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151', fontSize: '12px' }}>
-                              • {si.item.name} {si.portion && `(${si.portion})`}
+                              • {si.item.name} {si.portion && `(${si.portion})`}{comboQuantityText(si.quantity)}
                             </Typography>
                           ))}
                         </Box>

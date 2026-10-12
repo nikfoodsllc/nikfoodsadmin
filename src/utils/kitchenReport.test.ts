@@ -149,3 +149,13 @@ describe('report search', () => {
     expect(filterBlocksBySearch(report.cooked, 'zzzz')).toEqual([]);
   });
 });
+
+describe('a combo item that comes several to a combo', () => {
+  it('Chapati x 4 in 2 combos is 8 Chapati in the report, with the amount text of 8 pieces', () => {
+    const sections = [{ _id: 's3', title: 'Choice of Staple', selectedItems: [{ _id: 'c2', portion: '', quantity: 4, item: { name: 'Chapati' } }] }];
+    const r = buildKitchenReport([row({ name: 'Veg Combo', quantity: 2, customerName: 'Dev', sections, comboSelections: { s3: ['c2'] } })], byName);
+    const all = [...r.cooked, ...r.notSet, ...r.readyToEat].flatMap((b) => b.lines.map((l) => ({ name: b.name, ...l })));
+    const chapati = all.filter((l) => l.name === 'Chapati');
+    expect(chapati.reduce((n, l) => n + l.quantity, 0)).toBe(8);
+  });
+});
