@@ -38,6 +38,7 @@ import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
 import { MoveItemsBar, RescheduleBanner, shortDate } from './RescheduleControls';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
+import { comboQuantityText } from '@/utils/comboQuantity';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -464,7 +465,7 @@ export default function OrderDetailsDialog({
                                           </Typography>
                                           {selectedItems.map(si => (
                                             <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151' }}>
-                                              • {si.item.name} {si.portion && `(${si.portion})`}
+                                              • {si.item.name} {si.portion && `(${si.portion})`}{comboQuantityText(si.quantity)}
                                             </Typography>
                                           ))}
                                         </Box>

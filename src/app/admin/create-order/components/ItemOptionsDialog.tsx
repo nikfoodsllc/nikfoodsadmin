@@ -28,6 +28,7 @@ import {
   type MenuComboSection,
   type MenuItem,
 } from '@/utils/createOrder';
+import { comboQuantityText } from '@/utils/comboQuantity';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -68,7 +69,7 @@ function ComboSection({ section, chosen, onChange }: { section: MenuComboSection
       </Typography>
       {section.selectedItems.map((option) => {
         const on = chosen.includes(option._id);
-        const label = `${option.item?.name ?? 'Item'}${option.portion ? ` (${option.portion})` : ''}${option.price > 0 ? ` +${money(option.price)}` : ''}`;
+        const label = `${option.item?.name ?? 'Item'}${option.portion ? ` (${option.portion})` : ''}${comboQuantityText(option.quantity)}${option.price > 0 ? ` +${money(option.price)}` : ''}`;
         return (
           <FormControlLabel
             key={option._id}

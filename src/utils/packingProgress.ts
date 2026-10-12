@@ -111,7 +111,7 @@ export function lineKeys(stop: PackStop): KeyedLine[] {
           key: `${key}>${i}:${part.name}`,
           parentKey: key,
           viaCombo: line.name,
-          line: { orderId: line.orderId, name: part.name, quantity: line.quantity, portion: part.portion, spice: part.spice, isEco: part.isEco, choices: [], pickedFor: line.pickedFor, day: line.day },
+          line: { orderId: line.orderId, name: part.name, quantity: line.quantity * (part.quantity ?? 1), portion: part.portion, spice: part.spice, isEco: part.isEco, choices: [], pickedFor: line.pickedFor, day: line.day },
         });
       });
     } else {

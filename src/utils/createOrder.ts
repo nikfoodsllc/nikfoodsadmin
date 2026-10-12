@@ -4,10 +4,14 @@
  * the real ones (the screen always shows its numbers as the total).
  */
 
+import { comboQuantityText } from '@/utils/comboQuantity';
+
 export interface MenuSelectedItem {
   _id: string;
   item?: { name?: string };
   portion?: string;
+  /** How many of this item come with one combo (missing = 1) */
+  quantity?: number;
   price: number;
   isDefault?: boolean;
 }
@@ -221,7 +225,7 @@ export function lineTags(
     const names = (pick.comboSelections?.[section._id] ?? [])
       .map((id) => section.selectedItems.find((o) => o._id === id))
       .filter(Boolean)
-      .map((o) => `${o!.item?.name ?? 'Item'}${o!.portion ? ` (${o!.portion})` : ''}`);
+      .map((o) => `${o!.item?.name ?? 'Item'}${o!.portion ? ` (${o!.portion})` : ''}${comboQuantityText(o!.quantity)}`);
     if (names.length > 0) tags.push(`${section.title}: ${names.join(', ')}`);
   }
   return tags;

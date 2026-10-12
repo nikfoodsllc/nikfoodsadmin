@@ -40,6 +40,8 @@ export interface StopRecord {
 export interface PackPart {
   name: string;
   portion: string | null;
+  /** How many of this item come with ONE combo (Chapati x 4); 1 when not set */
+  quantity: number;
   spice: string | null;
   isEco: boolean;
 }
@@ -109,7 +111,7 @@ function toLine(row: PackingRow, date: string): PackLine {
   const choices = comboChoiceLines(row);
   const picked = comboParts(row);
   const spiced = spicedPartNames(row);
-  const parts: PackPart[] = picked.map((part) => ({ name: clean(part.name), portion: clean(part.portion) || null, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name) }));
+  const parts: PackPart[] = picked.map((part) => ({ name: clean(part.name), portion: clean(part.portion) || null, quantity: part.quantity, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name) }));
   return {
     orderId: row.orderId,
     name: clean(row.name),

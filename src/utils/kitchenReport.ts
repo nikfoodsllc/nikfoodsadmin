@@ -134,7 +134,7 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
         atoms.push({
           name: part.name,
           id: part.id ?? null,
-          line: { ...base, quantity: row.quantity, portion: part.portion, spice: spicedNames.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity) },
+          line: { ...base, quantity: row.quantity * part.quantity, portion: part.portion, spice: spicedNames.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity * part.quantity) },
         });
       }
     } else {

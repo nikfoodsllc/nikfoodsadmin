@@ -200,6 +200,8 @@ const comboItemSchema = z.object({
   portionId: z.string(),
   isDefault: z.boolean().optional(),
   isAvailable: z.boolean().optional().default(true), // Individual item availability within combo
+  // How many of this item come with ONE combo (Chapati x 4). Missing = 1.
+  quantity: z.number().int().min(1).max(99).optional(),
 });
 
 // Section schema for combo items
@@ -297,6 +299,7 @@ interface ComboItem {
   portionId: string;
   isDefault?: boolean;
   isAvailable?: boolean; // Individual item availability within combo
+  quantity?: number; // How many of this item come with one combo (missing = 1)
 }
 
 interface Section {
@@ -768,6 +771,7 @@ export async function POST(request: NextRequest) {
               portionId: selectedItem.portionId,
               isDefault: selectedItem.isDefault,
               isAvailable: selectedItem.isAvailable ?? true,
+              ...(selectedItem.quantity && selectedItem.quantity > 1 ? { quantity: selectedItem.quantity } : {}),
             });
           }
         }
@@ -1001,6 +1005,7 @@ const updateData: Partial<FoodItem> = {
               portionId: selectedItem.portionId,
               isDefault: selectedItem.isDefault,
               isAvailable: selectedItem.isAvailable ?? true,
+              ...(selectedItem.quantity && selectedItem.quantity > 1 ? { quantity: selectedItem.quantity } : {}),
             });
           }
         }

@@ -139,6 +139,8 @@ export interface FoodItemSnapshot {
         price: number;
       };
       portion?: string;
+      /** How many of this item come with one combo (missing = 1) */
+      quantity?: number;
       price: number;
       isDefault: boolean;
     }>;
