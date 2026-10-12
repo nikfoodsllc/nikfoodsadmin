@@ -46,6 +46,8 @@ export interface PackLine {
   choices: string[];
   /** The menu day it was picked for, when that is not the delivery date (cart clubbing or a moved date) */
   pickedFor: string | null;
+  /** The menu day of the line (always set), used to group a customer's items by day */
+  day: string;
 }
 
 export interface PackStop {
@@ -103,6 +105,7 @@ function toLine(row: PackingRow, date: string): PackLine {
     isEco: Boolean(row.isEco),
     choices,
     pickedFor: row.day && row.day !== date ? row.day : null,
+    day: row.day,
   };
 }
 
