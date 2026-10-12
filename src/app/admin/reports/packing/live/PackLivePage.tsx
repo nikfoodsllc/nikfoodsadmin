@@ -34,6 +34,8 @@ type TabId = 'pack' | 'times';
 
 const ORANGE = '#F89C35';
 const POLL_MS = 4000;
+/** The main button of the screen (Start packing, Resume packing): big enough to hit with a thumb, full width on a phone */
+const BIG_BUTTON = { textTransform: 'none', fontWeight: 800, fontSize: 22, minHeight: 72, px: 5, width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 340 }, borderRadius: 2, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } } as const;
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
 /** Phone: checkbox | quantity | item + chips. Wider screens follow the sheet: Check | Portion | Qty | Item | ECO | Spice. */
@@ -369,7 +371,7 @@ export default function PackLivePage() {
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mt: 1.25 }}>
               {status === 'not_started' ? (
-                <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={20} />} onClick={start} disabled={busy} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
+                <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={30} />} onClick={start} disabled={busy} sx={BIG_BUTTON}>
                   Start packing
                 </Button>
               ) : (
@@ -392,7 +394,7 @@ export default function PackLivePage() {
             {status !== 'not_started' && <LinearProgress variant="determinate" value={summary && summary.customers > 0 ? (summary.complete / summary.customers) * 100 : 0} sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: '#126B2C' } }} />}
             {status === 'paused' && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mt: 1.5 }}>
-                <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={20} />} onClick={() => void resume()} disabled={busy} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
+                <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={30} />} onClick={() => void resume()} disabled={busy} sx={BIG_BUTTON}>
                   Resume packing
                 </Button>
                 <Typography sx={{ fontSize: 13, color: '#6B7280' }}>Your place and ticks are kept. The timers are stopped.</Typography>
