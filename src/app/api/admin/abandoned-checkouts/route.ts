@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
-import { computeMetrics, type MetricsDraft, type PaidOrderForMetrics } from '@/utils/abandonedMetrics';
+import { computeMetrics, type PaidOrderForMetrics } from '@/utils/abandonedMetrics';
+import { buildPaidRows, type PaidOrderRef as PaidOrderWithId } from '@/utils/abandonedPaid';
 import { buildAbandonedRows, resolveRange, summarize, type DraftDoc, type OrderInfo, type PaidOrderRef } from '@/utils/abandonedCheckouts';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     const built = buildAbandonedRows(drafts, paidOrders, info);
 
     // the numbers at the top: every checkout opened in the range (any status), and the orders paid after a reminder went out
-    const everyone = await db.read<MetricsDraft>('checkoutDrafts', { createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, {
+    const everyone = await db.read<DraftDoc>('checkoutDrafts', { createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, {
       sort: { createdAt: -1 },
       limit: 5000,
       projection: { cartLines: 0, 'reminderEmail.token': 0 },
@@ -62,15 +63,23 @@ export async function GET(request: NextRequest) {
     const metricDrafts = everyone.data ?? [];
     // paid orders of everyone who opened checkout (a newer paid order means they did order), from a day before the range starts
     const metricUsers = [...new Set(metricDrafts.map((d) => d.userId).filter(Boolean))];
-    let metricOrders: PaidOrderForMetrics[] = [];
+    let metricOrders: Array<PaidOrderForMetrics & { orderId?: string }> = [];
     if (metricUsers.length > 0) {
-      const after = await db.read<PaidOrderForMetrics>('orders', { user: { $in: metricUsers }, paymentStatus: 'paid', createdAt: { $gte: new Date(since.getTime() - 24 * 3600 * 1000) } } as never, { projection: { user: 1, createdAt: 1, totalPaid: 1 } });
+      const after = await db.read<PaidOrderForMetrics & { orderId?: string }>('orders', { user: { $in: metricUsers }, paymentStatus: 'paid', createdAt: { $gte: new Date(since.getTime() - 24 * 3600 * 1000) } } as never, { projection: { user: 1, createdAt: 1, totalPaid: 1, orderId: 1 } });
       if (!after.success) throw new Error(after.error || 'Could not read the orders');
       metricOrders = after.data ?? [];
     }
+    // people who left, came back and paid (the Paid tab)
+    const paidWithId = metricOrders.filter((o): o is PaidOrderWithId => Boolean(o.orderId));
+    let paidRows = buildPaidRows(metricDrafts, paidWithId);
+    if (paidRows.length > 0) {
+      // older checkouts of those people can carry the reminder or the call that brought them back (so the reason does not depend on the days chosen)
+      const earlier = await db.read<DraftDoc>('checkoutDrafts', { userId: { $in: paidRows.map((r) => r.userId) }, createdAt: { $lt: since } } as never, { limit: 500, projection: { userId: 1, createdAt: 1, reminderEmail: 1, contacted: 1 } });
+      if (earlier.success && earlier.data && earlier.data.length > 0) paidRows = buildPaidRows(metricDrafts, paidWithId, earlier.data);
+    }
     return NextResponse.json({
       success: true,
-      data: { from: range.from, to: range.to, metrics: computeMetrics(metricDrafts, metricOrders), rows: { to_contact: built.to_contact, contacted: built.contacted }, ...summarize(built), orderedSince: built.orderedSince },
+      data: { from: range.from, to: range.to, paid: paidRows, metrics: computeMetrics(metricDrafts, metricOrders), rows: { to_contact: built.to_contact, contacted: built.contacted }, ...summarize(built), orderedSince: built.orderedSince },
     });
   } catch (error) {
     console.error('abandoned-checkouts GET failed', error);
