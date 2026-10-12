@@ -31,9 +31,9 @@ export const PACK_TOTAL_COLUMNS: ColumnDef[] = [
   col('eco', 'Eco', 10),
 ];
 
-/** The two sheets whose columns the admin can choose, with the table each choice is saved under. */
+/** The sheets whose columns the admin can choose, with the table each choice is saved under. */
 export const PACKING_SHEET_CHOICES: Array<{ key: 'packing' | 'packTotals'; title: string; serverTable: string; baseKey: string; columns: ColumnDef[] }> = [
-  { key: 'packing', title: 'Packing List', serverTable: 'packing-list', baseKey: 'admin_packing_list_columns', columns: PACKING_COLUMNS },
+  { key: 'packing', title: 'Packing sheets (one per route)', serverTable: 'packing-list', baseKey: 'admin_packing_list_columns', columns: PACKING_COLUMNS },
   { key: 'packTotals', title: 'Item totals', serverTable: 'packing-totals', baseKey: 'admin_packing_totals_columns', columns: PACK_TOTAL_COLUMNS },
 ];
 
@@ -67,24 +67,42 @@ function stopRows(route: string | number, stop: PackStop): SheetRow[] {
   }));
 }
 
-/** Packing List: header, then for each route a band and a box per stop; customers not on a route come last under their own band. */
-export function packingListSheet(report: PackingReport): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: PACKING_COLUMNS.map((c) => c.label), box: { top: true, bottom: false }, boldCells: PACKING_COLUMNS.map((_, i) => i), rightCells: [QTY_INDEX] }];
-  const bands: Array<{ band: string; route: string | number; stops: PackStop[] }> = report.routes.map((r, i) => ({
-    band: `${r.title}${r.driverName ? ` · ${r.driverName}` : ''}${r.vehicle ? ` · ${r.vehicle}` : ''} · ${r.stops.length} stop${r.stops.length === 1 ? '' : 's'}`,
-    route: i + 1,
-    stops: r.stops,
-  }));
-  if (report.unrouted.length > 0) bands.push({ band: `Not on a route yet · ${report.unrouted.length} customer${report.unrouted.length === 1 ? '' : 's'}`, route: '-', stops: report.unrouted });
-  bands.forEach((b, bi) => {
-    if (bi > 0 || rows.length > 1) rows.push({ kind: 'blank', cells: [] });
-    rows.push({ kind: 'section', cells: [b.band] });
-    b.stops.forEach((stop, si) => {
-      if (si > 0) rows.push({ kind: 'blank', cells: [] });
-      rows.push(...stopRows(b.route, stop));
-    });
+const HEADER_ROW = (): SheetRow => ({ kind: 'header', cells: PACKING_COLUMNS.map((c) => c.label), box: { top: true, bottom: false }, boldCells: PACKING_COLUMNS.map((_, i) => i), rightCells: [QTY_INDEX] });
+
+/** One packing sheet: the header, a band with the title, and a box per stop (a blank row between boxes). */
+function stopsSheet(name: string, band: string, route: string | number, stops: PackStop[]): SheetModel {
+  const rows: SheetRow[] = [HEADER_ROW(), { kind: 'section', cells: [band] }];
+  stops.forEach((stop, si) => {
+    if (si > 0) rows.push({ kind: 'blank', cells: [] });
+    rows.push(...stopRows(route, stop));
   });
-  return { key: 'packing', columnKeys: PACKING_COLUMNS.map((c) => c.key), name: 'Packing List', widths: PACKING_COLUMNS.map((c) => c.defaultWidth), margin: 2, rows };
+  return { key: 'packing', columnKeys: PACKING_COLUMNS.map((c) => c.key), name, widths: PACKING_COLUMNS.map((c) => c.defaultWidth), margin: 2, rows };
+}
+
+/** Excel does not allow these characters in a sheet name and stops at 31 characters. */
+export function safeSheetName(name: string, taken: Set<string>): string {
+  const base = name.replace(/[\\/?*[\]:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || 'Sheet';
+  let candidate = base;
+  for (let i = 2; taken.has(candidate.toLowerCase()); i++) candidate = `${base.slice(0, 31 - String(i).length - 1)} ${i}`;
+  taken.add(candidate.toLowerCase());
+  return candidate;
+}
+
+/** One sheet for each route (in route order), then a sheet for the customers who are not on a route. */
+export function packingRouteSheets(report: PackingReport): SheetModel[] {
+  const taken = new Set<string>(['item totals']);
+  const sheets = report.routes.map((r, i) =>
+    stopsSheet(
+      safeSheetName(`${r.title}${r.driverName ? ` - ${r.driverName}` : ''}`, taken),
+      `${r.title}${r.driverName ? ` · ${r.driverName}` : ''}${r.vehicle ? ` · ${r.vehicle}` : ''} · ${r.stops.length} stop${r.stops.length === 1 ? '' : 's'}`,
+      i + 1,
+      r.stops
+    )
+  );
+  if (report.unrouted.length > 0) {
+    sheets.push(stopsSheet(safeSheetName('Not on a route yet', taken), `Not on a route yet · ${report.unrouted.length} customer${report.unrouted.length === 1 ? '' : 's'}`, '-', report.unrouted));
+  }
+  return sheets;
 }
 
 /** Item totals: what to pull from stock for the whole day. */
@@ -103,5 +121,7 @@ export function packTotalsSheet(report: PackingReport): SheetModel {
 }
 
 export function buildPackingSheets(report: PackingReport): SheetModel[] {
-  return [packingListSheet(report), packTotalsSheet(report)];
+  const routes = packingRouteSheets(report);
+  // a day with nothing at all still gets one (empty) packing sheet, so the file is never without one
+  return [...(routes.length > 0 ? routes : [stopsSheet('Packing List', 'Nothing to deliver on this date', '-', [])]), packTotalsSheet(report)];
 }
