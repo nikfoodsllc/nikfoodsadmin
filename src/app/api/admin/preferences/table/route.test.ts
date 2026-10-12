@@ -66,6 +66,12 @@ describe('GET', () => {
       expect(readOne).toHaveBeenCalledWith('adminTablePreferences', { userId: 'admin-1', table });
     }
   });
+  it('knows the Packing Report column choices', async () => {
+    for (const table of ['packing-list', 'packing-totals']) {
+      expect((await GET(req('GET', { query: `?table=${table}` }))).status).toBe(200);
+      expect(readOne).toHaveBeenCalledWith('adminTablePreferences', { userId: 'admin-1', table });
+    }
+  });
   it('returns null when the admin has no saved layout', async () => {
     const res = await GET(req('GET', { query: '?table=orders' }));
     expect(await res.json()).toEqual({ data: null });
