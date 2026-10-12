@@ -158,7 +158,7 @@ function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: Aband
             startIcon={<IconMail size={18} />}
             sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 140px', sm: '0 0 auto' }, maxWidth: '100%', '& .MuiButton-startIcon': { flexShrink: 0 } }}
           >
-            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canSendReminder ? `Send reminder to ${row.email}` : `Email ${row.email}`}</Box>
+            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canSendReminder ? 'Send reminder email' : `Email ${row.email}`}</Box>
           </Button>
         )}
         {!row.phone && !row.email && <Typography sx={{ fontSize: 13, color: '#B45309' }}>No phone or email saved for this person.</Typography>}
