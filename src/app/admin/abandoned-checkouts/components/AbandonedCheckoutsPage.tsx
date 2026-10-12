@@ -26,6 +26,7 @@ import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconS
 import { useAuth } from '@/contexts/AuthContext';
 import AbandonedMetricsPanel from './AbandonedMetricsPanel';
 import type { AbandonedMetrics } from '@/utils/abandonedMetrics';
+import type { PaidReason, PaidRow } from '@/utils/abandonedPaid';
 import { addDaysToDay, CONTACT_NOTES, pacificToday, QUIET_MINUTES, reachOutEmail, resolveRange, RETENTION_DAYS, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
@@ -57,6 +58,7 @@ interface Data {
   valueToContact: number;
   orderedSince: number;
   metrics?: AbandonedMetrics;
+  paid?: PaidRow[];
 }
 
 /** What one person left in their cart, in short lines ("2 × Veg Combo · Medium · Eco"). */
@@ -104,6 +106,47 @@ function ReminderLine({ reminder }: { reminder: ReminderView }) {
       {reminder.clickedAt && <Chip size="small" color="success" label={`Opened the cart from the email · ${when(reminder.clickedAt)}`} sx={{ ...wrapChip, fontWeight: 700 }} />}
       {reminder.problem && <Typography sx={{ fontSize: 12, color: '#B91C1C', width: '100%' }}>{reminder.problem}</Typography>}
     </Box>
+  );
+}
+
+const PAID_REASON: Record<PaidReason, { label: string; color: 'success' | 'info' | 'default' }> = {
+  reminder_click: { label: 'Came back from the reminder email', color: 'success' },
+  reminder: { label: 'Paid after the reminder email', color: 'success' },
+  contacted: { label: 'Paid after you contacted them', color: 'info' },
+  own: { label: 'Came back on their own', color: 'default' },
+};
+
+/** Someone who left checkout and later paid: how much, when, and what brought them back. */
+function PaidCard({ row }: { row: PaidRow }) {
+  const reason = PAID_REASON[row.reason];
+  return (
+    <Paper elevation={0} sx={{ p: { xs: 1.5, sm: 2 }, border: '1px solid #BBF7D0', borderRadius: 2, minWidth: 0, overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start' }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: 16, wordBreak: 'break-word' }}>{row.name}</Typography>
+          <Typography sx={{ fontSize: 12, color: '#6B7280' }}>Left {when(row.leftAt)}</Typography>
+          <Typography sx={{ fontSize: 12, color: '#047857', fontWeight: 600 }}>Paid {when(row.paidAt)}</Typography>
+        </Box>
+        <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: 18, color: '#047857' }}>{money(row.amount)}</Typography>
+          <Typography sx={{ fontSize: 11.5, color: '#6B7280', wordBreak: 'break-all' }}>{row.orderId}</Typography>
+        </Box>
+      </Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
+        <Chip size="small" color={reason.color} variant={reason.color === 'default' ? 'outlined' : 'filled'} label={reason.label} sx={{ ...wrapChip, fontWeight: 700 }} />
+        {row.reminder && <Chip size="small" variant="outlined" label={`Reminder sent ${when(row.reminder.sentAt)}${row.reminder.opened ? ' · opened' : ''}${row.reminder.clicked ? ' · opened the cart' : ''}`} sx={wrapChip} />}
+        {row.contacted && <Chip size="small" variant="outlined" label={`Contacted ${when(row.contacted.at)}${row.contacted.by ? ` by ${row.contacted.by}` : ''}${row.contacted.note ? `: ${row.contacted.note}` : ''}`} sx={wrapChip} />}
+      </Box>
+      {row.items.length > 0 && (
+        <Box sx={{ mt: 1.25, p: 1.25, bgcolor: '#FAFAFA', borderRadius: 1.5, minWidth: 0, overflowWrap: 'anywhere' }}>
+          <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 0.25 }}>What they left in the cart</Typography>
+          {row.items.slice(0, 3).map((item, i) => (
+            <Typography key={`${item.name}-${i}`} sx={{ fontSize: 13.5, fontWeight: 600 }}>{item.quantity} × {item.name}</Typography>
+          ))}
+          {row.items.length > 3 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>+ {row.items.length - 3} more</Typography>}
+        </Box>
+      )}
+    </Paper>
   );
 }
 
@@ -211,7 +254,7 @@ export default function AbandonedCheckoutsPage() {
   })();
   const queryString = 'qs' in query ? query.qs : null;
   const rangeError = 'error' in query ? query.error : '';
-  const [tab, setTab] = useState<View>('to_contact');
+  const [tab, setTab] = useState<View | 'paid'>('to_contact');
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -302,7 +345,8 @@ export default function AbandonedCheckoutsPage() {
     return <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}><CircularProgress /></Box>;
   }
 
-  const rows = data?.rows[tab] ?? [];
+  const rows = tab === 'paid' ? [] : data?.rows[tab] ?? [];
+  const paidRows = data?.paid ?? [];
 
   return (
     <Box sx={{ maxWidth: 820, mx: 'auto', pb: 6 }}>
@@ -357,12 +401,25 @@ export default function AbandonedCheckoutsPage() {
             )}
           </Paper>
 
-          <Tabs value={tab} onChange={(_, v: View) => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1.25, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
+          <Tabs value={tab} onChange={(_, v: View | 'paid') => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1.25, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
             <Tab value="to_contact" label={`To contact (${data.to_contact})`} />
             <Tab value="contacted" label={`Contacted (${data.contacted})`} />
+            <Tab value="paid" label={`Paid (${paidRows.length})`} />
           </Tabs>
 
-          {rows.length === 0 && (
+          {tab === 'paid' && paidRows.length === 0 && (
+            <Paper elevation={0} sx={{ p: 3, border: '1px dashed #D1D5DB', borderRadius: 2, textAlign: 'center' }}>
+              <Box sx={{ color: '#9CA3AF', mb: 0.5 }}><IconShoppingCartOff size={32} /></Box>
+              <Typography sx={{ fontWeight: 700 }}>Nobody has come back and paid yet</Typography>
+              <Typography sx={{ fontSize: 13, color: '#6B7280' }}>People who leave checkout and later pay show up here, with what brought them back.</Typography>
+            </Paper>
+          )}
+          {tab === 'paid' && paidRows.length > 0 && (
+            <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+              {paidRows.map((row) => <PaidCard key={row.orderId} row={row} />)}
+            </Box>
+          )}
+          {tab !== 'paid' && rows.length === 0 && (
             <Paper elevation={0} sx={{ p: 3, border: '1px dashed #D1D5DB', borderRadius: 2, textAlign: 'center' }}>
               <Box sx={{ color: '#9CA3AF', mb: 0.5 }}><IconShoppingCartOff size={32} /></Box>
               <Typography sx={{ fontWeight: 700 }}>{tab === 'to_contact' ? 'Nobody to follow up with right now' : 'Nobody has been contacted yet'}</Typography>

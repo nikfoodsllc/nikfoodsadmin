@@ -187,6 +187,11 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Abandoned Checkout', 'Recovered by email', 'Abandoned Checkout, Overview', 'Money from orders that people paid within 7 days after the reminder email was sent to them. It shows the email helped, though some of those people might have ordered anyway.', 'good', 'reminder revenue recovered'),
   e('Abandoned Checkout', 'Reminder email results', 'Abandoned Checkout, Overview', 'How far the reminder emails got: delivered, opened, opened the cart from the button, and ordered within 7 days. Each person counts once. Opened is only a hint; the cart click is the reliable sign.', undefined, 'funnel delivered opened clicked'),
   e('Abandoned Checkout', 'Most left behind', 'Abandoned Checkout, Overview', 'The items most often sitting in the carts of people who left without paying, by units and by number of people.', undefined, 'top items'),
+  e('Abandoned Checkout', 'Paid (tab)', 'Abandoned Checkout tab', 'People who left checkout without paying and later came back and paid, so you can see who you won back. Someone who changes their cart and pays within 10 minutes never left, so they are not listed. Each card shows what brought them back.', 'good', 'converted won back recovered paid'),
+  e('Abandoned Checkout', 'Came back from the reminder email', 'Abandoned Checkout, Paid tab', 'They opened the cart from the reminder email and then paid.', 'good'),
+  e('Abandoned Checkout', 'Paid after the reminder email', 'Abandoned Checkout, Paid tab', 'The reminder email went out before they paid, but we did not see them open the cart from it. They may still have used it, or come back on their own.', 'good'),
+  e('Abandoned Checkout', 'Paid after you contacted them', 'Abandoned Checkout, Paid tab', 'You marked them as contacted before they paid.', 'info'),
+  e('Abandoned Checkout', 'Came back on their own', 'Abandoned Checkout, Paid tab', 'No reminder email or contact from you came before the payment.'),
   e('Abandoned Checkout', 'Date range (Today, 7, 14, 30, 60 days, Custom)', 'Abandoned Checkout', 'Which days of leftovers to show, in Pacific days, both ends included. The oldest you can look back is 60 days.'),
 
   // ---- kitchen dashboard
