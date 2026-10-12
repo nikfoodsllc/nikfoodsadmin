@@ -117,7 +117,8 @@ function skippedCount(run: PackingRun): number {
 const clockMs = (run: PackingRun) => {
   const start = run.startedAt ? new Date(run.startedAt).getTime() : NaN;
   const end = run.finishedAt ? new Date(run.finishedAt).getTime() : NaN;
-  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
+  // time the route was paused (Stop packing) is not packing time
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start - Math.max(0, num(run.pausedMs))) : 0;
 };
 
 /** Everything the metrics page shows for the runs of a date range (the caller passes only the runs inside the range). */

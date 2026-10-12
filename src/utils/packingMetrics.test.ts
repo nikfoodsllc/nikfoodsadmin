@@ -53,6 +53,12 @@ describe('buildPackingMetrics', () => {
     expect(m.slowest.map((c) => c.name)).toEqual(['B', 'D', 'A', 'E']);
     expect(m.fastest[0].name).toBe('E');
   });
+  it('paused time is not packing time in the route clock', () => {
+    const r = run({ pausedMs: 900000, stops: { ...stop('A', 1, 1, 60000) } });
+    const one = buildPackingMetrics([r]);
+    expect(one.routeMs).toBe(3600000 - 900000);
+    expect(one.betweenMs).toBe(3600000 - 900000 - 60000);
+  });
   it('nothing at all', () => {
     const e = buildPackingMetrics([]);
     expect(e).toMatchObject({ routesStarted: 0, customersPacked: 0, averageMs: 0, medianMs: 0, secondsPerUnit: 0, customersPerHour: 0, days: [], drivers: [] });

@@ -69,7 +69,7 @@ export async function startRun(c: Collection<Doc>, p: { date: string; routeKey: 
     // packing again after a finished run: the ticks stay, the clock restarts at this customer
     await c.updateOne(
       { date: p.date, routeKey: p.routeKey },
-      { $set: { startedAt: existing.startedAt ?? now.toISOString(), finishedAt: null, currentStopKey: p.firstStopKey, [`${first}.activeSince`]: now.toISOString(), updatedAt: now, driverName: p.driverName, ...metaSet } }
+      { $set: { startedAt: existing.startedAt ?? now.toISOString(), finishedAt: null, pausedAt: null, currentStopKey: p.firstStopKey, [`${first}.activeSince`]: now.toISOString(), updatedAt: now, driverName: p.driverName, ...metaSet } }
     );
   } else {
     await c
@@ -85,7 +85,8 @@ export async function startRun(c: Collection<Doc>, p: { date: string; routeKey: 
 
 /** Ticks or unticks lines of one customer. False when the run has not been started. */
 export async function setChecked(c: Collection<Doc>, p: { date: string; routeKey: string; stopKey: string; lineKeys: string[]; checked: boolean }, now: Date): Promise<Doc | null | false> {
-  const filter = { date: p.date, routeKey: p.routeKey, startedAt: { $ne: null } };
+  // not while paused: Resume first
+  const filter = { date: p.date, routeKey: p.routeKey, startedAt: { $ne: null }, finishedAt: null, pausedAt: null };
   const field = `stops.${p.stopKey}.checked`;
   const update = p.checked ? { $addToSet: { [field]: { $each: p.lineKeys } }, $set: { updatedAt: now } } : { $pull: { [field]: { $in: p.lineKeys } }, $set: { updatedAt: now } };
   const result = await c.updateOne(filter, update as never);
@@ -98,7 +99,7 @@ export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: 
   for (let attempt = 0; attempt < 3; attempt++) {
     const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
     if (!run?.startedAt) return false;
-    if (run.finishedAt || run.currentStopKey === p.toStopKey) return clean(run);
+    if (run.finishedAt || run.pausedAt || run.currentStopKey === p.toStopKey) return clean(run);
     const to = `stops.${p.toStopKey}`;
     const set: Record<string, unknown> = { ...closeCurrent(run, now), currentStopKey: p.toStopKey, [`${to}.activeSince`]: now.toISOString(), updatedAt: now };
     if (!run.stops?.[p.toStopKey]?.firstOpenedAt) set[`${to}.firstOpenedAt`] = now.toISOString();
@@ -114,7 +115,41 @@ export async function finishRun(c: Collection<Doc>, p: { date: string; routeKey:
     const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
     if (!run?.startedAt) return false;
     if (run.finishedAt) return clean(run);
-    const result = await c.updateOne({ date: p.date, routeKey: p.routeKey, currentStopKey: run.currentStopKey ?? null, finishedAt: null }, { $set: { ...closeCurrent(run, now), finishedAt: now.toISOString(), currentStopKey: null, updatedAt: now } });
+    const set: Record<string, unknown> = { ...closeCurrent(run, now), finishedAt: now.toISOString(), currentStopKey: null, pausedAt: null, updatedAt: now };
+    if (run.pausedAt) set.pausedMs = (Number(run.pausedMs) || 0) + pausedFor(run, now); // finishing while paused: the pause ends here
+    const result = await c.updateOne({ date: p.date, routeKey: p.routeKey, currentStopKey: run.currentStopKey ?? null, finishedAt: null }, { $set: set });
+    if (result.matchedCount > 0) break;
+  }
+  return clean(await c.findOne({ date: p.date, routeKey: p.routeKey }));
+}
+
+/** How long the run has been paused up to `now` (milliseconds; 0 when it is not paused). */
+function pausedFor(run: Doc, now: Date): number {
+  const since = run.pausedAt ? new Date(run.pausedAt).getTime() : NaN;
+  return Number.isFinite(since) ? Math.max(0, now.getTime() - since) : 0;
+}
+
+/** Stop packing for now: the clock of the customer on screen stops and the route clock stops; ticks and the place are kept. */
+export async function pauseRun(c: Collection<Doc>, p: { date: string; routeKey: string }, now: Date): Promise<Doc | null | false> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
+    if (!run?.startedAt) return false;
+    if (run.finishedAt || run.pausedAt) return clean(run);
+    const result = await c.updateOne({ date: p.date, routeKey: p.routeKey, currentStopKey: run.currentStopKey ?? null, finishedAt: null, pausedAt: null }, { $set: { ...closeCurrent(run, now), pausedAt: now.toISOString(), updatedAt: now } });
+    if (result.matchedCount > 0) break;
+  }
+  return clean(await c.findOne({ date: p.date, routeKey: p.routeKey }));
+}
+
+/** Carry on after a pause: the pause is added to the paused time and the clock of the same customer starts again. */
+export async function resumeRun(c: Collection<Doc>, p: { date: string; routeKey: string }, now: Date): Promise<Doc | null | false> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
+    if (!run?.startedAt) return false;
+    if (run.finishedAt || !run.pausedAt) return clean(run);
+    const set: Record<string, unknown> = { pausedAt: null, pausedMs: (Number(run.pausedMs) || 0) + pausedFor(run, now), updatedAt: now };
+    if (run.currentStopKey) set[`stops.${run.currentStopKey}.activeSince`] = now.toISOString();
+    const result = await c.updateOne({ date: p.date, routeKey: p.routeKey, pausedAt: run.pausedAt, finishedAt: null }, { $set: set });
     if (result.matchedCount > 0) break;
   }
   return clean(await c.findOne({ date: p.date, routeKey: p.routeKey }));
