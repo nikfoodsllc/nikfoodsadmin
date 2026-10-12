@@ -89,13 +89,16 @@ function ItemLines({ row, all }: { row: AbandonedRow; all: boolean }) {
 const REMINDER_TEXT: Record<ReminderView['state'], string> = { sending: 'Reminder email sending', sent: 'Reminder email sent', delivered: 'Reminder email delivered', bounced: 'Reminder email bounced', spam: 'Marked as spam', failed: 'Reminder email failed' };
 
 /** What happened to the automatic reminder email: sent, delivered, opened, button clicked (each with its time). */
+// the chips can be longer than a phone is wide: let their text wrap instead of being cut off
+const wrapChip = { height: 'auto', maxWidth: '100%', fontWeight: 600, '& .MuiChip-label': { whiteSpace: 'normal', py: 0.25 } } as const;
+
 function ReminderLine({ reminder }: { reminder: ReminderView }) {
   const bad = reminder.state === 'bounced' || reminder.state === 'spam' || reminder.state === 'failed';
   return (
     <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
-      <Chip size="small" color={bad ? 'error' : 'info'} variant="outlined" label={`${REMINDER_TEXT[reminder.state]}${reminder.sentAt ? ` · ${when(reminder.sentAt)}` : ''}`} sx={{ fontWeight: 600 }} />
-      {reminder.openedAt && <Chip size="small" color="success" variant="outlined" label={`Opened${reminder.openCount && reminder.openCount > 1 ? ` (${reminder.openCount}×)` : ''} · ${when(reminder.openedAt)}`} sx={{ fontWeight: 600 }} />}
-      {reminder.clickedAt && <Chip size="small" color="success" label={`Opened the cart from the email · ${when(reminder.clickedAt)}`} sx={{ fontWeight: 700 }} />}
+      <Chip size="small" color={bad ? 'error' : 'info'} variant="outlined" label={`${REMINDER_TEXT[reminder.state]}${reminder.sentAt ? ` · ${when(reminder.sentAt)}` : ''}`} sx={wrapChip} />
+      {reminder.openedAt && <Chip size="small" color="success" variant="outlined" label={`Opened${reminder.openCount && reminder.openCount > 1 ? ` (${reminder.openCount}×)` : ''} · ${when(reminder.openedAt)}`} sx={wrapChip} />}
+      {reminder.clickedAt && <Chip size="small" color="success" label={`Opened the cart from the email · ${when(reminder.clickedAt)}`} sx={{ ...wrapChip, fontWeight: 700 }} />}
       {reminder.problem && <Typography sx={{ fontSize: 12, color: '#B91C1C', width: '100%' }}>{reminder.problem}</Typography>}
     </Box>
   );
