@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { addDaysToDay, CONTACT_NOTES, pacificToday, QUIET_MINUTES, reachOutEmail, resolveRange, RETENTION_DAYS, type AbandonedRow, type View } from '@/utils/abandonedCheckouts';
+import { addDaysToDay, CONTACT_NOTES, pacificToday, QUIET_MINUTES, reachOutEmail, resolveRange, RETENTION_DAYS, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -86,6 +86,21 @@ function ItemLines({ row, all }: { row: AbandonedRow; all: boolean }) {
   );
 }
 
+const REMINDER_TEXT: Record<ReminderView['state'], string> = { sending: 'Reminder email sending', sent: 'Reminder email sent', delivered: 'Reminder email delivered', bounced: 'Reminder email bounced', spam: 'Marked as spam', failed: 'Reminder email failed' };
+
+/** What happened to the automatic reminder email: sent, delivered, opened, button clicked (each with its time). */
+function ReminderLine({ reminder }: { reminder: ReminderView }) {
+  const bad = reminder.state === 'bounced' || reminder.state === 'spam' || reminder.state === 'failed';
+  return (
+    <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
+      <Chip size="small" color={bad ? 'error' : 'info'} variant="outlined" label={`${REMINDER_TEXT[reminder.state]}${reminder.sentAt ? ` · ${when(reminder.sentAt)}` : ''}`} sx={{ fontWeight: 600 }} />
+      {reminder.openedAt && <Chip size="small" color="success" variant="outlined" label={`Opened${reminder.openCount && reminder.openCount > 1 ? ` (${reminder.openCount}×)` : ''} · ${when(reminder.openedAt)}`} sx={{ fontWeight: 600 }} />}
+      {reminder.clickedAt && <Chip size="small" color="success" label={`Opened the cart from the email · ${when(reminder.clickedAt)}`} sx={{ fontWeight: 700 }} />}
+      {reminder.problem && <Typography sx={{ fontSize: 12, color: '#B91C1C', width: '100%' }}>{reminder.problem}</Typography>}
+    </Box>
+  );
+}
+
 function PersonCard({ row, onContacted, onUndo, onHide }: { row: AbandonedRow; onContacted: (row: AbandonedRow) => void; onUndo: (row: AbandonedRow) => void; onHide: (row: AbandonedRow) => void }) {
   const [open, setOpen] = useState(false);
   const mail = reachOutEmail(row);
@@ -112,6 +127,7 @@ function PersonCard({ row, onContacted, onUndo, onHide }: { row: AbandonedRow; o
         {row.previouslyContactedAt && <Chip size="small" variant="outlined" label={`Contacted before (${when(row.previouslyContactedAt)})`} />}
       </Box>
       {row.problem && <Typography sx={{ fontSize: 13, color: '#B45309', mt: 0.75 }}>{row.problem}</Typography>}
+      {row.reminder && <ReminderLine reminder={row.reminder} />}
 
       <Box sx={{ mt: 1.25, p: 1.25, bgcolor: '#FAFAFA', borderRadius: 1.5, minWidth: 0, overflowWrap: 'anywhere' }}>
         <ItemLines row={row} all={open} />
