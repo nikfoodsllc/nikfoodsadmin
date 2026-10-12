@@ -177,6 +177,10 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Abandoned Checkout', 'Pressed Pay, payment did not go through', 'Abandoned Checkout chip', 'The customer pressed Pay but the payment failed or was not finished. They wanted to buy, so they are the best people to contact.', 'warn'),
   e('Abandoned Checkout', 'N earlier checkouts', 'Abandoned Checkout chip', 'The same person left checkout before as well.', undefined, 'earlier checkouts'),
   e('Abandoned Checkout', 'Contacted before (<time>)', 'Abandoned Checkout chip', 'You already contacted this person about an earlier checkout, at that time.'),
+  e('Abandoned Checkout', 'Reminder email sent / delivered', 'Abandoned Checkout chip', 'The site emailed this person a reminder about 30 minutes after they left checkout (one per cart, none to the same person within 14 days). Sent means it left our email service, delivered means their mailbox accepted it.', 'good', 'automatic reminder cart email'),
+  e('Abandoned Checkout', 'Opened (from the reminder email)', 'Abandoned Checkout chip', 'The reminder email was opened. This is only a hint: some mail apps (like Apple Mail) load the email on their own, so it can show opened when nobody read it.', undefined, 'open tracking pixel'),
+  e('Abandoned Checkout', 'Opened the cart from the email', 'Abandoned Checkout chip', 'The person pressed the button in the reminder email and their browser loaded the cart. This is the reliable sign that the email worked.', 'good', 'clicked button link'),
+  e('Abandoned Checkout', 'Reminder email bounced / marked as spam / failed', 'Abandoned Checkout chip', 'The reminder could not be delivered (bad address), the person marked it as spam, or our email service refused it. Reach out another way, for example by phone.', 'bad', 'bounce complaint'),
   e('Abandoned Checkout', 'Date range (Today, 7, 14, 30, 60 days, Custom)', 'Abandoned Checkout', 'Which days of leftovers to show, in Pacific days, both ends included. The oldest you can look back is 60 days.'),
 
   // ---- kitchen dashboard
