@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, LinearProgress, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPlay, IconCheck } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { addDays, formatDayShort, isDayString, shortSpiceLabel } from '@/utils/kitchenDashboard';
+import { addDays, formatDayShort, isDayString, shortSpiceLabel, weekdayName } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
 import type { PackingReport, PackStop } from '@/utils/packingReport';
 import {
@@ -19,6 +19,7 @@ import {
   runStatus,
   startIndex,
   stopCounts,
+  stopMetaOf,
   stopElapsedMs,
   stopKeyOf,
   summarizeRoute,
@@ -64,7 +65,7 @@ export default function PackLivePage() {
   const [tab, setTab] = useState<TabId>('pack');
   const [clockSkew, setClockSkew] = useState(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [confirm, setConfirm] = useState<null | 'next' | 'finish' | 'reset'>(null);
+  const [confirm, setConfirm] = useState<null | 'next' | 'finish' | 'reset' | 'stop'>(null);
   const [busy, setBusy] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const startRequest = useLatestRequest();
@@ -172,7 +173,7 @@ export default function PackLivePage() {
 
   const stops = route?.stops ?? [];
   const currentKey = run?.currentStopKey ?? null;
-  const index = status === 'packing' ? Math.max(0, stops.findIndex((s) => stopKeyOf(s) === currentKey)) : status === 'done' ? stops.length - 1 : startIndex(route ?? { key: '', title: '', driverName: '', stops: [] }, run);
+  const index = status === 'packing' || status === 'paused' ? Math.max(0, stops.findIndex((s) => stopKeyOf(s) === currentKey)) : status === 'done' ? stops.length - 1 : startIndex(route ?? { key: '', title: '', driverName: '', stops: [] }, run);
   const stop: PackStop | undefined = stops[index];
   const stopKey = stop ? stopKeyOf(stop) : '';
   const progress = stop ? run?.stops?.[stopKey] : undefined;
@@ -182,7 +183,8 @@ export default function PackLivePage() {
   const start = async () => {
     if (!route || stops.length === 0) return;
     setBusy(true);
-    await send({ action: 'start', routeKey: route.key, driverName: routeLabel(route), firstStopKey: stopKeyOf(stops[index] ?? stops[0]) });
+    const first = stops[index] ?? stops[0];
+    await send({ action: 'start', routeKey: route.key, driverName: routeLabel(route), firstStopKey: stopKeyOf(first), firstMeta: stopMetaOf(first), totals: { customers: stops.length, units: summary?.units ?? 0 } });
     setBusy(false);
   };
 
@@ -191,7 +193,7 @@ export default function PackLivePage() {
     setConfirm(null);
     // show it at once, the answer confirms it
     setRuns((prev) => prev.map((r) => (r.routeKey === route.key ? { ...r, currentStopKey: stopKeyOf(stops[target]) } : r)));
-    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]) });
+    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]), meta: stopMetaOf(stops[target]) });
   };
 
   const finish = async () => {
@@ -201,6 +203,23 @@ export default function PackLivePage() {
     await send({ action: 'finish', routeKey: route.key });
     setBusy(false);
     setTab('times');
+  };
+
+  const pause = async () => {
+    if (!route) return;
+    setConfirm(null);
+    setBusy(true);
+    await send({ action: 'pause', routeKey: route.key });
+    setBusy(false);
+    setShowPicker(false);
+  };
+
+  const resume = async () => {
+    if (!route) return;
+    setBusy(true);
+    await send({ action: 'resume', routeKey: route.key });
+    setBusy(false);
+    setTab('pack');
   };
 
   const reset = async () => {
@@ -298,7 +317,7 @@ export default function PackLivePage() {
                   }}
                   variant={selected ? 'filled' : 'outlined'}
                   icon={st === 'done' ? <IconCheck size={16} /> : undefined}
-                  label={`${routeLabel(r)} · ${st === 'not_started' ? `${r.stops.length} stops` : `${s.complete}/${s.customers}`}`}
+                  label={`${routeLabel(r)} · ${st === 'not_started' ? `${r.stops.length} stops` : st === 'paused' ? `paused ${s.complete}/${s.customers}` : `${s.complete}/${s.customers}`}`}
                   sx={{ height: 40, fontSize: 15, fontWeight: selected ? 800 : 500, ...(selected ? { bgcolor: ORANGE, color: '#fff', '&:hover': { bgcolor: '#E08A28' } } : {}), ...(st === 'done' && !selected ? { borderColor: '#126B2C', color: '#126B2C' } : {}) }}
                 />
               );
@@ -316,9 +335,14 @@ export default function PackLivePage() {
                 <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{routeLabel(route)}</Typography>
               </Box>
               {status === 'packing' && (
-                <Button size="small" onClick={() => setShowPicker((v) => !v)} sx={{ textTransform: 'none', fontWeight: 600, flexShrink: 0 }}>
-                  {showPicker ? 'Hide' : 'Change driver or day'}
-                </Button>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, flexShrink: 0 }}>
+                  <Button size="small" variant="outlined" color="error" startIcon={<IconPlayerPause size={16} />} onClick={() => setConfirm('stop')} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
+                    Stop packing
+                  </Button>
+                  <Button size="small" onClick={() => setShowPicker((v) => !v)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                    {showPicker ? 'Hide' : 'Change driver or day'}
+                  </Button>
+                </Box>
               )}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mt: 1.25 }}>
@@ -328,8 +352,8 @@ export default function PackLivePage() {
                 </Button>
               ) : (
                 <Box>
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>{status === 'done' ? 'Total time' : 'Timer'}</Typography>
-                  <Typography sx={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: status === 'done' ? '#126B2C' : '#111827', lineHeight: 1.1 }}>{formatDuration(runElapsedMs(run, serverNow))}</Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>{status === 'done' ? 'Total time' : status === 'paused' ? 'Paused' : 'Timer'}</Typography>
+                  <Typography sx={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#111827', lineHeight: 1.1 }}>{formatDuration(runElapsedMs(run, serverNow))}</Typography>
                 </Box>
               )}
               <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
@@ -344,6 +368,14 @@ export default function PackLivePage() {
               </Box>
             </Box>
             {status !== 'not_started' && <LinearProgress variant="determinate" value={summary && summary.customers > 0 ? (summary.complete / summary.customers) * 100 : 0} sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: '#126B2C' } }} />}
+            {status === 'paused' && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mt: 1.5 }}>
+                <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={20} />} onClick={() => void resume()} disabled={busy} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
+                  Resume packing
+                </Button>
+                <Typography sx={{ fontSize: 13, color: '#6B7280' }}>Your place and ticks are kept. The timers are stopped.</Typography>
+              </Box>
+            )}
           </Paper>
 
           {status !== 'not_started' && (
@@ -367,6 +399,11 @@ export default function PackLivePage() {
                     <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{stop.customerName}</Typography>
                     <Typography sx={{ fontSize: 14, color: '#374151', wordBreak: 'break-word', pt: 0.4 }}>Order # {stop.orderIds.join(', ')}</Typography>
                   </Box>
+                  {date && (
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                      <IconTruckDelivery size={16} /> Delivery {formatDayShort(date)}
+                    </Typography>
+                  )}
                   <Typography sx={{ fontSize: 13, color: counts.complete ? '#126B2C' : '#6B7280', fontWeight: 600 }}>
                     {counts.done} of {counts.total} item{counts.total === 1 ? '' : 's'} checked
                   </Typography>
@@ -376,15 +413,25 @@ export default function PackLivePage() {
                   const keys = group.lines.map((l) => l.key);
                   const all = keys.every((k) => checkedSet.has(k));
                   const some = keys.some((k) => checkedSet.has(k));
+                  // a day other than the delivery date: the food was picked for that day and goes out on the delivery date
+                  const otherDay = Boolean(group.day && date && group.day !== date);
                   return (
                     <Box key={group.day}>
-                      <Box sx={{ ...ROW_GRID, px: 1, py: 0.5, bgcolor: '#FFF7ED', borderBottom: '1px solid #FED7AA' }}>
+                      <Box sx={{ ...ROW_GRID, px: 1, py: otherDay ? 0.75 : 0.5, bgcolor: otherDay ? '#FEF3C7' : '#FFF7ED', borderBottom: `1px solid ${otherDay ? '#FCD34D' : '#FED7AA'}` }}>
                         <Box sx={{ gridArea: 'check' }}>
                           <Checkbox disabled={status !== 'packing'} checked={all} indeterminate={some && !all} onChange={() => tick(keys, !all)} inputProps={{ 'aria-label': `Check all for ${group.day ? formatDayShort(group.day) : 'this day'}` }} sx={{ p: 1.25, color: ORANGE, '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: ORANGE } }} />
                         </Box>
-                        <Typography sx={{ gridArea: { xs: 'item', sm: 'portion / portion / portion / eco' }, fontWeight: 800, fontSize: 15, color: '#9A3412' }}>
-                          {group.day ? formatDayShort(group.day) : 'Items'} <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: '#9A3412' }}>· check all</Typography>
-                        </Typography>
+                        <Box sx={{ gridArea: { xs: 'qty / qty / qty / item', sm: 'portion / portion / portion / spice' }, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 800, fontSize: 15, color: otherDay ? '#92400E' : '#9A3412' }}>
+                            {group.day ? (otherDay ? `${weekdayName(group.day)} items · ${formatDayShort(group.day)}` : formatDayShort(group.day)) : 'Items'}{' '}
+                            <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412', whiteSpace: 'nowrap' }}>· check all</Typography>
+                          </Typography>
+                          {otherDay && date && (
+                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <IconTruckDelivery size={15} /> Delivered {formatDayShort(date)}
+                            </Typography>
+                          )}
+                        </Box>
                       </Box>
                       <Box sx={{ ...ROW_GRID, display: { xs: 'none', sm: 'grid' }, px: 1, py: 0.5, borderBottom: '1px solid #F3F4F6' }}>
                         {[
@@ -420,7 +467,6 @@ export default function PackLivePage() {
                                   {c}
                                 </Typography>
                               ))}
-                              {line.pickedFor && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Picked for {formatDayShort(line.pickedFor)}</Typography>}
                               <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                 {line.portion && <Chip size="small" label={line.portion} sx={{ height: 22, fontSize: 12 }} />}
                                 {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
@@ -504,6 +550,25 @@ export default function PackLivePage() {
         </Box>
       )}
 
+      <Dialog open={confirm === 'stop'} onClose={() => setConfirm(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Stop packing?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            {summary?.complete ?? 0} of {summary?.customers ?? 0} customers are packed. Pause keeps your place and every tick, and you carry on later. Finish ends this route as done.
+          </DialogContentText>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Button variant="contained" size="large" startIcon={<IconPlayerPause size={20} />} onClick={() => void pause()} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
+              Pause and go back
+            </Button>
+            <Button variant="outlined" size="large" startIcon={<IconCheck size={20} />} onClick={() => void finish()} sx={{ textTransform: 'none', fontWeight: 700 }}>
+              Finish this route now
+            </Button>
+            <Button onClick={() => setConfirm(null)} sx={{ textTransform: 'none' }}>
+              Keep packing
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
       <Dialog open={confirm === 'next' || confirm === 'finish'} onClose={() => setConfirm(null)}>
         <DialogTitle>Some items are not checked</DialogTitle>
         <DialogContent>

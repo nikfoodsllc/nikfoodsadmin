@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
-import { IconColumns3, IconFileSpreadsheet, IconPlayerPlay, IconPrinter, IconRefresh, IconRoute, IconSearch, IconX } from '@tabler/icons-react';
+import { IconClockHour4, IconColumns3, IconFileSpreadsheet, IconPlayerPlay, IconPrinter, IconRefresh, IconRoute, IconSearch, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
@@ -275,6 +275,9 @@ export default function PackingReportPage() {
         <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <Button component={Link} href="/admin/reports/packing/live" variant="contained" size="small" startIcon={<IconPlayerPlay size={16} />} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#F89C35', '&:hover': { bgcolor: '#E08A28' } }}>
             Pack live
+          </Button>
+          <Button component={Link} href="/admin/reports/packing/metrics" variant="outlined" size="small" startIcon={<IconClockHour4 size={16} />} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Packing times
           </Button>
           <Button variant="outlined" size="small" startIcon={<IconColumns3 size={16} />} onClick={() => setColumnsOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Columns

@@ -11,8 +11,18 @@ import type { PackLine, PackRoute, PackStop } from './packingReport';
 /** The route that holds customers who are on no driver's route */
 export const UNROUTED_KEY = 'unrouted';
 
+/** What was on screen for a customer when it was opened: kept so the times can be reported later (the report cannot rebuild it once orders change). */
+export interface StopMeta {
+  name: string;
+  units: number;
+  /** Number of item lines to tick */
+  lines: number;
+  orderIds: string[];
+}
+
 export interface StopProgress {
   checked?: string[];
+  meta?: StopMeta;
   /** Time already spent on this customer when the packer left it (milliseconds) */
   timeMs?: number;
   /** Set while this customer is the one being packed: when the packer arrived (ISO) */
@@ -27,7 +37,13 @@ export interface PackingRun {
   startedAt?: string | null;
   startedBy?: string | null;
   finishedAt?: string | null;
+  /** Set while packing is paused (Stop packing): when it was paused (ISO) */
+  pausedAt?: string | null;
+  /** Time spent paused so far, earlier pauses included (milliseconds) */
+  pausedMs?: number;
   currentStopKey?: string | null;
+  /** The whole route when packing started */
+  totals?: { customers: number; units: number } | null;
   stops?: Record<string, StopProgress>;
 }
 
@@ -56,6 +72,10 @@ export function packableRoutes(routes: PackRoute[], unrouted: PackStop[]): Packa
   const loose = unrouted.filter((s) => s.lines.length > 0);
   if (loose.length > 0) list.push({ key: UNROUTED_KEY, title: 'Not on a route', driverName: '', stops: loose });
   return list;
+}
+
+export function stopMetaOf(stop: PackStop): StopMeta {
+  return { name: clean(stop.customerName), units: stop.lines.reduce((n, l) => n + l.quantity, 0), lines: stop.lines.length, orderIds: stop.orderIds.slice(0, 10) };
 }
 
 /** The name shown on the driver button: the driver, else "Route 1". */
@@ -115,12 +135,14 @@ export function stopElapsedMs(progress: StopProgress | undefined, nowMs: number)
   return saved + (Number.isFinite(since) ? Math.max(0, nowMs - since) : 0);
 }
 
-/** Time since the packing of the route started, stopped at the end time once finished. */
+/** Time since the packing of the route started, without the time it was paused, stopped at the end time once finished. */
 export function runElapsedMs(run: PackingRun | undefined | null, nowMs: number): number {
   const start = run?.startedAt ? new Date(run.startedAt).getTime() : NaN;
   if (!Number.isFinite(start)) return 0;
   const end = run?.finishedAt ? new Date(run.finishedAt).getTime() : nowMs;
-  return Math.max(0, end - start);
+  const pausedSince = !run?.finishedAt && run?.pausedAt ? new Date(run.pausedAt).getTime() : NaN;
+  const runningPause = Number.isFinite(pausedSince) ? Math.max(0, nowMs - pausedSince) : 0;
+  return Math.max(0, end - start - Math.max(0, Number(run?.pausedMs) || 0) - runningPause);
 }
 
 /** 65000 -> "1:05", 3725000 -> "1:02:05" */
@@ -133,11 +155,12 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
 }
 
-export type RunStatus = 'not_started' | 'packing' | 'done';
+export type RunStatus = 'not_started' | 'packing' | 'paused' | 'done';
 
 export function runStatus(run: PackingRun | undefined | null): RunStatus {
   if (!run?.startedAt) return 'not_started';
-  return run.finishedAt ? 'done' : 'packing';
+  if (run.finishedAt) return 'done';
+  return run.pausedAt ? 'paused' : 'packing';
 }
 
 export interface RouteSummary {

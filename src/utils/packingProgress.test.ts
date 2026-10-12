@@ -59,6 +59,13 @@ describe('counts and times', () => {
     expect(runElapsedMs({ date: 'd', routeKey: 'r', startedAt: '2026-10-13T10:00:00Z', finishedAt: '2026-10-13T10:30:00Z' }, now)).toBe(1800000);
     expect(runElapsedMs(null, now)).toBe(0);
   });
+  it('the route clock leaves out paused time, also while paused', () => {
+    const now = new Date('2026-10-13T11:00:00Z').getTime();
+    const base = { date: 'd', routeKey: 'r', startedAt: '2026-10-13T10:00:00Z' };
+    expect(runElapsedMs({ ...base, pausedMs: 600000 }, now)).toBe(3000000);
+    expect(runElapsedMs({ ...base, pausedMs: 600000, pausedAt: '2026-10-13T10:50:00Z' }, now)).toBe(3600000 - 600000 - 600000);
+    expect(runElapsedMs({ ...base, pausedMs: 600000, finishedAt: '2026-10-13T10:30:00Z' }, now)).toBe(1800000 - 600000);
+  });
   it('formats durations', () => {
     expect(formatDuration(0)).toBe('0:00');
     expect(formatDuration(65000)).toBe('1:05');
@@ -69,6 +76,8 @@ describe('counts and times', () => {
     expect(runStatus(null)).toBe('not_started');
     expect(runStatus({ date: 'd', routeKey: 'r', startedAt: 'x' })).toBe('packing');
     expect(runStatus({ date: 'd', routeKey: 'r', startedAt: 'x', finishedAt: 'y' })).toBe('done');
+    expect(runStatus({ date: 'd', routeKey: 'r', startedAt: 'x', pausedAt: 'p' })).toBe('paused');
+    expect(runStatus({ date: 'd', routeKey: 'r', startedAt: 'x', pausedAt: 'p', finishedAt: 'y' })).toBe('done');
   });
 });
 

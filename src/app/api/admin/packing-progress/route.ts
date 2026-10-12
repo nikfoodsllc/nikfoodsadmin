@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { jwtHandler } from '@/lib/jwt';
 import { isDayString } from '@/utils/kitchenDashboard';
-import { RUNS, ensureIndex, finishRun, goToStop, isSafeKey, listRuns, resetRun, setChecked, startRun } from '@/lib/packingRuns';
+import { RUNS, cleanMeta, cleanTotals, ensureIndex, finishRun, goToStop, isSafeKey, listRuns, pauseRun, resetRun, resumeRun, setChecked, startRun } from '@/lib/packingRuns';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,13 +46,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-type Body = { action?: string; date?: string; routeKey?: string; driverName?: unknown; firstStopKey?: string; stopKey?: string; toStopKey?: string; lineKeys?: unknown; checked?: unknown };
+type Body = { action?: string; date?: string; routeKey?: string; driverName?: unknown; firstStopKey?: string; firstMeta?: unknown; totals?: unknown; meta?: unknown; stopKey?: string; toStopKey?: string; lineKeys?: unknown; checked?: unknown };
 
 /**
  * POST /api/admin/packing-progress  { action, date, routeKey, ... }
- *   start   { driverName, firstStopKey }       begin packing a route (the clock starts on the first customer)
+ *   start   { driverName, firstStopKey, totals, firstMeta }  begin packing a route (the clock starts on the first customer)
  *   check   { stopKey, lineKeys[], checked }   tick or untick items of one customer
- *   goto    { toStopKey }                      next / previous customer (the time spent on the one left is saved)
+ *   goto    { toStopKey, meta }                next / previous customer (the time spent on the one left is saved)
+ *   pause   {}                                 stop packing for now (timers stop, place and ticks are kept)
+ *   resume  {}                                 carry on from the same customer
  *   finish  {}                                 the route is packed
  *   reset   {}                                 forget the run (ticks and times) to start again
  */
@@ -73,14 +75,14 @@ export async function POST(request: NextRequest) {
     const c = (await db.getDb()).collection(RUNS);
     await ensureIndex(c as never);
     const now = new Date();
-    const wrap = (run: unknown) => (run === false ? NextResponse.json({ error: 'Start packing this route first' }, { status: 409 }) : NextResponse.json({ success: true, data: { now: now.toISOString(), run } }));
+    const wrap = (run: unknown) => (run === false ? NextResponse.json({ error: 'This route is not being packed right now. Start or resume it first.' }, { status: 409 }) : NextResponse.json({ success: true, data: { now: now.toISOString(), run } }));
 
     switch (body.action) {
       case 'start': {
         if (!isSafeKey(body.firstStopKey)) return NextResponse.json({ error: 'Unknown customer' }, { status: 400 });
         const by = await adminName(auth.userId);
         const driverName = typeof body.driverName === 'string' ? body.driverName.slice(0, 80) : '';
-        return wrap(await startRun(c as never, { date, routeKey, driverName, firstStopKey: body.firstStopKey, by }, now));
+        return wrap(await startRun(c as never, { date, routeKey, driverName, firstStopKey: body.firstStopKey, by, totals: cleanTotals(body.totals), firstMeta: cleanMeta(body.firstMeta) }, now));
       }
       case 'check': {
         if (!isSafeKey(body.stopKey)) return NextResponse.json({ error: 'Unknown customer' }, { status: 400 });
@@ -90,8 +92,12 @@ export async function POST(request: NextRequest) {
       }
       case 'goto': {
         if (!isSafeKey(body.toStopKey)) return NextResponse.json({ error: 'Unknown customer' }, { status: 400 });
-        return wrap(await goToStop(c as never, { date, routeKey, toStopKey: body.toStopKey }, now));
+        return wrap(await goToStop(c as never, { date, routeKey, toStopKey: body.toStopKey, meta: cleanMeta(body.meta) }, now));
       }
+      case 'pause':
+        return wrap(await pauseRun(c as never, { date, routeKey }, now));
+      case 'resume':
+        return wrap(await resumeRun(c as never, { date, routeKey }, now));
       case 'finish':
         return wrap(await finishRun(c as never, { date, routeKey }, now));
       case 'reset':
