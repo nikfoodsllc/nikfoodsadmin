@@ -1,5 +1,5 @@
 import type { Collection } from 'mongodb';
-import type { PackingRun } from '@/utils/packingProgress';
+import type { PackingRun, StopMeta } from '@/utils/packingProgress';
 
 /**
  * The saved packing runs ("Pack live"): one document per delivery date and route in `packingRuns`. Every change is one small
@@ -22,6 +22,25 @@ function closeCurrent(run: Doc, now: Date): Record<string, unknown> {
   return { [`stops.${key}.timeMs`]: (Number(progress?.timeMs) || 0) + add, [`stops.${key}.activeSince`]: null };
 }
 
+/** Checks what the browser sent as a customer's snapshot; anything odd is dropped (the times are still kept). */
+export function cleanMeta(raw: unknown): StopMeta | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const m = raw as Record<string, unknown>;
+  const num = (v: unknown, max: number) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max ? v : null);
+  const units = num(m.units, 5000);
+  const lines = num(m.lines, 1000);
+  if (typeof m.name !== 'string' || units === null || lines === null) return undefined;
+  const orderIds = Array.isArray(m.orderIds) ? m.orderIds.filter((x): x is string => typeof x === 'string' && x.length <= 60).slice(0, 10) : [];
+  return { name: m.name.replace(/\s+/g, ' ').trim().slice(0, 120), units, lines, orderIds };
+}
+
+export function cleanTotals(raw: unknown): { customers: number; units: number } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  const ok = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 20000;
+  return ok(m.customers) && ok(m.units) ? { customers: m.customers as number, units: m.units as number } : null;
+}
+
 const clean = (run: Doc | null): Doc | null => {
   if (!run) return null;
   const { _id, ...rest } = run;
@@ -37,21 +56,26 @@ export async function listRuns(c: Collection<Doc>, date: string): Promise<Doc[]>
   return (await c.find({ date }).toArray()).map((r) => clean(r) as Doc);
 }
 
-export async function startRun(c: Collection<Doc>, p: { date: string; routeKey: string; driverName: string; firstStopKey: string; by: string }, now: Date): Promise<Doc | null> {
+export async function listRunsBetween(c: Collection<Doc>, from: string, to: string): Promise<Doc[]> {
+  return (await c.find({ date: { $gte: from, $lte: to } }).toArray()).map((r) => clean(r) as Doc);
+}
+
+export async function startRun(c: Collection<Doc>, p: { date: string; routeKey: string; driverName: string; firstStopKey: string; by: string; totals?: { customers: number; units: number } | null; firstMeta?: StopMeta }, now: Date): Promise<Doc | null> {
   const existing = await c.findOne({ date: p.date, routeKey: p.routeKey });
   if (existing?.startedAt && !existing.finishedAt) return clean(existing);
   const first = `stops.${p.firstStopKey}`;
+  const metaSet: Record<string, unknown> = { ...(p.firstMeta ? { [`${first}.meta`]: p.firstMeta } : {}), ...(p.totals ? { totals: p.totals } : {}) };
   if (existing) {
     // packing again after a finished run: the ticks stay, the clock restarts at this customer
     await c.updateOne(
       { date: p.date, routeKey: p.routeKey },
-      { $set: { startedAt: existing.startedAt ?? now.toISOString(), finishedAt: null, currentStopKey: p.firstStopKey, [`${first}.activeSince`]: now.toISOString(), updatedAt: now, driverName: p.driverName } }
+      { $set: { startedAt: existing.startedAt ?? now.toISOString(), finishedAt: null, currentStopKey: p.firstStopKey, [`${first}.activeSince`]: now.toISOString(), updatedAt: now, driverName: p.driverName, ...metaSet } }
     );
   } else {
     await c
       .updateOne(
         { date: p.date, routeKey: p.routeKey },
-        { $setOnInsert: { date: p.date, routeKey: p.routeKey, driverName: p.driverName, startedAt: now.toISOString(), startedBy: p.by, finishedAt: null, currentStopKey: p.firstStopKey, stops: { [p.firstStopKey]: { checked: [], timeMs: 0, activeSince: now.toISOString(), firstOpenedAt: now.toISOString() } }, updatedAt: now } },
+        { $setOnInsert: { date: p.date, routeKey: p.routeKey, driverName: p.driverName, startedAt: now.toISOString(), startedBy: p.by, finishedAt: null, currentStopKey: p.firstStopKey, stops: { [p.firstStopKey]: { checked: [], timeMs: 0, activeSince: now.toISOString(), firstOpenedAt: now.toISOString(), ...(p.firstMeta ? { meta: p.firstMeta } : {}) } }, totals: p.totals ?? null, updatedAt: now } },
         { upsert: true }
       )
       .catch(() => undefined); // two taps at once: the other one created it
@@ -70,7 +94,7 @@ export async function setChecked(c: Collection<Doc>, p: { date: string; routeKey
 }
 
 /** Moves to another customer: the time of the one being left is saved, the clock of the new one starts. */
-export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: string; toStopKey: string }, now: Date): Promise<Doc | null | false> {
+export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: string; toStopKey: string; meta?: StopMeta }, now: Date): Promise<Doc | null | false> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
     if (!run?.startedAt) return false;
@@ -78,6 +102,7 @@ export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: 
     const to = `stops.${p.toStopKey}`;
     const set: Record<string, unknown> = { ...closeCurrent(run, now), currentStopKey: p.toStopKey, [`${to}.activeSince`]: now.toISOString(), updatedAt: now };
     if (!run.stops?.[p.toStopKey]?.firstOpenedAt) set[`${to}.firstOpenedAt`] = now.toISOString();
+    if (p.meta) set[`${to}.meta`] = p.meta;
     const result = await c.updateOne({ date: p.date, routeKey: p.routeKey, currentStopKey: run.currentStopKey ?? null, finishedAt: null }, { $set: set });
     if (result.matchedCount > 0) break; // otherwise someone else moved first: read again
   }

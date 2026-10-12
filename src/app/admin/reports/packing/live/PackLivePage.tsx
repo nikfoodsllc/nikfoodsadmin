@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, LinearProgress, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPlay, IconCheck } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPlay, IconCheck, IconTruckDelivery } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { addDays, formatDayShort, isDayString, shortSpiceLabel } from '@/utils/kitchenDashboard';
+import { addDays, formatDayShort, isDayString, shortSpiceLabel, weekdayName } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
 import type { PackingReport, PackStop } from '@/utils/packingReport';
 import {
@@ -19,6 +19,7 @@ import {
   runStatus,
   startIndex,
   stopCounts,
+  stopMetaOf,
   stopElapsedMs,
   stopKeyOf,
   summarizeRoute,
@@ -182,7 +183,8 @@ export default function PackLivePage() {
   const start = async () => {
     if (!route || stops.length === 0) return;
     setBusy(true);
-    await send({ action: 'start', routeKey: route.key, driverName: routeLabel(route), firstStopKey: stopKeyOf(stops[index] ?? stops[0]) });
+    const first = stops[index] ?? stops[0];
+    await send({ action: 'start', routeKey: route.key, driverName: routeLabel(route), firstStopKey: stopKeyOf(first), firstMeta: stopMetaOf(first), totals: { customers: stops.length, units: summary?.units ?? 0 } });
     setBusy(false);
   };
 
@@ -191,7 +193,7 @@ export default function PackLivePage() {
     setConfirm(null);
     // show it at once, the answer confirms it
     setRuns((prev) => prev.map((r) => (r.routeKey === route.key ? { ...r, currentStopKey: stopKeyOf(stops[target]) } : r)));
-    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]) });
+    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]), meta: stopMetaOf(stops[target]) });
   };
 
   const finish = async () => {
@@ -367,6 +369,11 @@ export default function PackLivePage() {
                     <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{stop.customerName}</Typography>
                     <Typography sx={{ fontSize: 14, color: '#374151', wordBreak: 'break-word', pt: 0.4 }}>Order # {stop.orderIds.join(', ')}</Typography>
                   </Box>
+                  {date && (
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                      <IconTruckDelivery size={16} /> Delivery {formatDayShort(date)}
+                    </Typography>
+                  )}
                   <Typography sx={{ fontSize: 13, color: counts.complete ? '#126B2C' : '#6B7280', fontWeight: 600 }}>
                     {counts.done} of {counts.total} item{counts.total === 1 ? '' : 's'} checked
                   </Typography>
@@ -376,15 +383,25 @@ export default function PackLivePage() {
                   const keys = group.lines.map((l) => l.key);
                   const all = keys.every((k) => checkedSet.has(k));
                   const some = keys.some((k) => checkedSet.has(k));
+                  // a day other than the delivery date: the food was picked for that day and goes out on the delivery date
+                  const otherDay = Boolean(group.day && date && group.day !== date);
                   return (
                     <Box key={group.day}>
-                      <Box sx={{ ...ROW_GRID, px: 1, py: 0.5, bgcolor: '#FFF7ED', borderBottom: '1px solid #FED7AA' }}>
+                      <Box sx={{ ...ROW_GRID, px: 1, py: otherDay ? 0.75 : 0.5, bgcolor: otherDay ? '#FEF3C7' : '#FFF7ED', borderBottom: `1px solid ${otherDay ? '#FCD34D' : '#FED7AA'}` }}>
                         <Box sx={{ gridArea: 'check' }}>
                           <Checkbox disabled={status !== 'packing'} checked={all} indeterminate={some && !all} onChange={() => tick(keys, !all)} inputProps={{ 'aria-label': `Check all for ${group.day ? formatDayShort(group.day) : 'this day'}` }} sx={{ p: 1.25, color: ORANGE, '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: ORANGE } }} />
                         </Box>
-                        <Typography sx={{ gridArea: { xs: 'item', sm: 'portion / portion / portion / eco' }, fontWeight: 800, fontSize: 15, color: '#9A3412' }}>
-                          {group.day ? formatDayShort(group.day) : 'Items'} <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: '#9A3412' }}>· check all</Typography>
-                        </Typography>
+                        <Box sx={{ gridArea: { xs: 'qty / qty / qty / item', sm: 'portion / portion / portion / spice' }, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 800, fontSize: 15, color: otherDay ? '#92400E' : '#9A3412' }}>
+                            {group.day ? (otherDay ? `${weekdayName(group.day)} items · ${formatDayShort(group.day)}` : formatDayShort(group.day)) : 'Items'}{' '}
+                            <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412' }}>· check all</Typography>
+                          </Typography>
+                          {otherDay && date && (
+                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <IconTruckDelivery size={15} /> Delivered {formatDayShort(date)}
+                            </Typography>
+                          )}
+                        </Box>
                       </Box>
                       <Box sx={{ ...ROW_GRID, display: { xs: 'none', sm: 'grid' }, px: 1, py: 0.5, borderBottom: '1px solid #F3F4F6' }}>
                         {[
@@ -420,7 +437,6 @@ export default function PackLivePage() {
                                   {c}
                                 </Typography>
                               ))}
-                              {line.pickedFor && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Picked for {formatDayShort(line.pickedFor)}</Typography>}
                               <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                 {line.portion && <Chip size="small" label={line.portion} sx={{ height: 22, fontSize: 12 }} />}
                                 {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
