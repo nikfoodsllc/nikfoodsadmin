@@ -33,11 +33,11 @@ const ORANGE = '#F89C35';
 const POLL_MS = 4000;
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
-/** Phone: checkbox | item + chips | quantity. Wider screens follow the sheet: Check | Portion | Qty | Item | ECO | Spice. */
+/** Phone: checkbox | quantity | item + chips. Wider screens follow the sheet: Check | Portion | Qty | Item | ECO | Spice. */
 const ROW_GRID = {
   display: 'grid',
-  gridTemplateColumns: { xs: '52px 1fr 44px', sm: '56px 90px 56px 1fr 80px 150px' },
-  gridTemplateAreas: { xs: '"check item qty"', sm: '"check portion qty item eco spice"' },
+  gridTemplateColumns: { xs: '52px 34px 1fr', sm: '56px 90px 56px 1fr 80px 150px' },
+  gridTemplateAreas: { xs: '"check qty item"', sm: '"check portion qty item eco spice"' },
   alignItems: 'center',
   columnGap: 1,
 };
