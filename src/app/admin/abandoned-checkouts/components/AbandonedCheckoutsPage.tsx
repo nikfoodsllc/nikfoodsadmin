@@ -101,12 +101,14 @@ function ReminderLine({ reminder }: { reminder: ReminderView }) {
   );
 }
 
-function PersonCard({ row, onContacted, onUndo, onHide }: { row: AbandonedRow; onContacted: (row: AbandonedRow) => void; onUndo: (row: AbandonedRow) => void; onHide: (row: AbandonedRow) => void }) {
+function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: AbandonedRow; onContacted: (row: AbandonedRow) => void; onUndo: (row: AbandonedRow) => void; onHide: (row: AbandonedRow) => void; onRemind: (row: AbandonedRow) => void }) {
   const [open, setOpen] = useState(false);
   const mail = reachOutEmail(row);
   const mailto = row.email ? `mailto:${row.email}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}` : '';
   const phoneDigits = (row.phone ?? '').replace(/[^\d+]/g, '');
   const canExpand = row.items.length > 3;
+  // the reminder email can be sent from here when the checkout has its saved items and no reminder went out yet (or the first one failed)
+  const canSendReminder = Boolean(row.email) && !row.noItemDetails && (!row.reminder || row.reminder.state === 'failed');
 
   return (
     <Paper elevation={0} sx={{ p: { xs: 1.5, sm: 2 }, border: '1px solid #E5E7EB', borderRadius: 2, minWidth: 0, overflow: 'hidden' }}>
@@ -149,8 +151,14 @@ function PersonCard({ row, onContacted, onUndo, onHide }: { row: AbandonedRow; o
           </Button>
         )}
         {row.email && (
-          <Button variant="outlined" color="inherit" href={mailto} startIcon={<IconMail size={18} />} sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 140px', sm: '0 0 auto' }, maxWidth: '100%', '& .MuiButton-startIcon': { flexShrink: 0 } }}>
-            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Email {row.email}</Box>
+          <Button
+            variant="outlined"
+            color="inherit"
+            {...(canSendReminder ? { onClick: () => onRemind(row) } : { href: mailto })}
+            startIcon={<IconMail size={18} />}
+            sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 140px', sm: '0 0 auto' }, maxWidth: '100%', '& .MuiButton-startIcon': { flexShrink: 0 } }}
+          >
+            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canSendReminder ? `Send reminder to ${row.email}` : `Email ${row.email}`}</Box>
           </Button>
         )}
         {!row.phone && !row.email && <Typography sx={{ fontSize: 13, color: '#B45309' }}>No phone or email saved for this person.</Typography>}
@@ -201,6 +209,7 @@ export default function AbandonedCheckoutsPage() {
   const [contactRow, setContactRow] = useState<AbandonedRow | null>(null);
   const [note, setNote] = useState('');
   const [hideRow, setHideRow] = useState<AbandonedRow | null>(null);
+  const [remindRow, setRemindRow] = useState<AbandonedRow | null>(null);
   const [snack, setSnack] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -255,6 +264,26 @@ export default function AbandonedCheckoutsPage() {
       await load(true);
     } catch (e) {
       setSnack(e instanceof Error ? e.message : 'Could not save that');
+    }
+    setSaving(false);
+  };
+
+  // sends the cart reminder email from the site's own sender (the same email the automatic reminder uses)
+  const sendReminder = async (row: AbandonedRow) => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/abandoned-checkouts/remind', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentIntentId: row.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.success) throw new Error(body.error || 'Could not send the reminder');
+      setSnack('Reminder sent');
+      await load(true);
+    } catch (e) {
+      setSnack(e instanceof Error ? e.message : 'Could not send the reminder');
     }
     setSaving(false);
   };
@@ -342,6 +371,7 @@ export default function AbandonedCheckoutsPage() {
                 }}
                 onUndo={(r) => void act(r, 'undo_contacted', undefined, 'Moved back to To contact')}
                 onHide={setHideRow}
+                onRemind={setRemindRow}
               />
             ))}
           </Box>
@@ -371,6 +401,30 @@ export default function AbandonedCheckoutsPage() {
             sx={{ textTransform: 'none', fontWeight: 700 }}
           >
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(remindRow)} onClose={() => setRemindRow(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Send the reminder to {remindRow?.name.split(' ')[0] ?? 'them'}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ overflowWrap: 'anywhere' }}>
+            The cart reminder email goes to {remindRow?.email} now, from the NikFoods sender. Its button brings them back to checkout with their items. Each checkout gets one reminder.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemindRow(null)} sx={{ textTransform: 'none' }}>Back</Button>
+          <Button
+            variant="contained"
+            disabled={saving}
+            onClick={async () => {
+              const row = remindRow;
+              setRemindRow(null);
+              if (row) await sendReminder(row);
+            }}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            Send reminder
           </Button>
         </DialogActions>
       </Dialog>
