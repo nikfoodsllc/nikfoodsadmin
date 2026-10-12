@@ -36,6 +36,20 @@ export interface DraftDoc {
   lastActivityAt: Date | string;
   contacted?: { at: Date | string; by?: string; note?: string };
   dismissedAt?: Date | string;
+  /** The automatic reminder email of this checkout (written by the customer site; the secret in its link is never read) */
+  reminderEmail?: {
+    status?: string;
+    sentAt?: Date | string;
+    deliveredAt?: Date | string;
+    bouncedAt?: Date | string;
+    bounceReason?: string;
+    firstOpenedAt?: Date | string;
+    openCount?: number;
+    firstClickedAt?: Date | string;
+    clickCount?: number;
+    error?: string;
+    attempts?: number;
+  };
 }
 
 export interface PaidOrderRef {
@@ -48,6 +62,40 @@ export interface OrderInfo {
   status?: string;
   paymentStatus?: string;
   paymentError?: { code?: string; declineCode?: string; message?: string };
+}
+
+/** What happened to the automatic reminder email, in the order it happens: sent, delivered, opened, button clicked. */
+export interface ReminderView {
+  state: 'sending' | 'sent' | 'delivered' | 'bounced' | 'spam' | 'failed';
+  sentAt?: string;
+  deliveredAt?: string;
+  openedAt?: string;
+  openCount?: number;
+  clickedAt?: string;
+  clickCount?: number;
+  /** why it bounced or failed, in the provider's words */
+  problem?: string;
+}
+
+/** The reminder of a checkout as the list shows it, or undefined when none was sent or tried. */
+export function reminderView(r: DraftDoc['reminderEmail']): ReminderView | undefined {
+  if (!r || !r.status) return undefined;
+  const state: ReminderView['state'] =
+    r.status === 'claimed' ? 'sending'
+    : r.status === 'failed' ? 'failed'
+    : r.status === 'bounced' ? 'bounced'
+    : r.status === 'complained' ? 'spam'
+    : r.status === 'delivered' || r.deliveredAt ? 'delivered'
+    : 'sent';
+  const problem = r.status === 'failed' ? r.error : r.status === 'bounced' ? r.bounceReason : undefined;
+  return {
+    state,
+    ...(r.sentAt ? { sentAt: iso(r.sentAt) } : {}),
+    ...(r.deliveredAt ? { deliveredAt: iso(r.deliveredAt) } : {}),
+    ...(r.firstOpenedAt ? { openedAt: iso(r.firstOpenedAt), openCount: r.openCount ?? 1 } : {}),
+    ...(r.firstClickedAt ? { clickedAt: iso(r.firstClickedAt), clickCount: r.clickCount ?? 1 } : {}),
+    ...(problem ? { problem: String(problem).slice(0, 160) } : {}),
+  };
 }
 
 export interface AbandonedRow {
@@ -74,6 +122,8 @@ export interface AbandonedRow {
   contacted?: { at: string; by?: string; note?: string };
   /** Contacted before, but they started a newer checkout since */
   previouslyContactedAt?: string;
+  /** The automatic reminder email sent for this checkout */
+  reminder?: ReminderView;
 }
 
 export type View = 'to_contact' | 'contacted';
@@ -164,6 +214,7 @@ export function buildAbandonedRows(
       triedToPay: Boolean(latest.orderId),
       ...(problemText(info) && latest.orderId ? { problem: problemText(info) } : {}),
       noItemDetails: (latest.items ?? []).length === 0,
+      ...(reminderView(latest.reminderEmail) ? { reminder: reminderView(latest.reminderEmail) } : {}),
       ...(stillContacted && contactedDraft?.contacted
         ? { contacted: { at: iso(contactedDraft.contacted.at), ...(contactedDraft.contacted.by ? { by: contactedDraft.contacted.by } : {}), ...(contactedDraft.contacted.note ? { note: contactedDraft.contacted.note } : {}) } }
         : {}),

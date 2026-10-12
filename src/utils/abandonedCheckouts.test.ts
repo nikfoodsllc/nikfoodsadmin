@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAbandonedRows, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
+import { buildAbandonedRows, reminderView, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
 
 const NOW = new Date('2026-10-07T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60 * 1000);
@@ -186,5 +186,32 @@ describe('date range of the list', () => {
   it('the oldest allowed start is 59 days back (60 days including today)', () => {
     expect('error' in resolveRange({ from: '2026-08-09', to: '2026-08-10' }, now)).toBe(false);
     expect('error' in resolveRange({ from: '2026-08-08', to: '2026-08-10' }, now)).toBe(true);
+  });
+});
+
+describe('reminder email status', () => {
+  const at = new Date('2026-10-07T11:00:00Z');
+  it('shows nothing when no reminder was sent', () => {
+    expect(reminderView(undefined)).toBeUndefined();
+    expect(reminderView({})).toBeUndefined();
+  });
+  it('goes sent -> delivered -> opened -> button clicked', () => {
+    expect(reminderView({ status: 'sent', sentAt: at })).toMatchObject({ state: 'sent' });
+    expect(reminderView({ status: 'delivered', sentAt: at, deliveredAt: at })).toMatchObject({ state: 'delivered' });
+    expect(reminderView({ status: 'delivered', sentAt: at, firstOpenedAt: at, openCount: 3 })).toMatchObject({ state: 'delivered', openCount: 3 });
+    const v = reminderView({ status: 'delivered', sentAt: at, firstClickedAt: at, clickCount: 2 })!;
+    expect(v.clickedAt).toBe(at.toISOString());
+    expect(v.clickCount).toBe(2);
+  });
+  it('shows problems with their reason', () => {
+    expect(reminderView({ status: 'bounced', bounceReason: 'mailbox full' })).toMatchObject({ state: 'bounced', problem: 'mailbox full' });
+    expect(reminderView({ status: 'complained' })).toMatchObject({ state: 'spam' });
+    expect(reminderView({ status: 'failed', error: 'Email service not configured' })).toMatchObject({ state: 'failed', problem: 'Email service not configured' });
+    expect(reminderView({ status: 'claimed' })).toMatchObject({ state: 'sending' });
+  });
+  it('is carried on the person row of the latest checkout', () => {
+    const d = draft({ paymentIntentId: 'pi_r', userId: 'u9', reminderEmail: { status: 'sent', sentAt: at } });
+    expect(build([d]).to_contact[0].reminder).toMatchObject({ state: 'sent' });
+    expect(build([draft({ paymentIntentId: 'pi_n', userId: 'u8' })]).to_contact[0].reminder).toBeUndefined();
   });
 });
