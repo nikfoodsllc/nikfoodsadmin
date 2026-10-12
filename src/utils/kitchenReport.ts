@@ -21,6 +21,7 @@ import {
   sizeRank,
   spiceRank,
   type KitchenRow,
+  spicedPartNames,
 } from './kitchenDashboard';
 import type { PreparationType } from './preparationType';
 
@@ -108,25 +109,8 @@ export function isEcoEligiblePart(name: string): boolean {
   return !/chapati|chapathi|roti|naan|paratha|phulka/i.test(name);
 }
 
-/**
- * The names of the picked options that take the combo's spice level: everything the customer chose except the staples
- * (the section called "... Staple(s)": chapati, rice). So the curry AND the vegetable of the day get the spice, or the
- * non-veg dish; the bread and the rice do not.
- */
-export function spicedPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Set<string> {
-  const names = new Set<string>();
-  const sections = row.sections ?? [];
-  if (!sections.length || !row.comboSelections) return names;
-  for (const section of sections) {
-    if (/staple|bread/i.test(clean(section.title))) continue;
-    const picked = (section._id && row.comboSelections[section._id]) || [];
-    for (const id of picked) {
-      const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);
-      if (name) names.add(name);
-    }
-  }
-  return names;
-}
+// (spicedPartNames lives in kitchenDashboard.ts, where the Kitchen Dashboard uses it too)
+export { spicedPartNames };
 
 /** Every thing to make or pack: the items ordered on their own and the parts chosen inside combos. */
 function atomsOf(rows: KitchenRow[]): Atom[] {
