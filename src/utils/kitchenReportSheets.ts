@@ -35,7 +35,7 @@ export interface SheetRow {
   box?: { top: boolean; bottom: boolean };
 }
 
-export type SheetKey = 'prep' | 'ready' | 'stickers' | 'totals';
+export type SheetKey = 'prep' | 'ready' | 'stickers' | 'totals' | 'packing' | 'packTotals';
 
 export interface SheetModel {
   /** Which sheet this is (the admin's chosen columns are saved per key) */

@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import {
   IconToolsKitchen2,
+  IconPackage,
   IconCategory,
   IconCalendarEvent,
   IconMapPin,
@@ -64,6 +65,7 @@ const navItems: NavItem[] = [
       { title: 'Kitchen Dashboard (BETA)', href: '/admin/kitchen-dashboard', icon: IconChefHat },
       { title: 'Ordered Items', href: '/admin/reports/ordered-items', icon: IconShoppingCart },
       { title: 'Kitchen Report (BETA)', href: '/admin/reports/kitchen', icon: IconToolsKitchen2 },
+      { title: 'Packing Report (BETA)', href: '/admin/reports/packing', icon: IconPackage },
       { title: 'Delivery Report', href: '/admin/reports/delivery', icon: IconMapPin },
       { title: 'Abandoned Checkout (BETA)', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
     ],
