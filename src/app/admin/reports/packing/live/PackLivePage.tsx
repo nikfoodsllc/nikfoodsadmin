@@ -394,7 +394,7 @@ export default function PackLivePage() {
                         <Box sx={{ gridArea: { xs: 'qty / qty / qty / item', sm: 'portion / portion / portion / spice' }, minWidth: 0 }}>
                           <Typography sx={{ fontWeight: 800, fontSize: 15, color: otherDay ? '#92400E' : '#9A3412' }}>
                             {group.day ? (otherDay ? `${weekdayName(group.day)} items · ${formatDayShort(group.day)}` : formatDayShort(group.day)) : 'Items'}{' '}
-                            <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412' }}>· check all</Typography>
+                            <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412', whiteSpace: 'nowrap' }}>· check all</Typography>
                           </Typography>
                           {otherDay && date && (
                             <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.5 }}>
