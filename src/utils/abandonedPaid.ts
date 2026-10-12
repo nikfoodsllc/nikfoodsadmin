@@ -38,10 +38,16 @@ export interface PaidRow {
 const ms = (d: Date | string | undefined) => (d ? new Date(d).getTime() : 0);
 const iso = (d: Date | string) => new Date(d).toISOString();
 
-export function buildPaidRows(drafts: DraftDoc[], orders: PaidOrderRef[]): PaidRow[] {
+/**
+ * `earlier` are older checkouts of the same people (from before the chosen days): they are only used to say what brought someone
+ * back (a reminder or a call that was recorded on an earlier checkout), so the reason does not change with the days you pick.
+ */
+export function buildPaidRows(drafts: DraftDoc[], orders: PaidOrderRef[], earlier: DraftDoc[] = []): PaidRow[] {
   const quiet = QUIET_MINUTES * 60 * 1000;
   const byUser = new Map<string, DraftDoc[]>();
   for (const d of drafts) byUser.set(d.userId, [...(byUser.get(d.userId) ?? []), d]);
+  const earlierByUser = new Map<string, DraftDoc[]>();
+  for (const d of earlier) earlierByUser.set(d.userId, [...(earlierByUser.get(d.userId) ?? []), d]);
   const ordersByUser = new Map<string, PaidOrderRef[]>();
   for (const o of orders) ordersByUser.set(o.user, [...(ordersByUser.get(o.user) ?? []), o]);
 
@@ -66,7 +72,8 @@ export function buildPaidRows(drafts: DraftDoc[], orders: PaidOrderRef[]): PaidR
     const c = left.customer ?? list.find((d) => d.customer)?.customer ?? {};
 
     let reminder: PaidRow['reminder'];
-    for (const d of list) {
+    const attribution = [...list, ...(earlierByUser.get(userId) ?? [])];
+    for (const d of attribution) {
       const r = d.reminderEmail;
       if (!r?.sentAt || r.status === 'claimed' || r.status === 'failed' || ms(r.sentAt) >= paid) continue;
       const cur = {
@@ -77,7 +84,7 @@ export function buildPaidRows(drafts: DraftDoc[], orders: PaidOrderRef[]): PaidR
       if (!reminder) reminder = { sentAt: iso(new Date(cur.sentAt)), opened: cur.opened, clicked: cur.clicked };
       else reminder = { sentAt: reminder.sentAt, opened: reminder.opened || cur.opened, clicked: reminder.clicked || cur.clicked };
     }
-    const contactedDraft = list.find((d) => d.contacted && ms(d.contacted.at) < paid);
+    const contactedDraft = attribution.find((d) => d.contacted && ms(d.contacted.at) < paid);
     const contacted = contactedDraft?.contacted
       ? { at: iso(contactedDraft.contacted.at), ...(contactedDraft.contacted.by ? { by: contactedDraft.contacted.by } : {}), ...(contactedDraft.contacted.note ? { note: contactedDraft.contacted.note } : {}) }
       : undefined;

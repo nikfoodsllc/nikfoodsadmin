@@ -53,4 +53,13 @@ describe('paid tab (people who left and then paid)', () => {
     expect(rows.map((r) => r.orderId)).toEqual(['ORD-h', 'ORD-g1']);
     expect(rows[1].amount).toBe(10);
   });
+
+  it('uses an earlier checkout (before the chosen days) only to explain what brought them back', () => {
+    const left = draft({ userId: 'z', createdAt: at(200), lastActivityAt: at(200) });
+    const earlier = draft({ userId: 'z', createdAt: at(-5000), lastActivityAt: at(-5000), reminderEmail: { status: 'delivered', sentAt: at(150), firstClickedAt: at(250) } });
+    expect(buildPaidRows([left], [order('z', 400)])[0].reason).toBe('own');
+    expect(buildPaidRows([left], [order('z', 400)], [earlier])[0].reason).toBe('reminder_click');
+    // an earlier checkout alone never makes someone appear in the list
+    expect(buildPaidRows([], [order('z', 400)], [earlier])).toHaveLength(0);
+  });
 });

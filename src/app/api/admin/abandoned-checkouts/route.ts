@@ -70,7 +70,13 @@ export async function GET(request: NextRequest) {
       metricOrders = after.data ?? [];
     }
     // people who left, came back and paid (the Paid tab)
-    const paidRows = buildPaidRows(metricDrafts, metricOrders.filter((o): o is PaidOrderWithId => Boolean(o.orderId)));
+    const paidWithId = metricOrders.filter((o): o is PaidOrderWithId => Boolean(o.orderId));
+    let paidRows = buildPaidRows(metricDrafts, paidWithId);
+    if (paidRows.length > 0) {
+      // older checkouts of those people can carry the reminder or the call that brought them back (so the reason does not depend on the days chosen)
+      const earlier = await db.read<DraftDoc>('checkoutDrafts', { userId: { $in: paidRows.map((r) => r.userId) }, createdAt: { $lt: since } } as never, { limit: 500, projection: { userId: 1, createdAt: 1, reminderEmail: 1, contacted: 1 } });
+      if (earlier.success && earlier.data && earlier.data.length > 0) paidRows = buildPaidRows(metricDrafts, paidWithId, earlier.data);
+    }
     return NextResponse.json({
       success: true,
       data: { from: range.from, to: range.to, paid: paidRows, metrics: computeMetrics(metricDrafts, metricOrders), rows: { to_contact: built.to_contact, contacted: built.contacted }, ...summarize(built), orderedSince: built.orderedSince },
