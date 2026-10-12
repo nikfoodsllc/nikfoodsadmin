@@ -60,11 +60,11 @@ export async function GET(request: NextRequest) {
     });
     if (!everyone.success) throw new Error(everyone.error || 'Could not read the checkouts');
     const metricDrafts = everyone.data ?? [];
-    const sentTimes = metricDrafts.map((d) => (d.reminderEmail?.sentAt ? new Date(d.reminderEmail.sentAt).getTime() : 0)).filter(Boolean);
-    const remindedUsers = [...new Set(metricDrafts.filter((d) => d.reminderEmail?.sentAt).map((d) => d.userId).filter(Boolean))];
+    // paid orders of everyone who opened checkout (a newer paid order means they did order), from a day before the range starts
+    const metricUsers = [...new Set(metricDrafts.map((d) => d.userId).filter(Boolean))];
     let metricOrders: PaidOrderForMetrics[] = [];
-    if (remindedUsers.length > 0) {
-      const after = await db.read<PaidOrderForMetrics>('orders', { user: { $in: remindedUsers }, paymentStatus: 'paid', createdAt: { $gte: new Date(Math.min(...sentTimes)) } } as never, { projection: { user: 1, createdAt: 1, totalPaid: 1 } });
+    if (metricUsers.length > 0) {
+      const after = await db.read<PaidOrderForMetrics>('orders', { user: { $in: metricUsers }, paymentStatus: 'paid', createdAt: { $gte: new Date(since.getTime() - 24 * 3600 * 1000) } } as never, { projection: { user: 1, createdAt: 1, totalPaid: 1 } });
       if (!after.success) throw new Error(after.error || 'Could not read the orders');
       metricOrders = after.data ?? [];
     }
