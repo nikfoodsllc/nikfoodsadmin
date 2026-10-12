@@ -155,6 +155,7 @@ export async function GET(request: NextRequest) {
                             description: '$$selectedItem.item.description',
                           },
                           portion: '$$selectedItem.portion',
+                          quantity: '$$selectedItem.quantity',
                           isDefault: '$$selectedItem.isDefault',
                         },
                       },
