@@ -148,7 +148,7 @@ function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: Aband
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.25 }}>
         {row.phone && (
-          <Button variant="outlined" color="inherit" href={`tel:${phoneDigits}`} startIcon={<IconPhone size={18} />} sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 140px', sm: '0 0 auto' } }}>
+          <Button variant="outlined" color="inherit" href={`tel:${phoneDigits}`} startIcon={<IconPhone size={18} />} sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
             Call {row.phone}
           </Button>
         )}
@@ -159,7 +159,7 @@ function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: Aband
             disabled={row.reminder?.state === 'sending'}
             {...(canSendReminder ? { onClick: () => onRemind(row) } : { href: mailto })}
             startIcon={<IconMail size={18} />}
-            sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 140px', sm: '0 0 auto' }, maxWidth: '100%', '& .MuiButton-startIcon': { flexShrink: 0 } }}
+            sx={{ textTransform: 'none', fontWeight: 700, minHeight: 42, flex: { xs: '1 1 100%', sm: '0 0 auto' }, maxWidth: '100%', '& .MuiButton-startIcon': { flexShrink: 0 } }}
           >
             <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{canSendReminder ? (reminderSentBefore ? 'Send reminder again' : 'Send reminder email') : `Email ${row.email}`}</Box>
           </Button>
