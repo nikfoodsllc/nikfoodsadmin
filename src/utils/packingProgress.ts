@@ -75,7 +75,8 @@ export function packableRoutes(routes: PackRoute[], unrouted: PackStop[]): Packa
 }
 
 export function stopMetaOf(stop: PackStop): StopMeta {
-  return { name: clean(stop.customerName), units: stop.lines.reduce((n, l) => n + l.quantity, 0), lines: stop.lines.length, orderIds: stop.orderIds.slice(0, 10) };
+  const items = lineKeys(stop);
+  return { name: clean(stop.customerName), units: items.reduce((n, i) => n + i.line.quantity, 0), lines: items.length, orderIds: stop.orderIds.slice(0, 10) };
 }
 
 /** The name shown on the driver button: the driver, else "Route 1". */
@@ -86,17 +87,43 @@ export function routeLabel(route: { title: string; driverName: string }): string
 export interface KeyedLine {
   key: string;
   line: PackLine;
+  /** Set on an option of a combo: the key the whole combo line used to have (it was ticked as one line before combos were split) */
+  parentKey?: string;
+  /** The combo this item comes from */
+  viaCombo?: string;
 }
 
-/** One key per line of a customer: the same line always gets the same key (two identical lines are told apart by a counter). */
+/**
+ * One key per item to pack. A combo is split into its picked options (each its own item with its own tick); everything else is
+ * one item per line. The same item always gets the same key (two identical lines are told apart by a counter).
+ */
 export function lineKeys(stop: PackStop): KeyedLine[] {
   const seen = new Map<string, number>();
-  return stop.lines.map((line) => {
+  const items: KeyedLine[] = [];
+  for (const line of stop.lines) {
     const base = [line.orderId, line.day, line.name, line.portion ?? '', line.spice ?? '', line.isEco ? 'eco' : '', line.choices.join('+')].join('|');
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
-    return { key: n === 1 ? base : `${base}#${n}`, line };
-  });
+    const key = n === 1 ? base : `${base}#${n}`;
+    if (line.parts && line.parts.length > 0) {
+      line.parts.forEach((part, i) => {
+        items.push({
+          key: `${key}>${i}:${part.name}`,
+          parentKey: key,
+          viaCombo: line.name,
+          line: { orderId: line.orderId, name: part.name, quantity: line.quantity, portion: part.portion, spice: part.spice, isEco: part.isEco, choices: [], pickedFor: line.pickedFor, day: line.day },
+        });
+      });
+    } else {
+      items.push({ key, line });
+    }
+  }
+  return items;
+}
+
+/** Is this item ticked? A part also counts as ticked when the whole combo line was ticked before the combos were split. */
+export function isTicked(item: KeyedLine, checked: ReadonlySet<string>): boolean {
+  return checked.has(item.key) || (item.parentKey !== undefined && checked.has(item.parentKey));
 }
 
 export interface DayGroup {
@@ -122,10 +149,10 @@ export interface StopCounts {
 
 /** How many of a customer's lines are ticked. Ticks of lines that no longer exist (the order changed) are ignored. */
 export function stopCounts(stop: PackStop, progress: StopProgress | undefined): StopCounts {
-  const keys = lineKeys(stop).map((k) => k.key);
+  const items = lineKeys(stop);
   const checked = new Set(progress?.checked ?? []);
-  const done = keys.filter((k) => checked.has(k)).length;
-  return { total: keys.length, done, complete: keys.length > 0 && done === keys.length };
+  const done = items.filter((i) => isTicked(i, checked)).length;
+  return { total: items.length, done, complete: items.length > 0 && done === items.length };
 }
 
 /** Time spent on a customer so far in milliseconds: what was saved plus the running part when the packer is on it now. */
@@ -186,7 +213,7 @@ export function summarizeRoute(route: PackableRoute, run: PackingRun | undefined
     const key = stopKeyOf(stop);
     const progress = run?.stops?.[key];
     const counts = stopCounts(stop, progress);
-    units += stop.lines.reduce((n, l) => n + l.quantity, 0);
+    units += lineKeys(stop).reduce((n, i) => n + i.line.quantity, 0);
     if (counts.complete) complete += 1;
     if (counts.done > 0) packed += 1;
     const ms = stopElapsedMs(progress, nowMs);

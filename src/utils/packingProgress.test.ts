@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PackLine, PackRoute, PackStop } from './packingReport';
-import { formatDuration, groupByDay, lineKeys, packableRoutes, routeLabel, runElapsedMs, runStatus, startIndex, stopCounts, stopElapsedMs, stopKeyOf, summarizeRoute } from './packingProgress';
+import { formatDuration, groupByDay, isTicked, stopMetaOf, lineKeys, packableRoutes, routeLabel, runElapsedMs, runStatus, startIndex, stopCounts, stopElapsedMs, stopKeyOf, summarizeRoute } from './packingProgress';
 
 const line = (over: Partial<PackLine> = {}): PackLine => ({ orderId: 'ORD-1', name: 'Dal', quantity: 1, portion: '12Oz', spice: 'Medium', isEco: false, choices: [], pickedFor: null, day: '2026-10-13', ...over });
 const stop = (number: number, over: Partial<PackStop> = {}): PackStop => ({ number, customerName: `C${number}`, address: '', scheduledAt: '', orderIds: [`ORD-${number}`], lines: [line({ orderId: `ORD-${number}` })], empty: false, ...over });
@@ -97,5 +97,37 @@ describe('summarizeRoute and startIndex', () => {
     expect(startIndex(route, { date: 'd', routeKey: '1', currentStopKey: k2 })).toBe(1);
     expect(startIndex(route, { date: 'd', routeKey: '1', stops: { [k1]: { checked: lineKeys(s1).map((k) => k.key) } } })).toBe(1);
     expect(startIndex(route, null)).toBe(0);
+  });
+});
+
+describe('combos are split into their own items', () => {
+  const combo = line({ name: 'Veg Combo', quantity: 2, portion: null, spice: 'Medium', isEco: true, choices: ['Curry: Kale Chane (12Oz)'], parts: [
+    { name: 'Kale Chane', portion: '12Oz', spice: 'Medium', isEco: true },
+    { name: 'Chapati', portion: null, spice: null, isEco: false },
+  ] });
+  const s = stop(1, { lines: [line({ name: 'Rajma' }), combo] });
+  it('each option is an item with the combo quantity, keyed under the combo', () => {
+    const items = lineKeys(s);
+    expect(items.map((i) => i.line.name)).toEqual(['Rajma', 'Kale Chane', 'Chapati']);
+    expect(items[1]).toMatchObject({ viaCombo: 'Veg Combo', line: { quantity: 2, portion: '12Oz', spice: 'Medium', isEco: true } });
+    expect(items[2].line).toMatchObject({ quantity: 2, spice: null, isEco: false });
+    expect(items[1].parentKey).toBeDefined();
+    expect(items[1].key.startsWith(items[1].parentKey!)).toBe(true);
+    expect(new Set(items.map((i) => i.key)).size).toBe(3);
+  });
+  it('counts, units and snapshot use the split items', () => {
+    expect(stopCounts(s, undefined)).toEqual({ total: 3, done: 0, complete: false });
+    expect(stopMetaOf(s)).toMatchObject({ lines: 3, units: 1 + 2 + 2 });
+  });
+  it('a combo ticked as one line before the split counts its options as ticked', () => {
+    const items = lineKeys(s);
+    const oldKey = items[1].parentKey!;
+    expect(stopCounts(s, { checked: [oldKey] }).done).toBe(2);
+    expect(isTicked(items[2], new Set([oldKey]))).toBe(true);
+    expect(isTicked(items[0], new Set([oldKey]))).toBe(false);
+  });
+  it('a combo with no parts saved stays one item', () => {
+    const plain = stop(1, { lines: [line({ name: 'Veg Combo', choices: ['x'] })] });
+    expect(lineKeys(plain).length).toBe(1);
   });
 });

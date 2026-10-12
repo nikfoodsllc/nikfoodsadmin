@@ -13,6 +13,8 @@ import type { PackingReport, PackStop } from '@/utils/packingReport';
 import {
   formatDuration,
   groupByDay,
+  isTicked,
+  lineKeys,
   packableRoutes,
   routeLabel,
   runElapsedMs,
@@ -37,7 +39,8 @@ const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 /** Phone: checkbox | quantity | item + chips. Wider screens follow the sheet: Check | Portion | Qty | Item | ECO | Spice. */
 const ROW_GRID = {
   display: 'grid',
-  gridTemplateColumns: { xs: '52px 34px 1fr', sm: '56px 90px 56px 1fr 80px 150px' },
+  gridTemplateColumns: { xs: '48px 34px 1fr', sm: '48px 76px 44px minmax(0, 440px) 60px 140px' },
+  justifyContent: 'start',
   gridTemplateAreas: { xs: '"check qty item"', sm: '"check portion qty item eco spice"' },
   alignItems: 'center',
   columnGap: 1,
@@ -231,15 +234,34 @@ export default function PackLivePage() {
 
   const tick = (keys: string[], checked: boolean) => {
     if (!route || !stop || status !== 'packing') return;
+    // items to tick and items to untick. A combo ticked as ONE line before combos were split counts all its options as ticked:
+    // unticking one of them turns the rest into ticks of their own.
+    const items = lineKeys(stop);
+    const current = new Set(progress?.checked ?? []);
+    const add: string[] = [];
+    const pull: string[] = [];
+    if (checked) add.push(...keys);
+    else {
+      for (const key of keys) {
+        pull.push(key);
+        const item = items.find((i) => i.key === key);
+        if (item?.parentKey && current.has(item.parentKey)) {
+          pull.push(item.parentKey);
+          for (const sibling of items) if (sibling.parentKey === item.parentKey && !keys.includes(sibling.key)) add.push(sibling.key);
+        }
+      }
+    }
     setRuns((prev) =>
       prev.map((r) => {
         if (r.routeKey !== route.key) return r;
         const before = new Set(r.stops?.[stopKey]?.checked ?? []);
-        keys.forEach((k) => (checked ? before.add(k) : before.delete(k)));
+        add.forEach((k) => before.add(k));
+        pull.forEach((k) => before.delete(k));
         return { ...r, stops: { ...r.stops, [stopKey]: { ...r.stops?.[stopKey], checked: [...before] } } };
       })
     );
-    void send({ action: 'check', routeKey: route.key, stopKey, lineKeys: keys, checked });
+    if (add.length > 0) void send({ action: 'check', routeKey: route.key, stopKey, lineKeys: [...new Set(add)], checked: true });
+    if (pull.length > 0) void send({ action: 'check', routeKey: route.key, stopKey, lineKeys: [...new Set(pull)], checked: false });
   };
 
   const onNext = () => {
@@ -331,7 +353,7 @@ export default function PackLivePage() {
           <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>Packing for{date ? ` · ${formatDayShort(date)}` : ''}</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>Packing for{date ? ` · ${formatDayShort(date)}` : ''}</Typography>
                 <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{routeLabel(route)}</Typography>
               </Box>
               {status === 'packing' && (
@@ -352,7 +374,7 @@ export default function PackLivePage() {
                 </Button>
               ) : (
                 <Box>
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>{status === 'done' ? 'Total time' : status === 'paused' ? 'Paused' : 'Timer'}</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>{status === 'done' ? 'Total time' : status === 'paused' ? 'Paused' : 'Timer'}</Typography>
                   <Typography sx={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#111827', lineHeight: 1.1 }}>{formatDuration(runElapsedMs(run, serverNow))}</Typography>
                 </Box>
               )}
@@ -411,8 +433,8 @@ export default function PackLivePage() {
 
                 {groupByDay(stop).map((group) => {
                   const keys = group.lines.map((l) => l.key);
-                  const all = keys.every((k) => checkedSet.has(k));
-                  const some = keys.some((k) => checkedSet.has(k));
+                  const all = group.lines.every((l) => isTicked(l, checkedSet));
+                  const some = group.lines.some((l) => isTicked(l, checkedSet));
                   // a day other than the delivery date: the food was picked for that day and goes out on the delivery date
                   const otherDay = Boolean(group.day && date && group.day !== date);
                   return (
@@ -422,9 +444,9 @@ export default function PackLivePage() {
                           <Checkbox disabled={status !== 'packing'} checked={all} indeterminate={some && !all} onChange={() => tick(keys, !all)} inputProps={{ 'aria-label': `Check all for ${group.day ? formatDayShort(group.day) : 'this day'}` }} sx={{ p: 1.25, color: ORANGE, '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: ORANGE } }} />
                         </Box>
                         <Box sx={{ gridArea: { xs: 'qty / qty / qty / item', sm: 'portion / portion / portion / spice' }, minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 800, fontSize: 15, color: otherDay ? '#92400E' : '#9A3412' }}>
+                          <Typography sx={{ fontWeight: 800, fontSize: 16, color: otherDay ? '#92400E' : '#9A3412' }}>
                             {group.day ? (otherDay ? `${weekdayName(group.day)} items · ${formatDayShort(group.day)}` : formatDayShort(group.day)) : 'Items'}{' '}
-                            <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412', whiteSpace: 'nowrap' }}>· check all</Typography>
+                            <Typography component="span" sx={{ fontSize: 13, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412', whiteSpace: 'nowrap' }}>· check all</Typography>
                           </Typography>
                           {otherDay && date && (
                             <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -442,39 +464,41 @@ export default function PackLivePage() {
                           ['eco', 'ECO'],
                           ['spice', 'Spice level'],
                         ].map(([area, label]) => (
-                          <Typography key={area} sx={{ gridArea: area, fontSize: 12, fontWeight: 700, color: '#6B7280', textAlign: area === 'check' || area === 'qty' ? 'center' : 'left' }}>
+                          <Typography key={area} sx={{ gridArea: area, fontSize: 13, fontWeight: 700, color: '#6B7280', textAlign: 'left' }}>
                             {label}
                           </Typography>
                         ))}
                       </Box>
-                      {group.lines.map(({ key, line }) => {
-                        const on = checkedSet.has(key);
+                      {group.lines.map((item) => {
+                        const { key, line } = item;
+                        const on = isTicked(item, checkedSet);
                         return (
                           <Box
                             key={key}
                             onClick={() => tick([key], !on)}
                             sx={{ ...ROW_GRID, px: 1, py: 0.5, minHeight: 56, cursor: 'pointer', borderBottom: '1px solid #F3F4F6', bgcolor: on ? '#F0FDF4' : line.isEco ? '#F4FBF6' : '#fff', '&:hover': { bgcolor: on ? '#E7F8EE' : '#FAFAFA' } }}
                           >
-                            <Box sx={{ gridArea: 'check', display: 'flex', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
+                            <Box sx={{ gridArea: 'check', display: 'flex', justifyContent: 'flex-start' }} onClick={(e) => e.stopPropagation()}>
                               <Checkbox disabled={status !== 'packing'} checked={on} onChange={() => tick([key], !on)} inputProps={{ 'aria-label': `Packed: ${line.name}` }} sx={{ p: 1.25, '&.Mui-checked': { color: '#126B2C' } }} />
                             </Box>
-                            <Typography sx={{ gridArea: 'portion', display: { xs: 'none', sm: 'block' }, fontSize: 14, color: '#374151' }}>{line.portion ?? ''}</Typography>
-                            <Typography sx={{ gridArea: 'qty', fontSize: 18, fontWeight: 800, color: '#111827', textAlign: 'center' }}>{line.quantity}</Typography>
+                            <Typography sx={{ gridArea: 'portion', display: { xs: 'none', sm: 'block' }, fontSize: 16, color: '#374151' }}>{line.portion ?? ''}</Typography>
+                            <Typography sx={{ gridArea: 'qty', fontSize: 18, fontWeight: 800, color: '#111827', textAlign: 'left' }}>{line.quantity}</Typography>
                             <Box sx={{ gridArea: 'item', minWidth: 0, textDecoration: on ? 'line-through' : 'none', color: on ? '#6B7280' : '#111827' }}>
-                              <Typography sx={{ fontWeight: 700, fontSize: 15, wordBreak: 'break-word', textDecoration: 'inherit' }}>{line.name}</Typography>
+                              <Typography sx={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, wordBreak: 'break-word', textDecoration: 'inherit' }}>{line.name}</Typography>
+                              {item.viaCombo && <Typography sx={{ fontSize: 13, color: '#6B7280', wordBreak: 'break-word', textDecoration: 'inherit' }}>from {item.viaCombo}</Typography>}
                               {line.choices.map((c) => (
-                                <Typography key={c} sx={{ fontSize: 12, color: '#4B5563', wordBreak: 'break-word', textDecoration: 'inherit' }}>
+                                <Typography key={c} sx={{ fontSize: 14, color: '#4B5563', wordBreak: 'break-word', textDecoration: 'inherit' }}>
                                   {c}
                                 </Typography>
                               ))}
                               <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                {line.portion && <Chip size="small" label={line.portion} sx={{ height: 22, fontSize: 12 }} />}
-                                {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
-                                {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+                                {line.portion && <Chip size="small" label={line.portion} sx={{ height: 26, fontSize: 14 }} />}
+                                {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}
+                                {line.isEco && <Chip size="small" label="ECO" sx={{ height: 26, fontSize: 14, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
                               </Box>
                             </Box>
-                            <Box sx={{ gridArea: 'eco', display: { xs: 'none', sm: 'block' } }}>{line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}</Box>
-                            <Box sx={{ gridArea: 'spice', display: { xs: 'none', sm: 'block' } }}>{line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}</Box>
+                            <Box sx={{ gridArea: 'eco', display: { xs: 'none', sm: 'block' } }}>{line.isEco && <Chip size="small" label="ECO" sx={{ height: 26, fontSize: 14, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}</Box>
+                            <Box sx={{ gridArea: 'spice', display: { xs: 'none', sm: 'block' } }}>{line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}</Box>
                           </Box>
                         );
                       })}
@@ -489,15 +513,15 @@ export default function PackLivePage() {
             <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, px: 2, py: 1.5, bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
                 <Box>
-                  <Typography sx={{ fontSize: 12, color: '#6B7280', fontWeight: 700 }}>On customers</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 700 }}>On customers</Typography>
                   <Typography sx={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{formatDuration(summary.totalMs)}</Typography>
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: 12, color: '#6B7280', fontWeight: 700 }}>Average per customer</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 700 }}>Average per customer</Typography>
                   <Typography sx={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{summary.averageMs > 0 ? formatDuration(summary.averageMs) : '–'}</Typography>
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: 12, color: '#6B7280', fontWeight: 700 }}>Packed</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 700 }}>Packed</Typography>
                   <Typography sx={{ fontSize: 20, fontWeight: 800 }}>
                     {summary.complete} of {summary.customers}
                   </Typography>
@@ -521,7 +545,7 @@ export default function PackLivePage() {
                       <Typography sx={{ fontSize: 14, fontWeight: 700, wordBreak: 'break-word' }}>
                         {i + 1}. {s.customerName}
                       </Typography>
-                      <Typography sx={{ fontSize: 12, color: c.complete ? '#126B2C' : c.done > 0 ? '#B45309' : '#9CA3AF' }}>
+                      <Typography sx={{ fontSize: 13, color: c.complete ? '#126B2C' : c.done > 0 ? '#B45309' : '#9CA3AF' }}>
                         {c.done} of {c.total} item{c.total === 1 ? '' : 's'}{c.complete ? ' · packed' : ''}
                       </Typography>
                     </Box>
