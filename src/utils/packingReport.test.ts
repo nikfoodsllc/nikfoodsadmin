@@ -95,3 +95,30 @@ describe('filterPackingReport', () => {
     expect(filterPackingReport(report, 'zzz').routes).toEqual([]);
   });
 });
+
+describe('combo parts', () => {
+  const eveRows: PackingRow[] = [
+  row({
+    orderId: 'ORD-6', customerName: 'Eve Combo', name: 'Veg Combo', quantity: 2, spiceLevel: 'Medium', isEco: true, street: '4 Fir',
+    sections: [
+      { _id: 'c1', title: 'Veg Curry of the Day', selectedItems: [{ _id: 'a', portion: '12Oz', item: { _id: 'f1', name: 'Kale Chane' } }] },
+      { _id: 'c2', title: 'Choice of Staple', selectedItems: [{ _id: 'b', portion: '', item: { _id: 'f2', name: 'Chapati' } }, { _id: 'd', portion: '16Oz', item: { _id: 'f3', name: 'Jeera Rice' } }] },
+    ],
+    comboSelections: { c1: ['a'], c2: ['b', 'd'] },
+  }),
+  ];
+  const report = buildPackingReport(DATE, [...rows, ...eveRows], [], []);
+  const eve = report.unrouted.find((s) => s.customerName === 'Eve Combo')!;
+  it('a combo line carries its picked options as parts, with the combo spice on the curry only and eco never on bread', () => {
+    const parts = eve.lines[0].parts!;
+    expect(parts.map((p) => p.name)).toEqual(['Kale Chane', 'Chapati', 'Jeera Rice']);
+    expect(parts[0]).toMatchObject({ portion: '12Oz', spice: 'Medium', isEco: true });
+    expect(parts[1]).toMatchObject({ portion: null, spice: null, isEco: false });
+    expect(parts[2]).toMatchObject({ portion: '16Oz', spice: null, isEco: true });
+    expect(eve.lines[0].choices.length).toBe(2); // the old text lines stay for the report
+  });
+  it('a plain item has no parts', () => {
+    const asha = buildPackingReport(DATE, rows, [], []).unrouted.find((s) => s.customerName === 'Asha Rao')!;
+    expect(asha.lines.every((l) => l.parts === undefined)).toBe(true);
+  });
+});
