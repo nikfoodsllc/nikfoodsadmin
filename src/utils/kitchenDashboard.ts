@@ -280,6 +280,26 @@ function toSpiceLines(map: Map<string, number>): CountLine[] {
 }
 
 /** The picked options of a combo line, as name + portion. Unknown ids are skipped. */
+/**
+ * The names of the picked options that take the combo's spice level: everything the customer chose except the staples
+ * (the section called "... Staple(s)": chapati, rice). So the curry AND the vegetable of the day get the spice, or the
+ * non-veg dish; the bread and the rice do not.
+ */
+export function spicedPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Set<string> {
+  const names = new Set<string>();
+  const sections = row.sections ?? [];
+  if (!sections.length || !row.comboSelections) return names;
+  for (const section of sections) {
+    if (/staple|bread/i.test(clean(section.title))) continue;
+    const picked = (section._id && row.comboSelections[section._id]) || [];
+    for (const id of picked) {
+      const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);
+      if (name) names.add(name);
+    }
+  }
+  return names;
+}
+
 export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; id?: string }> {
   if (!row.sections?.length || !row.comboSelections) return [];
   const parts: Array<{ name: string; portion: string | null; id?: string }> = [];
@@ -386,6 +406,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
     const name = clean(row.name);
     const spice = clean(row.spiceLevel);
     const parts = comboParts(row);
+    const spiced = spicedPartNames(row);
     // delivered on a different day than it is cooked: counted by delivery date
     const later = laterDelivery(row);
 
@@ -409,6 +430,8 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         const acc = itemAcc(part.name);
         acc.total += row.quantity;
         acc.inCombos += row.quantity;
+        // the combo's spice level goes on every picked part except the staples (chapati, rice), as in the Kitchen Report
+        if (spice && spiced.has(part.name)) bump(acc.spice, spice, row.quantity);
         if (later) bump(acc.deliveries, later, row.quantity);
         bump(acc.portions, part.portion ?? 'No size', row.quantity);
         const partSize = parsePortionAmount(part.portion);
@@ -524,13 +547,14 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       orderStatus: row.orderStatus ?? null,
     };
     const parts = comboParts(row);
+    const spiced = spicedPartNames(row);
     if (parts.length > 0) {
       if (clean(row.name) === wanted) {
         lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: '', choices: comboChoiceLines(row) });
       }
       for (const part of parts) {
         if (part.name === wanted) {
-          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, row.quantity), choices: [] });
+          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, row.quantity), choices: [] });
         }
       }
     } else if (clean(row.name) === wanted) {

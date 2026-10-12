@@ -739,3 +739,42 @@ describe('pacificDayOf', () => {
     for (const v of [null, undefined, '', 'nope', {}, NaN]) expect(pacificDayOf(v)).toBeNull();
   });
 });
+
+describe('the combo spice level on the parts (like the Kitchen Report)', () => {
+  const titled = {
+    sections: [
+      { _id: 's1', title: 'Veg Curry of the Day', selectedItems: [{ _id: 'a1', portion: '12Oz', item: { name: 'Kale Chane' } }] },
+      { _id: 's2', title: 'Vegetable of the Day', selectedItems: [{ _id: 'b1', portion: '8Oz', item: { name: 'Cabbage Matar' } }] },
+      { _id: 's3', title: 'Staples', selectedItems: [{ _id: 'c1', portion: '', item: { name: 'Chapati' } }] },
+    ],
+  };
+  const picks = { s1: ['a1'], s2: ['b1'], s3: ['c1'] };
+  const rows = [
+    row({ orderId: 'A', name: 'Veg Combo', quantity: 1, spiceLevel: 'Medium Spice', comboSelections: picks, ...titled }),
+    row({ orderId: 'B', name: 'Veg Combo', quantity: 2, spiceLevel: 'Hot', comboSelections: picks, ...titled }),
+    row({ orderId: 'C', name: 'Cabbage Matar', quantity: 1, portion: '8Oz', spiceLevel: 'Mild (Kid Friendly)' }),
+  ];
+  it('item cards count the combo spice for the curry and the vegetable, not for the staples', () => {
+    const [day] = buildKitchenDays(rows, ['2026-10-07']);
+    expect(day.items.find((i) => i.name === 'Cabbage Matar')!.spice).toEqual([
+      { label: 'Mild (Kid Friendly)', quantity: 1 },
+      { label: 'Medium Spice', quantity: 1 },
+      { label: 'Hot', quantity: 2 },
+    ]);
+    expect(day.items.find((i) => i.name === 'Kale Chane')!.spice).toEqual([{ label: 'Medium Spice', quantity: 1 }, { label: 'Hot', quantity: 2 }]);
+    expect(day.items.find((i) => i.name === 'Chapati')!.spice).toEqual([]);
+  });
+  it('the who-ordered list gives a part inside a combo the combo spice, and none for a staple', () => {
+    const cabbage = buildItemOrders(rows, 'Cabbage Matar');
+    expect(cabbage.map((l) => [l.orderId, l.spice, l.viaCombo])).toEqual([['C', 'Mild (Kid Friendly)', null], ['A', 'Medium Spice', 'Veg Combo'], ['B', 'Hot', 'Veg Combo']]);
+    expect(buildItemOrders(rows, 'Chapati').every((l) => l.spice === null)).toBe(true);
+  });
+  it('the week block agrees with the day', () => {
+    const week = buildKitchenWeek(rows);
+    expect(week.items.find((i) => i.name === 'Cabbage Matar')!.spice).toEqual([
+      { label: 'Mild (Kid Friendly)', quantity: 1 },
+      { label: 'Medium Spice', quantity: 1 },
+      { label: 'Hot', quantity: 2 },
+    ]);
+  });
+});
