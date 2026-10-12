@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
+import { computeMetrics, type MetricsDraft, type PaidOrderForMetrics } from '@/utils/abandonedMetrics';
 import { buildAbandonedRows, resolveRange, summarize, type DraftDoc, type OrderInfo, type PaidOrderRef } from '@/utils/abandonedCheckouts';
 
 export const dynamic = 'force-dynamic';
@@ -50,9 +51,26 @@ export async function GET(request: NextRequest) {
     }
 
     const built = buildAbandonedRows(drafts, paidOrders, info);
+
+    // the numbers at the top: every checkout opened in the range (any status), and the orders paid after a reminder went out
+    const everyone = await db.read<MetricsDraft>('checkoutDrafts', { createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, {
+      sort: { createdAt: -1 },
+      limit: 5000,
+      projection: { cartLines: 0, 'reminderEmail.token': 0 },
+    });
+    if (!everyone.success) throw new Error(everyone.error || 'Could not read the checkouts');
+    const metricDrafts = everyone.data ?? [];
+    const sentTimes = metricDrafts.map((d) => (d.reminderEmail?.sentAt ? new Date(d.reminderEmail.sentAt).getTime() : 0)).filter(Boolean);
+    const remindedUsers = [...new Set(metricDrafts.filter((d) => d.reminderEmail?.sentAt).map((d) => d.userId).filter(Boolean))];
+    let metricOrders: PaidOrderForMetrics[] = [];
+    if (remindedUsers.length > 0) {
+      const after = await db.read<PaidOrderForMetrics>('orders', { user: { $in: remindedUsers }, paymentStatus: 'paid', createdAt: { $gte: new Date(Math.min(...sentTimes)) } } as never, { projection: { user: 1, createdAt: 1, totalPaid: 1 } });
+      if (!after.success) throw new Error(after.error || 'Could not read the orders');
+      metricOrders = after.data ?? [];
+    }
     return NextResponse.json({
       success: true,
-      data: { from: range.from, to: range.to, rows: { to_contact: built.to_contact, contacted: built.contacted }, ...summarize(built), orderedSince: built.orderedSince },
+      data: { from: range.from, to: range.to, metrics: computeMetrics(metricDrafts, metricOrders), rows: { to_contact: built.to_contact, contacted: built.contacted }, ...summarize(built), orderedSince: built.orderedSince },
     });
   } catch (error) {
     console.error('abandoned-checkouts GET failed', error);
