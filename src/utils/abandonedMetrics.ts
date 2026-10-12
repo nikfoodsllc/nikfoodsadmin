@@ -4,7 +4,8 @@ import type { DraftDoc } from '@/utils/abandonedCheckouts';
  * The numbers at the top of Abandoned Checkout, for the chosen days. Everything counts PEOPLE (one person with several
  * checkouts is one), taken from the checkouts opened in the range:
  *  - started    people who opened checkout
- *  - completed  people who paid for one of those checkouts (a later payment of theirs also counts: that checkout was "superseded")
+ *  - completed  people who paid: one of those checkouts was paid or superseded by a later payment, or a paid order of theirs
+ *               (the website's or one an admin entered) is newer than their latest checkout, the same rule as the list below
  *  - abandoned  started minus completed. People you hid (tests, or people you do not want to contact) are left out of everything.
  * The reminder funnel counts the automatic and manual cart reminder emails sent for those checkouts; a person is "recovered" when
  * they paid for an order within RECOVERY_DAYS after the reminder was sent.
@@ -57,6 +58,8 @@ const pct = (n: number, of: number): number | null => (of > 0 ? Math.round((n / 
 const cents = (n: number) => Math.round(n * 100 + 1e-9) / 100;
 
 export function computeMetrics(drafts: MetricsDraft[], paidOrders: PaidOrderForMetrics[]): AbandonedMetrics {
+  const lastPaid = new Map<string, number>();
+  for (const o of paidOrders) lastPaid.set(o.user, Math.max(lastPaid.get(o.user) ?? 0, ms(o.createdAt)));
   const byUser = new Map<string, MetricsDraft[]>();
   for (const d of drafts) byUser.set(d.userId, [...(byUser.get(d.userId) ?? []), d]);
 
@@ -69,7 +72,8 @@ export function computeMetrics(drafts: MetricsDraft[], paidOrders: PaidOrderForM
   const reminded: Array<{ userId: string; sentAt: number; delivered: boolean; opened: boolean; clicked: boolean; problem: boolean }> = [];
 
   for (const [userId, list] of byUser) {
-    const done = list.some((d) => d.status === 'converted' || d.status === 'superseded');
+    const latestStarted = Math.max(...list.map((d) => ms(d.createdAt)));
+    const done = list.some((d) => d.status === 'converted' || d.status === 'superseded') || (lastPaid.get(userId) ?? 0) >= latestStarted;
     // people you hid and who never paid are left out (they are tests or people you do not want counted)
     if (!done && list.every((d) => d.dismissedAt)) continue;
     started += 1;

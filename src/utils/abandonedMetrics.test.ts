@@ -80,4 +80,18 @@ describe('abandoned metrics', () => {
     ], [{ user: 'a', createdAt: at(12), totalPaid: 20 }]);
     expect(m.reminders).toMatchObject({ sent: 1, delivered: 1, opened: 1, recovered: 1 });
   });
+
+  it('counts someone as completed when a paid order of theirs is newer than their latest checkout (same rule as the list)', () => {
+    const m = computeMetrics([
+      d({ userId: 'a', createdAt: at(2) }),                 // ordered later, even though this checkout was never marked paid
+      d({ userId: 'b', createdAt: at(8) }),                 // their only order was BEFORE this checkout: still abandoned
+      d({ userId: 'c', createdAt: at(2) }),
+      d({ userId: 'c', createdAt: at(9) }),                 // paid between their two checkouts: the latest one is abandoned
+    ], [
+      { user: 'a', createdAt: at(4), totalPaid: 10 },
+      { user: 'b', createdAt: at(3), totalPaid: 10 },
+      { user: 'c', createdAt: at(5), totalPaid: 10 },
+    ]);
+    expect(m).toMatchObject({ started: 3, completed: 1, abandoned: 2 });
+  });
 });
