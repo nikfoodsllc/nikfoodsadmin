@@ -260,6 +260,8 @@ export async function GET(request: NextRequest) {
                 isComboSelection: true,
                 comboSectionTitle: section.title,
                 comboItemName: selectedItem.item.name,
+                // how many of this item come with ONE combo (Chapati x 4); the report multiplies it into Total Ordered Qty
+                partQuantity: Math.max(1, Math.min(99, Math.floor(Number(selectedItem.quantity)) || 1)),
               });
             });
           });

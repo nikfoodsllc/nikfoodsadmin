@@ -7,6 +7,8 @@
  * later combined into another delivery day.
  */
 
+import { comboItemQuantity, comboQuantityText } from './comboQuantity';
+
 export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
 
 export interface DayRange {
@@ -118,7 +120,7 @@ export interface KitchenRow {
   sections?: Array<{
     _id?: string;
     title?: string;
-    selectedItems?: Array<{ _id?: string; portion?: string | null; item?: { _id?: string; name?: string } | null }>;
+    selectedItems?: Array<{ _id?: string; portion?: string | null; quantity?: number | null; item?: { _id?: string; name?: string } | null }>;
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
@@ -300,9 +302,10 @@ export function spicedPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelecti
   return names;
 }
 
-export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; id?: string }> {
+/** The picked options of a combo as separate items. `quantity` is how many of that item come with ONE combo (Chapati x 4); 1 when the combo does not say. */
+export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; quantity: number; id?: string }> {
   if (!row.sections?.length || !row.comboSelections) return [];
-  const parts: Array<{ name: string; portion: string | null; id?: string }> = [];
+  const parts: Array<{ name: string; portion: string | null; quantity: number; id?: string }> = [];
   for (const section of row.sections) {
     const picked = (section._id && row.comboSelections[section._id]) || [];
     for (const id of picked) {
@@ -310,7 +313,8 @@ export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>
       const name = clean(option?.item?.name);
       if (!name) continue;
       const foodId = option?.item?._id ? String(option.item._id) : '';
-      parts.push(foodId ? { name, portion: clean(option?.portion) || null, id: foodId } : { name, portion: clean(option?.portion) || null });
+      const quantity = comboItemQuantity(option?.quantity);
+      parts.push(foodId ? { name, portion: clean(option?.portion) || null, quantity, id: foodId } : { name, portion: clean(option?.portion) || null, quantity });
     }
   }
   return parts;
@@ -422,22 +426,24 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
       if (row.isEco) combo.eco += row.quantity;
       if (spice) bump(combo.spice, spice, row.quantity);
       for (const part of parts) {
+        // how many of this part to make: the combos ordered x how many come with one combo (Chapati x 4)
+        const made = row.quantity * part.quantity;
         const key = `${part.name}\u0000${part.portion ?? ''}`;
         const existing = combo.parts.get(key);
-        if (existing) existing.quantity += row.quantity;
-        else combo.parts.set(key, { name: part.name, portion: part.portion, quantity: row.quantity });
+        if (existing) existing.quantity += made;
+        else combo.parts.set(key, { name: part.name, portion: part.portion, quantity: made });
 
         const acc = itemAcc(part.name);
-        acc.total += row.quantity;
-        acc.inCombos += row.quantity;
+        acc.total += made;
+        acc.inCombos += made;
         // the combo's spice level goes on every picked part except the staples (chapati, rice), as in the Kitchen Report
-        if (spice && spiced.has(part.name)) bump(acc.spice, spice, row.quantity);
-        if (later) bump(acc.deliveries, later, row.quantity);
-        bump(acc.portions, part.portion ?? 'No size', row.quantity);
+        if (spice && spiced.has(part.name)) bump(acc.spice, spice, made);
+        if (later) bump(acc.deliveries, later, made);
+        bump(acc.portions, part.portion ?? 'No size', made);
         const partSize = parsePortionAmount(part.portion);
         if (partSize) {
-          addAmount(acc.amount, partSize, row.quantity);
-          acc.sized += row.quantity;
+          addAmount(acc.amount, partSize, made);
+          acc.sized += made;
         }
       }
     } else {
@@ -554,7 +560,8 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       }
       for (const part of parts) {
         if (part.name === wanted) {
-          lines.push({ ...base, quantity: row.quantity, portion: part.portion, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, row.quantity), choices: [] });
+          const made = row.quantity * part.quantity;
+          lines.push({ ...base, quantity: made, portion: part.portion, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, made), choices: [] });
         }
       }
     } else if (clean(row.name) === wanted) {
@@ -617,7 +624,7 @@ export function comboChoiceLines(row: Pick<KitchenRow, 'sections' | 'comboSelect
       const name = clean(option?.item?.name);
       if (!name) continue;
       const portion = clean(option?.portion);
-      names.push(portion ? `${name} (${portion})` : name);
+      names.push(`${portion ? `${name} (${portion})` : name}${comboQuantityText(option?.quantity)}`);
     }
     if (names.length > 0) lines.push(`${clean(section.title) || 'Choice'}: ${names.join(', ')}`);
   }

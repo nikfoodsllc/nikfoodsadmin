@@ -123,9 +123,9 @@ const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day:
 describe('comboParts', () => {
   it('lists the picked options with their sizes', () => {
     expect(comboParts({ ...combo, comboSelections: { s1: ['a1'], s2: ['b2'], s3: ['c2'] } })).toEqual([
-      { name: 'Kale Chane', portion: '12Oz' },
-      { name: 'Punjabi Kathal', portion: '8Oz' },
-      { name: 'Chapati', portion: null },
+      { name: 'Kale Chane', portion: '12Oz', quantity: 1 },
+      { name: 'Punjabi Kathal', portion: '8Oz', quantity: 1 },
+      { name: 'Chapati', portion: null, quantity: 1 },
     ]);
   });
 
@@ -776,5 +776,46 @@ describe('the combo spice level on the parts (like the Kitchen Report)', () => {
       { label: 'Medium Spice', quantity: 1 },
       { label: 'Hot', quantity: 2 },
     ]);
+  });
+});
+
+describe('a combo item that comes several to a combo (Chapati x 4)', () => {
+  const sections = [
+    { _id: 's1', title: 'Curry', selectedItems: [{ _id: 'a1', portion: '12Oz', item: { name: 'Kale Chane' } }] },
+    { _id: 's3', title: 'Choice of Staple', selectedItems: [{ _id: 'c2', portion: '', quantity: 4, item: { name: 'Chapati' } }, { _id: 'c1', portion: '16Oz', item: { name: 'Jeera Rice' } }] },
+  ];
+  const days = ['2026-10-07'];
+  const rows = (n: number, pick: string): KitchenRow[] => [row({ orderId: 'A', name: 'Veg Combo', quantity: n, sections, comboSelections: { s1: ['a1'], s3: [pick] } })];
+
+  it('comboParts carries the quantity, 1 when the combo does not say', () => {
+    const parts = comboParts({ sections, comboSelections: { s1: ['a1'], s3: ['c2'] } });
+    expect(parts.map((p) => [p.name, p.quantity])).toEqual([['Kale Chane', 1], ['Chapati', 4]]);
+    expect(comboParts({ sections: [{ _id: 's', selectedItems: [{ _id: 'x', quantity: 0, item: { name: 'X' } }, { _id: 'y', quantity: 3.7 as number, item: { name: 'Y' } }] }], comboSelections: { s: ['x', 'y'] } }).map((p) => p.quantity)).toEqual([1, 3]);
+  });
+  it('3 combos with Chapati x 4 make 12 Chapati; the other parts stay 3', () => {
+    const day = buildKitchenDays(rows(3, 'c2'), days)[0];
+    const chapati = day.items.find((i) => i.name === 'Chapati')!;
+    expect(chapati.quantity).toBe(12);
+    expect(chapati.inCombos).toBe(12);
+    expect(day.items.find((i) => i.name === 'Kale Chane')!.quantity).toBe(3);
+    expect(day.combos[0].quantity).toBe(3); // still 3 combos
+  });
+  it('a size on such an item multiplies as well (3 combos x 2 x 4Oz = 24 oz)', () => {
+    const two = [{ _id: 's', title: 'Side', selectedItems: [{ _id: 'p', portion: '4Oz', quantity: 2, item: { name: 'Raita' } }] }];
+    const day = buildKitchenDays([row({ orderId: 'A', name: 'Combo', quantity: 3, sections: two, comboSelections: { s: ['p'] } })], days)[0];
+    const raita = day.items.find((i) => i.name === 'Raita')!;
+    expect(raita.quantity).toBe(6);
+    expect(raita.totalText).toContain('24 oz');
+  });
+  it('a combo that does not say counts as before', () => {
+    const day = buildKitchenDays(rows(3, 'c1'), days)[0];
+    expect(day.items.find((i) => i.name === 'Jeera Rice')!.quantity).toBe(3);
+  });
+  it('the choice lines say how many ("Chapati × 4")', () => {
+    expect(comboChoiceLines({ sections, comboSelections: { s1: ['a1'], s3: ['c2'] } })).toEqual(['Curry: Kale Chane (12Oz)', 'Choice of Staple: Chapati × 4']);
+  });
+  it('who ordered Chapati lists 8 for 2 combos', () => {
+    const lines = buildItemOrders(rows(2, 'c2'), 'Chapati', '2026-10-07');
+    expect(lines.map((l) => l.quantity)).toEqual([8]);
   });
 });
