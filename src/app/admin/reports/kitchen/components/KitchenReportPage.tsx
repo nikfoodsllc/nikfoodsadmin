@@ -34,6 +34,8 @@ import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
 import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, rowTone, STICKER_COLUMNS, TONE_COLORS, TOTALS_COLUMNS, type RowTone } from '@/utils/kitchenReportSheets';
 import ReportColumnsDialog from './ReportColumnsDialog';
+import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
+import { updatedAtText } from '@/utils/dataFreshness';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
 type TabId = 'prep' | 'ready' | 'stickers' | 'days';
@@ -244,6 +246,7 @@ export default function KitchenReportPage() {
   const totalCols = useColumnPreferences('admin_kitchen_report_totals_columns', TOTALS_COLUMNS, 'kitchen-report-totals');
   const [printing, setPrinting] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const startRequest = useLatestRequest();
@@ -255,10 +258,12 @@ export default function KitchenReportPage() {
     return customApplied;
   }, [preset, today, customApplied]);
 
-  const load = useCallback(async () => {
-    if (!token || !range) return;
+  // `silent`: load again without covering what is on screen (used when coming back to the tab and before a download).
+  // Returns the fresh report, or null when it could not be loaded.
+  const load = useCallback(async (options: { silent?: boolean } = {}): Promise<ReportData | null> => {
+    if (!token || !range) return null;
     const request = startRequest();
-    setLoading(true);
+    if (!options.silent) setLoading(true);
     setError('');
     try {
       const response = await fetch(`/api/admin/kitchen-report?startDate=${range.startDate}&endDate=${range.endDate}`, {
@@ -266,21 +271,28 @@ export default function KitchenReportPage() {
         signal: request.signal,
       });
       const json = await response.json().catch(() => ({}));
-      if (!request.isCurrent()) return;
+      if (!request.isCurrent()) return null;
       if (!response.ok) throw new Error(json.error || 'Could not load the report');
-      setData(json.data as ReportData);
+      const fresh = json.data as ReportData;
+      setData(fresh);
+      setLoadedAt(new Date());
+      return fresh;
     } catch (e) {
-      if (!request.isCurrent() || (e instanceof DOMException && e.name === 'AbortError')) return;
-      setData(null);
+      if (!request.isCurrent() || (e instanceof DOMException && e.name === 'AbortError')) return null;
+      if (!options.silent) setData(null);
       setError(e instanceof Error ? e.message : 'Could not load the report');
+      return null;
     } finally {
-      if (request.isCurrent()) setLoading(false);
+      if (request.isCurrent() && !options.silent) setLoading(false);
     }
   }, [token, range, startRequest]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  // a page left open while orders came in: load again when the admin comes back to it
+  useReloadWhenStale(loadedAt, () => void load({ silent: true }), Boolean(data));
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -296,14 +308,23 @@ export default function KitchenReportPage() {
   const notSetCount = notSet.length;
   const readyCount = readyToEat.length + notSetCount;
 
-  // the sheets for the Excel file and the PDF, with only the columns this admin chose
-  const buildSheets = () =>
-    applyColumnChoice(buildReportSheets({ cooked, readyToEat, notSet, stickers, days: dayBlocks }), {
-      prep: [...prepCols.hiddenKeys],
-      ready: [...readyCols.hiddenKeys],
-      stickers: [...stickerCols.hiddenKeys],
-      totals: [...totalCols.hiddenKeys],
-    });
+  // the sheets for the Excel file and the PDF, with only the columns this admin chose, from the report they are made from
+  const sheetsFrom = (src: ReportData) =>
+    applyColumnChoice(
+      buildReportSheets({
+        cooked: filterBlocksBySearch(src.cooked, search),
+        readyToEat: filterBlocksBySearch(src.readyToEat, search),
+        notSet: filterBlocksBySearch(src.notSet, search),
+        stickers: filterStickersBySearch(src.stickers, search),
+        days: src.days.map((d) => (searching ? filterBlockBySearch(d, search) : d)),
+      }),
+      {
+        prep: [...prepCols.hiddenKeys],
+        ready: [...readyCols.hiddenKeys],
+        stickers: [...stickerCols.hiddenKeys],
+        totals: [...totalCols.hiddenKeys],
+      }
+    );
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -324,7 +345,10 @@ export default function KitchenReportPage() {
     tab?.document.write('<p style="font-family:sans-serif;padding:24px">Making the PDF...</p>');
     setPrinting(true);
     try {
-      const sheets = buildSheets();
+      // always from the latest orders, not from what was loaded when the page was opened
+      const latest = await load({ silent: true });
+      if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
+      const sheets = sheetsFrom(latest);
       const title = `${formatRangeLabel(range)}${searching ? ` · search: ${search.trim()}` : ''}`;
       const blob = await buildReportPdf(sheets, title);
       if (tab) tab.location.href = URL.createObjectURL(blob);
@@ -342,8 +366,11 @@ export default function KitchenReportPage() {
     const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
     setExporting(true);
     try {
+      // always from the latest orders, not from what was loaded when the page was opened
+      const latest = await load({ silent: true });
+      if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
       // the file has all three sheets and follows the search, like the screen
-      const sheets = buildSheets();
+      const sheets = sheetsFrom(latest);
       const blob = await buildReportWorkbook(sheets, `Kitchen report ${label}`);
       downloadBlob(blob, `kitchen-report-${label}.xlsx`);
     } catch (e) {
@@ -380,7 +407,7 @@ export default function KitchenReportPage() {
           </Button>
           <Tooltip title="Reload">
             <span>
-              <IconButton onClick={load} disabled={loading} aria-label="Reload the report">
+              <IconButton onClick={() => void load()} disabled={loading} aria-label="Reload the report">
                 <IconRefresh size={20} />
               </IconButton>
             </span>
@@ -418,6 +445,7 @@ export default function KitchenReportPage() {
         <Typography sx={{ fontSize: 14, color: '#374151', fontWeight: 600, mb: 1.5 }}>
           {formatRangeLabel(range)}
           {data && !loading ? ` · ${cookedCount} item${cookedCount === 1 ? '' : 's'} to cook · ${stickers.length} sticker${stickers.length === 1 ? '' : 's'}` : ''}
+          {data && !loading && loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
         </Typography>
       )}
       {preset === 'custom' && !range && <Typography sx={{ color: '#6B7280', mb: 2 }}>Pick the dates and press Show.</Typography>}
