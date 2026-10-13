@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     }
     await clearCounter(pairKey);
 
-    // Check if user is admin
-    if (user.role !== 'ADMIN') {
+    // Only admins and packers can sign in here (a packer sees the Orders list and the Packing Report, nothing else)
+    if (user.role !== 'ADMIN' && user.role !== 'PACKER') {
       return NextResponse.json(
         {
           success: false,
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Account deactivated',
-          message: 'Your admin account has been deactivated. Please contact the system administrator.',
+          message: 'Your account has been deactivated. Please contact the system administrator.',
         } as ApiErrorResponse,
         { status: 403 }
       );
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     // Generate JWT token
     const tokenResult = jwtHandler.generateToken(
       user._id!.toString(),
-      'admin',
+      user.role === 'PACKER' ? 'packer' : 'admin',
       '7d' // 7 days expiration
     );
 

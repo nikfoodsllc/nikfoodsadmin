@@ -6,6 +6,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from './Sidebar';
 import AdminNavbar from './AdminNavbar';
+import { PACKER_HOME, packerMayOpen } from '@/utils/staffAccess';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -25,6 +26,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       router.push('/login');
     }
   }, [loading, isAuthenticated, router]);
+
+  // A packer only has the Orders list and the Packing Report: any other address is turned back to Orders
+  const packerTurnedAway = user?.role === 'PACKER' && !packerMayOpen(pathname);
+  useEffect(() => {
+    if (packerTurnedAway) router.replace(PACKER_HOME);
+  }, [packerTurnedAway, router]);
 
   const handleMobileToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -61,8 +68,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return null;
   }
 
-  // Check if user is admin
-  if (user.role !== 'ADMIN') {
+  // Check if user is an admin or a packer
+  if (user.role !== 'ADMIN' && user.role !== 'PACKER') {
     return (
       <Box
         sx={{
@@ -93,6 +100,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             Please contact an administrator if you believe this is an error.
           </Typography>
         </Box>
+      </Box>
+    );
+  }
+
+  if (packerTurnedAway) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
+        <CircularProgress size={48} sx={{ color: '#4F8CFF' }} />
       </Box>
     );
   }

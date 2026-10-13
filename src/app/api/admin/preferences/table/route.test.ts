@@ -31,7 +31,7 @@ function req(method: string, opts: { query?: string; body?: unknown; rawBody?: s
 
 beforeEach(() => {
   vi.clearAllMocks();
-  verifyToken.mockImplementation((t: string) => (t === 'good' ? adminToken : t === 'user' ? { success: true, payload: { userId: 'u9', role: 'user' } } : { success: false, error: 'bad' }));
+  verifyToken.mockImplementation((t: string) => (t === 'good' ? adminToken : t === 'user' ? { success: true, payload: { userId: 'u9', role: 'user' } } : t === 'packer' ? { success: true, payload: { userId: 'p1', role: 'packer' } } : { success: false, error: 'bad' }));
   readOne.mockResolvedValue({ success: true, data: null });
   deleteOne.mockResolvedValue({ success: true, deletedCount: 1 });
   updateOne.mockResolvedValue({});
@@ -129,5 +129,17 @@ describe('PUT', () => {
     const res = await PUT(req('PUT', { body: { table: 'orders', columns: { hidden: ['a'] } } }));
     expect(res.status).toBe(200);
     expect(updateOne).toHaveBeenCalled();
+  });
+});
+
+// last: saving creates the index once for the whole file, which the PUT tests above check
+describe('a packer', () => {
+  it('may keep the layout of the packing report tables only', async () => {
+    expect((await GET(req('GET', { query: '?table=packing-list', token: 'packer' }))).status).toBe(200);
+    expect((await GET(req('GET', { query: '?table=packing-totals', token: 'packer' }))).status).toBe(200);
+    expect((await GET(req('GET', { query: '?table=kitchen-days', token: 'packer' }))).status).toBe(200);
+    expect((await GET(req('GET', { query: '?table=orders', token: 'packer' }))).status).toBe(403);
+    expect((await PUT(req('PUT', { body: { table: 'food-items', columns: { hidden: ['a'] } }, token: 'packer' }))).status).toBe(403);
+    expect((await PUT(req('PUT', { body: { table: 'packing-list', columns: { hidden: ['a'] } }, token: 'packer' }))).status).toBe(200);
   });
 });

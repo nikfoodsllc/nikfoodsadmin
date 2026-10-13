@@ -65,9 +65,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const includeInactive = searchParams.get('includeInactive') === 'true';
 
-    // Build filter query - only admin users
+    // Build filter query - admins and packers (staff accounts)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filter: any = { role: 'ADMIN' };
+    const filter: any = { role: { $in: ['ADMIN', 'PACKER'] } };
 
     // Filter by active status
     if (!includeInactive) {
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/admin/admin-users
  * Create a new admin user
- * Body: { email, password, name, phone }
+ * Body: { email, password, name, phone, role? } (role: 'ADMIN' (default) or 'PACKER')
  */
 export async function POST(request: NextRequest) {
   try {
@@ -137,6 +137,10 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const body = await request.json();
     const { email, password, name, phone } = body;
+    const role = body.role === 'PACKER' ? 'PACKER' : 'ADMIN';
+    if (body.role !== undefined && body.role !== 'ADMIN' && body.role !== 'PACKER') {
+      return NextResponse.json({ error: 'role must be ADMIN or PACKER' }, { status: 400 });
+    }
 
     // Validate required fields
     if (!email || !password) {
@@ -179,7 +183,7 @@ export async function POST(request: NextRequest) {
     const newAdmin: Omit<UserDocument, '_id'> = {
       email,
       password: hashedPassword,
-      role: 'ADMIN',
+      role,
       name: name || undefined,
       phone: phone || undefined,
       isActive: true,

@@ -23,7 +23,8 @@ function verifyAuth(request: NextRequest) {
     return { success: false, error: verificationResult.error || 'Invalid token' };
   }
 
-  if (verificationResult.payload.role !== 'admin') {
+  // a packer changes their own password here too
+  if (verificationResult.payload.role !== 'admin' && verificationResult.payload.role !== 'packer') {
     return { success: false, error: 'Unauthorized: Admin access required' };
   }
 
@@ -86,7 +87,7 @@ export async function PUT(request: NextRequest) {
     // Fetch current user with password
     const userResult = await db.read<UserDocument>(
       'users',
-      { _id: new ObjectId(currentUserId), role: 'ADMIN' }
+      { _id: new ObjectId(currentUserId), role: { $in: ['ADMIN', 'PACKER'] } }
     );
 
     if (!userResult.success || !userResult.data || userResult.data.length === 0) {

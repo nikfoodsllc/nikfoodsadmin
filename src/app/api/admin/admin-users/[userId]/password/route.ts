@@ -83,7 +83,7 @@ export async function PUT(
     // Check if target user exists and is an admin
     const targetUserResult = await db.read<UserDocument>(
       'users',
-      { _id: new ObjectId(userId), role: 'ADMIN' }
+      { _id: new ObjectId(userId), role: { $in: ['ADMIN', 'PACKER'] } }
     );
 
     if (!targetUserResult.success || !targetUserResult.data || targetUserResult.data.length === 0) {
@@ -99,7 +99,7 @@ export async function PUT(
     // Update password
     const updateResult = await db.updateOne<UserDocument>(
       'users',
-      { _id: new ObjectId(userId), role: 'ADMIN' },
+      { _id: new ObjectId(userId), role: { $in: ['ADMIN', 'PACKER'] } },
       { $set: { password: hashedPassword, updatedAt: new Date() } }
     );
 
