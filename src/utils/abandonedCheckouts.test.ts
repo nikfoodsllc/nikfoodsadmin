@@ -155,16 +155,16 @@ describe('date range of the list', () => {
     expect(pacificDayStart('2026-11-02').toISOString()).toBe('2026-11-02T08:00:00.000Z');
     expect(pacificDayStart('2026-03-08').toISOString()).toBe('2026-03-08T08:00:00.000Z'); // the day daylight time starts
   });
-  it('days: last N days, default 14, clamped to 1..60', () => {
+  it('days: last N days, default 7, clamped to 1..7', () => {
     const r = resolveRange({ days: 7 }, now) as { since: Date; until: Date | null; from: string; to: string };
     expect(r.until).toBeNull();
     expect(r.since.toISOString()).toBe('2026-09-30T18:50:00.000Z');
     expect(r.from).toBe('2026-10-01');
     expect(r.to).toBe('2026-10-07');
-    expect((resolveRange({}, now) as { from: string }).from).toBe('2026-09-24');
-    expect((resolveRange({ days: 500 }, now) as { from: string }).from).toBe('2026-08-09');
+    expect((resolveRange({}, now) as { from: string }).from).toBe('2026-10-01');
+    expect((resolveRange({ days: 500 }, now) as { from: string }).from).toBe('2026-10-01');
     expect((resolveRange({ days: 0 }, now) as { from: string }).from).toBe('2026-10-07');
-    expect((resolveRange({ days: Number.NaN }, now) as { from: string }).from).toBe('2026-09-24');
+    expect((resolveRange({ days: Number.NaN }, now) as { from: string }).from).toBe('2026-10-01');
   });
   it('custom range: both end days included', () => {
     const r = resolveRange({ from: '2026-10-05', to: '2026-10-06' }, now) as { since: Date; until: Date };
@@ -181,11 +181,11 @@ describe('date range of the list', () => {
     expect(msg({ from: '2026-02-31', to: '2026-03-02' })).toMatch(/start and an end/);
     expect(msg({ from: '2026-10-06', to: '2026-10-05' })).toMatch(/must not be after/);
     expect(msg({ from: '2026-10-05', to: '2026-10-08' })).toMatch(/future/);
-    expect(msg({ from: '2026-08-01', to: '2026-10-05' })).toMatch(/only kept for 60 days/);
+    expect(msg({ from: '2026-08-01', to: '2026-10-05' })).toMatch(/only kept for 7 days/);
   });
-  it('the oldest allowed start is 59 days back (60 days including today)', () => {
-    expect('error' in resolveRange({ from: '2026-08-09', to: '2026-08-10' }, now)).toBe(false);
-    expect('error' in resolveRange({ from: '2026-08-08', to: '2026-08-10' }, now)).toBe(true);
+  it('the oldest allowed start is 6 days back (7 days including today)', () => {
+    expect('error' in resolveRange({ from: '2026-10-01', to: '2026-10-02' }, now)).toBe(false);
+    expect('error' in resolveRange({ from: '2026-09-30', to: '2026-10-02' }, now)).toBe(true);
   });
 });
 
