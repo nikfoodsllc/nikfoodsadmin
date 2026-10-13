@@ -76,10 +76,17 @@ class DatabaseHandler {
           throw new Error('DATABASE_URL environment variable is not defined');
         }
 
+        // A serverless function is frozen between requests, and the database closes idle connections meanwhile. A kept-open
+        // connection can then be dead without the driver knowing, and a request on it would wait until Vercel stopped the whole
+        // function (300 s). So: drop idle connections early, keep none open, and give up on a silent socket instead of waiting forever.
         this.client = new MongoClient(uri, {
           maxPoolSize: 10,
-          minPoolSize: 2,
-          serverSelectionTimeoutMS: 5000,
+          minPoolSize: 0,
+          maxIdleTimeMS: 20000,
+          connectTimeoutMS: 10000,
+          serverSelectionTimeoutMS: 10000,
+          socketTimeoutMS: 60000,
+          waitQueueTimeoutMS: 15000,
         });
 
         await this.client.connect();
