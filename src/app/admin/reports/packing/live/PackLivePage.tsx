@@ -15,6 +15,7 @@ import { formatPSTDateISO } from '@/utils/timezone';
 import type { PackingReport, PackStop } from '@/utils/packingReport';
 import {
   formatDuration,
+  findMovedStop,
   groupByDay,
   isTicked,
   lineKeys,
@@ -239,15 +240,27 @@ export default function PackLivePage() {
   const counts = stop ? stopCounts(stop, progress) : { total: 0, done: 0, complete: false };
   const summary = route ? summarizeRoute(route, run, serverNow) : null;
 
-  // The list was swapped for a newer one: a customer whose stop was renumbered (a second order joined it) keeps their place, found by name.
+  // The list was swapped for a newer one. A customer whose stop was renumbered (a second order joined it) keeps their place and
+  // their ticks: found again by name and orders, and the ticks are copied onto the new stop. Only while packing is on.
+  const carried = useRef(new Set<string>());
   useEffect(() => {
-    if (status !== 'packing' || !route || !currentKey || stops.length === 0) return;
-    if (stops.some((s) => stopKeyOf(s) === currentKey)) return;
-    const name = run?.stops?.[currentKey]?.meta?.name;
-    const target = name ? stops.findIndex((s) => s.customerName.trim() === name) : -1;
-    if (target >= 0) void goTo(target);
+    if (status !== 'packing' || !route || !run || stops.length === 0) return;
+    const keys = new Set(stops.map(stopKeyOf));
+    if (currentKey && !keys.has(currentKey)) {
+      const target = findMovedStop(stops, run.stops?.[currentKey]?.meta);
+      if (target >= 0) void goTo(target);
+    }
+    for (const [oldKey, progress] of Object.entries(run.stops ?? {})) {
+      if (keys.has(oldKey) || carried.current.has(oldKey) || !progress.checked?.length) continue;
+      const target = findMovedStop(stops, progress.meta);
+      if (target < 0) continue;
+      carried.current.add(oldKey);
+      const newKey = stopKeyOf(stops[target]);
+      if ((run.stops?.[newKey]?.checked?.length ?? 0) > 0) continue; // already has ticks of its own
+      void send({ action: 'check', routeKey: route.key, stopKey: newKey, lineKeys: progress.checked, checked: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, stops.length, currentKey]);
+  }, [route, run, stops, status, currentKey]);
 
   const start = async () => {
     if (!route || stops.length === 0) return;

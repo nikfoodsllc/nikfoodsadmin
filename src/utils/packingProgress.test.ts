@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PackLine, PackRoute, PackStop } from './packingReport';
-import { formatDuration, groupByDay, isTicked, stopMetaOf, lineKeys, packableRoutes, routeLabel, runElapsedMs, runStatus, startIndex, stopCounts, stopElapsedMs, stopKeyOf, summarizeRoute } from './packingProgress';
+import { findMovedStop, formatDuration, groupByDay, isTicked, stopMetaOf, lineKeys, packableRoutes, routeLabel, runElapsedMs, runStatus, startIndex, stopCounts, stopElapsedMs, stopKeyOf, summarizeRoute } from './packingProgress';
 
 const line = (over: Partial<PackLine> = {}): PackLine => ({ orderId: 'ORD-1', name: 'Dal', quantity: 1, portion: '12Oz', spice: 'Medium', isEco: false, choices: [], pickedFor: null, day: '2026-10-13', ...over });
 const stop = (number: number, over: Partial<PackStop> = {}): PackStop => ({ number, customerName: `C${number}`, address: '', scheduledAt: '', orderIds: [`ORD-${number}`], lines: [line({ orderId: `ORD-${number}` })], empty: false, ...over });
@@ -129,5 +129,20 @@ describe('combos are split into their own items', () => {
   it('a combo with no parts saved stays one item', () => {
     const plain = stop(1, { lines: [line({ name: 'Veg Combo', choices: ['x'] })] });
     expect(lineKeys(plain).length).toBe(1);
+  });
+});
+
+describe('findMovedStop', () => {
+  const a = stop(1, { customerName: 'Asha', orderIds: ['ORD-1', 'ORD-9'] });
+  const b = stop(2, { customerName: 'Bob', orderIds: ['ORD-2'] });
+  it('finds the same customer when a second order joined the stop', () => {
+    expect(findMovedStop([a, b], { name: 'Asha', orderIds: ['ORD-1'] })).toBe(0);
+    expect(findMovedStop([a, b], { name: 'Bob', orderIds: ['ORD-2'] })).toBe(1);
+  });
+  it('does not guess: a different customer, a missing order, or two matches', () => {
+    expect(findMovedStop([a, b], { name: 'Cy', orderIds: ['ORD-3'] })).toBe(-1);
+    expect(findMovedStop([a, b], { name: 'Asha', orderIds: ['ORD-1', 'ORD-5'] })).toBe(-1);
+    expect(findMovedStop([a, stop(3, { customerName: 'Asha', orderIds: ['ORD-1'] })], { name: 'Asha', orderIds: ['ORD-1'] })).toBe(-1);
+    expect(findMovedStop([a], undefined)).toBe(-1);
   });
 });
