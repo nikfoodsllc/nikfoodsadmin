@@ -104,9 +104,10 @@ const adminNavItems: NavItem[] = [
   },
 ];
 
-/** A packer's menu: two entries, nothing else */
+/** A packer's menu: three entries, nothing else */
 const packerNavItems: NavItem[] = [
   { title: 'Orders', href: '/admin/orders', icon: IconShoppingCart },
+  { title: 'Kitchen Dashboard (BETA)', href: '/admin/kitchen-dashboard', icon: IconChefHat },
   { title: 'Packing Report', href: '/admin/reports/packing', icon: IconPackage },
 ];
 

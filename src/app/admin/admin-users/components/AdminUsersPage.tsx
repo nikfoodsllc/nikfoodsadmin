@@ -264,7 +264,7 @@ export default function AdminUsersPage() {
               fontSize: '13px',
             }}
           >
-            Add Admin
+            Add Role
           </Button>
         </Box>
       </Box>

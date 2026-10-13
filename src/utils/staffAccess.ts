@@ -1,12 +1,12 @@
 /**
- * What a packer (a staff account that is not an admin) may open in the admin panel: the Orders list and the Packing Report with
- * Pack live. Everything else is hidden from their menu and turned back to Orders. The server enforces the same limit on its own
+ * What a packer (a staff account that is not an admin) may open in the admin panel: the Orders list, the Kitchen Dashboard and the
+ * Packing Report with Pack live. Everything else is hidden from their menu and turned back to Orders. The server enforces the same limit on its own
  * (a packer's login token is refused by every admin route except the few packing ones), so this only keeps the screens tidy.
  */
 export const PACKER_HOME = '/admin/orders';
 
 /** Pages a packer may open (each one with everything below it) */
-const PACKER_PAGES = ['/admin/orders', '/admin/reports/packing'];
+const PACKER_PAGES = ['/admin/orders', '/admin/kitchen-dashboard', '/admin/reports/packing'];
 
 /** Below an allowed page but for admins only: how fast the team packs */
 const PACKER_BLOCKED = ['/admin/reports/packing/metrics'];
