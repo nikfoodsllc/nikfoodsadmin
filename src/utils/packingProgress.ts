@@ -234,3 +234,16 @@ export function startIndex(route: PackableRoute, run: PackingRun | undefined | n
   const open = route.stops.findIndex((s) => !stopCounts(s, run?.stops?.[stopKeyOf(s)]).complete);
   return open >= 0 ? open : 0;
 }
+
+/**
+ * Where a customer went when their stop was renumbered (a second order joined it, so the stop key changed): the stop with the
+ * same name that holds every order the old stop had. -1 when there is no such stop (or more than one: then nothing is guessed).
+ */
+export function findMovedStop(stops: PackStop[], old: Pick<StopMeta, 'name' | 'orderIds'> | undefined): number {
+  if (!old || !clean(old.name)) return -1;
+  const name = clean(old.name);
+  const matches = stops
+    .map((stop, index) => ({ stop, index }))
+    .filter(({ stop }) => clean(stop.customerName) === name && (old.orderIds ?? []).every((id) => stop.orderIds.includes(id)));
+  return matches.length === 1 ? matches[0].index : -1;
+}
