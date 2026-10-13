@@ -16,6 +16,8 @@ import { filterPackingReport, type PackLine, type PackRoute, type PackStop, type
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
 import ReportColumnsDialog from '../../kitchen/components/ReportColumnsDialog';
+import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
+import { updatedAtText } from '@/utils/dataFreshness';
 
 type TabId = 'routes' | 'totals';
 type Preset = 'today' | 'tomorrow' | 'other';
@@ -156,6 +158,7 @@ export default function PackingReportPage() {
   const [tab, setTab] = useState<TabId>('routes');
   const [search, setSearch] = useState('');
   const [data, setData] = useState<ReportData | null>(null);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -170,29 +173,38 @@ export default function PackingReportPage() {
 
   const date = preset === 'today' ? today : preset === 'tomorrow' ? addDays(today, 1) : isDayString(otherDate) ? otherDate : null;
 
-  const load = useCallback(async () => {
-    if (!token || !date) return;
+  // `silent`: load again without covering what is on screen (used when coming back to the tab and before a download).
+  // Returns the fresh report, or null when it could not be loaded.
+  const load = useCallback(async (options: { silent?: boolean } = {}): Promise<ReportData | null> => {
+    if (!token || !date) return null;
     const request = startRequest();
-    setLoading(true);
+    if (!options.silent) setLoading(true);
     setError('');
     try {
       const response = await fetch(`/api/admin/packing-report?date=${date}`, { headers: { Authorization: `Bearer ${token}` }, signal: request.signal });
       const json = await response.json().catch(() => ({}));
-      if (!request.isCurrent()) return;
+      if (!request.isCurrent()) return null;
       if (!response.ok) throw new Error(json.error || 'Could not load the report');
-      setData(json.data as ReportData);
+      const fresh = json.data as ReportData;
+      setData(fresh);
+      setLoadedAt(new Date());
+      return fresh;
     } catch (e) {
-      if (!request.isCurrent() || (e instanceof DOMException && e.name === 'AbortError')) return;
-      setData(null);
+      if (!request.isCurrent() || (e instanceof DOMException && e.name === 'AbortError')) return null;
+      if (!options.silent) setData(null);
       setError(e instanceof Error ? e.message : 'Could not load the report');
+      return null;
     } finally {
-      if (request.isCurrent()) setLoading(false);
+      if (request.isCurrent() && !options.silent) setLoading(false);
     }
   }, [token, date, startRequest]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  // a page left open while orders came in: load again when the admin comes back to it
+  useReloadWhenStale(loadedAt, () => void load({ silent: true }), Boolean(data));
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -221,7 +233,7 @@ export default function PackingReportPage() {
   };
 
   // the sheets for the Excel file and the PDF: what is on the screen, with the columns this admin chose
-  const buildSheets = () => (shown ? applyColumnChoice(buildPackingSheets(shown), { packing: [...listCols.hiddenKeys], packTotals: [...totalCols.hiddenKeys] }) : []);
+  const sheetsFrom = (src: ReportData) => applyColumnChoice(buildPackingSheets(filterPackingReport(src, search)), { packing: [...listCols.hiddenKeys], packTotals: [...totalCols.hiddenKeys] });
 
   const printPdf = async () => {
     if (!shown || !date) return;
@@ -229,7 +241,10 @@ export default function PackingReportPage() {
     win?.document.write('<p style="font-family:sans-serif;padding:24px">Making the PDF...</p>');
     setPrinting(true);
     try {
-      const blob = await buildReportPdf(buildSheets(), `Delivery ${formatDayShort(date)}${searching ? ` · search: ${search.trim()}` : ''}`);
+      // always from the latest orders, not from what was loaded when the page was opened
+      const latest = await load({ silent: true });
+      if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
+      const blob = await buildReportPdf(sheetsFrom(latest), `Delivery ${formatDayShort(date)}${searching ? ` · search: ${search.trim()}` : ''}`);
       if (win) win.location.href = URL.createObjectURL(blob);
       else downloadBlob(blob, `packing-report-${date}.pdf`);
     } catch (e) {
@@ -244,7 +259,10 @@ export default function PackingReportPage() {
     if (!shown || !date) return;
     setExporting(true);
     try {
-      downloadBlob(await buildReportWorkbook(buildSheets(), `Packing report ${date}`), `packing-report-${date}.xlsx`);
+      // always from the latest orders, not from what was loaded when the page was opened
+      const latest = await load({ silent: true });
+      if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
+      downloadBlob(await buildReportWorkbook(sheetsFrom(latest), `Packing report ${date}`), `packing-report-${date}.xlsx`);
     } catch (e) {
       setError(e instanceof Error ? `Could not make the Excel file: ${e.message}` : 'Could not make the Excel file');
     } finally {
@@ -297,7 +315,7 @@ export default function PackingReportPage() {
           </Tooltip>
           <Tooltip title="Reload">
             <span>
-              <IconButton onClick={load} disabled={loading} aria-label="Reload the report">
+              <IconButton onClick={() => void load()} disabled={loading} aria-label="Reload the report">
                 <IconRefresh size={20} />
               </IconButton>
             </span>
@@ -325,6 +343,7 @@ export default function PackingReportPage() {
         <Typography sx={{ fontSize: 14, color: '#374151', fontWeight: 600, mb: 1.5 }}>
           Delivery {formatDayShort(date)}
           {data && !loading ? ` · ${data.stats.orders} order${data.stats.orders === 1 ? '' : 's'} · ${data.stats.units} unit${data.stats.units === 1 ? '' : 's'}${data.stats.eco > 0 ? ` · ♻️ ${data.stats.eco} eco` : ''}` : ''}
+          {data && !loading && loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
         </Typography>
       )}
       {preset === 'other' && !date && <Typography sx={{ color: '#B91C1C', mb: 2 }}>Pick a real date.</Typography>}

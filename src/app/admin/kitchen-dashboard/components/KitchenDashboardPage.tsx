@@ -26,6 +26,8 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import ColumnVisibilityMenu from '@/components/table/ColumnVisibilityMenu';
 import { KITCHEN_DAY_DEFS, arrangeKitchenDays } from '@/utils/kitchenDayLayout';
 import { formatPSTDateISO } from '@/utils/timezone';
+import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
+import { updatedAtText } from '@/utils/dataFreshness';
 import {
   formatDayShort,
   formatRangeLabel,
@@ -297,6 +299,7 @@ export default function KitchenDashboardPage() {
   // which weekdays to show and in what order; saved per admin (same mechanism as the table columns)
   const dayLayout = useColumnPreferences('admin_kitchen_days', KITCHEN_DAY_DEFS, 'kitchen-days');
   const [loading, setLoading] = useState(true);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const range: DayRange | null = useMemo(() => {
@@ -310,11 +313,12 @@ export default function KitchenDashboardPage() {
 
   const beginRequest = useLatestRequest();
 
-  const load = useCallback(async () => {
+  // `silent`: load again without covering what is on screen (used when coming back to the tab)
+  const load = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!token || !range) return;
     // a slow earlier answer (for example the first week) must never replace the newest one
     const request = beginRequest();
-    setLoading(true);
+    if (!options.silent) setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ startDate: range.startDate, endDate: range.endDate });
@@ -327,19 +331,25 @@ export default function KitchenDashboardPage() {
       if (!response.ok) throw new Error(body?.error || 'Could not load the kitchen dashboard');
       setAllDays(body.data?.days ?? []);
       setWeek(body.data?.week ?? null);
+      setLoadedAt(new Date());
     } catch (e) {
-      if (!request.isCurrent()) return;
-      setAllDays([]);
-      setWeek(null);
+      if (!request.isCurrent() || (e instanceof DOMException && e.name === 'AbortError')) return;
+      if (!options.silent) {
+        setAllDays([]);
+        setWeek(null);
+      }
       setError(e instanceof Error ? e.message : 'Could not load the kitchen dashboard');
     } finally {
-      if (request.isCurrent()) setLoading(false);
+      if (request.isCurrent() && !options.silent) setLoading(false);
     }
   }, [token, range, beginRequest]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  // a page left open while orders came in: load again when the admin comes back to it
+  useReloadWhenStale(loadedAt, () => void load({ silent: true }), loadedAt !== null);
 
   const applyCustom = () => {
     const problem = validateRange(customDraft);
@@ -398,7 +408,7 @@ export default function KitchenDashboardPage() {
           />
           <Tooltip title="Refresh">
             <span>
-              <IconButton onClick={load} disabled={loading || !range} aria-label="Refresh">
+              <IconButton onClick={() => void load()} disabled={loading || !range} aria-label="Refresh">
                 <IconRefresh size={20} />
               </IconButton>
             </span>
@@ -455,6 +465,7 @@ export default function KitchenDashboardPage() {
             {formatRangeLabel(range)}
             {!loading && !error && days.length > 0 ? ` · ${totalUnits} ${totalUnits === 1 ? 'unit' : 'units'} across ${busyDays} ${busyDays === 1 ? 'day' : 'days'}` : ''}
             {!loading && !error && hiddenDays > 0 ? ` · ${hiddenDays} ${hiddenDays === 1 ? 'day' : 'days'} hidden` : ''}
+            {!loading && !error && loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
           </Typography>
         )}
       </Paper>
