@@ -834,7 +834,7 @@ export default function DeliveryReportPage() {
       >
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827' }}>
-            Delivery Report
+            (OLD) Delivery Report
           </Typography>
           <Typography variant="body2" sx={{ color: '#6B7280', marginTop: 0.5 }}>
             View comprehensive delivery information by date
