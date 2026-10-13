@@ -10,6 +10,7 @@ import {
   CircularProgress,
   Button,
   Chip,
+  IconButton,
   FormControl,
   InputLabel,
   Select,
@@ -22,7 +23,9 @@ import { ORDERS_COLUMNS, ORDERS_COLUMNS_STORAGE_KEY } from './ordersColumns';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ExportToCsvDialog from './ExportToCsvDialog';
-import { IconDownload } from '@tabler/icons-react';
+import { IconDownload, IconRefresh } from '@tabler/icons-react';
+import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
+import { updatedAtText } from '@/utils/dataFreshness';
 import TablePagination from '../../food-items/components/TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
@@ -55,6 +58,10 @@ export default function OrdersPage() {
   const [sortBy, setSortBy] = useState('date_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
+  // a page left open while orders came in: load again, quietly, when the admin comes back to it (the loader is set below)
+  const quietReload = useRef<() => void>(() => {});
+  useReloadWhenStale(loadedAt, () => quietReload.current(), loadedAt !== null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | ''>('');
@@ -117,13 +124,14 @@ export default function OrdersPage() {
   }
 
   // Fetch orders with filters
-  const fetchOrders = useCallback(async () => {
+  // `silent`: load again without the loading skeleton over the table (used when coming back to the tab)
+  const fetchOrders = useCallback(async (options: { silent?: boolean } = {}) => {
     const seq = ++fetchSeq.current;
     fetchAbort.current?.abort();
     const controller = new AbortController();
     fetchAbort.current = controller;
     try {
-      setLoading(true);
+      if (!options.silent) setLoading(true);
       if (!token) {
         throw new Error('No authentication token found');
       }
@@ -158,6 +166,7 @@ export default function OrdersPage() {
       const nextOrders = data.data?.items || [];
       setOrders(nextOrders);
       setTotalOrders(data.data?.total || 0);
+      setLoadedAt(new Date());
       setSelectedOrderIds((prev) => {
         const visibleIds = new Set(
           nextOrders
@@ -177,14 +186,16 @@ export default function OrdersPage() {
       console.error('Error fetching orders:', error);
       showSnackbar('Failed to load orders', 'error');
     } finally {
-      if (seq === fetchSeq.current) setLoading(false);
+      if (seq === fetchSeq.current && !options.silent) setLoading(false);
     }
   }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedRescheduled, startDate, endDate, sortBy, currentPage, itemsPerPage, token]);
 
   // Fetch orders when filters change
   useEffect(() => {
-    fetchOrders();
+    void fetchOrders();
   }, [fetchOrders]);
+
+  quietReload.current = () => void fetchOrders({ silent: true });
 
   // After a delivery date was moved or the customer was emailed: reload the list and the open order
   const handleOrderChanged = async () => {
@@ -551,7 +562,11 @@ export default function OrdersPage() {
           </Button>
           <Typography variant="body2" sx={{ color: '#6B7280' }}>
             Total: {totalOrders} orders
+            {loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
           </Typography>
+          <IconButton size="small" onClick={() => void fetchOrders()} disabled={loading} aria-label="Reload the orders" sx={{ color: '#6B7280' }}>
+            <IconRefresh size={18} />
+          </IconButton>
         </Box>
       </Box>
 

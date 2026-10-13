@@ -7,6 +7,9 @@ import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogAct
 import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
+import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
+import { updatedAtText } from '@/utils/dataFreshness';
+import { comparePackingReports, describeChanges, type PackingChanges } from '@/utils/packingChanges';
 import { addDays, formatDayShort, isDayString, shortSpiceLabel, weekdayName } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
 import type { PackingReport, PackStop } from '@/utils/packingReport';
@@ -63,6 +66,9 @@ export default function PackLivePage() {
   const [preset, setPreset] = useState<Preset>(startPreset);
   const [otherDate, setOtherDate] = useState(addDays(today, 2));
   const [report, setReport] = useState<PackingReport | null>(null);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
+  // a newer list that is waiting for the packers to accept it (never swapped in while someone is packing)
+  const [pending, setPending] = useState<{ report: PackingReport; changes: PackingChanges } | null>(null);
   const [runs, setRuns] = useState<PackingRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -101,6 +107,8 @@ export default function PackLivePage() {
       if (!reportRes.ok) throw new Error(reportJson.error || 'Could not load the packing list');
       if (!progressRes.ok) throw new Error(progressJson.error || 'Could not load the packing progress');
       setReport(reportJson.data as PackingReport);
+      setLoadedAt(new Date());
+      setPending(null);
       setRuns((progressJson.data?.runs ?? []) as PackingRun[]);
       if (progressJson.data?.now) setClockSkew(new Date(progressJson.data.now).getTime() - Date.now());
     } catch (e) {
@@ -121,6 +129,52 @@ export default function PackLivePage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
   }, [authLoading, isAuthenticated, router]);
+
+  // Is anyone packing right now (on any route of this day)? Then the list must not change under them.
+  const someonePacking = runs.some((r) => runStatus(r) === 'packing');
+
+  // Orders paid after this page opened: look again quietly. Nothing changes on screen while someone is packing; a banner offers
+  // the new list instead. When nobody is packing, the new list is simply used.
+  const checkForNew = useCallback(async () => {
+    if (!token || !date || !report) return;
+    try {
+      const res = await fetch(`/api/admin/packing-report?date=${date}`, { headers: authHeaders(token) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.data) return;
+      const fresh = json.data as PackingReport;
+      const changes = comparePackingReports(report, fresh);
+      if (changes.same) {
+        setLoadedAt(new Date());
+        setPending(null);
+      } else if (someonePacking) {
+        setPending({ report: fresh, changes });
+      } else {
+        setReport(fresh);
+        setLoadedAt(new Date());
+        setPending(null);
+      }
+    } catch {
+      /* the next check tries again */
+    }
+  }, [token, date, report, someonePacking]);
+
+  useReloadWhenStale(loadedAt, () => void checkForNew(), Boolean(report));
+
+  // and while the screen stays open all day (packing never leaves it): look every 90 seconds
+  useEffect(() => {
+    if (!report) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void checkForNew();
+    }, 90 * 1000);
+    return () => clearInterval(timer);
+  }, [report, checkForNew]);
+
+  const applyPending = () => {
+    if (!pending) return;
+    setReport(pending.report);
+    setLoadedAt(new Date());
+    setPending(null);
+  };
 
   // the same screen for everyone: pick up what the others ticked (not while one of my own taps is still being saved)
   useEffect(() => {
@@ -184,6 +238,16 @@ export default function PackLivePage() {
   const progress = stop ? run?.stops?.[stopKey] : undefined;
   const counts = stop ? stopCounts(stop, progress) : { total: 0, done: 0, complete: false };
   const summary = route ? summarizeRoute(route, run, serverNow) : null;
+
+  // The list was swapped for a newer one: a customer whose stop was renumbered (a second order joined it) keeps their place, found by name.
+  useEffect(() => {
+    if (status !== 'packing' || !route || !currentKey || stops.length === 0) return;
+    if (stops.some((s) => stopKeyOf(s) === currentKey)) return;
+    const name = run?.stops?.[currentKey]?.meta?.name;
+    const target = name ? stops.findIndex((s) => s.customerName.trim() === name) : -1;
+    if (target >= 0) void goTo(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, stops.length, currentKey]);
 
   const start = async () => {
     if (!route || stops.length === 0) return;
@@ -309,6 +373,19 @@ export default function PackLivePage() {
       </Paper>
       )}
 
+      {pending && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2, alignItems: 'center' }}
+          action={
+            <Button color="inherit" size="small" onClick={applyPending} sx={{ textTransform: 'none', fontWeight: 800 }}>
+              Update list
+            </Button>
+          }
+        >
+          {describeChanges(pending.changes)} since you opened this. Update the list when you are between customers (your ticks and place are kept).
+        </Alert>
+      )}
       {error && (
         <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
           {error}
@@ -382,7 +459,7 @@ export default function PackLivePage() {
               )}
               <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
                 <Typography sx={{ fontSize: 14, color: '#374151' }}>
-                  {route.stops.length} customer{route.stops.length === 1 ? '' : 's'} · {summary?.units ?? 0} unit{summary?.units === 1 ? '' : 's'}
+                  {route.stops.length} customer{route.stops.length === 1 ? '' : 's'} · {summary?.units ?? 0} unit{summary?.units === 1 ? '' : 's'}{loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
                 </Typography>
                 {status !== 'not_started' && (
                   <Typography sx={{ fontSize: 14, color: '#374151' }}>
