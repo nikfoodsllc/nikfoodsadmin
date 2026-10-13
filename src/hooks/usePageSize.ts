@@ -5,21 +5,21 @@ import { DEFAULT_PAGE_SIZE, PageSize, parsePageSize } from '@/utils/pageSize';
 
 /**
  * Rows-per-page choice for one admin table, remembered in this browser under its own key.
- * The first render always uses the default (100) so server and browser agree; a saved choice
- * is applied right after.
+ * The first render always uses the table's default (100 unless the table says otherwise) so server and browser agree;
+ * a saved choice is applied right after.
  */
-export function usePageSize(tableKey: string): [PageSize, (size: PageSize) => void] {
+export function usePageSize(tableKey: string, defaultSize: PageSize = DEFAULT_PAGE_SIZE): [PageSize, (size: PageSize) => void] {
   const storageKey = `admin_page_size:${tableKey}`;
-  const [pageSize, setPageSizeState] = useState<PageSize>(DEFAULT_PAGE_SIZE);
+  const [pageSize, setPageSizeState] = useState<PageSize>(defaultSize);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
-      if (saved !== null) setPageSizeState(parsePageSize(saved));
+      if (saved !== null) setPageSizeState(parsePageSize(saved, defaultSize));
     } catch {
       /* storage blocked: the default stays */
     }
-  }, [storageKey]);
+  }, [storageKey, defaultSize]);
 
   const setPageSize = useCallback(
     (size: PageSize) => {

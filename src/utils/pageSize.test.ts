@@ -4,6 +4,12 @@ import { ALL_RECORDS_LIMIT, DEFAULT_PAGE_SIZE, pageSizeToLimit, parsePageSize, r
 describe('page size', () => {
   it('defaults to 100', () => {
     expect(DEFAULT_PAGE_SIZE).toBe(100);
+    // a table can start somewhere else (Orders starts at 50); anything unknown falls back to that table's default
+    expect(parsePageSize('garbage', 50)).toBe(50);
+    expect(parsePageSize(null, 50)).toBe(50);
+    expect(parsePageSize('100', 50)).toBe(100);
+    expect(parsePageSize('all', 50)).toBe('all');
+    expect(parsePageSize('garbage')).toBe(100);
     expect(parsePageSize(null)).toBe(100);
     expect(parsePageSize(undefined)).toBe(100);
     expect(parsePageSize('7')).toBe(100);
