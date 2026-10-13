@@ -162,8 +162,8 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
               <Box key={`${s.orderId}-${i}`} sx={{ py: 0.9, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: toneBg(rowTone(i, s.isEco)) }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.customerName}</Typography>
-                  <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{s.item}</Typography>
+                  <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.item}</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{s.customerName}</Typography>
                   {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
                   {s.movedFrom && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Moved from {formatDayShort(s.movedFrom)}</Typography>}
                 </Box>
