@@ -255,9 +255,9 @@ export function reachOutEmail(row: AbandonedRow): { subject: string; body: strin
 export const CONTACT_NOTES = ['Called, no answer', 'Left a voicemail', 'Texted', 'Emailed', 'Spoke with them', 'Will order later'];
 
 // ---------------------------------------------------------------------------------------------------------------
-// The date range of the list. Checkouts are kept for 60 days, so no range reaches further back than that.
+// The date range of the list. Checkouts are kept for 7 days (older ones are irrelevant), so no range reaches further back than that.
 
-export const RETENTION_DAYS = 60;
+export const RETENTION_DAYS = 7;
 const TZ = 'America/Los_Angeles';
 const DAY_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
@@ -308,7 +308,7 @@ export interface ResolvedRange {
 /**
  * The range asked for: either the last `days` days, or a from/to pair of Pacific dates (both ends included).
  * Returns an error message for anything that cannot be served (bad date, backwards, in the future, older than the
- * 60 days the checkouts are kept).
+ * 7 days the checkouts are kept).
  */
 export function resolveRange(input: { days?: number | null; from?: string | null; to?: string | null }, now: Date = new Date()): ResolvedRange | { error: string } {
   const today = pacificToday(now);
@@ -322,7 +322,7 @@ export function resolveRange(input: { days?: number | null; from?: string | null
     if (from < oldest) return { error: `Checkouts are only kept for ${RETENTION_DAYS} days, so the earliest start date is ${oldest}` };
     return { since: pacificDayStart(from), until: pacificDayStart(addDaysToDay(to, 1)), from, to };
   }
-  const requested = Number(input.days ?? 14);
-  const days = Number.isFinite(requested) ? Math.min(RETENTION_DAYS, Math.max(1, Math.floor(requested))) : 14;
+  const requested = Number(input.days ?? RETENTION_DAYS);
+  const days = Number.isFinite(requested) ? Math.min(RETENTION_DAYS, Math.max(1, Math.floor(requested))) : RETENTION_DAYS;
   return { since: new Date(now.getTime() - days * 24 * 3600 * 1000), until: null, from: addDaysToDay(today, -(days - 1)), to: today };
 }

@@ -17,7 +17,7 @@ export default function ReportsDashboardPage() {
       path: '/admin/reports/kitchen',
     },
     {
-      title: 'Delivery Report',
+      title: '(OLD) Delivery Report',
       description: 'View delivery-wise reports with customer details and order summaries',
       icon: IconTruckDelivery,
       iconColor: '#5FD068',
@@ -25,7 +25,7 @@ export default function ReportsDashboardPage() {
       path: '/admin/reports/delivery',
     },
     {
-      title: 'Ordered Items',
+      title: '(OLD) Ordered Items',
       description: 'View detailed ordered items report with customer details, quantities, spice levels, and pricing',
       icon: IconShoppingCart,
       iconColor: '#F59E0B',
