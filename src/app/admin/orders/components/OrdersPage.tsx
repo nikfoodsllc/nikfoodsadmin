@@ -78,7 +78,7 @@ export default function OrdersPage() {
     return () => clearTimeout(timer);
   }, [searchInput, searchQuery]);
   // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
-  const [pageSize, setPageSize] = usePageSize('orders', 50);
+  const [pageSize, setPageSize] = usePageSize('orders', 25);
   const itemsPerPage = pageSizeToLimit(pageSize);
 
   // Column order, widths and hidden columns, saved to this admin's account
