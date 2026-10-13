@@ -147,9 +147,13 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Get total count for pagination
-    const countResult = await db.read<Order>('orders', filter);
-    const total = countResult.data?.length || 0;
+    // Get total count for pagination: counted by the database. (This used to load every matching order in full just to take
+    // its length: with thousands of orders, each carrying its own copy of the menu item, the unfiltered list never finished.)
+    const countResult = await db.count<Order>('orders', filter);
+    if (!countResult.success) {
+      throw new Error(countResult.error || 'Failed to count orders');
+    }
+    const total = countResult.count ?? 0;
 
     // Fetch paginated orders
     const result = await db.read<Order>('orders', filter, {
