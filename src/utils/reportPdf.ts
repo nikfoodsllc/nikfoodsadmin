@@ -12,14 +12,16 @@ export const PDF_FONT_SIZE = 12;
 
 /**
  * The PDF version of the Excel file: the same sheets, drawn as tables with the same boxes (a thick outline round each item),
- * the same red / white / green rows and the same columns, landscape Letter. Boxes are packed one under another; a small box
+ * the same red / white / green rows and the same columns, Letter (landscape unless told otherwise; `boxPerPage` starts every item's box on its own page). Boxes are packed one under another; a small box
  * is kept on one page, a long one continues on the next page (with its side edges) instead of leaving a gap.
  * Browser only: the PDF library is loaded when someone presses Print, not with the page.
  */
-export async function buildReportPdf(sheets: SheetModel[], title: string): Promise<Blob> {
+export async function buildReportPdf(sheets: SheetModel[], title: string, options: { orientation?: 'landscape' | 'portrait'; boxPerPage?: boolean } = {}): Promise<Blob> {
+  if (sheets.length === 0) throw new Error('every column is switched off, so there is nothing to include. Choose some columns first');
+  const { orientation = 'landscape', boxPerPage = false } = options;
   const { jsPDF } = await import('jspdf');
   const autoTable = (await import('jspdf-autotable')).default;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+  const doc = new jsPDF({ orientation, unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = { left: 28, right: 28, top: 44, bottom: 36 };
   const usable = pageWidth - margin.left - margin.right;
@@ -33,7 +35,14 @@ export async function buildReportPdf(sheets: SheetModel[], title: string): Promi
     const last = widths.length - 1;
     let y = margin.top;
 
-    for (const table of sheetToPdfTables(sheet)) {
+    let previous: string | null = null;
+    for (const table of sheetToPdfTables(sheet, { repeatHead: boxPerPage })) {
+      // one item per page: a box (or the band above it) starts a fresh page, a band stays with the box under it
+      if (boxPerPage && previous !== null && table.kind !== 'plain' && !(table.kind === 'box' && previous === 'section')) {
+        doc.addPage();
+        y = margin.top;
+      }
+      previous = table.kind;
       const isSection = table.kind === 'section';
       autoTable(doc, {
         startY: y,
@@ -43,7 +52,7 @@ export async function buildReportPdf(sheets: SheetModel[], title: string): Promi
         head: table.head ? [table.head] : undefined,
         showHead: 'firstPage',
         body: isSection ? table.rows.map((r) => [{ content: r.cells[0], colSpan: widths.length }]) : table.rows.map((r) => r.cells),
-        pageBreak: table.rows.length <= KEEP_TOGETHER_ROWS ? 'avoid' : 'auto',
+        pageBreak: !boxPerPage && table.rows.length <= KEEP_TOGETHER_ROWS ? 'avoid' : 'auto',
         rowPageBreak: 'avoid',
         styles: { fontSize: PDF_FONT_SIZE, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, textColor: [17, 24, 39], lineColor: [0, 0, 0], valign: 'top', overflow: 'linebreak' },
         columnStyles: Object.fromEntries(widths.map((w, i) => [i, { cellWidth: w }])),

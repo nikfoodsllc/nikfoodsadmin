@@ -180,20 +180,24 @@ export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: Pre
 }
 
 /**
- * Keeps only the columns the admin chose: `hidden` lists, per sheet, the column keys to leave out. A sheet always keeps at
- * least one column (if every column were hidden, the first one stays), and the section / blank rows are left alone.
+ * Keeps only the columns the admin chose: `hidden` lists, per sheet, the column keys to leave out. A sheet with every column
+ * switched off is left out altogether, and the section / blank rows are left alone.
  */
 export function applyColumnChoice(sheets: SheetModel[], hidden: Partial<Record<SheetKey, string[]>>): SheetModel[] {
-  return sheets.map((sheet) => {
+  const result: SheetModel[] = [];
+  for (const sheet of sheets) {
     const off = new Set(hidden[sheet.key] ?? []);
-    let keep = sheet.columnKeys.map((k) => !off.has(k));
-    if (!keep.some(Boolean)) keep = keep.map((_, i) => i === 0);
-    if (keep.every(Boolean)) return sheet;
+    const keep = sheet.columnKeys.map((k) => !off.has(k));
+    if (!keep.some(Boolean)) continue;
+    if (keep.every(Boolean)) {
+      result.push(sheet);
+      continue;
+    }
     const newIndex: number[] = [];
     let next = 0;
     keep.forEach((k, i) => { newIndex[i] = k ? next++ : -1; });
     const remap = (list?: number[]) => list?.map((i) => newIndex[i]).filter((i) => i >= 0);
-    return {
+    result.push({
       ...sheet,
       columnKeys: sheet.columnKeys.filter((_, i) => keep[i]),
       widths: sheet.widths.filter((_, i) => keep[i]),
@@ -202,8 +206,9 @@ export function applyColumnChoice(sheets: SheetModel[], hidden: Partial<Record<S
           ? row
           : { ...row, cells: row.cells.filter((_, i) => keep[i]), boldCells: remap(row.boldCells), rightCells: remap(row.rightCells) }
       ),
-    };
-  });
+    });
+  }
+  return result;
 }
 
 /** The text of a date cell: "Tue, Oct 13", or '' when there is no date. */
@@ -237,7 +242,7 @@ export interface PdfTable {
  * (separated, like in Excel, by the gap where the blank row is), so a box can be kept on one page; the header belongs to
  * the first box, as in Kunal's sheet. A sheet without boxes is one table.
  */
-export function sheetToPdfTables(sheet: SheetModel): PdfTable[] {
+export function sheetToPdfTables(sheet: SheetModel, options: { repeatHead?: boolean } = {}): PdfTable[] {
   const header = sheet.rows.find((r) => r.kind === 'header');
   const head = header ? header.cells.map(cellText) : undefined;
   const hasBoxes = sheet.rows.some((r) => r.kind === 'data' && r.box);
@@ -260,7 +265,7 @@ export function sheetToPdfTables(sheet: SheetModel): PdfTable[] {
       continue;
     }
     if (!current) {
-      current = { kind: 'box', head: headUsed ? undefined : head, rows: [] };
+      current = { kind: 'box', head: headUsed && !options.repeatHead ? undefined : head, rows: [] };
       headUsed = true;
       tables.push(current);
     }

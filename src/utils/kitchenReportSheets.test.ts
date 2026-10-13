@@ -193,9 +193,10 @@ describe('applyColumnChoice (the columns an admin picked)', () => {
     expect(cut[2].columnKeys).not.toContain('order');
     expect(cut[2].rows[0].cells).not.toContain('Order');
   });
-  it('a sheet always keeps at least one column', () => {
-    const [cut] = applyColumnChoice(sheets, { prep: prep.columnKeys });
-    expect(cut.columnKeys).toEqual(['item']);
+  it('a sheet with every column switched off is left out', () => {
+    const cut = applyColumnChoice(sheets, { prep: prep.columnKeys });
+    expect(cut.map((s) => s.key)).toEqual(sheets.slice(1).map((s) => s.key));
+    expect(applyColumnChoice(sheets, { prep: prep.columnKeys, ready: sheets[1].columnKeys, stickers: sheets[2].columnKeys, totals: sheets[3].columnKeys })).toEqual([]);
   });
   it('the Ready to Eat sheet and the section band survive a column choice', () => {
     const report2 = buildKitchenReport([row({ orderId: '5', name: 'Mystery', customerName: 'Eve' })], byName);

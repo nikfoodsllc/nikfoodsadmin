@@ -431,8 +431,8 @@ export default function PackingReportPage() {
         open={columnsOpen}
         onClose={() => setColumnsOpen(false)}
         groups={[
-          { key: 'packing', title: 'Packing List', columns: listCols.allColumns, hidden: listCols.hiddenKeys, syncStatus: listCols.syncStatus, onToggle: listCols.toggleColumn, onReset: listCols.showAll },
-          { key: 'packTotals', title: 'Item totals', columns: totalCols.allColumns, hidden: totalCols.hiddenKeys, syncStatus: totalCols.syncStatus, onToggle: totalCols.toggleColumn, onReset: totalCols.showAll },
+          { key: 'packing', title: 'Packing List', columns: listCols.allColumns, hidden: listCols.hiddenKeys, syncStatus: listCols.syncStatus, onToggle: listCols.toggleColumn, onReset: listCols.showAll, onHideAll: listCols.hideAll },
+          { key: 'packTotals', title: 'Item totals', columns: totalCols.allColumns, hidden: totalCols.hiddenKeys, syncStatus: totalCols.syncStatus, onToggle: totalCols.toggleColumn, onReset: totalCols.showAll, onHideAll: totalCols.hideAll },
         ]}
       />
     </Box>

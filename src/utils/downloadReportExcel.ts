@@ -16,6 +16,7 @@ function cellValue(cell: SheetCell): string | number | Date | null {
 
 /** Builds the Excel file (browser only; the library is loaded when someone downloads, not with the page). */
 export async function buildReportWorkbook(sheets: SheetModel[], title: string): Promise<Blob> {
+  if (sheets.length === 0) throw new Error('every column is switched off, so there is nothing to include. Choose some columns first');
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'NikFoods admin';

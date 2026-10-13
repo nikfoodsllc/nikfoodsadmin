@@ -189,6 +189,7 @@ export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs:
   const moveColumn = useCallback((key: string, toIndex: number) => setPrefs((p) => moveColumnInPrefs(defs, p, key, toIndex)), [defs]);
 
   const showAll = useCallback(() => setPrefs((p) => ({ ...p, hidden: [] })), []);
+  const hideAll = useCallback(() => setPrefs((p) => ({ ...p, hidden: defs.filter((d) => !d.locked).map((d) => d.key) })), [defs]);
   const reset = useCallback(() => setPrefs(emptyColumnPrefs()), []);
 
   return {
@@ -205,6 +206,7 @@ export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs:
     toggleColumn,
     moveColumn,
     showAll,
+    hideAll,
     reset,
   };
 }

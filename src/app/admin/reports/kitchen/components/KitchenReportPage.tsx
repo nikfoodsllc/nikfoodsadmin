@@ -350,7 +350,7 @@ export default function KitchenReportPage() {
       if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
       const sheets = sheetsFrom(latest);
       const title = `${formatRangeLabel(range)}${searching ? ` · search: ${search.trim()}` : ''}`;
-      const blob = await buildReportPdf(sheets, title);
+      const blob = await buildReportPdf(sheets, title, { orientation: 'portrait', boxPerPage: true });
       if (tab) tab.location.href = URL.createObjectURL(blob);
       else downloadBlob(blob, `kitchen-report-${label}.pdf`); // the browser blocked the new tab: save the file instead
     } catch (e) {
@@ -529,10 +529,10 @@ export default function KitchenReportPage() {
         open={columnsOpen}
         onClose={() => setColumnsOpen(false)}
         groups={[
-          { key: 'prep', title: 'Kitchen Prep', columns: prepCols.allColumns, hidden: prepCols.hiddenKeys, syncStatus: prepCols.syncStatus, onToggle: prepCols.toggleColumn, onReset: prepCols.showAll },
-          { key: 'ready', title: 'Ready to Eat', columns: readyCols.allColumns, hidden: readyCols.hiddenKeys, syncStatus: readyCols.syncStatus, onToggle: readyCols.toggleColumn, onReset: readyCols.showAll },
-          { key: 'stickers', title: 'Stickers', columns: stickerCols.allColumns, hidden: stickerCols.hiddenKeys, syncStatus: stickerCols.syncStatus, onToggle: stickerCols.toggleColumn, onReset: stickerCols.showAll },
-          { key: 'totals', title: 'Day totals', columns: totalCols.allColumns, hidden: totalCols.hiddenKeys, syncStatus: totalCols.syncStatus, onToggle: totalCols.toggleColumn, onReset: totalCols.showAll },
+          { key: 'prep', title: 'Kitchen Prep', columns: prepCols.allColumns, hidden: prepCols.hiddenKeys, syncStatus: prepCols.syncStatus, onToggle: prepCols.toggleColumn, onReset: prepCols.showAll, onHideAll: prepCols.hideAll },
+          { key: 'ready', title: 'Ready to Eat', columns: readyCols.allColumns, hidden: readyCols.hiddenKeys, syncStatus: readyCols.syncStatus, onToggle: readyCols.toggleColumn, onReset: readyCols.showAll, onHideAll: readyCols.hideAll },
+          { key: 'stickers', title: 'Stickers', columns: stickerCols.allColumns, hidden: stickerCols.hiddenKeys, syncStatus: stickerCols.syncStatus, onToggle: stickerCols.toggleColumn, onReset: stickerCols.showAll, onHideAll: stickerCols.hideAll },
+          { key: 'totals', title: 'Day totals', columns: totalCols.allColumns, hidden: totalCols.hiddenKeys, syncStatus: totalCols.syncStatus, onToggle: totalCols.toggleColumn, onReset: totalCols.showAll, onHideAll: totalCols.hideAll },
         ]}
       />
     </Box>
