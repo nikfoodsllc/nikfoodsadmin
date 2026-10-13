@@ -1,6 +1,6 @@
 /**
- * Rows per page for the admin tables: 10, 50, 100 or all records. 100 unless the admin chose
- * otherwise (the choice is remembered in the browser, per table).
+ * Rows per page for the admin tables: 10, 50, 100 or all records. 100 unless the table sets another default (the Orders page
+ * starts at 50) or the admin chose otherwise (the choice is remembered in the browser, per table).
  */
 export type PageSize = 10 | 50 | 100 | 'all';
 
@@ -10,10 +10,10 @@ export const DEFAULT_PAGE_SIZE: PageSize = 100;
 /** What the list APIs get as `limit` when "All" is chosen (more than any table holds). */
 export const ALL_RECORDS_LIMIT = 100000;
 
-export function parsePageSize(raw: unknown): PageSize {
+export function parsePageSize(raw: unknown, fallback: PageSize = DEFAULT_PAGE_SIZE): PageSize {
   if (raw === 'all') return 'all';
   const n = typeof raw === 'string' ? Number(raw) : raw;
-  return n === 10 || n === 50 || n === 100 ? n : DEFAULT_PAGE_SIZE;
+  return n === 10 || n === 50 || n === 100 ? n : fallback;
 }
 
 export function pageSizeToLimit(size: PageSize): number {
