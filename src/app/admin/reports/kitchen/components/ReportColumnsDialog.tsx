@@ -12,6 +12,7 @@ export interface ColumnChoiceGroup {
   syncStatus: ColumnSyncStatus;
   onToggle: (key: string) => void;
   onReset: () => void;
+  onHideAll: () => void;
 }
 
 const STATUS_TEXT: Record<ColumnSyncStatus, string> = {
@@ -23,7 +24,7 @@ const STATUS_TEXT: Record<ColumnSyncStatus, string> = {
 
 /**
  * Which columns go into the Excel file and the PDF, sheet by sheet. The choice is kept in the admin's own account (the
- * same place as the table layouts), so it is the same on every computer. At least one column always stays on.
+ * same place as the table layouts), so it is the same on every computer. A sheet with every column switched off is left out of the file.
  */
 export default function ReportColumnsDialog({ open, onClose, groups }: { open: boolean; onClose: () => void; groups: ColumnChoiceGroup[] }) {
   const status = groups.some((g) => g.syncStatus === 'error') ? 'error' : groups.some((g) => g.syncStatus === 'saving') ? 'saving' : groups.some((g) => g.syncStatus === 'saved') ? 'saved' : 'idle';
@@ -40,9 +41,14 @@ export default function ReportColumnsDialog({ open, onClose, groups }: { open: b
             <Box key={group.key} sx={{ mb: 2.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                 <Typography sx={{ fontWeight: 700, color: '#111827' }}>{group.title}</Typography>
-                <Button size="small" onClick={group.onReset} disabled={group.hidden.size === 0} sx={{ textTransform: 'none' }}>
-                  Show all
-                </Button>
+                <Box>
+                  <Button size="small" onClick={group.onHideAll} disabled={shown === 0} sx={{ textTransform: 'none' }}>
+                    Hide all
+                  </Button>
+                  <Button size="small" onClick={group.onReset} disabled={group.hidden.size === 0} sx={{ textTransform: 'none' }}>
+                    Show all
+                  </Button>
+                </Box>
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, columnGap: 2 }}>
                 {group.columns.map((c) => {
@@ -50,7 +56,7 @@ export default function ReportColumnsDialog({ open, onClose, groups }: { open: b
                   return (
                     <FormControlLabel
                       key={c.key}
-                      control={<Checkbox size="small" checked={checked} disabled={checked && shown === 1} onChange={() => group.onToggle(c.key)} />}
+                      control={<Checkbox size="small" checked={checked} onChange={() => group.onToggle(c.key)} />}
                       label={<Typography variant="body2">{c.label}</Typography>}
                     />
                   );
