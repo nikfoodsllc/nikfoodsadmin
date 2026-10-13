@@ -10,7 +10,8 @@ function verifyAuth(request: NextRequest) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return { success: false as const, error: 'Missing or invalid authorization header' };
   const result = jwtHandler.verifyToken(authHeader.substring(7));
   if (!result.success || !result.payload) return { success: false as const, error: result.error || 'Invalid token' };
-  if (result.payload.role !== 'admin') return { success: false as const, error: 'Unauthorized: Admin access required' };
+  // admins and packers (the packing tools are the packer's work)
+  if (result.payload.role !== 'admin' && result.payload.role !== 'packer') return { success: false as const, error: 'Unauthorized: Admin access required' };
   return { success: true as const };
 }
 

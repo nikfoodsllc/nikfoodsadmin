@@ -35,6 +35,7 @@ import {
   IconBook,
 } from '@tabler/icons-react';
 import Image from 'next/image';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NavItem {
   title: string;
@@ -49,7 +50,7 @@ interface NavItem {
  * Food Catalog and User Administration. Pages that are no longer in the menu (the old stats Dashboard at
  * /admin/dashboard, Modifiers) still work when opened by their address.
  */
-const navItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
   {
     title: 'Order',
     icon: IconShoppingCart,
@@ -103,6 +104,12 @@ const navItems: NavItem[] = [
   },
 ];
 
+/** A packer's menu: two entries, nothing else */
+const packerNavItems: NavItem[] = [
+  { title: 'Orders', href: '/admin/orders', icon: IconShoppingCart },
+  { title: 'Packing Report', href: '/admin/reports/packing', icon: IconPackage },
+];
+
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
@@ -113,6 +120,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { user } = useAuth();
+  const navItems = user?.role === 'PACKER' ? packerNavItems : adminNavItems;
   const isActive = (href?: string) => {
     if (!href) return false;
     if (href === '/admin') {
@@ -129,7 +138,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   useEffect(() => {
     const holding = navItems.find((item) => item.children && item.children.some((c) => c.href && pathname?.startsWith(c.href)));
     if (holding) setOpenGroups((current) => (current[holding.title] ? current : { ...current, [holding.title]: true }));
-  }, [pathname]);
+  }, [pathname, navItems]);
 
   const handleNavigation = (href: string) => {
     router.push(href);

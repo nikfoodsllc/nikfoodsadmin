@@ -19,7 +19,7 @@ function req(query = '', token: string | null = 'good') {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  verifyToken.mockImplementation((t: string) => (t === 'good' ? { success: true, payload: { userId: 'a1', role: 'admin' } } : { success: false, error: 'bad' }));
+  verifyToken.mockImplementation((t: string) => (t === 'good' ? { success: true, payload: { userId: 'a1', role: 'admin' } } : t === 'packer' ? { success: true, payload: { userId: 'p1', role: 'packer' } } : { success: false, error: 'bad' }));
   count.mockResolvedValue({ success: true, count: 4321 });
   read.mockResolvedValue({ success: true, data: [{ orderId: 'ORD-1', items: [] }] });
 });
@@ -28,6 +28,10 @@ describe('GET /api/admin/orders', () => {
   it('needs an admin', async () => {
     expect((await GET(req('', null))).status).toBe(401);
     expect((await GET(req('', 'bad'))).status).toBe(401);
+  });
+  it('refuses a packer: the full orders list (money, emails, tracking) is for admins', async () => {
+    expect((await GET(req('', 'packer'))).status).toBe(401);
+    expect(read).not.toHaveBeenCalled();
   });
   it('counts orders in the database instead of loading them all, and reads only the one page', async () => {
     const res = await GET(req('?page=2&limit=10'));

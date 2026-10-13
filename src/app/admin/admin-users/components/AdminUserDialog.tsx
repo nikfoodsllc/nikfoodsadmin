@@ -11,6 +11,7 @@ import {
   Box,
   Typography,
   Alert,
+  MenuItem,
 } from '@mui/material';
 import { UserDocument } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +41,8 @@ export default function AdminUserDialog({
     phone: '',
     password: '',
   });
+  // who the account is for: an admin (everything) or a packer (only Orders and the Packing Report, no money). Set when it is created.
+  const [role, setRole] = useState<'ADMIN' | 'PACKER'>('ADMIN');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -59,6 +62,7 @@ export default function AdminUserDialog({
         password: '',
       });
     }
+    setRole('ADMIN');
     setError('');
   }, [mode, admin, open]);
 
@@ -124,6 +128,7 @@ export default function AdminUserDialog({
 
       if (mode === 'create') {
         body.password = formData.password;
+        body.role = role;
       } else if (mode === 'edit' && admin?._id) {
         url = `/api/admin/admin-users/${admin._id.toString()}`;
         method = 'PUT';
@@ -170,7 +175,7 @@ export default function AdminUserDialog({
       }}
     >
       <DialogTitle sx={{ fontWeight: 600, fontSize: '18px' }}>
-        {mode === 'create' ? 'Add New Admin' : 'Edit Admin User'}
+        {mode === 'create' ? 'Add New Admin or Packer' : admin?.role === 'PACKER' ? 'Edit Packer' : 'Edit Admin User'}
       </DialogTitle>
 
       <DialogContent>
@@ -209,6 +214,18 @@ export default function AdminUserDialog({
               disabled={loading}
             />
           </Box>
+
+          {mode === 'create' && (
+            <Box>
+              <Typography variant="body2" sx={{ marginBottom: 0.5, fontWeight: 500 }}>
+                Role
+              </Typography>
+              <TextField select fullWidth size="small" value={role} onChange={(e) => setRole(e.target.value === 'PACKER' ? 'PACKER' : 'ADMIN')} disabled={loading} inputProps={{ 'aria-label': 'Role' }}>
+                <MenuItem value="ADMIN">Admin: everything</MenuItem>
+                <MenuItem value="PACKER">Packer: only Orders and the Packing Report</MenuItem>
+              </TextField>
+            </Box>
+          )}
 
           <Box>
             <Typography variant="body2" sx={{ marginBottom: 0.5, fontWeight: 500 }}>

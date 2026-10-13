@@ -34,11 +34,14 @@ function verifyAuth(request: NextRequest) {
   if (!result.success || !result.payload) {
     return { success: false as const, error: result.error || 'Invalid token' };
   }
-  if (result.payload.role !== 'admin') {
+  // a packer may only keep the layout of the packing report tables (checked where the table is read)
+  if (result.payload.role !== 'admin' && result.payload.role !== 'packer') {
     return { success: false as const, error: 'Unauthorized: Admin access required' };
   }
-  return { success: true as const, userId: result.payload.userId };
+  return { success: true as const, userId: result.payload.userId, role: result.payload.role };
 }
+
+const PACKER_TABLES = ['packing-list', 'packing-totals'];
 
 // One layout per admin and table. Created once, on the first save (needs no manual setup).
 let indexEnsured = false;
@@ -60,6 +63,7 @@ export async function GET(request: NextRequest) {
 
     const table = new URL(request.url).searchParams.get('table') || '';
     if (!TABLES.includes(table)) return NextResponse.json({ error: 'Unknown table' }, { status: 400 });
+    if (auth.role === 'packer' && !PACKER_TABLES.includes(table)) return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
 
     const result = await db.readOne<TablePreferencesDoc>(COLLECTION, { userId: auth.userId, table });
     if (!result.success) return NextResponse.json({ error: 'Failed to load preferences' }, { status: 500 });
@@ -93,6 +97,7 @@ export async function PUT(request: NextRequest) {
     if (typeof table !== 'string' || !TABLES.includes(table)) {
       return NextResponse.json({ error: 'Unknown table' }, { status: 400 });
     }
+    if (auth.role === 'packer' && !PACKER_TABLES.includes(table)) return NextResponse.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
     const columns = validateColumnPrefsPayload(rawColumns);
     if (!columns) return NextResponse.json({ error: 'columns must be an object' }, { status: 400 });
 
