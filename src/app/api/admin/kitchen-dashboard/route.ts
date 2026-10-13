@@ -19,7 +19,8 @@ function verifyAuth(request: NextRequest) {
     return { success: false, error: verificationResult.error || 'Invalid token' };
   }
 
-  if (verificationResult.payload.role !== 'admin') {
+  // admins and packers (the kitchen dashboard holds counts only, no money)
+  if (verificationResult.payload.role !== 'admin' && verificationResult.payload.role !== 'packer') {
     return { success: false, error: 'Unauthorized: Admin access required' };
   }
 

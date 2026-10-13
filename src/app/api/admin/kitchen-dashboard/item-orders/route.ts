@@ -16,7 +16,8 @@ function verifyAuth(request: NextRequest) {
   if (!result.success || !result.payload) {
     return { success: false as const, error: result.error || 'Invalid token' };
   }
-  if (result.payload.role !== 'admin') {
+  // admins and packers (counts and who ordered, no money)
+  if (result.payload.role !== 'admin' && result.payload.role !== 'packer') {
     return { success: false as const, error: 'Unauthorized: Admin access required' };
   }
   return { success: true as const };

@@ -175,7 +175,7 @@ export default function AdminUserDialog({
       }}
     >
       <DialogTitle sx={{ fontWeight: 600, fontSize: '18px' }}>
-        {mode === 'create' ? 'Add New Admin or Packer' : admin?.role === 'PACKER' ? 'Edit Packer' : 'Edit Admin User'}
+        {mode === 'create' ? 'Add New Role' : admin?.role === 'PACKER' ? 'Edit Packer' : 'Edit Admin User'}
       </DialogTitle>
 
       <DialogContent>
@@ -222,7 +222,7 @@ export default function AdminUserDialog({
               </Typography>
               <TextField select fullWidth size="small" value={role} onChange={(e) => setRole(e.target.value === 'PACKER' ? 'PACKER' : 'ADMIN')} disabled={loading} inputProps={{ 'aria-label': 'Role' }}>
                 <MenuItem value="ADMIN">Admin: everything</MenuItem>
-                <MenuItem value="PACKER">Packer: only Orders and the Packing Report</MenuItem>
+                <MenuItem value="PACKER">Packer: Orders, Kitchen Dashboard, Packing Report</MenuItem>
               </TextField>
             </Box>
           )}

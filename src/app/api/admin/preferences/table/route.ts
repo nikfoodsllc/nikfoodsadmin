@@ -34,14 +34,14 @@ function verifyAuth(request: NextRequest) {
   if (!result.success || !result.payload) {
     return { success: false as const, error: result.error || 'Invalid token' };
   }
-  // a packer may only keep the layout of the packing report tables (checked where the table is read)
+  // a packer may only keep the layout of the packing report tables and the kitchen dashboard days (checked where the table is read)
   if (result.payload.role !== 'admin' && result.payload.role !== 'packer') {
     return { success: false as const, error: 'Unauthorized: Admin access required' };
   }
   return { success: true as const, userId: result.payload.userId, role: result.payload.role };
 }
 
-const PACKER_TABLES = ['packing-list', 'packing-totals'];
+const PACKER_TABLES = ['packing-list', 'packing-totals', 'kitchen-days'];
 
 // One layout per admin and table. Created once, on the first save (needs no manual setup).
 let indexEnsured = false;

@@ -137,6 +137,7 @@ describe('a packer', () => {
   it('may keep the layout of the packing report tables only', async () => {
     expect((await GET(req('GET', { query: '?table=packing-list', token: 'packer' }))).status).toBe(200);
     expect((await GET(req('GET', { query: '?table=packing-totals', token: 'packer' }))).status).toBe(200);
+    expect((await GET(req('GET', { query: '?table=kitchen-days', token: 'packer' }))).status).toBe(200);
     expect((await GET(req('GET', { query: '?table=orders', token: 'packer' }))).status).toBe(403);
     expect((await PUT(req('PUT', { body: { table: 'food-items', columns: { hidden: ['a'] } }, token: 'packer' }))).status).toBe(403);
     expect((await PUT(req('PUT', { body: { table: 'packing-list', columns: { hidden: ['a'] } }, token: 'packer' }))).status).toBe(200);
