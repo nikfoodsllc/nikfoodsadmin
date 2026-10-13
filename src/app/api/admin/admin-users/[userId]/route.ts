@@ -103,7 +103,7 @@ export async function PUT(
     // Update admin user
     const updateResult = await db.updateOne<UserDocument>(
       'users',
-      { _id: new ObjectId(userId), role: 'ADMIN' },
+      { _id: new ObjectId(userId), role: { $in: ['ADMIN', 'PACKER'] } },
       { $set: updateData }
     );
 
@@ -173,7 +173,7 @@ export async function DELETE(
     // Soft delete by setting isActive to false
     const updateResult = await db.updateOne<UserDocument>(
       'users',
-      { _id: new ObjectId(userId), role: 'ADMIN' },
+      { _id: new ObjectId(userId), role: { $in: ['ADMIN', 'PACKER'] } },
       { $set: { isActive: false, updatedAt: new Date() } }
     );
 
@@ -225,7 +225,7 @@ export async function PATCH(
     // Reactivate by setting isActive to true
     const updateResult = await db.updateOne<UserDocument>(
       'users',
-      { _id: new ObjectId(userId), role: 'ADMIN' },
+      { _id: new ObjectId(userId), role: { $in: ['ADMIN', 'PACKER'] } },
       { $set: { isActive: true, updatedAt: new Date() } }
     );
 

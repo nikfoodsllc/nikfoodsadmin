@@ -145,7 +145,9 @@ function TotalsTab({ totals, searching }: { totals: PackTotal[]; searching: bool
 }
 
 export default function PackingReportPage() {
-  const { token, loading: authLoading, isAuthenticated } = useAuth();
+  const { token, loading: authLoading, isAuthenticated, user } = useAuth();
+  // a packer has the report and Pack live; the packing times and reading routes from OptimoRoute are for admins
+  const isPacker = user?.role === 'PACKER';
   const router = useRouter();
   const today = useMemo(() => pacificDayOf(new Date()) ?? formatPSTDateISO(new Date()), []);
   // after the evening the next day's routes are what the team looks at
@@ -294,9 +296,9 @@ export default function PackingReportPage() {
           <Button component={Link} href="/admin/reports/packing/live" variant="contained" size="small" startIcon={<IconPlayerPlay size={16} />} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#F89C35', '&:hover': { bgcolor: '#E08A28' } }}>
             Pack live
           </Button>
-          <Button component={Link} href="/admin/reports/packing/metrics" variant="outlined" size="small" startIcon={<IconClockHour4 size={16} />} sx={{ textTransform: 'none', fontWeight: 600 }}>
+          {!isPacker && <Button component={Link} href="/admin/reports/packing/metrics" variant="outlined" size="small" startIcon={<IconClockHour4 size={16} />} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Packing times
-          </Button>
+          </Button>}
           <Button variant="outlined" size="small" startIcon={<IconColumns3 size={16} />} onClick={() => setColumnsOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Columns
           </Button>
@@ -306,13 +308,13 @@ export default function PackingReportPage() {
           <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} onClick={printPdf} disabled={!shown || loading || printing} sx={{ textTransform: 'none', fontWeight: 600 }}>
             {printing ? 'Making the PDF...' : 'Print (PDF)'}
           </Button>
-          <Tooltip title="Read the routes from OptimoRoute now">
+          {!isPacker && <Tooltip title="Read the routes from OptimoRoute now">
             <span>
               <IconButton onClick={refreshRoutes} disabled={loading || refreshing || !date} aria-label="Read the routes from OptimoRoute now">
                 {refreshing ? <CircularProgress size={20} /> : <IconRoute size={20} />}
               </IconButton>
             </span>
-          </Tooltip>
+          </Tooltip>}
           <Tooltip title="Reload">
             <span>
               <IconButton onClick={() => void load()} disabled={loading} aria-label="Reload the report">

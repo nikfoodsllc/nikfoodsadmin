@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
  */
 export interface JWTPayload {
   userId: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'packer';
   iat?: number;
   exp?: number;
 }
@@ -45,7 +45,7 @@ class JWTHandler {
    */
   public generateToken(
     userId: string,
-    role: 'user' | 'admin' = 'admin',
+    role: 'user' | 'admin' | 'packer' = 'admin',
     expiresIn: string = '7d'
   ): { success: boolean; token?: string; error?: string } {
     try {
@@ -172,7 +172,7 @@ export const jwtHandler = {
     }
     return jwtHandlerInstance;
   },
-  generateToken: (userId: string, role?: 'user' | 'admin', expiresIn?: string) => {
+  generateToken: (userId: string, role?: 'user' | 'admin' | 'packer', expiresIn?: string) => {
     const instance = JWTHandler.getInstance();
     return instance.generateToken(userId, role, expiresIn);
   },

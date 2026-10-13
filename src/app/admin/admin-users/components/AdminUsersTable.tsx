@@ -150,6 +150,19 @@ export default function AdminUsersTable({
                     <TableCell sx={{ padding: '12px' }}>
                       <Typography variant="body2" sx={{ fontWeight: 500, color: '#111827' }}>
                         {admin.name || 'N/A'}
+                        {admin.role === 'PACKER' && (
+                          <Chip
+                            label="Packer"
+                            size="small"
+                            sx={{
+                              marginLeft: 1,
+                              height: 20,
+                              fontSize: '11px',
+                              backgroundColor: '#FEF3C7',
+                              color: '#92400E',
+                            }}
+                          />
+                        )}
                         {isCurrentUser && (
                           <Chip
                             label="You"
