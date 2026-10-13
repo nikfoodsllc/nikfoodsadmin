@@ -71,6 +71,13 @@ describe('buildReportPdf', () => {
     for (const needle of ['Kitchen Prep', 'Ready to Eat', 'Stickers', 'Day totals', 'Rajma', 'Chapati', 'Amy', '12 oz', 'Page 1 of 4', 'Tue, Oct 13']) expect(pdf).toContain(needle);
     expect((pdf.match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(4); // one page per sheet here
   });
+  it('portrait with one item per page: every box has its own page, and nothing at all is refused', async () => {
+    const pdf = await text(await buildReportPdf(sheets.slice(0, 1), 'x', { orientation: 'portrait', boxPerPage: true }));
+    const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
+    expect(pages).toBe(report.cooked.length); // Rajma and Chapati
+    expect(pdf).toMatch(/MediaBox\s*\[0 0 612\.?\d* 792/);
+    await expect(buildReportPdf([], 'x')).rejects.toThrow(/nothing to include/);
+  });
   it('a long report runs over several pages and every page has a number', async () => {
     const many: KitchenRow[] = [];
     for (let i = 0; i < 40; i++) for (let j = 0; j < 8; j++) many.push(row({ orderId: `${i}-${j}`, name: `Item ${i}`, customerName: `Customer ${j}`, portion: '12Oz' }));
