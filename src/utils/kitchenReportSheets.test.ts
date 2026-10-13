@@ -138,7 +138,10 @@ describe('the Excel file', () => {
     expect(prep.getRow(1).getCell(3).border?.top?.style).toBe('medium');
     expect(prep.getRow(1).getCell(3).value).toBe('Item Name');
     expect(prep.getColumn(1).width).toBe(2);
-    expect(wb.getWorksheet('Stickers')!.getRow(2).getCell(2).value).toBe('Cat');
+    // Item first, then Customer Name
+    expect(wb.getWorksheet('Stickers')!.getRow(1).getCell(2).value).toBe('Item');
+    expect(wb.getWorksheet('Stickers')!.getRow(1).getCell(3).value).toBe('Customer Name');
+    expect(wb.getWorksheet('Stickers')!.getRow(2).getCell(3).value).toBe('Cat');
   });
   it('text that looks like a formula stays text', async () => {
     const report = buildKitchenReport([row({ customerName: '=SUM(A1)' })], byName);
