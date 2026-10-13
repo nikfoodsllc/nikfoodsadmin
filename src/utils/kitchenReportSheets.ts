@@ -67,8 +67,8 @@ export const PREP_COLUMNS: ColumnDef[] = [
 ];
 export const STICKER_COLUMNS: ColumnDef[] = [
   col('deliveryDate', 'Delivery date', 17),
-  col('customer', 'Customer', 22),
   col('item', 'Item', 30),
+  col('customer', 'Customer Name', 22),
   col('size', 'Size', 9),
   col('qty', 'Qty', 6),
   col('spice', 'Spice', 14),
@@ -154,12 +154,12 @@ export function readyToEatSheet(readyToEat: PrepBlock[], notSet: PrepBlock[]): S
 }
 
 export function stickersSheet(stickers: StickerLine[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Customer', 'Item', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Order', 'Order date', 'Kitchen date'] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Order', 'Order date', 'Kitchen date'] }];
   stickers.forEach((s, i) => {
     rows.push({
       kind: 'data',
       tone: rowTone(i, s.isEco),
-      cells: [date(s.deliveryDate), s.customerName, s.item, s.portion ?? '', s.quantity, s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.orderedOn), date(s.day)],
+      cells: [date(s.deliveryDate), s.item, s.customerName, s.portion ?? '', s.quantity, s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.orderedOn), date(s.day)],
     });
   });
   return { key: 'stickers', columnKeys: STICKER_COLUMNS.map((c) => c.key), name: 'Stickers', widths: STICKER_COLUMNS.map((c) => c.defaultWidth), rows };
