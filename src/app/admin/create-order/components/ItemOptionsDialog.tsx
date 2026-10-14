@@ -110,6 +110,8 @@ export default function ItemOptionsDialog({
   const [combo, setCombo] = useState<Record<string, string[]>>({});
   const [notes, setNotes] = useState('');
   const [quantity, setQuantity] = useState(1);
+  // the day it is delivered ('' = the kitchen day)
+  const [deliverOn, setDeliverOn] = useState('');
   // another price for one item, as typed ('' = the menu price)
   const [priceText, setPriceText] = useState('');
 
@@ -122,6 +124,7 @@ export default function ItemOptionsDialog({
       setCombo(editing.comboSelections ?? {});
       setNotes(editing.notes ?? '');
       setQuantity(editing.quantity);
+      setDeliverOn(editing.deliverOn ?? '');
       setPriceText(editing.unitPriceEdited !== undefined ? String(editing.unitPriceEdited) : '');
       return;
     }
@@ -132,6 +135,7 @@ export default function ItemOptionsDialog({
     setCombo(d.combo);
     setNotes('');
     setQuantity(1);
+    setDeliverOn('');
     setPriceText('');
   }, [open, item, editing]);
 
@@ -150,11 +154,13 @@ export default function ItemOptionsDialog({
   const edited = typed !== null && !priceBad && Math.round(typed * 100) !== Math.round(menuPrice * 100) ? Math.round(typed * 100) / 100 : undefined;
   const unit = Math.round(((edited ?? menuPrice) + eco_) * 100) / 100;
 
+  const deliverBad = deliverOn !== '' && deliverOn < date;
   const add = () => {
-    if (problem || priceBad) return;
+    if (problem || priceBad || deliverBad) return;
     const comboSelections = Object.fromEntries(Object.entries(combo).filter(([, ids]) => ids.length > 0));
     onAdd({
       date,
+      ...(deliverOn && deliverOn > date ? { deliverOn } : {}),
       foodItemId: item._id,
       quantity,
       selectedPortion: portion,
@@ -212,6 +218,18 @@ export default function ItemOptionsDialog({
             label={`Eco container${item.ecoContainerCharge ? ` (+${money(Number(item.ecoContainerCharge))})` : ''}`}
           />
         )}
+        <TextField
+          label="Deliver on"
+          type="date"
+          value={deliverOn || date}
+          onChange={(e) => setDeliverOn(e.target.value)}
+          size="small"
+          fullWidth
+          error={deliverBad}
+          helperText={deliverBad ? 'Not before the kitchen day' : deliverOn && deliverOn > date ? `Cooked for ${dayLabel}, delivered ${new Date(`${deliverOn}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })}` : `Kitchen day: ${dayLabel}`}
+          slotProps={{ htmlInput: { min: date } }}
+          sx={{ mb: 2 }}
+        />
         <TextField label="Note for the kitchen (optional)" value={notes} onChange={(e) => setNotes(e.target.value.slice(0, 300))} fullWidth size="small" multiline maxRows={3} sx={{ mb: 2 }} />
         <TextField
           label="Price for one (optional)"
@@ -235,7 +253,7 @@ export default function ItemOptionsDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 1.5 }}>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
-        <Button variant="contained" onClick={add} disabled={Boolean(problem) || priceBad} sx={{ textTransform: 'none', fontWeight: 700 }}>
+        <Button variant="contained" onClick={add} disabled={Boolean(problem) || priceBad || deliverBad} sx={{ textTransform: 'none', fontWeight: 700 }}>
           {editing ? 'Save changes' : 'Add'} · {money(unit * quantity)}
         </Button>
       </DialogActions>
