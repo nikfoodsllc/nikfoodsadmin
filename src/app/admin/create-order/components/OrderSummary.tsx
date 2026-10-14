@@ -105,6 +105,7 @@ export default function OrderSummary(props: {
                 </Typography>
                 {l.tags.length > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{l.tags.join(' · ')}</Typography>}
                 {l.notes && <Typography sx={{ fontSize: 12, color: '#6B7280', fontStyle: 'italic' }}>Note: {l.notes}</Typography>}
+                {l.deliverOn && l.deliverOn > l.date && <Typography sx={{ fontSize: 12, color: '#A85A00', fontWeight: 600 }}>Delivered {dayChipLabel(l.deliverOn)}</Typography>}
                 <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
                   {money(l.unitPrice)} each
                   {l.unitPriceEdited !== undefined && <Box component="span" sx={{ color: '#B45309', fontWeight: 600 }}> · price changed</Box>}

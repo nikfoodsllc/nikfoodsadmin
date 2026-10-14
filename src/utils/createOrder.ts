@@ -90,7 +90,10 @@ export function itemGroupsForDay(menu: MenuPayload, date: string): ItemGroup[] {
 
 /** What the admin picked for one line, as the customer site expects it. */
 export interface OrderLine {
+  /** The kitchen (menu) day */
   date: string;
+  /** The day it is delivered when that is later than the kitchen day (none = the same day) */
+  deliverOn?: string;
   foodItemId: string;
   quantity: number;
   selectedPortion?: string;
@@ -106,6 +109,7 @@ export interface OrderLine {
 export function orderLinePayload(l: OrderLine) {
   return {
     date: l.date,
+    ...(l.deliverOn && l.deliverOn > l.date ? { deliverOn: l.deliverOn } : {}),
     foodItemId: l.foodItemId,
     quantity: l.quantity,
     selectedPortion: l.selectedPortion,
@@ -132,7 +136,7 @@ export function lineSignature(line: OrderLine): string {
     .sort()
     .map((k) => `${k}:${[...(line.comboSelections?.[k] ?? [])].sort().join('+')}`)
     .join('|');
-  return [line.date, line.foodItemId, line.selectedPortion ?? '', line.selectedSpiceLevel ?? '', line.isEcoFriendlyContainer ? 'eco' : '', combo, (line.notes ?? '').trim(), line.unitPriceEdited !== undefined ? `price:${line.unitPriceEdited}` : ''].join('~');
+  return [line.date, line.deliverOn && line.deliverOn > line.date ? line.deliverOn : '', line.foodItemId, line.selectedPortion ?? '', line.selectedSpiceLevel ?? '', line.isEcoFriendlyContainer ? 'eco' : '', combo, (line.notes ?? '').trim(), line.unitPriceEdited !== undefined ? `price:${line.unitPriceEdited}` : ''].join('~');
 }
 
 export function addLine(lines: CartLine[], incoming: Omit<CartLine, 'key'>): CartLine[] {
