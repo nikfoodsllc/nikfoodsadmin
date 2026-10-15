@@ -32,6 +32,7 @@ interface FoodItem {
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
   preparationType?: 'cooked' | 'ready_to_eat';
+  sticker?: 'yes' | 'no';
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;

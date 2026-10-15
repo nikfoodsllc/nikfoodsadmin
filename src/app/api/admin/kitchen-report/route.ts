@@ -4,8 +4,9 @@ import { db } from '@/lib/db';
 import { jwtHandler } from '@/lib/jwt';
 import { fetchKitchenRows, fetchMovedKitchenRows } from '@/lib/kitchenRows';
 import { buildKitchenDays, comboParts, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
-import { buildKitchenReport, type TypeLookup } from '@/utils/kitchenReport';
+import { buildKitchenReport, type StickerLookup, type TypeLookup } from '@/utils/kitchenReport';
 import { normalizePreparationType, type PreparationType } from '@/utils/preparationType';
+import { normalizeSticker, type StickerFlag } from '@/utils/stickerFlag';
 
 function verifyAuth(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -57,9 +58,11 @@ export async function GET(request: NextRequest) {
     }
     const byId = new Map<string, PreparationType | null>();
     const nameTypes = new Map<string, Set<string>>();
+    const stickerById = new Map<string, StickerFlag | null>();
+    const nameStickers = new Map<string, Set<string>>();
     const objectIds = [...ids].filter((id) => /^[0-9a-fA-F]{24}$/.test(id)).map((id) => new ObjectId(id));
     if (objectIds.length > 0 || names.size > 0) {
-      const found = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown }>('fooditems', {
+      const found = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown; sticker?: unknown }>('fooditems', {
         $or: [{ _id: { $in: objectIds } }, { name: { $in: [...names] } }],
       } as never);
       for (const item of found.success ? found.data ?? [] : []) {
@@ -69,7 +72,11 @@ export async function GET(request: NextRequest) {
           const set = nameTypes.get(item.name.trim()) ?? new Set<string>();
           set.add(type ?? 'none');
           nameTypes.set(item.name.trim(), set);
+          const stickerSet = nameStickers.get(item.name.trim()) ?? new Set<string>();
+          stickerSet.add(normalizeSticker(item.sticker) ?? 'none');
+          nameStickers.set(item.name.trim(), stickerSet);
         }
+        stickerById.set(String(item._id), normalizeSticker(item.sticker));
       }
     }
     const typeOf: TypeLookup = ({ id, name }) => {
@@ -83,7 +90,18 @@ export async function GET(request: NextRequest) {
       return null;
     };
 
-    const report = buildKitchenReport(rows, typeOf);
+    const stickerOf: StickerLookup = ({ id, name }) => {
+      if (id && stickerById.has(id)) return stickerById.get(id) ?? null;
+      // same rule as the preparation type: by name only when every item with that name agrees
+      const set = nameStickers.get(name.trim());
+      if (set && set.size === 1) {
+        const only = [...set][0];
+        return only === 'none' ? null : (only as StickerFlag);
+      }
+      return null;
+    };
+
+    const report = buildKitchenReport(rows, typeOf, stickerOf);
     return NextResponse.json({
       data: {
         startDate: range.startDate,

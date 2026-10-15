@@ -106,6 +106,22 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="not_set">(not set yet)</MenuItem>
         </Select>
       </FormControl>
+
+      {/* Sticker */}
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>Sticker</InputLabel>
+        <Select
+          value={filters.sticker}
+          label="Sticker"
+          onChange={(e) => onFilterChange('sticker', e.target.value as FoodItemFilters['sticker'])}
+          sx={selectSx}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="yes">Yes</MenuItem>
+          <MenuItem value="no">No</MenuItem>
+          <MenuItem value="not_set">(not set yet)</MenuItem>
+        </Select>
+      </FormControl>
     </Box>
   );
 }

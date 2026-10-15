@@ -32,6 +32,7 @@ import ComboFoodItemDialog from './ComboFoodItemDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import TableFilters from './TableFilters';
 import { PreparationType } from '@/utils/preparationType';
+import { StickerFlag } from '@/utils/stickerFlag';
 import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, foodItemFilterParams } from './foodItemFilters';
 import TablePagination from './TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
@@ -62,6 +63,7 @@ interface FoodItem {
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
   preparationType?: PreparationType;
+  sticker?: StickerFlag;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -478,6 +480,29 @@ export default function FoodItemsPage() {
     }
   };
 
+  const applySticker = async (sticker: StickerFlag | null) => {
+    if (selectedIds.size === 0) return;
+    try {
+      setBulkLoading(true);
+      const response = await fetch('/api/admin/food-items/sticker', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: [...selectedIds], sticker }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update items');
+      const label = sticker === 'yes' ? 'Sticker: Yes' : sticker === 'no' ? 'Sticker: No' : 'Sticker: not set yet';
+      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
+      setSelectedIds(new Set());
+      await fetchItems();
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const handleAddMenuClick = (
     event: React.MouseEvent<HTMLElement>
   ) => {
@@ -797,6 +822,18 @@ export default function FoodItemsPage() {
           <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
             Clear (not set yet)
           </Button>
+          <Box sx={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#3730A3' }}>Sticker:</Typography>
+            <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('yes')} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+              Sticker Yes
+            </Button>
+            <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('no')} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+              Sticker No
+            </Button>
+            <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null)} sx={{ textTransform: 'none' }}>
+              Clear (not set yet)
+            </Button>
+          </Box>
           <Button size="small" disabled={bulkLoading} onClick={clearSelection} sx={{ textTransform: 'none' }}>
             Deselect all
           </Button>
