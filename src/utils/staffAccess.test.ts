@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { packerMayOpen } from './staffAccess';
 
 describe('packerMayOpen', () => {
-  it('allows the Orders list, the Kitchen Dashboard and the Packing Report with Pack live', () => {
+  it('allows the Orders list, the Kitchen Dashboard and the Packing Report with the Packing Planner', () => {
     expect(packerMayOpen('/admin/orders')).toBe(true);
     expect(packerMayOpen('/admin/orders/')).toBe(true);
     expect(packerMayOpen('/admin/reports/packing')).toBe(true);

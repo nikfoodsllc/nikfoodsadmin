@@ -148,7 +148,7 @@ function TotalsTab({ totals, searching }: { totals: PackTotal[]; searching: bool
 
 export default function PackingReportPage() {
   const { token, loading: authLoading, isAuthenticated, user } = useAuth();
-  // a packer has the report and Pack live; the packing times and reading routes from OptimoRoute are for admins
+  // a packer has the report and the Packing Planner; the packing times and reading routes from OptimoRoute are for admins
   const isPacker = user?.role === 'PACKER';
   const router = useRouter();
   const today = useMemo(() => pacificDayOf(new Date()) ?? formatPSTDateISO(new Date()), []);
@@ -296,7 +296,7 @@ export default function PackingReportPage() {
         </Box>
         <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <Button component={Link} href="/admin/reports/packing/live" variant="contained" size="small" startIcon={<IconPlayerPlay size={16} />} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#F89C35', '&:hover': { bgcolor: '#E08A28' } }}>
-            Pack live
+            Packing Planner
           </Button>
           {!isPacker && <Button component={Link} href="/admin/reports/packing/metrics" variant="outlined" size="small" startIcon={<IconClockHour4 size={16} />} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Packing times
