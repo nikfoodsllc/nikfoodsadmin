@@ -2,7 +2,7 @@
  * Whether a food item gets a packing sticker, for the Kitchen Report's Stickers sheet.
  *  - yes: its orders appear on the Stickers sheet
  *  - no:  they do not
- * An item with neither is "not set yet" (it does not appear on the Stickers sheet either).
+ * An item with neither is "not set yet": it appears on the Stickers sheet too, until it is marked No.
  */
 export type StickerFlag = 'yes' | 'no';
 

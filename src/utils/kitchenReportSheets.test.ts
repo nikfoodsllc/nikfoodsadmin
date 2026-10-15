@@ -10,7 +10,7 @@ import { buildReportWorkbook } from './downloadReportExcel';
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
 const types: Record<string, 'cooked' | 'ready_to_eat'> = { Rajma: 'cooked', Chapati: 'cooked', Pickle: 'ready_to_eat' };
 const byName: TypeLookup = ({ name }) => types[name] ?? null;
-const stickerYes: StickerLookup = ({ name }) => (name === 'Pickle' ? 'yes' : null);
+const stickerYes: StickerLookup = ({ name }) => (name === 'Pickle' ? 'yes' : 'no');
 
 describe('rowTone', () => {
   it('red, white, red ... and ECO is always green', () => {

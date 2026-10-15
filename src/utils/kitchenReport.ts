@@ -87,7 +87,7 @@ export interface KitchenReport {
   cooked: PrepBlock[];
   notSet: PrepBlock[];
   readyToEat: PrepBlock[];
-  /** The items marked Sticker = Yes, one line per customer order line, in the order they are packed */
+  /** The items not marked Sticker = No (Yes or not set yet), one line per customer order line, in the order they are packed */
   stickers: StickerLine[];
 }
 
@@ -195,7 +195,7 @@ function blockOf(name: string, group: PrepGroup, lines: PrepLine[]): PrepBlock {
   return { name, group, quantity, totalText, unsized: sized > 0 ? quantity - sized : 0, eco, lines: [...lines].sort(compareLines) };
 }
 
-/** `stickerOf`: only items it answers 'yes' for get a line on the Stickers sheet (without it there are none). */
+/** `stickerOf`: every item gets a line on the Stickers sheet except the ones it answers 'no' for (items not set yet are included). */
 export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stickerOf: StickerLookup = () => null): KitchenReport {
   const groups = new Map<string, { name: string; group: PrepGroup; lines: PrepLine[] }>();
   const stickers: StickerLine[] = [];
@@ -207,7 +207,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
     const entry = groups.get(key) ?? { name: atom.name, group, lines: [] };
     entry.lines.push(atom.line);
     groups.set(key, entry);
-    if (stickerOf({ id: atom.id, name: atom.name }) === 'yes') {
+    if (stickerOf({ id: atom.id, name: atom.name }) !== 'no') {
       stickers.push({
         item: atom.name,
         customerName: atom.line.customerName,

@@ -5,9 +5,9 @@ import type { KitchenRow } from './kitchenDashboard';
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
 const types: Record<string, 'cooked' | 'ready_to_eat'> = { Rajma: 'cooked', 'Kale Chane': 'cooked', Chapati: 'cooked', Pickle: 'ready_to_eat' };
 const byName: TypeLookup = ({ name }) => types[name] ?? null;
-// the items marked Sticker = Yes
+// the items on the Stickers sheet (everything else is marked No)
 const yes = new Set(['Pickle', 'Achar']);
-const stickerYes: StickerLookup = ({ name }) => (yes.has(name) ? 'yes' : null);
+const stickerYes: StickerLookup = ({ name }) => (yes.has(name) ? 'yes' : 'no');
 
 const combo = {
   name: 'Veg Combo',
@@ -100,7 +100,7 @@ describe('buildKitchenReport', () => {
     const r = buildKitchenReport([row({ name: 'Same Name', foodId: 'f-1' }), row({ orderId: '2', name: 'Same Name', foodId: 'f-2' })], byId);
     expect(r.readyToEat.map((b) => b.name)).toEqual(['Same Name']); expect(r.cooked.map((b) => b.name)).toEqual(['Same Name']);
   });
-  it('stickers: only items marked Yes, one line per order line, in item, spice, amount order', () => {
+  it('stickers: every item not marked No, one line per order line, in item, spice, amount order', () => {
     const r = buildKitchenReport([
       row({ name: 'Pickle', orderId: '1', customerName: 'Zed', day: '2026-10-14' }),
       row({ name: 'Pickle', orderId: '2', customerName: 'Amy', day: '2026-10-13', deliveredOn: '2026-10-14', portion: '16Oz', isEco: true }),
@@ -110,16 +110,16 @@ describe('buildKitchenReport', () => {
     expect(r.stickers.map((s) => `${s.deliveredOn ?? s.day}:${s.customerName}`)).toEqual(['2026-10-13:Bob', '2026-10-14:Zed', '2026-10-14:Amy']);
     expect(r.stickers[2]).toMatchObject({ item: 'Pickle', portion: '16Oz', isEco: true });
   });
-  it('only items marked Sticker = Yes get a sticker, whether cooked or ready to eat', () => {
+  it('items marked No are left off the stickers; Yes and not set yet are listed, cooked or ready to eat', () => {
     const marks: Record<string, 'yes' | 'no'> = { Rajma: 'yes', Pickle: 'no' };
     const r = buildKitchenReport([row({ name: 'Rajma' }), row({ name: 'Pickle', orderId: '2' }), row({ name: 'Chapati', orderId: '3' })], byName, ({ name }) => marks[name] ?? null);
-    expect(r.stickers.map((x) => x.item)).toEqual(['Rajma']);
+    expect(r.stickers.map((x) => x.item)).toEqual(['Chapati', 'Rajma']);
     // nothing changes on the prep sheets
     expect(r.cooked.map((b) => b.name)).toEqual(['Chapati', 'Rajma']);
     expect(r.readyToEat.map((b) => b.name)).toEqual(['Pickle']);
   });
-  it('without a sticker lookup there are no stickers', () => {
-    expect(buildKitchenReport([row({ name: 'Pickle' })], byName).stickers).toEqual([]);
+  it('without a sticker lookup every item is not set yet, so all are listed', () => {
+    expect(buildKitchenReport([row({ name: 'Pickle' })], byName).stickers).toHaveLength(1);
   });
   it('says a delivery is later only when it is', () => {
     const r = buildKitchenReport([row({ deliveredOn: '2026-10-14' }), row({ orderId: '2', deliveredOn: '2026-10-13' }), row({ orderId: '3', deliveredOn: null })], byName);

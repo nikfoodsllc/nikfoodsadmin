@@ -235,7 +235,7 @@ const foodItemSchema = z.object({
   // How the item is prepared for the kitchen. Required when CREATING an item (POST checks it); on update, null means
   // "back to not set yet" and leaving it out leaves the stored value alone.
   preparationType: z.enum(['cooked', 'ready_to_eat']).nullish(),
-  // Whether the item's orders get a packing sticker (Kitchen Report). Optional: null on update means "back to not set yet".
+  // Whether the item's orders get a packing sticker (Kitchen Report; No leaves it off). Optional: null on update means "back to not set yet".
   sticker: z.enum(['yes', 'no']).nullish(),
 
   // Portions type fields

@@ -7,7 +7,7 @@ import { buildReportPdf } from './reportPdf';
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
 const types: Record<string, 'cooked' | 'ready_to_eat'> = { Rajma: 'cooked', Chapati: 'cooked', Pickle: 'ready_to_eat' };
 const lookup: TypeLookup = ({ name }) => types[name] ?? null;
-const stickerLookup: StickerLookup = ({ name }) => (types[name] === 'ready_to_eat' ? 'yes' : null);
+const stickerLookup: StickerLookup = ({ name }) => (types[name] === 'ready_to_eat' ? 'yes' : 'no');
 
 const rows: KitchenRow[] = [
   row({ orderId: '1', customerName: 'Amy', portion: '12Oz', isEco: true, spiceLevel: 'Mild' }),
