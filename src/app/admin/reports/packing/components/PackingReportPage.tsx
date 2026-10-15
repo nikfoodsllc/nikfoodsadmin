@@ -362,7 +362,7 @@ export default function PackingReportPage() {
           </Typography>
         ) : (
           <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
-            There are no routes for this day yet (OptimoRoute plans them at 11 PM the evening before). Everything for the day is listed under &quot;Not on a route yet&quot; for now.
+            There are no routes for this day yet (OptimoRoute plans them at 8 PM the evening before). Everything for the day is listed under &quot;Not on a route yet&quot; for now.
           </Alert>
         )
       )}
