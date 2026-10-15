@@ -288,3 +288,72 @@ export function sheetAmounts(block: Pick<PrepBlock, 'lines' | 'totalText' | 'qua
   }
   return { values: block.lines.map((l) => l.amountText || `${l.quantity} ${l.quantity === 1 ? 'unit' : 'units'}`), total: blockTotal(block) };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Sorting (the same choice orders the screen, the Excel file and the PDF)
+// ---------------------------------------------------------------------------------------------
+
+export type SortKey = 'default' | 'item' | 'spice' | 'qty' | 'customer' | 'date';
+export interface SortChoice {
+  key: SortKey;
+  /** 'desc' reverses the chosen key only; ties keep the usual order */
+  dir: 'asc' | 'desc';
+}
+export const DEFAULT_SORT: SortChoice = { key: 'default', dir: 'asc' };
+
+export const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
+  { key: 'default', label: 'Standard order' },
+  { key: 'item', label: 'Item name' },
+  { key: 'spice', label: 'Spice level' },
+  { key: 'qty', label: 'Qty' },
+  { key: 'customer', label: 'Customer name' },
+  { key: 'date', label: 'Delivery date' },
+];
+
+const byText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+
+/** How much food a line is: size times quantity in ounces, or just the quantity when it has no readable weight. */
+function lineAmount(portion: string | null, quantity: number): number {
+  const size = parsePortionAmount(portion);
+  return size && size.oz > 0 ? size.oz * quantity : quantity;
+}
+
+function applyDir(sign: number, dir: SortChoice['dir']): number {
+  return dir === 'desc' ? -sign : sign;
+}
+
+/** Orders the lines inside every item box by the chosen key (boxes stay A to Z, except for "Item name" which can reverse them). */
+export function sortBlocks(blocks: PrepBlock[], sort: SortChoice): PrepBlock[] {
+  if (sort.key === 'default') return blocks;
+  if (sort.key === 'item') {
+    return [...blocks].sort((a, b) => applyDir(byText(a.name, b.name), sort.dir));
+  }
+  const keyOf = (a: PrepLine, b: PrepLine): number => {
+    if (sort.key === 'spice') return spiceRank(a.spice) - spiceRank(b.spice) || byText(clean(a.spice), clean(b.spice));
+    if (sort.key === 'qty') return lineAmount(a.portion, a.quantity) - lineAmount(b.portion, b.quantity);
+    if (sort.key === 'customer') return byText(a.customerName, b.customerName);
+    return a.deliveryDate.localeCompare(b.deliveryDate);
+  };
+  return blocks.map((block) => ({ ...block, lines: [...block.lines].sort((a, b) => applyDir(keyOf(a, b), sort.dir) || compareLines(a, b)) }));
+}
+
+/** Orders the sticker list by the chosen key (ties fall back to delivery date, customer, item, order number). */
+export function sortStickers(stickers: StickerLine[], sort: SortChoice): StickerLine[] {
+  if (sort.key === 'default') return stickers;
+  const keyOf = (a: StickerLine, b: StickerLine): number => {
+    if (sort.key === 'item') return byText(a.item, b.item);
+    if (sort.key === 'spice') return spiceRank(a.spice) - spiceRank(b.spice) || byText(clean(a.spice), clean(b.spice));
+    if (sort.key === 'qty') return lineAmount(a.portion, a.quantity) - lineAmount(b.portion, b.quantity);
+    if (sort.key === 'customer') return byText(a.customerName, b.customerName);
+    return a.deliveryDate.localeCompare(b.deliveryDate);
+  };
+  return [...stickers].sort(
+    (a, b) => applyDir(keyOf(a, b), sort.dir) || a.deliveryDate.localeCompare(b.deliveryDate) || byText(a.customerName, b.customerName) || byText(a.item, b.item) || a.orderId.localeCompare(b.orderId)
+  );
+}
+
+/** Orders each day's items (and combos) by name or by quantity; the other keys do not apply to a day total, so the usual order stays. */
+export function sortDayItems<T extends { name: string; quantity: number }>(list: T[], sort: SortChoice): T[] {
+  if (sort.key !== 'item' && sort.key !== 'qty') return list;
+  return [...list].sort((a, b) => applyDir(sort.key === 'qty' ? a.quantity - b.quantity : byText(a.name, b.name), sort.dir) || byText(a.name, b.name));
+}

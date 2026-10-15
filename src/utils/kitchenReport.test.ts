@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, type TypeLookup } from './kitchenReport';
+import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, sortBlocks, sortDayItems, sortStickers, type SortChoice, type TypeLookup } from './kitchenReport';
 import type { KitchenRow } from './kitchenDashboard';
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
@@ -157,5 +157,59 @@ describe('a combo item that comes several to a combo', () => {
     const all = [...r.cooked, ...r.notSet, ...r.readyToEat].flatMap((b) => b.lines.map((l) => ({ name: b.name, ...l })));
     const chapati = all.filter((l) => l.name === 'Chapati');
     expect(chapati.reduce((n, l) => n + l.quantity, 0)).toBe(8);
+  });
+});
+
+describe('sorting', () => {
+  const asc = (key: SortChoice['key']): SortChoice => ({ key, dir: 'asc' });
+  const desc = (key: SortChoice['key']): SortChoice => ({ key, dir: 'desc' });
+  const rows = [
+    row({ orderId: 'ORD-1', portion: '16Oz', spiceLevel: 'Hot', customerName: 'Zara', day: '2026-10-14' }),
+    row({ orderId: 'ORD-2', portion: '8Oz', spiceLevel: 'Mild', customerName: 'Beena', day: '2026-10-15' }),
+    row({ orderId: 'ORD-3', portion: '12Oz', spiceLevel: 'Medium', customerName: 'Asha', day: '2026-10-13', quantity: 2 }),
+  ];
+  const report = buildKitchenReport(rows, byName);
+  const who = (key: SortChoice) => sortBlocks(report.cooked, key)[0].lines.map((l) => l.customerName);
+  it('standard order changes nothing', () => {
+    expect(sortBlocks(report.cooked, { key: 'default', dir: 'asc' })).toBe(report.cooked);
+  });
+  it('sorts the lines of a box by spice, qty, customer and delivery date, and can reverse', () => {
+    expect(who(asc('spice'))).toEqual(['Beena', 'Asha', 'Zara']);
+    expect(who(desc('spice'))).toEqual(['Zara', 'Asha', 'Beena']);
+    expect(who(asc('qty'))).toEqual(['Beena', 'Zara', 'Asha']); // 8, 16, 24 oz
+    expect(who(desc('qty'))).toEqual(['Asha', 'Zara', 'Beena']);
+    expect(who(asc('customer'))).toEqual(['Asha', 'Beena', 'Zara']);
+    expect(who(asc('date'))).toEqual(['Asha', 'Zara', 'Beena']);
+  });
+  it('item name orders the boxes, A to Z or Z to A', () => {
+    const many = buildKitchenReport([row({ name: 'Rajma' }), row({ name: 'Kale Chane', orderId: 'ORD-9' })], byName);
+    expect(sortBlocks(many.cooked, asc('item')).map((b) => b.name)).toEqual(['Kale Chane', 'Rajma']);
+    expect(sortBlocks(many.cooked, desc('item')).map((b) => b.name)).toEqual(['Rajma', 'Kale Chane']);
+  });
+  it('does not change the input lists', () => {
+    const before = report.cooked[0].lines.map((l) => l.orderId);
+    sortBlocks(report.cooked, desc('customer'));
+    expect(report.cooked[0].lines.map((l) => l.orderId)).toEqual(before);
+  });
+  it('sorts stickers by every key, ties fall back to the usual order', () => {
+    const t: Record<string, 'ready_to_eat'> = { Pickle: 'ready_to_eat', Achar: 'ready_to_eat' };
+    const r = buildKitchenReport([
+      row({ name: 'Pickle', orderId: 'A', customerName: 'Zed', spiceLevel: 'Hot', portion: '8Oz' }),
+      row({ name: 'Achar', orderId: 'B', customerName: 'Amy', spiceLevel: 'Mild', portion: '16Oz' }),
+      row({ name: 'Pickle', orderId: 'C', customerName: 'Amy', spiceLevel: 'Mild', portion: '8Oz' }),
+    ], ({ name }) => t[name] ?? null);
+    const ids = (k: SortChoice) => sortStickers(r.stickers, k).map((s) => s.orderId);
+    expect(ids(asc('item'))).toEqual(['B', 'C', 'A']);
+    expect(ids(asc('spice'))).toEqual(['B', 'C', 'A']);
+    expect(ids(desc('spice'))).toEqual(['A', 'B', 'C']);
+    expect(ids(asc('qty'))).toEqual(['C', 'A', 'B']);
+    expect(ids(asc('customer'))).toEqual(['B', 'C', 'A']);
+  });
+  it('day totals sort by name or quantity only', () => {
+    const list = [{ name: 'B', quantity: 5 }, { name: 'A', quantity: 9 }];
+    expect(sortDayItems(list, asc('item')).map((x) => x.name)).toEqual(['A', 'B']);
+    expect(sortDayItems(list, desc('qty')).map((x) => x.name)).toEqual(['A', 'B']);
+    expect(sortDayItems(list, asc('qty')).map((x) => x.name)).toEqual(['B', 'A']);
+    expect(sortDayItems(list, asc('spice'))).toBe(list);
   });
 });
