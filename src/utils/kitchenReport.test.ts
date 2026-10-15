@@ -97,15 +97,15 @@ describe('buildKitchenReport', () => {
     const r = buildKitchenReport([row({ name: 'Same Name', foodId: 'f-1' }), row({ orderId: '2', name: 'Same Name', foodId: 'f-2' })], byId);
     expect(r.readyToEat.map((b) => b.name)).toEqual(['Same Name']); expect(r.cooked.map((b) => b.name)).toEqual(['Same Name']);
   });
-  it('stickers: only ready to eat, one line per order line, in delivery order then customer', () => {
+  it('stickers: only ready to eat, one line per order line, in item, spice, amount order', () => {
     const r = buildKitchenReport([
       row({ name: 'Pickle', orderId: '1', customerName: 'Zed', day: '2026-10-14' }),
       row({ name: 'Pickle', orderId: '2', customerName: 'Amy', day: '2026-10-13', deliveredOn: '2026-10-14', portion: '16Oz', isEco: true }),
       row({ name: 'Pickle', orderId: '3', customerName: 'Bob', day: '2026-10-13' }),
       row({}),
     ], byName);
-    expect(r.stickers.map((s) => `${s.deliveredOn ?? s.day}:${s.customerName}`)).toEqual(['2026-10-13:Bob', '2026-10-14:Amy', '2026-10-14:Zed']);
-    expect(r.stickers[1]).toMatchObject({ item: 'Pickle', portion: '16Oz', isEco: true });
+    expect(r.stickers.map((s) => `${s.deliveredOn ?? s.day}:${s.customerName}`)).toEqual(['2026-10-13:Bob', '2026-10-14:Zed', '2026-10-14:Amy']);
+    expect(r.stickers[2]).toMatchObject({ item: 'Pickle', portion: '16Oz', isEco: true });
   });
   it('says a delivery is later only when it is', () => {
     const r = buildKitchenReport([row({ deliveredOn: '2026-10-14' }), row({ orderId: '2', deliveredOn: '2026-10-13' }), row({ orderId: '3', deliveredOn: null })], byName);
@@ -204,6 +204,16 @@ describe('sorting', () => {
     expect(ids(desc('spice'))).toEqual(['A', 'B', 'C']);
     expect(ids(asc('qty'))).toEqual(['C', 'A', 'B']);
     expect(ids(asc('customer'))).toEqual(['B', 'C', 'A']);
+  });
+  it('the usual sticker order is item, then spice (mild to hot), then amount, not customer', () => {
+    const t: Record<string, 'ready_to_eat'> = { Pickle: 'ready_to_eat', Achar: 'ready_to_eat' };
+    const r = buildKitchenReport([
+      row({ name: 'Pickle', orderId: 'A', customerName: 'Amy', spiceLevel: 'Hot', portion: '8Oz' }),
+      row({ name: 'Achar', orderId: 'B', customerName: 'Zed', spiceLevel: 'Mild', portion: '16Oz' }),
+      row({ name: 'Pickle', orderId: 'C', customerName: 'Zed', spiceLevel: 'Mild', portion: '16Oz' }),
+      row({ name: 'Pickle', orderId: 'D', customerName: 'Bob', spiceLevel: 'Mild', portion: '8Oz' }),
+    ], ({ name }) => t[name] ?? null);
+    expect(r.stickers.map((x) => x.orderId)).toEqual(['B', 'D', 'C', 'A']);
   });
   it('day totals sort by name or quantity only', () => {
     const list = [{ name: 'B', quantity: 5 }, { name: 'A', quantity: 9 }];

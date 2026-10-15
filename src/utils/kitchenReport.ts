@@ -161,6 +161,19 @@ function compareLines(a: PrepLine, b: PrepLine): number {
   );
 }
 
+/** The usual order of the stickers: item name, then spice level (mild to hot), then the amount (smallest first), then delivery date, customer and order number. */
+function compareStickers(a: StickerLine, b: StickerLine): number {
+  return (
+    byText(a.item, b.item) ||
+    spiceRank(a.spice) - spiceRank(b.spice) ||
+    byText(clean(a.spice), clean(b.spice)) ||
+    lineAmount(a.portion, a.quantity) - lineAmount(b.portion, b.quantity) ||
+    a.deliveryDate.localeCompare(b.deliveryDate) ||
+    byText(a.customerName, b.customerName) ||
+    a.orderId.localeCompare(b.orderId)
+  );
+}
+
 function blockOf(name: string, group: PrepGroup, lines: PrepLine[]): PrepBlock {
   const amount = emptyAmount();
   let quantity = 0;
@@ -209,13 +222,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
     }
   }
   const blocks = [...groups.values()].map((g) => blockOf(g.name, g.group, g.lines)).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  stickers.sort(
-    (a, b) =>
-      a.deliveryDate.localeCompare(b.deliveryDate) ||
-      a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
-      a.item.localeCompare(b.item, undefined, { sensitivity: 'base' }) ||
-      a.orderId.localeCompare(b.orderId)
-  );
+  stickers.sort(compareStickers);
   return {
     cooked: blocks.filter((b) => b.group === 'cooked'),
     notSet: blocks.filter((b) => b.group === 'not_set'),
@@ -337,7 +344,7 @@ export function sortBlocks(blocks: PrepBlock[], sort: SortChoice): PrepBlock[] {
   return blocks.map((block) => ({ ...block, lines: [...block.lines].sort((a, b) => applyDir(keyOf(a, b), sort.dir) || compareLines(a, b)) }));
 }
 
-/** Orders the sticker list by the chosen key (ties fall back to delivery date, customer, item, order number). */
+/** Orders the sticker list by the chosen key (ties fall back to the usual order: item, spice, qty ...). */
 export function sortStickers(stickers: StickerLine[], sort: SortChoice): StickerLine[] {
   if (sort.key === 'default') return stickers;
   const keyOf = (a: StickerLine, b: StickerLine): number => {
@@ -348,7 +355,7 @@ export function sortStickers(stickers: StickerLine[], sort: SortChoice): Sticker
     return a.deliveryDate.localeCompare(b.deliveryDate);
   };
   return [...stickers].sort(
-    (a, b) => applyDir(keyOf(a, b), sort.dir) || a.deliveryDate.localeCompare(b.deliveryDate) || byText(a.customerName, b.customerName) || byText(a.item, b.item) || a.orderId.localeCompare(b.orderId)
+    (a, b) => applyDir(keyOf(a, b), sort.dir) || compareStickers(a, b)
   );
 }
 
