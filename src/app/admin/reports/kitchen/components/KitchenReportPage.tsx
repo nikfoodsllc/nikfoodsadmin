@@ -408,7 +408,7 @@ export default function KitchenReportPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827' }}>
-            Kitchen Report (BETA)
+            Kitchen Report
           </Typography>
           <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
             What to cook and what to pack for each menu day. Paid orders only; cancelled and refunded orders are left out.

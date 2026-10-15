@@ -437,7 +437,6 @@ export default function AbandonedCheckoutsPage() {
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 800 }}>Abandoned Checkout</Typography>
-          <Chip label="BETA" size="small" color="warning" sx={{ fontWeight: 800 }} />
         </Box>
         <Button size="small" onClick={() => void load()} disabled={refreshing} startIcon={refreshing ? <CircularProgress size={14} /> : <IconRefresh size={16} />} sx={{ textTransform: 'none' }}>Refresh</Button>
       </Box>

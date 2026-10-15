@@ -63,12 +63,12 @@ const adminNavItems: NavItem[] = [
     title: 'Reporting',
     icon: IconChartBar,
     children: [
-      { title: 'Kitchen Dashboard (BETA)', href: '/admin/kitchen-dashboard', icon: IconChefHat },
+      { title: 'Kitchen Dashboard', href: '/admin/kitchen-dashboard', icon: IconChefHat },
       { title: '(OLD) Ordered Items', href: '/admin/reports/ordered-items', icon: IconShoppingCart },
-      { title: 'Kitchen Report (BETA)', href: '/admin/reports/kitchen', icon: IconToolsKitchen2 },
-      { title: 'Packing Report (BETA)', href: '/admin/reports/packing', icon: IconPackage },
+      { title: 'Kitchen Report', href: '/admin/reports/kitchen', icon: IconToolsKitchen2 },
+      { title: 'Packing Report', href: '/admin/reports/packing', icon: IconPackage },
       { title: '(OLD) Delivery Report', href: '/admin/reports/delivery', icon: IconMapPin },
-      { title: 'Abandoned Checkout (BETA)', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
+      { title: 'Abandoned Checkout', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
     ],
   },
   {
@@ -107,7 +107,7 @@ const adminNavItems: NavItem[] = [
 /** A packer's menu: three entries, nothing else */
 const packerNavItems: NavItem[] = [
   { title: 'Orders', href: '/admin/orders', icon: IconShoppingCart },
-  { title: 'Kitchen Dashboard (BETA)', href: '/admin/kitchen-dashboard', icon: IconChefHat },
+  { title: 'Kitchen Dashboard', href: '/admin/kitchen-dashboard', icon: IconChefHat },
   { title: 'Packing Report', href: '/admin/reports/packing', icon: IconPackage },
 ];
 

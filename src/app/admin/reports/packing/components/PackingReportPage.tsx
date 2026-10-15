@@ -286,7 +286,7 @@ export default function PackingReportPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827' }}>
-            Packing Report (BETA)
+            Packing Report
           </Typography>
           <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
             What to pack for each delivery stop, in the order of the drivers&apos; routes. Only what is delivered on the day counts, whatever day it was cooked for.
