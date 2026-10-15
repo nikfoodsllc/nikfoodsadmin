@@ -326,7 +326,7 @@ function ConversionDialog({ kind, people, onClose, onOpenPerson, hasRow }: { kin
 export default function AbandonedCheckoutsPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [preset, setPreset] = useState<Preset>(7);
+  const [preset, setPreset] = useState<Preset>('today');
   const today = pacificToday();
   // what to ask the server for
   const queryString = preset === 'today' ? `from=${today}&to=${today}` : `days=${preset}`;
