@@ -1,6 +1,6 @@
 /**
  * What changed in a packing list since it was opened: orders that came in, orders that changed and orders that went away,
- * plus whether the drivers' routes were rearranged. Pack live uses it to tell the packers about new orders without ever
+ * plus whether the drivers' routes were rearranged. Packing Planner uses it to tell the packers about new orders without ever
  * changing the list under them mid-customer. Pure functions (no browser, no network).
  */
 import type { PackingReport, PackStop } from './packingReport';

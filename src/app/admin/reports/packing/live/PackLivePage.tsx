@@ -3,30 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, LinearProgress, Paper, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, LinearProgress, Paper, TextField, Typography } from '@mui/material';
+import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery, IconListDetails } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
-import { updatedAtText } from '@/utils/dataFreshness';
 import { comparePackingReports, describeChanges, type PackingChanges } from '@/utils/packingChanges';
 import { addDays, formatDayShort, isDayString, shortSpiceLabel, weekdayName } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
 import type { PackingReport, PackStop } from '@/utils/packingReport';
 import {
-  formatDuration,
   findMovedStop,
   groupByDay,
-  isTicked,
-  lineKeys,
   packableRoutes,
   routeLabel,
-  runElapsedMs,
   runStatus,
   startIndex,
-  stopCounts,
   stopMetaOf,
-  stopElapsedMs,
   stopKeyOf,
   summarizeRoute,
   type PackableRoute,
@@ -34,7 +27,6 @@ import {
 } from '@/utils/packingProgress';
 
 type Preset = 'today' | 'tomorrow' | 'other';
-type TabId = 'pack' | 'times';
 
 const ORANGE = '#F89C35';
 const POLL_MS = 4000;
@@ -42,18 +34,58 @@ const POLL_MS = 4000;
 const BIG_BUTTON = { textTransform: 'none', fontWeight: 800, fontSize: 22, minHeight: 72, px: 5, width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 340 }, borderRadius: 2, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } } as const;
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
-/** Phone: checkbox | quantity | item + chips. Wider screens follow the sheet: Check | Portion | Qty | Item | ECO | Spice. */
+/** Phone: quantity | item + chips. Wider screens follow the sheet: Portion | Qty | Item | ECO | Spice. (No checkboxes: the packer just moves on.) */
 const ROW_GRID = {
   display: 'grid',
-  gridTemplateColumns: { xs: '48px 34px 1fr', sm: '48px 76px 44px minmax(0, 440px) 60px 140px' },
+  gridTemplateColumns: { xs: '40px 1fr', sm: '76px 44px minmax(0, 440px) 60px 140px' },
   justifyContent: 'start',
-  gridTemplateAreas: { xs: '"check qty item"', sm: '"check portion qty item eco spice"' },
+  gridTemplateAreas: { xs: '"qty item"', sm: '"portion qty item eco spice"' },
   alignItems: 'center',
   columnGap: 1,
 };
 
 function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+/**
+ * Every customer of the route by name, in route order. The ones the packer has been through carry a check mark, the one on screen is
+ * highlighted, and tapping any name goes straight to that customer (while packing is on). Customers the packer skipped over stay unchecked.
+ */
+function CustomerList({ stops, run, current, canJump, finished, onJump, maxHeight }: { stops: PackStop[]; run: PackingRun | null; current: number; canJump: boolean; finished?: boolean; onJump: (index: number) => void; maxHeight?: string }) {
+  const currentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // keep the customer on screen in view inside the list (not the whole page)
+    const el = currentRef.current;
+    const box = el?.parentElement;
+    if (el && box) box.scrollTop = Math.max(0, el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2);
+  }, [current]);
+  return (
+    <Box sx={{ maxHeight, overflowY: 'auto' }}>
+      {stops.map((s, i) => {
+        const progress = run?.stops?.[stopKeyOf(s)];
+        // once the route is finished every customer the packer reached (the last one too) is checked and nobody is "current"
+        const isCurrent = i === current && !finished;
+        const visited = !isCurrent && Boolean(progress && (Number(progress.timeMs) > 0 || progress.firstOpenedAt));
+        return (
+          <Box
+            key={stopKeyOf(s)}
+            ref={isCurrent ? currentRef : undefined}
+            {...(canJump ? { role: 'button', tabIndex: 0, onClick: () => onJump(i), onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onJump(i)) } : {})}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.9, minHeight: 44, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: isCurrent ? '#FFF1DC' : '#fff', cursor: canJump ? 'pointer' : 'default', '&:hover': canJump ? { bgcolor: isCurrent ? '#FFF1DC' : '#FAFAFA' } : undefined, '&:focus-visible': { outline: '2px solid #F5C77E', outlineOffset: -2 } }}
+          >
+            <Box sx={{ width: 22, height: 22, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: visited ? '#126B2C' : 'transparent', border: visited ? 'none' : `1.5px solid ${isCurrent ? ORANGE : '#D1D5DB'}`, color: '#fff' }}>
+              {visited && <IconCheck size={14} stroke={3} />}
+            </Box>
+            <Typography sx={{ fontSize: 14, fontWeight: isCurrent ? 800 : 600, color: visited ? '#6B7280' : '#111827', wordBreak: 'break-word', lineHeight: 1.3 }}>
+              <Box component="span" sx={{ color: '#9CA3AF', fontWeight: 600, mr: 0.75 }}>{i + 1}</Box>
+              {s.customerName || 'Customer'}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
 }
 
 export default function PackLivePage() {
@@ -74,14 +106,16 @@ export default function PackLivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [routeKey, setRouteKey] = useState<string>('');
-  const [tab, setTab] = useState<TabId>('pack');
   const [clockSkew, setClockSkew] = useState(0);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  const [confirm, setConfirm] = useState<null | 'next' | 'finish' | 'reset' | 'stop'>(null);
+  const [confirm, setConfirm] = useState<null | 'reset' | 'stop'>(null);
   const [busy, setBusy] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  // the list of all customers: always at the side on a computer, in a window on a phone
+  const [listOpen, setListOpen] = useState(false);
   const startRequest = useLatestRequest();
   const inFlight = useRef(0);
+  // when the packer last moved to another customer: a second tap right after the first (a double tap) must not skip a customer
+  const lastMoveAt = useRef(0);
 
   const date = preset === 'today' ? today : preset === 'tomorrow' ? addDays(today, 1) : isDayString(otherDate) ? otherDate : null;
 
@@ -89,7 +123,7 @@ export default function PackLivePage() {
   const route = routes.find((r) => r.key === routeKey) ?? null;
   const run = runs.find((r) => r.routeKey === routeKey) ?? null;
   const status = runStatus(run);
-  const serverNow = nowMs + clockSkew;
+  const serverNow = Date.now() + clockSkew;
 
   // the report (what to pack) and the saved progress (who is where): the report once, the progress again and again
   const load = useCallback(async () => {
@@ -195,12 +229,6 @@ export default function PackLivePage() {
     return () => clearInterval(timer);
   }, [token, date, loading]);
 
-  // the timers
-  useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   // with one route, no need to choose
   useEffect(() => {
     if (!routeKey && routes.length === 1) setRouteKey(routes[0].key);
@@ -235,29 +263,16 @@ export default function PackLivePage() {
   const currentKey = run?.currentStopKey ?? null;
   const index = status === 'packing' || status === 'paused' ? Math.max(0, stops.findIndex((s) => stopKeyOf(s) === currentKey)) : status === 'done' ? stops.length - 1 : startIndex(route ?? { key: '', title: '', driverName: '', stops: [] }, run);
   const stop: PackStop | undefined = stops[index];
-  const stopKey = stop ? stopKeyOf(stop) : '';
-  const progress = stop ? run?.stops?.[stopKey] : undefined;
-  const counts = stop ? stopCounts(stop, progress) : { total: 0, done: 0, complete: false };
   const summary = route ? summarizeRoute(route, run, serverNow) : null;
 
-  // The list was swapped for a newer one. A customer whose stop was renumbered (a second order joined it) keeps their place and
-  // their ticks: found again by name and orders, and the ticks are copied onto the new stop. Only while packing is on.
-  const carried = useRef(new Set<string>());
+  // The list was swapped for a newer one. A customer whose stop was renumbered (a second order joined it) keeps their place: found again by
+  // name and orders. Only while packing is on.
   useEffect(() => {
     if (status !== 'packing' || !route || !run || stops.length === 0) return;
     const keys = new Set(stops.map(stopKeyOf));
     if (currentKey && !keys.has(currentKey)) {
       const target = findMovedStop(stops, run.stops?.[currentKey]?.meta);
-      if (target >= 0) void goTo(target);
-    }
-    for (const [oldKey, progress] of Object.entries(run.stops ?? {})) {
-      if (keys.has(oldKey) || carried.current.has(oldKey) || !progress.checked?.length) continue;
-      const target = findMovedStop(stops, progress.meta);
-      if (target < 0) continue;
-      carried.current.add(oldKey);
-      const newKey = stopKeyOf(stops[target]);
-      if ((run.stops?.[newKey]?.checked?.length ?? 0) > 0) continue; // already has ticks of its own
-      void send({ action: 'check', routeKey: route.key, stopKey: newKey, lineKeys: progress.checked, checked: true });
+      if (target >= 0) void goTo(target, { automatic: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, run, stops, status, currentKey]);
@@ -270,12 +285,18 @@ export default function PackLivePage() {
     setBusy(false);
   };
 
-  const goTo = async (target: number) => {
+  const goTo = async (target: number, options: { automatic?: boolean; jump?: boolean } = {}) => {
     if (!route || target < 0 || target >= stops.length) return;
+    if (!options.automatic && !options.jump) {
+      if (Date.now() - lastMoveAt.current < 900) return;
+      lastMoveAt.current = Date.now();
+    }
     setConfirm(null);
     // show it at once, the answer confirms it
     setRuns((prev) => prev.map((r) => (r.routeKey === route.key ? { ...r, currentStopKey: stopKeyOf(stops[target]) } : r)));
-    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]), meta: stopMetaOf(stops[target]) });
+    // the last customer is never moved on from: the server gives it the average time and finishes the route
+    const last = target === stops.length - 1 && stops.length > 1;
+    await send({ action: 'goto', routeKey: route.key, toStopKey: stopKeyOf(stops[target]), meta: stopMetaOf(stops[target]), ...(last ? { finishIfLast: true } : {}) });
   };
 
   const finish = async () => {
@@ -284,7 +305,6 @@ export default function PackLivePage() {
     setBusy(true);
     await send({ action: 'finish', routeKey: route.key });
     setBusy(false);
-    setTab('times');
   };
 
   const pause = async () => {
@@ -301,55 +321,17 @@ export default function PackLivePage() {
     setBusy(true);
     await send({ action: 'resume', routeKey: route.key });
     setBusy(false);
-    setTab('pack');
   };
 
   const reset = async () => {
     if (!route) return;
     setConfirm(null);
     await send({ action: 'reset', routeKey: route.key });
-    setTab('pack');
   };
 
-  const tick = (keys: string[], checked: boolean) => {
-    if (!route || !stop || status !== 'packing') return;
-    // items to tick and items to untick. A combo ticked as ONE line before combos were split counts all its options as ticked:
-    // unticking one of them turns the rest into ticks of their own.
-    const items = lineKeys(stop);
-    const current = new Set(progress?.checked ?? []);
-    const add: string[] = [];
-    const pull: string[] = [];
-    if (checked) add.push(...keys);
-    else {
-      for (const key of keys) {
-        pull.push(key);
-        const item = items.find((i) => i.key === key);
-        if (item?.parentKey && current.has(item.parentKey)) {
-          pull.push(item.parentKey);
-          for (const sibling of items) if (sibling.parentKey === item.parentKey && !keys.includes(sibling.key)) add.push(sibling.key);
-        }
-      }
-    }
-    setRuns((prev) =>
-      prev.map((r) => {
-        if (r.routeKey !== route.key) return r;
-        const before = new Set(r.stops?.[stopKey]?.checked ?? []);
-        add.forEach((k) => before.add(k));
-        pull.forEach((k) => before.delete(k));
-        return { ...r, stops: { ...r.stops, [stopKey]: { ...r.stops?.[stopKey], checked: [...before] } } };
-      })
-    );
-    if (add.length > 0) void send({ action: 'check', routeKey: route.key, stopKey, lineKeys: [...new Set(add)], checked: true });
-    if (pull.length > 0) void send({ action: 'check', routeKey: route.key, stopKey, lineKeys: [...new Set(pull)], checked: false });
-  };
-
+  // no checkboxes and no questions: Next customer simply moves on (the last customer finishes the route by itself)
   const onNext = () => {
-    if (index >= stops.length - 1) {
-      if (!counts.complete) setConfirm('finish');
-      else void finish();
-      return;
-    }
-    if (!counts.complete) setConfirm('next');
+    if (index >= stops.length - 1) void finish();
     else void goTo(index + 1);
   };
 
@@ -361,7 +343,6 @@ export default function PackLivePage() {
   const isLast = index >= stops.length - 1;
   // while packing the screen is only the work: the day and driver choices come back with "Change"
   const pickerOpen = status !== 'packing' || showPicker;
-  const checkedSet = new Set(progress?.checked ?? []);
 
   return (
     <Box sx={{ pb: { xs: status === 'packing' ? 12 : 2, md: status === 'packing' ? 12 : 2 } }}>
@@ -371,7 +352,7 @@ export default function PackLivePage() {
         </Button>
       </Box>
       <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827', mb: 1.5 }}>
-        Pack live
+        Packing Planner
       </Typography>
 
       {pickerOpen && (
@@ -382,7 +363,6 @@ export default function PackLivePage() {
           ))}
           {preset === 'other' && <TextField label="Delivery date" type="date" size="small" value={otherDate} onChange={(e) => setOtherDate(e.target.value)} InputLabelProps={{ shrink: true }} />}
         </Box>
-        {date && <Typography sx={{ fontSize: 14, color: '#374151', fontWeight: 600, mt: 1.25 }}>Delivery {formatDayShort(date)}</Typography>}
       </Paper>
       )}
 
@@ -426,7 +406,6 @@ export default function PackLivePage() {
                   clickable
                   onClick={() => {
                     setRouteKey(r.key);
-                    setTab('pack');
                     setShowPicker(false);
                   }}
                   variant={selected ? 'filled' : 'outlined'}
@@ -443,234 +422,168 @@ export default function PackLivePage() {
       {route && (
         <>
           <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>Packing for{date ? ` · ${formatDayShort(date)}` : ''}</Typography>
-                <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{routeLabel(route)}</Typography>
+                <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#111827', wordBreak: 'break-word', lineHeight: 1.2 }}>{routeLabel(route)}</Typography>
+                {/* the delivery day and the driver are written once, here at the top */}
+                {status === 'not_started' && (
+                  <Typography sx={{ fontSize: 14, color: '#374151' }}>
+                    {date ? `${formatDayShort(date)} · ` : ''}{route.stops.length} customer{route.stops.length === 1 ? '' : 's'} · {summary?.units ?? 0} unit{summary?.units === 1 ? '' : 's'}
+                  </Typography>
+                )}
+                {status !== 'not_started' && (
+                  <Typography sx={{ fontSize: 14, color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#374151', fontWeight: status === 'packing' ? 400 : 700 }}>
+                    {date ? `${formatDayShort(date)} · ` : ''}{status === 'done' ? 'Route done' : status === 'paused' ? 'Paused' : `${Math.min(index + 1, stops.length)} of ${stops.length}`}
+                  </Typography>
+                )}
               </Box>
               {status === 'packing' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, flexShrink: 0 }}>
-                  <Button size="small" variant="outlined" color="error" startIcon={<IconPlayerPause size={16} />} onClick={() => setConfirm('stop')} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
-                    Stop packing
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                  <Button size="small" startIcon={<IconListDetails size={16} />} onClick={() => setListOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, display: { xs: 'inline-flex', md: 'none' } }}>
+                    Customers
                   </Button>
                   <Button size="small" onClick={() => setShowPicker((v) => !v)} sx={{ textTransform: 'none', fontWeight: 600 }}>
                     {showPicker ? 'Hide' : 'Change driver or day'}
                   </Button>
+                  <Button size="small" variant="outlined" color="error" startIcon={<IconPlayerPause size={16} />} onClick={() => setConfirm('stop')} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
+                    Stop packing
+                  </Button>
                 </Box>
               )}
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mt: 1.25 }}>
-              {status === 'not_started' ? (
+            {status === 'not_started' && (
+              <Box sx={{ mt: 1.5 }}>
                 <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={30} />} onClick={start} disabled={busy} sx={BIG_BUTTON}>
                   Start packing
                 </Button>
-              ) : (
-                <Box>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280' }}>{status === 'done' ? 'Total time' : status === 'paused' ? 'Paused' : 'Timer'}</Typography>
-                  <Typography sx={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#111827', lineHeight: 1.1 }}>{formatDuration(runElapsedMs(run, serverNow))}</Typography>
-                </Box>
-              )}
-              <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                <Typography sx={{ fontSize: 14, color: '#374151' }}>
-                  {route.stops.length} customer{route.stops.length === 1 ? '' : 's'} · {summary?.units ?? 0} unit{summary?.units === 1 ? '' : 's'}{loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
-                </Typography>
-                {status !== 'not_started' && (
-                  <Typography sx={{ fontSize: 14, color: '#374151' }}>
-                    {summary?.complete ?? 0} of {summary?.customers ?? 0} packed{run?.startedBy ? ` · started by ${run.startedBy}` : ''}
-                  </Typography>
-                )}
               </Box>
-            </Box>
-            {status !== 'not_started' && <LinearProgress variant="determinate" value={summary && summary.customers > 0 ? (summary.complete / summary.customers) * 100 : 0} sx={{ mt: 1.5, height: 8, borderRadius: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: '#126B2C' } }} />}
+            )}
+            {status !== 'not_started' && <LinearProgress variant="determinate" value={stops.length > 0 ? (Math.min(status === 'done' ? stops.length : index, stops.length) / stops.length) * 100 : 0} sx={{ mt: 1.25, height: 8, borderRadius: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: '#126B2C' } }} />}
             {status === 'paused' && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, mt: 1.5 }}>
                 <Button variant="contained" size="large" startIcon={<IconPlayerPlay size={30} />} onClick={() => void resume()} disabled={busy} sx={BIG_BUTTON}>
                   Resume packing
                 </Button>
-                <Typography sx={{ fontSize: 13, color: '#6B7280' }}>Your place and ticks are kept. The timers are stopped.</Typography>
               </Box>
+            )}
+            {(status === 'paused' || status === 'done') && (
+              <Button color="inherit" size="small" onClick={() => setConfirm('reset')} sx={{ textTransform: 'none', color: '#B91C1C', mt: 1, ml: -1 }}>
+                Start this route again
+              </Button>
             )}
           </Paper>
 
-          {status !== 'not_started' && (
-            <Tabs value={tab} onChange={(_, v: TabId) => setTab(v)} sx={{ borderBottom: '1px solid #E5E7EB', mb: 2 }}>
-              <Tab value="pack" label="Pack" sx={{ textTransform: 'none', fontWeight: 600 }} />
-              <Tab value="times" label="Times" sx={{ textTransform: 'none', fontWeight: 600 }} />
-            </Tabs>
-          )}
-
-          {status === 'not_started' && <Typography sx={{ color: '#6B7280', fontSize: 14 }}>Press Start packing to begin with customer 1. The timer runs for each customer until you move to the next.</Typography>}
-
-          {status !== 'not_started' && tab === 'pack' && stop && (
-            <Box>
+          {status !== 'not_started' && stop && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 280px' }, columnGap: 2, alignItems: 'start' }}>
               <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>Customer {index + 1} of {stops.length}</Typography>
-                    <Typography sx={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#111827' }}>{formatDuration(stopElapsedMs(progress, serverNow))}</Typography>
-                  </Box>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>Customer {index + 1} of {stops.length}</Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, flexWrap: 'wrap' }}>
                     <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{stop.customerName}</Typography>
                     <Typography sx={{ fontSize: 14, color: '#374151', wordBreak: 'break-word', pt: 0.4 }}>Order # {stop.orderIds.join(', ')}</Typography>
                   </Box>
-                  {date && (
-                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-                      <IconTruckDelivery size={16} /> Delivery {formatDayShort(date)}
-                    </Typography>
-                  )}
-                  <Typography sx={{ fontSize: 13, color: counts.complete ? '#126B2C' : '#6B7280', fontWeight: 600 }}>
-                    {counts.done} of {counts.total} item{counts.total === 1 ? '' : 's'} checked
-                  </Typography>
                 </Box>
 
-                {groupByDay(stop).map((group) => {
-                  const keys = group.lines.map((l) => l.key);
-                  const all = group.lines.every((l) => isTicked(l, checkedSet));
-                  const some = group.lines.some((l) => isTicked(l, checkedSet));
-                  // a day other than the delivery date: the food was picked for that day and goes out on the delivery date
-                  const otherDay = Boolean(group.day && date && group.day !== date);
-                  return (
-                    <Box key={group.day}>
-                      <Box sx={{ ...ROW_GRID, px: 1, py: otherDay ? 0.75 : 0.5, bgcolor: otherDay ? '#FEF3C7' : '#FFF7ED', borderBottom: `1px solid ${otherDay ? '#FCD34D' : '#FED7AA'}` }}>
-                        <Box sx={{ gridArea: 'check' }}>
-                          <Checkbox disabled={status !== 'packing'} checked={all} indeterminate={some && !all} onChange={() => tick(keys, !all)} inputProps={{ 'aria-label': `Check all for ${group.day ? formatDayShort(group.day) : 'this day'}` }} sx={{ p: 1.25, color: ORANGE, '&.Mui-checked, &.MuiCheckbox-indeterminate': { color: ORANGE } }} />
-                        </Box>
-                        <Box sx={{ gridArea: { xs: 'qty / qty / qty / item', sm: 'portion / portion / portion / spice' }, minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 800, fontSize: 16, color: otherDay ? '#92400E' : '#9A3412' }}>
-                            {group.day ? (otherDay ? `${weekdayName(group.day)} items · ${formatDayShort(group.day)}` : formatDayShort(group.day)) : 'Items'}{' '}
-                            <Typography component="span" sx={{ fontSize: 13, fontWeight: 600, color: otherDay ? '#92400E' : '#9A3412', whiteSpace: 'nowrap' }}>· check all</Typography>
-                          </Typography>
-                          {otherDay && date && (
-                            <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <IconTruckDelivery size={15} /> Delivered {formatDayShort(date)}
+                {(() => {
+                  const groups = groupByDay(stop);
+                  return groups.map((group) => {
+                    // a day other than the delivery date: the food was picked for that day and goes out on the delivery date
+                    const otherDay = Boolean(group.day && date && group.day !== date);
+                    // the day heading is only written when it tells something: several days, or a day other than the delivery date
+                    const showHeading = groups.length > 1 || otherDay;
+                    return (
+                      <Box key={group.day}>
+                        {showHeading && (
+                          <Box sx={{ px: 2, py: 0.75, bgcolor: otherDay ? '#FEF3C7' : '#FFF7ED', borderBottom: `1px solid ${otherDay ? '#FCD34D' : '#FED7AA'}` }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: 16, color: otherDay ? '#92400E' : '#9A3412' }}>
+                              {group.day ? (otherDay ? `${weekdayName(group.day)} items · ${formatDayShort(group.day)}` : formatDayShort(group.day)) : 'Items'}
                             </Typography>
-                          )}
-                        </Box>
-                      </Box>
-                      <Box sx={{ ...ROW_GRID, display: { xs: 'none', sm: 'grid' }, px: 1, py: 0.5, borderBottom: '1px solid #F3F4F6' }}>
-                        {[
-                          ['check', 'Check'],
-                          ['portion', 'Portion size'],
-                          ['qty', 'Qty'],
-                          ['item', 'Item'],
-                          ['eco', 'ECO'],
-                          ['spice', 'Spice level'],
-                        ].map(([area, label]) => (
-                          <Typography key={area} sx={{ gridArea: area, fontSize: 13, fontWeight: 700, color: '#6B7280', textAlign: 'left' }}>
-                            {label}
-                          </Typography>
-                        ))}
-                      </Box>
-                      {group.lines.map((item) => {
-                        const { key, line } = item;
-                        const on = isTicked(item, checkedSet);
-                        return (
-                          <Box
-                            key={key}
-                            onClick={() => tick([key], !on)}
-                            sx={{ ...ROW_GRID, px: 1, py: 0.5, minHeight: 56, cursor: 'pointer', borderBottom: '1px solid #F3F4F6', bgcolor: on ? '#F0FDF4' : line.isEco ? '#F4FBF6' : '#fff', '&:hover': { bgcolor: on ? '#E7F8EE' : '#FAFAFA' } }}
-                          >
-                            <Box sx={{ gridArea: 'check', display: 'flex', justifyContent: 'flex-start' }} onClick={(e) => e.stopPropagation()}>
-                              <Checkbox disabled={status !== 'packing'} checked={on} onChange={() => tick([key], !on)} inputProps={{ 'aria-label': `Packed: ${line.name}` }} sx={{ p: 1.25, '&.Mui-checked': { color: '#126B2C' } }} />
-                            </Box>
-                            <Typography sx={{ gridArea: 'portion', display: { xs: 'none', sm: 'block' }, fontSize: 16, color: '#374151' }}>{line.portion ?? ''}</Typography>
-                            <Typography sx={{ gridArea: 'qty', fontSize: 18, fontWeight: 800, color: '#111827', textAlign: 'left' }}>{line.quantity}</Typography>
-                            <Box sx={{ gridArea: 'item', minWidth: 0, textDecoration: on ? 'line-through' : 'none', color: on ? '#6B7280' : '#111827' }}>
-                              <Typography sx={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, wordBreak: 'break-word', textDecoration: 'inherit' }}>{line.name}</Typography>
-                              {item.viaCombo && <Typography sx={{ fontSize: 13, color: '#6B7280', wordBreak: 'break-word', textDecoration: 'inherit' }}>from {item.viaCombo}</Typography>}
-                              {line.choices.map((c) => (
-                                <Typography key={c} sx={{ fontSize: 14, color: '#4B5563', wordBreak: 'break-word', textDecoration: 'inherit' }}>
-                                  {c}
-                                </Typography>
-                              ))}
-                              <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                {line.portion && <Chip size="small" label={line.portion} sx={{ height: 26, fontSize: 14 }} />}
-                                {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}
-                                {line.isEco && <Chip size="small" label="ECO" sx={{ height: 26, fontSize: 14, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
-                              </Box>
-                            </Box>
-                            <Box sx={{ gridArea: 'eco', display: { xs: 'none', sm: 'block' } }}>{line.isEco && <Chip size="small" label="ECO" sx={{ height: 26, fontSize: 14, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}</Box>
-                            <Box sx={{ gridArea: 'spice', display: { xs: 'none', sm: 'block' } }}>{line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}</Box>
+                            {otherDay && date && (
+                              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <IconTruckDelivery size={15} /> Delivered {formatDayShort(date)}
+                              </Typography>
+                            )}
                           </Box>
-                        );
-                      })}
-                    </Box>
-                  );
-                })}
+                        )}
+                        <Box sx={{ ...ROW_GRID, display: { xs: 'none', sm: 'grid' }, px: 2, py: 0.5, borderBottom: '1px solid #F3F4F6' }}>
+                          {[
+                            ['portion', 'Portion size'],
+                            ['qty', 'Qty'],
+                            ['item', 'Item'],
+                            ['eco', 'ECO'],
+                            ['spice', 'Spice level'],
+                          ].map(([area, label]) => (
+                            <Typography key={area} sx={{ gridArea: area, fontSize: 13, fontWeight: 700, color: '#6B7280', textAlign: 'left' }}>
+                              {label}
+                            </Typography>
+                          ))}
+                        </Box>
+                        {group.lines.map((item) => {
+                          const { key, line } = item;
+                          return (
+                            <Box key={key} sx={{ ...ROW_GRID, px: 2, py: 0.75, minHeight: 56, borderBottom: '1px solid #F3F4F6', bgcolor: line.isEco ? '#F4FBF6' : '#fff' }}>
+                              <Typography sx={{ gridArea: 'portion', display: { xs: 'none', sm: 'block' }, fontSize: 16, color: '#374151' }}>{line.portion ?? ''}</Typography>
+                              <Typography sx={{ gridArea: 'qty', fontSize: 18, fontWeight: 800, color: '#111827', textAlign: 'left' }}>{line.quantity}</Typography>
+                              <Box sx={{ gridArea: 'item', minWidth: 0, color: '#111827' }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3, wordBreak: 'break-word' }}>{line.name}</Typography>
+                                {item.viaCombo && <Typography sx={{ fontSize: 13, color: '#6B7280', wordBreak: 'break-word' }}>from {item.viaCombo}</Typography>}
+                                {line.choices.map((c) => (
+                                  <Typography key={c} sx={{ fontSize: 14, color: '#4B5563', wordBreak: 'break-word' }}>
+                                    {c}
+                                  </Typography>
+                                ))}
+                                <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                  {line.portion && <Chip size="small" label={line.portion} sx={{ height: 26, fontSize: 14 }} />}
+                                  {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}
+                                  {line.isEco && <Chip size="small" label="ECO" sx={{ height: 26, fontSize: 14, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+                                </Box>
+                              </Box>
+                              <Box sx={{ gridArea: 'eco', display: { xs: 'none', sm: 'block' } }}>{line.isEco && <Chip size="small" label="ECO" sx={{ height: 26, fontSize: 14, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}</Box>
+                              <Box sx={{ gridArea: 'spice', display: { xs: 'none', sm: 'block' } }}>{line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}</Box>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    );
+                  });
+                })()}
+              </Paper>
+              <Paper elevation={0} sx={{ display: { xs: 'none', md: 'block' }, border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, position: 'sticky', top: 80 }}>
+                <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>Customers</Typography>
+                <CustomerList stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} maxHeight="calc(100vh - 230px)" />
               </Paper>
             </Box>
-          )}
-
-          {status !== 'not_started' && tab === 'times' && summary && (
-            <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, px: 2, py: 1.5, bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                <Box>
-                  <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 700 }}>On customers</Typography>
-                  <Typography sx={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{formatDuration(summary.totalMs)}</Typography>
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 700 }}>Average per customer</Typography>
-                  <Typography sx={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{summary.averageMs > 0 ? formatDuration(summary.averageMs) : '–'}</Typography>
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 700 }}>Packed</Typography>
-                  <Typography sx={{ fontSize: 20, fontWeight: 800 }}>
-                    {summary.complete} of {summary.customers}
-                  </Typography>
-                </Box>
-              </Box>
-              {stops.map((s, i) => {
-                const key = stopKeyOf(s);
-                const p = run?.stops?.[key];
-                const c = stopCounts(s, p);
-                const ms = stopElapsedMs(p, serverNow);
-                return (
-                  <Box
-                    key={key}
-                    onClick={() => {
-                      setTab('pack');
-                      if (status === 'packing') void goTo(i);
-                    }}
-                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, px: 2, py: 1, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', cursor: status === 'packing' ? 'pointer' : 'default', bgcolor: key === currentKey ? '#FFF7ED' : '#fff' }}
-                  >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 14, fontWeight: 700, wordBreak: 'break-word' }}>
-                        {i + 1}. {s.customerName}
-                      </Typography>
-                      <Typography sx={{ fontSize: 13, color: c.complete ? '#126B2C' : c.done > 0 ? '#B45309' : '#9CA3AF' }}>
-                        {c.done} of {c.total} item{c.total === 1 ? '' : 's'}{c.complete ? ' · packed' : ''}
-                      </Typography>
-                    </Box>
-                    <Typography sx={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: ms > 0 ? '#111827' : '#D1D5DB' }}>{ms > 0 ? formatDuration(ms) : '–'}</Typography>
-                  </Box>
-                );
-              })}
-              <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid #E5E7EB' }}>
-                <Button color="inherit" size="small" onClick={() => setConfirm('reset')} sx={{ textTransform: 'none', color: '#B91C1C' }}>
-                  Start this route again
-                </Button>
-              </Box>
-            </Paper>
           )}
         </>
       )}
 
-      {status === 'packing' && stop && tab === 'pack' && (
+      {status === 'packing' && stop && (
         <Box sx={{ position: 'fixed', left: { xs: 0, md: 270 }, right: 0, bottom: 0, zIndex: 1200, p: 1.25, bgcolor: '#fff', borderTop: '1px solid #E5E7EB', boxShadow: '0 -4px 16px rgba(0,0,0,0.08)', display: 'flex', gap: 1.25 }}>
           <Button variant="outlined" size="large" startIcon={<IconChevronLeft size={20} />} disabled={index === 0} onClick={() => void goTo(index - 1)} sx={{ flex: 1, textTransform: 'none', fontWeight: 700, minHeight: 52 }}>
             Previous
           </Button>
-          <Button variant="contained" size="large" endIcon={isLast ? <IconCheck size={20} /> : <IconChevronRight size={20} />} onClick={onNext} disabled={busy} sx={{ flex: 1.4, textTransform: 'none', fontWeight: 800, minHeight: 52, bgcolor: counts.complete ? '#126B2C' : ORANGE, '&:hover': { bgcolor: counts.complete ? '#0E5522' : '#E08A28' } }}>
+          <Button variant="contained" size="large" endIcon={isLast ? <IconCheck size={20} /> : <IconChevronRight size={20} />} onClick={onNext} disabled={busy} sx={{ flex: 1.4, textTransform: 'none', fontWeight: 800, minHeight: 52, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
             {isLast ? 'Finish packing' : 'Next customer'}
           </Button>
         </Box>
       )}
 
+      <Dialog open={listOpen} onClose={() => setListOpen(false)} fullWidth maxWidth="xs" scroll="paper">
+        <DialogTitle sx={{ pb: 1 }}>Customers</DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <CustomerList stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => { setListOpen(false); void goTo(i, { jump: true }); }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setListOpen(false)} sx={{ textTransform: 'none' }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={confirm === 'stop'} onClose={() => setConfirm(null)} fullWidth maxWidth="xs">
         <DialogTitle>Stop packing?</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            {summary?.complete ?? 0} of {summary?.customers ?? 0} customers are packed. Pause keeps your place and every tick, and you carry on later. Finish ends this route as done.
+            Pause keeps your place and you carry on later. Finish ends this route as done.
           </DialogContentText>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Button variant="contained" size="large" startIcon={<IconPlayerPause size={20} />} onClick={() => void pause()} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
@@ -685,26 +598,10 @@ export default function PackLivePage() {
           </Box>
         </DialogContent>
       </Dialog>
-      <Dialog open={confirm === 'next' || confirm === 'finish'} onClose={() => setConfirm(null)}>
-        <DialogTitle>Some items are not checked</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {counts.total - counts.done} of {counts.total} items for {stop?.customerName} are not checked. {confirm === 'finish' ? 'Finish packing anyway?' : 'Go to the next customer anyway?'}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirm(null)} sx={{ textTransform: 'none' }}>
-            Keep packing
-          </Button>
-          <Button variant="contained" onClick={() => (confirm === 'finish' ? void finish() : void goTo(index + 1))} sx={{ textTransform: 'none', bgcolor: ORANGE, '&:hover': { bgcolor: '#E08A28' } }}>
-            {confirm === 'finish' ? 'Finish anyway' : 'Next anyway'}
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Dialog open={confirm === 'reset'} onClose={() => setConfirm(null)}>
         <DialogTitle>Start this route again?</DialogTitle>
         <DialogContent>
-          <DialogContentText>This clears every check mark and all the times saved for {route ? routeLabel(route) : 'this route'}. It cannot be undone.</DialogContentText>
+          <DialogContentText>This clears all the times saved for {route ? routeLabel(route) : 'this route'}. It cannot be undone.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirm(null)} sx={{ textTransform: 'none' }}>

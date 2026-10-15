@@ -1,5 +1,5 @@
 /**
- * Live packing: the helpers behind "Pack live". The team packs one driver's route customer by customer, ticks each item and
+ * Live packing: the helpers behind "Packing Planner". The team packs one driver's route customer by customer, ticks each item and
  * moves on; the time spent on every customer is kept. Pure functions (no database, no network) so they can be checked alone.
  *
  * A saved run (`packingRuns`, one per delivery date + route) looks like:
@@ -27,6 +27,8 @@ export interface StopProgress {
   timeMs?: number;
   /** Set while this customer is the one being packed: when the packer arrived (ISO) */
   activeSince?: string | null;
+  /** The time was filled in by the system (the average of the other customers) because the last customer is never moved on from */
+  auto?: boolean;
   firstOpenedAt?: string | null;
 }
 
@@ -192,46 +194,47 @@ export function runStatus(run: PackingRun | undefined | null): RunStatus {
 
 export interface RouteSummary {
   customers: number;
-  packed: number;
-  /** Customers with every item ticked */
+  /** Customers the packer has been through (some time recorded on them) */
   complete: number;
+  /** Same number as `complete` (kept for older callers) */
+  packed: number;
   units: number;
   totalMs: number;
   averageMs: number;
   slowest: { stopKey: string; ms: number } | null;
 }
 
-/** The totals shown for a route: how many customers are fully packed, and how long it took (only customers that were opened count in the average). */
+/**
+ * The totals for a route: how many customers the packer has been through, and how long it took (only customers that were opened count in
+ * the average). There are no checkboxes any more: a customer counts as packed once the packer moved on from it.
+ */
 export function summarizeRoute(route: PackableRoute, run: PackingRun | undefined | null, nowMs: number): RouteSummary {
   let complete = 0;
-  let packed = 0;
   let units = 0;
   let totalMs = 0;
-  let timed = 0;
   let slowest: RouteSummary['slowest'] = null;
   for (const stop of route.stops) {
     const key = stopKeyOf(stop);
     const progress = run?.stops?.[key];
-    const counts = stopCounts(stop, progress);
     units += lineKeys(stop).reduce((n, i) => n + i.line.quantity, 0);
-    if (counts.complete) complete += 1;
-    if (counts.done > 0) packed += 1;
     const ms = stopElapsedMs(progress, nowMs);
+    const saved = Math.max(0, Number(progress?.timeMs) || 0);
+    if (saved > 0) complete += 1;
     if (ms > 0) {
       totalMs += ms;
-      timed += 1;
       if (!slowest || ms > slowest.ms) slowest = { stopKey: key, ms };
     }
   }
-  return { customers: route.stops.length, packed, complete, units, totalMs, averageMs: timed > 0 ? Math.round(totalMs / timed) : 0, slowest };
+  const timed = route.stops.filter((s) => stopElapsedMs(run?.stops?.[stopKeyOf(s)], nowMs) > 0).length;
+  return { customers: route.stops.length, complete, packed: complete, units, totalMs, averageMs: timed > 0 ? Math.round(totalMs / timed) : 0, slowest };
 }
 
-/** Where to start packing: the saved current customer, else the first one not yet complete, else the first. */
+/** Where to start packing: the saved current customer, else the first one with no time on it yet, else the first. */
 export function startIndex(route: PackableRoute, run: PackingRun | undefined | null): number {
   const keys = route.stops.map(stopKeyOf);
   const saved = run?.currentStopKey ? keys.indexOf(run.currentStopKey) : -1;
   if (saved >= 0) return saved;
-  const open = route.stops.findIndex((s) => !stopCounts(s, run?.stops?.[stopKeyOf(s)]).complete);
+  const open = route.stops.findIndex((s) => !(Number(run?.stops?.[stopKeyOf(s)]?.timeMs) > 0));
   return open >= 0 ? open : 0;
 }
 

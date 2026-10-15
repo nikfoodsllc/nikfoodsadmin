@@ -47,13 +47,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-type Body = { action?: string; date?: string; routeKey?: string; driverName?: unknown; firstStopKey?: string; firstMeta?: unknown; totals?: unknown; meta?: unknown; stopKey?: string; toStopKey?: string; lineKeys?: unknown; checked?: unknown };
+type Body = { action?: string; date?: string; routeKey?: string; driverName?: unknown; firstStopKey?: string; firstMeta?: unknown; totals?: unknown; meta?: unknown; stopKey?: string; toStopKey?: string; lineKeys?: unknown; checked?: unknown; finishIfLast?: unknown };
 
 /**
  * POST /api/admin/packing-progress  { action, date, routeKey, ... }
  *   start   { driverName, firstStopKey, totals, firstMeta }  begin packing a route (the clock starts on the first customer)
  *   check   { stopKey, lineKeys[], checked }   tick or untick items of one customer
- *   goto    { toStopKey, meta }                next / previous customer (the time spent on the one left is saved)
+ *   goto    { toStopKey, meta, finishIfLast }  next / previous customer (the time spent on the one left is saved); finishIfLast: the target is the
+ *                                              last customer, so give it the average time and finish the route
  *   pause   {}                                 stop packing for now (timers stop, place and ticks are kept)
  *   resume  {}                                 carry on from the same customer
  *   finish  {}                                 the route is packed
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       }
       case 'goto': {
         if (!isSafeKey(body.toStopKey)) return NextResponse.json({ error: 'Unknown customer' }, { status: 400 });
-        return wrap(await goToStop(c as never, { date, routeKey, toStopKey: body.toStopKey, meta: cleanMeta(body.meta) }, now));
+        return wrap(await goToStop(c as never, { date, routeKey, toStopKey: body.toStopKey, meta: cleanMeta(body.meta), finishIfLast: body.finishIfLast === true }, now));
       }
       case 'pause':
         return wrap(await pauseRun(c as never, { date, routeKey }, now));
