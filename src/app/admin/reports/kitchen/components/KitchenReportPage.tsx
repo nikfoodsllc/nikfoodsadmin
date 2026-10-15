@@ -95,35 +95,50 @@ function DatesLine({ orderedOn, kitchenDay, deliveryDate }: { orderedOn: string 
   );
 }
 
-function LineRow({ line, index }: { line: PrepLine; index: number }) {
+/**
+ * One order line of an item card, easy to scan: who and how much first (the amount big on the right), then the size,
+ * spice and ECO as small tags. Dates are only shown when they matter: the kitchen day when the report covers several
+ * days, and the delivery day when it is a later day than the kitchen day. (The day the order was placed is left out.)
+ */
+function LineRow({ line, index, showKitchenDay }: { line: PrepLine; index: number; showKitchenDay: boolean }) {
+  const later = line.deliveryDate !== line.day;
+  const amount = line.amountText || `× ${line.quantity}`;
   return (
-    <Box sx={{ py: 0.9, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(index, line.isEco)) }}>
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{line.customerName}</Typography>
-        {line.viaCombo && (
-          <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
-            with {line.viaCombo}
-            {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
-          </Typography>
-        )}
-        {line.movedFrom && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Moved from {formatDayShort(line.movedFrom)}</Typography>}
+    <Box sx={{ py: 1.1, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(index, line.isEco)) }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1.5 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#111827', wordBreak: 'break-word', minWidth: 0, lineHeight: 1.3 }}>{line.customerName}</Typography>
+        <Typography sx={{ fontSize: 16, fontWeight: 800, color: '#92400E', whiteSpace: 'nowrap', flexShrink: 0 }}>{amount}</Typography>
       </Box>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '62%' }}>
-        {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
-        <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>
-          {line.portion ? `${line.portion} × ${line.quantity}` : `× ${line.quantity}`}
+      {(line.portion || line.spice || line.isEco) && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+          {line.portion && <Typography sx={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{`${line.portion} × ${line.quantity}`}</Typography>}
+          {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, fontWeight: 600, ...SPICE_CHIP }} />}
+          {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+        </Box>
+      )}
+      {line.viaCombo && (
+        <Typography sx={{ fontSize: 12.5, color: '#4B5563', mt: 0.4 }}>
+          From {line.viaCombo}
+          {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
         </Typography>
-        {line.amountText && <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', whiteSpace: 'nowrap' }}>{line.amountText}</Typography>}
-        {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
-      </Box>
-    </Box>
-    <DatesLine orderedOn={line.orderedOn} kitchenDay={line.day} deliveryDate={line.deliveryDate} />
+      )}
+      {(showKitchenDay || later || line.movedFrom) && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.15, mt: 0.4, fontSize: 12.5, lineHeight: 1.45 }}>
+          {showKitchenDay && <Box component="span" sx={{ color: '#4B5563' }}>Cook {formatDayShort(line.day)}</Box>}
+          {later && (
+            <Box component="span" sx={{ color: '#B45309', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
+              Delivered {formatDayShort(line.deliveryDate)}
+            </Box>
+          )}
+          {line.movedFrom && <Box component="span" sx={{ color: '#B45309', fontWeight: 600 }}>Moved from {formatDayShort(line.movedFrom)}</Box>}
+        </Box>
+      )}
     </Box>
   );
 }
 
-function PrepCard({ block, warn }: { block: PrepBlock; warn?: boolean }) {
+function PrepCard({ block, warn, showKitchenDay }: { block: PrepBlock; warn?: boolean; showKitchenDay: boolean }) {
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
@@ -139,7 +154,7 @@ function PrepCard({ block, warn }: { block: PrepBlock; warn?: boolean }) {
       </Box>
       <Box>
         {block.lines.map((line, i) => (
-          <LineRow key={`${line.orderId}-${i}`} line={line} index={i} />
+          <LineRow key={`${line.orderId}-${i}`} line={line} index={i} showKitchenDay={showKitchenDay} />
         ))}
       </Box>
     </Paper>
@@ -315,6 +330,12 @@ export default function KitchenReportPage() {
   const stickers = useMemo(() => (data ? sortStickers(filterStickersBySearch(data.stickers, search), sort) : []), [data, search, sort]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const dayBlocks = useMemo(() => (data ? data.days.map((d) => sortDay(searching ? filterBlockBySearch(d, search) : d)) : []), [data, search, searching, sort]);
+  // the kitchen day is only written on each line when the report covers more than one kitchen day
+  const multiDay = useMemo(() => {
+    const days = new Set<string>();
+    for (const b of [...(data?.cooked ?? []), ...(data?.readyToEat ?? []), ...(data?.notSet ?? [])]) for (const l of b.lines) days.add(l.day);
+    return days.size > 1;
+  }, [data]);
   const cookedCount = cooked.length;
   const notSetCount = notSet.length;
   const readyCount = readyToEat.length + notSetCount;
@@ -533,7 +554,7 @@ export default function KitchenReportPage() {
             <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? `Nothing matches “${search.trim()}”.` : 'Nothing to cook for these days.'}</Typography>
           )}
           {cooked.map((block) => (
-            <PrepCard key={block.name} block={block} />
+            <PrepCard key={block.name} block={block} showKitchenDay={multiDay} />
           ))}
         </>
       )}
@@ -548,13 +569,13 @@ export default function KitchenReportPage() {
             <Typography sx={{ color: '#9CA3AF', py: 3 }}>{searching ? `Nothing matches “${search.trim()}”.` : 'No ready-to-eat items for these days.'}</Typography>
           )}
           {readyToEat.map((block) => (
-            <PrepCard key={`ready-${block.name}`} block={block} />
+            <PrepCard key={`ready-${block.name}`} block={block} showKitchenDay={multiDay} />
           ))}
           {notSetCount > 0 && (
             <>
               <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mt: 3, mb: 1 }}>Preparation type not set yet</Typography>
               {notSet.map((block) => (
-                <PrepCard key={`notset-${block.name}`} block={block} warn />
+                <PrepCard key={`notset-${block.name}`} block={block} warn showKitchenDay={multiDay} />
               ))}
             </>
           )}
