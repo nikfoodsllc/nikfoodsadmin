@@ -24,6 +24,8 @@ import {
   Divider,
 } from '@mui/material';
 import PreparationTypeField from './PreparationTypeField';
+import StickerField from './StickerField';
+import { StickerFlag } from '@/utils/stickerFlag';
 import { PreparationType, preparationTypeError } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
@@ -79,6 +81,7 @@ interface ComboFoodItem {
   ecoContainerCharge: number;
   isDraft?: boolean;
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
+  sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
 }
 
 interface ComboFoodItemDialogProps {
@@ -528,6 +531,9 @@ export default function ComboFoodItemDialog({
             required={!item?._id}
             error={errors.preparationType}
           />
+
+          {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
+          <StickerField value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value }))} disabled={loading} />
 
           <Divider />
 

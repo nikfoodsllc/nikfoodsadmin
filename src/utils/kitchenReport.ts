@@ -24,6 +24,7 @@ import {
   spicedPartNames,
 } from './kitchenDashboard';
 import type { PreparationType } from './preparationType';
+import type { StickerFlag } from './stickerFlag';
 
 export type PrepGroup = 'cooked' | 'ready_to_eat' | 'not_set';
 
@@ -86,12 +87,14 @@ export interface KitchenReport {
   cooked: PrepBlock[];
   notSet: PrepBlock[];
   readyToEat: PrepBlock[];
-  /** The ready-to-eat items, one line per customer order line, in the order they go out */
+  /** The items not marked Sticker = No (Yes or not set yet), one line per customer order line, in the order they are packed */
   stickers: StickerLine[];
 }
 
 /** How an item is prepared, looked up by its id (when the order has one) or its name. */
 export type TypeLookup = (food: { id?: string | null; name: string }) => PreparationType | null;
+/** Whether an item gets a packing sticker, looked up the same way (null = not set yet). */
+export type StickerLookup = (food: { id?: string | null; name: string }) => StickerFlag | null;
 
 const clean = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -192,7 +195,8 @@ function blockOf(name: string, group: PrepGroup, lines: PrepLine[]): PrepBlock {
   return { name, group, quantity, totalText, unsized: sized > 0 ? quantity - sized : 0, eco, lines: [...lines].sort(compareLines) };
 }
 
-export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): KitchenReport {
+/** `stickerOf`: every item gets a line on the Stickers sheet except the ones it answers 'no' for (items not set yet are included). */
+export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stickerOf: StickerLookup = () => null): KitchenReport {
   const groups = new Map<string, { name: string; group: PrepGroup; lines: PrepLine[] }>();
   const stickers: StickerLine[] = [];
   for (const atom of atomsOf(rows)) {
@@ -203,7 +207,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup): Kitc
     const entry = groups.get(key) ?? { name: atom.name, group, lines: [] };
     entry.lines.push(atom.line);
     groups.set(key, entry);
-    if (group === 'ready_to_eat') {
+    if (stickerOf({ id: atom.id, name: atom.name }) !== 'no') {
       stickers.push({
         item: atom.name,
         customerName: atom.line.customerName,

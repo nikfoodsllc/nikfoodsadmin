@@ -21,11 +21,12 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff, IconShoppingCartPlus } from '@tabler/icons-react';
+import { IconMail, IconPhone, IconRefresh, IconShoppingCartOff, IconShoppingCartPlus } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AbandonedMetricsPanel from './AbandonedMetricsPanel';
 import type { AbandonedMetrics, ConversionPerson } from '@/utils/abandonedMetrics';
 import type { PaidReason, PaidRow } from '@/utils/abandonedPaid';
+import { layoutCheckoutDays, weekdayName } from '@/utils/checkoutDays';
 import { pacificToday, QUIET_MINUTES, reachOutEmail, RETENTION_DAYS, splitByReminder, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
@@ -60,8 +61,30 @@ interface Data {
   paid?: PaidRow[];
 }
 
-/** What one person left in their cart, in short lines ("2 × Veg Combo · Medium · Eco"). */
-function ItemLines({ row, all }: { row: AbandonedRow; all: boolean }) {
+/** One item line: "2 × Veg Combo · $50.00" with its size, spice, eco container, combo picks and note underneath. */
+function ItemLine({ item }: { item: AbandonedRow['items'][number] }) {
+  return (
+    <Box sx={{ py: 0.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word', minWidth: 0 }}>
+          {item.quantity} × {item.name}
+        </Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 600, flexShrink: 0 }}>{money(item.lineTotal)}</Typography>
+      </Box>
+      {[item.portion, item.spice, item.eco ? 'Eco container' : '', ...(item.choices ?? []), item.note ? `Note: ${item.note}` : '']
+        .filter(Boolean)
+        .map((line, j) => (
+          <Typography key={j} sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{line}</Typography>
+        ))}
+    </Box>
+  );
+}
+
+/**
+ * What they left in the cart, laid out like the order details in Orders: a block per menu day (the day the items were
+ * picked for) with the day it is delivered on, the items, the day's total, then the whole total.
+ */
+function CheckoutDetails({ row }: { row: AbandonedRow }) {
   if (row.noItemDetails) {
     return (
       <Typography sx={{ fontSize: 13, color: '#6B7280' }}>
@@ -69,23 +92,45 @@ function ItemLines({ row, all }: { row: AbandonedRow; all: boolean }) {
       </Typography>
     );
   }
-  const shown = all ? row.items : row.items.slice(0, 3);
+  const layout = layoutCheckoutDays(row.items, row.minCartValue);
   return (
     <Box>
-      {shown.map((item, i) => (
-        <Box key={`${item.name}-${i}`} sx={{ py: 0.25 }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>
-            {item.quantity} × {item.name}
-            <Typography component="span" sx={{ fontSize: 13, color: '#6B7280', fontWeight: 400 }}> · {money(item.lineTotal)}</Typography>
-          </Typography>
-          {[item.portion, item.spice, item.eco ? 'Eco container' : '', ...(item.choices ?? []), item.note ? `Note: ${item.note}` : '']
-            .filter(Boolean)
-            .map((line, j) => (
-              <Typography key={j} sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{line}</Typography>
-            ))}
-        </Box>
-      ))}
-      {!all && row.items.length > 3 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>+ {row.items.length - 3} more</Typography>}
+      {layout.days.map((day) => {
+        const deliveryDay = day.deliveredOn ?? day.date;
+        return (
+          <Box key={day.date || 'no-day'} sx={{ mb: 1, border: '1px solid #E5E7EB', borderRadius: 1.5, bgcolor: '#fff', overflow: 'hidden' }}>
+            <Box sx={{ px: 1.25, py: 0.75, bgcolor: '#FFF8EC', borderBottom: '1px solid #F3E3C3' }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Picked for</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 800 }}>{day.date ? `${day.weekday || weekdayName(day.date)} - ${dayText(day.date).replace(/^\w+, /, '')}` : 'No day saved'}</Typography>
+              {day.date && (
+                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: day.deliveredOn ? '#B45309' : '#047857' }}>
+                  Delivered on {weekdayName(deliveryDay)}, {dayText(deliveryDay).replace(/^\w+, /, '')}
+                  {day.deliveredOn ? ' (combined with the last day of the cart)' : ''}
+                </Typography>
+              )}
+            </Box>
+            <Box sx={{ px: 1.25, py: 0.5 }}>
+              {day.items.map((item, i) => (
+                <ItemLine key={`${item.name}-${i}`} item={item} />
+              ))}
+            </Box>
+            <Box sx={{ px: 1.25, py: 0.5, borderTop: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between' }}>
+              <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>{day.weekday || 'Day'} total</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{money(day.dayTotal)}</Typography>
+            </Box>
+          </Box>
+        );
+      })}
+      {layout.belowMinimum && (
+        <Typography sx={{ fontSize: 12.5, color: '#B45309', mb: 0.5 }}>
+          The whole cart is under the {money(layout.minCartValue)} minimum for {row.zip ? `zip ${row.zip}` : 'this zip'}, so it could not be paid yet.
+        </Typography>
+      )}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 0.25 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Items subtotal</Typography>
+        <Typography sx={{ fontSize: 13, fontWeight: 800 }}>{money(layout.days.reduce((sum, d) => sum + d.dayTotal, 0))}</Typography>
+      </Box>
+      {row.zip && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>Zip {row.zip}</Typography>}
     </Box>
   );
 }
@@ -150,11 +195,9 @@ function PaidCard({ row }: { row: PaidRow }) {
 }
 
 function PersonCard({ row, onHide, onRemind, onCreateOrder }: { row: AbandonedRow; onHide: (row: AbandonedRow) => void; onRemind: (row: AbandonedRow) => void; onCreateOrder: (row: AbandonedRow) => void }) {
-  const [open, setOpen] = useState(false);
   const mail = reachOutEmail(row);
   const mailto = row.email ? `mailto:${row.email}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}` : '';
   const phoneDigits = (row.phone ?? '').replace(/[^\d+]/g, '');
-  const canExpand = row.items.length > 3;
   // the reminder email is sent from here whenever the checkout has its saved items (older ones without items still open your mail app);
   // after a send the same button sends another one, after a confirmation
   const canSendReminder = Boolean(row.email) && !row.noItemDetails;
@@ -175,22 +218,14 @@ function PersonCard({ row, onHide, onRemind, onCreateOrder }: { row: AbandonedRo
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
         {row.triedToPay ? <Chip size="small" color="warning" label="Pressed Pay, payment did not go through" sx={{ fontWeight: 600 }} /> : <Chip size="small" label="Never pressed Pay" sx={{ fontWeight: 600 }} />}
+        {!row.reminder && <Chip size="small" variant="outlined" color="info" label="Waiting for the reminder email" sx={{ fontWeight: 600 }} />}
         {row.earlierCheckouts > 0 && <Chip size="small" variant="outlined" label={`${row.earlierCheckouts} earlier checkout${row.earlierCheckouts === 1 ? '' : 's'}`} />}
       </Box>
       {row.problem && <Typography sx={{ fontSize: 13, color: '#B45309', mt: 0.75 }}>{row.problem}</Typography>}
       {row.reminder && <ReminderLine reminder={row.reminder} />}
 
       <Box sx={{ mt: 1.25, p: 1.25, bgcolor: '#FAFAFA', borderRadius: 1.5, minWidth: 0, overflowWrap: 'anywhere' }}>
-        <ItemLines row={row} all={open} />
-        <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-          {row.deliveryDates.length > 0 ? `For ${row.deliveryDates.map(dayText).join(' and ')}` : 'No delivery day saved'}
-          {row.zip ? ` · zip ${row.zip}` : ''}
-        </Typography>
-        {canExpand && (
-          <Button size="small" onClick={() => setOpen((v) => !v)} endIcon={open ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />} sx={{ textTransform: 'none', mt: 0.25, ml: -1 }}>
-            {open ? 'Show less' : 'Show everything'}
-          </Button>
-        )}
+        <CheckoutDetails row={row} />
       </Box>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.25 }}>
@@ -291,11 +326,11 @@ function ConversionDialog({ kind, people, onClose, onOpenPerson, hasRow }: { kin
 export default function AbandonedCheckoutsPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const [preset, setPreset] = useState<Preset>(7);
+  const [preset, setPreset] = useState<Preset>('today');
   const today = pacificToday();
   // what to ask the server for
   const queryString = preset === 'today' ? `from=${today}&to=${today}` : `days=${preset}`;
-  const [tab, setTab] = useState<'waiting' | 'sent' | 'recovered'>('waiting');
+  const [tab, setTab] = useState<'abandoned' | 'recovered'>('abandoned');
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -389,7 +424,8 @@ export default function AbandonedCheckoutsPage() {
 
   // everyone still unpaid, split by whether the reminder email went out (the old "contacted" marker no longer matters)
   const split = splitByReminder([...(data?.rows.to_contact ?? []), ...(data?.rows.contacted ?? [])]);
-  const rows = tab === 'waiting' ? split.waiting : tab === 'sent' ? split.emailed : [];
+  // one list of everyone still unpaid, the most recent first (a reminder chip on each card says whether the email went out)
+  const rows = [...split.waiting, ...split.emailed].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
   const paidRows = data?.paid ?? [];
   const allRows = [...split.waiting, ...split.emailed];
   const waitingValue = Math.round(split.waiting.reduce((sum, r) => sum + r.total, 0) * 100) / 100;
@@ -440,9 +476,8 @@ export default function AbandonedCheckoutsPage() {
             )}
           </Paper>
 
-          <Tabs value={tab} onChange={(_, v: 'waiting' | 'sent' | 'recovered') => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1.25, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
-            <Tab value="waiting" label={`Waiting to send email (${split.waiting.length})`} />
-            <Tab value="sent" label={`Email sent (${split.emailed.length})`} />
+          <Tabs value={tab} onChange={(_, v: 'abandoned' | 'recovered') => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1.25, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
+            <Tab value="abandoned" label={`Abandoned checkout (${rows.length})`} />
             <Tab value="recovered" label={`Recovered (${paidRows.length})`} />
           </Tabs>
 
@@ -461,9 +496,9 @@ export default function AbandonedCheckoutsPage() {
           {tab !== 'recovered' && rows.length === 0 && (
             <Paper elevation={0} sx={{ p: 3, border: '1px dashed #D1D5DB', borderRadius: 2, textAlign: 'center' }}>
               <Box sx={{ color: '#9CA3AF', mb: 0.5 }}><IconShoppingCartOff size={32} /></Box>
-              <Typography sx={{ fontWeight: 700 }}>{tab === 'waiting' ? 'Nobody is waiting for the reminder email' : 'No reminder email has gone out yet'}</Typography>
+              <Typography sx={{ fontWeight: 700 }}>No abandoned checkouts</Typography>
               <Typography sx={{ fontSize: 13, color: '#6B7280' }}>
-                {tab === 'waiting' ? `When someone opens checkout and leaves without paying, they appear here after ${QUIET_MINUTES} minutes, until their reminder email goes out (about 30 minutes after they left).` : 'People who got the reminder email and have not ordered yet are listed here.'}
+                {`When someone opens checkout and leaves without paying, they appear here after ${QUIET_MINUTES} minutes. Their reminder email goes out about 30 minutes after they left.`}
               </Typography>
             </Paper>
           )}

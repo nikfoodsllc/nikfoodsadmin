@@ -6,6 +6,7 @@ import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { ObjectId, type Filter } from 'mongodb';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 import { isPreparationType } from '@/utils/preparationType';
+import { isStickerFlag } from '@/utils/stickerFlag';
 import { foodItemListFilters } from './listFilters';
 
 // Interface for available days
@@ -234,6 +235,8 @@ const foodItemSchema = z.object({
   // How the item is prepared for the kitchen. Required when CREATING an item (POST checks it); on update, null means
   // "back to not set yet" and leaving it out leaves the stored value alone.
   preparationType: z.enum(['cooked', 'ready_to_eat']).nullish(),
+  // Whether the item's orders get a packing sticker (Kitchen Report; No leaves it off). Optional: null on update means "back to not set yet".
+  sticker: z.enum(['yes', 'no']).nullish(),
 
   // Portions type fields
   portions: z.array(z.string()).optional(),
@@ -326,6 +329,8 @@ interface FoodItem {
   itemType: 'simple' | 'portions' | 'combo';
   // 'cooked' = made fresh for the day's menu, 'ready_to_eat' = already made, only packed; missing = not set yet
   preparationType?: 'cooked' | 'ready_to_eat';
+  // 'yes' = its orders appear on the Stickers sheet, 'no' = they do not; missing = not set yet
+  sticker?: 'yes' | 'no';
 
   // Portions fields
   portions?: string[];
@@ -732,6 +737,7 @@ export async function POST(request: NextRequest) {
       hasSpiceLevel: data.hasSpiceLevel,
       spiceLevel: data.spiceLevel || [],
       ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
+      ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -957,6 +963,7 @@ const updateData: Partial<FoodItem> = {
   hasSpiceLevel: data.hasSpiceLevel,
   spiceLevel: data.spiceLevel || [],
   ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
+  ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
   updatedAt: new Date(),
 };
 
@@ -1042,11 +1049,14 @@ const updateData: Partial<FoodItem> = {
     }
 
     // Update food item
-    // preparationType: sent as null means "back to not set yet"; left out means "leave as it is"
+    // preparationType / sticker: sent as null means "back to not set yet"; left out means "leave as it is"
+    const unset: Record<string, ''> = {};
+    if (data.preparationType === null) unset.preparationType = '';
+    if (data.sticker === null) unset.sticker = '';
     const updateResult = await db.updateOne<FoodItem>(
       'fooditems',
       { _id: new ObjectId(_id) },
-      data.preparationType === null ? { $set: updateData, $unset: { preparationType: '' } } : { $set: updateData }
+      Object.keys(unset).length > 0 ? { $set: updateData, $unset: unset } : { $set: updateData }
     );
 
     if (!updateResult.success) {

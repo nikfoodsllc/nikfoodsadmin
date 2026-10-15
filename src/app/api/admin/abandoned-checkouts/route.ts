@@ -53,6 +53,17 @@ export async function GET(request: NextRequest) {
 
     const built = buildAbandonedRows(drafts, paidOrders, info);
 
+    // the minimum order value of each person's zip: it decides which day an item is really delivered on
+    const zips = [...new Set([...built.to_contact, ...built.contacted].map((r) => r.zip).filter((z): z is string => Boolean(z)))];
+    if (zips.length > 0) {
+      const zipDocs = await db.read<{ zipcode: string; minCartValue?: number }>('zincodes', { zipcode: { $in: zips } } as never, { projection: { zipcode: 1, minCartValue: 1 } });
+      const minByZip = new Map((zipDocs.success ? zipDocs.data ?? [] : []).map((z) => [z.zipcode, z.minCartValue]));
+      for (const row of [...built.to_contact, ...built.contacted]) {
+        const min = row.zip ? minByZip.get(row.zip) : undefined;
+        if (typeof min === 'number') row.minCartValue = min;
+      }
+    }
+
     // the numbers at the top: every checkout opened in the range (any status), and the orders paid after a reminder went out
     const everyone = await db.read<DraftDoc>('checkoutDrafts', { createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, {
       sort: { createdAt: -1 },
