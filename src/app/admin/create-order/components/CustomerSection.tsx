@@ -27,6 +27,7 @@ export default function CustomerSection({
   onAddress,
   onPickedExisting,
   accountExists,
+  prefillEmail,
 }: {
   token: string;
   customer: CustomerForm;
@@ -35,6 +36,8 @@ export default function CustomerSection({
   onAddress: (a: AddressForm) => void;
   onPickedExisting: (found: FoundCustomer | null) => void;
   accountExists: FoundCustomer | null;
+  /** Started from an abandoned checkout: pick this person's account as if the admin had searched for them */
+  prefillEmail?: string;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoundCustomer[]>([]);
@@ -81,6 +84,21 @@ export default function CustomerSection({
     setQuery('');
     setResults([]);
   };
+
+  // from an abandoned checkout: find the account by its email and pick it (its saved address and phone come with it)
+  const prefilled = useRef('');
+  useEffect(() => {
+    const email = (prefillEmail ?? '').trim().toLowerCase();
+    if (!email || prefilled.current === email || accountExists) return;
+    prefilled.current = email;
+    void (async () => {
+      const res = await fetch(`/api/admin/create-order/customers?q=${encodeURIComponent(email)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const body = await res.json().catch(() => ({}));
+      const match = (res.ok && body.success ? (body.data as FoundCustomer[]) : []).find((c) => c.email.trim().toLowerCase() === email);
+      if (match) choose(match);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillEmail, accountExists, token]);
 
   const clearExisting = () => {
     onPickedExisting(null);

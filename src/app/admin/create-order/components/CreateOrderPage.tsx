@@ -98,6 +98,9 @@ export default function CreateOrderPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editError, setEditError] = useState('');
   const [listRows, setListRows] = useState<OrderListRow[]>([]);
+  // started from an abandoned checkout (?fromCheckout=pi_...): who it is for, and a note about anything that could not be added
+  const [fromCheckout, setFromCheckout] = useState<{ name: string; skipped: number; noCart: boolean; email: string } | null>(null);
+  const fromCheckoutDone = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -122,6 +125,38 @@ export default function CreateOrderPage() {
       cancelled = true;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !menu || fromCheckoutDone.current) return;
+    const id = new URLSearchParams(window.location.search).get('fromCheckout');
+    if (!id) return;
+    fromCheckoutDone.current = true;
+    window.history.replaceState(null, '', window.location.pathname);
+    void (async () => {
+      const res = await fetch(`/api/admin/abandoned-checkouts/${encodeURIComponent(id)}/order-draft`, { headers: { Authorization: `Bearer ${token}` } });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.success) {
+        setEditError(body?.error || 'Could not open that checkout');
+        return;
+      }
+      const draft = body.data as { customer: CustomerForm; lines: Array<Omit<CartLine, 'key' | 'name' | 'unitPrice' | 'tags'>>; noCart: boolean };
+      let next: CartLine[] = [];
+      let skipped = 0;
+      for (const l of draft.lines) {
+        const item = menu.items[l.foodItemId];
+        if (!item) {
+          skipped += 1;
+          continue;
+        }
+        const pick = { selectedPortion: l.selectedPortion, selectedSpiceLevel: l.selectedSpiceLevel, isEcoFriendlyContainer: l.isEcoFriendlyContainer, comboSelections: l.comboSelections };
+        next = addLine(next, { ...l, name: item.name, unitPrice: estimateUnitPrice(item, pick), tags: lineTags(item, pick) });
+      }
+      setCustomer(draft.customer);
+      setLines(next);
+      if (next[0]) setDate(next[0].date);
+      setFromCheckout({ name: draft.customer.name || draft.customer.email, skipped, noCart: draft.noCart, email: draft.customer.email });
+    })();
+  }, [token, menu]);
 
   const orderLines = useCallback(
     () => lines.map(orderLinePayload),
@@ -298,6 +333,13 @@ export default function CreateOrderPage() {
         Enter an order for a customer who ordered by phone or in person. Prices come from the live menu. This is a master tool: no cutoff, delivery area or day rules apply.
       </Typography>
 
+      {fromCheckout && !result && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setFromCheckout(null)}>
+          Started from the abandoned checkout of {fromCheckout.name}.
+          {fromCheckout.noCart ? ' Their cart was not saved for this checkout, so add the items yourself.' : ' Check the items, the address and how they pay, then create the order.'}
+          {fromCheckout.skipped > 0 ? ` ${fromCheckout.skipped} item${fromCheckout.skipped === 1 ? ' is' : 's are'} no longer on the menu and ${fromCheckout.skipped === 1 ? 'was' : 'were'} left out.` : ''}
+        </Alert>
+      )}
       {editError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError('')}>{editError}</Alert>}
       {editing && !result && (
         <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>Stop editing</Button>}>
@@ -320,7 +362,7 @@ export default function CreateOrderPage() {
       ) : (
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: wide ? 'minmax(0, 1fr) 440px' : 'minmax(0, 1fr)', alignItems: 'start' }}>
           <Box sx={{ display: 'grid', gap: 2, minWidth: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-            <CustomerSection token={token} customer={customer} address={address} onCustomer={setCustomer} onAddress={setAddress} onPickedExisting={setExisting} accountExists={existing} />
+            <CustomerSection token={token} customer={customer} address={address} onCustomer={setCustomer} onAddress={setAddress} onPickedExisting={setExisting} accountExists={existing} prefillEmail={fromCheckout?.email} />
             <MenuPicker catalog={menu} date={date} onDate={setDate} lines={lines} counts={counts} onAdd={choose} onRemove={takeOne} />
           </Box>
           {/* sticks 12px below the 65px top bar (which stays pinned), so the whole panel is visible */}
