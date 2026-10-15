@@ -377,14 +377,15 @@ export default function PackLivePage() {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Box sx={{ minWidth: 0 }}>
                 <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#111827', wordBreak: 'break-word', lineHeight: 1.2 }}>{routeLabel(route)}</Typography>
+                {/* the delivery day and the driver are written once, here at the top */}
                 {status === 'not_started' && (
                   <Typography sx={{ fontSize: 14, color: '#374151' }}>
-                    {route.stops.length} customer{route.stops.length === 1 ? '' : 's'} · {summary?.units ?? 0} unit{summary?.units === 1 ? '' : 's'}
+                    {date ? `${formatDayShort(date)} · ` : ''}{route.stops.length} customer{route.stops.length === 1 ? '' : 's'} · {summary?.units ?? 0} unit{summary?.units === 1 ? '' : 's'}
                   </Typography>
                 )}
                 {status !== 'not_started' && (
                   <Typography sx={{ fontSize: 14, color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#374151', fontWeight: status === 'packing' ? 400 : 700 }}>
-                    {status === 'done' ? 'Route done' : status === 'paused' ? 'Paused' : `${Math.min(index + 1, stops.length)} of ${stops.length}`}
+                    {date ? `${formatDayShort(date)} · ` : ''}{status === 'done' ? 'Route done' : status === 'paused' ? 'Paused' : `${Math.min(index + 1, stops.length)} of ${stops.length}`}
                   </Typography>
                 )}
               </Box>
