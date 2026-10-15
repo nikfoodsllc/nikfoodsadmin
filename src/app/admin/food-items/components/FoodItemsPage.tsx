@@ -14,6 +14,8 @@ import {
   Menu,
   MenuItem,
   CircularProgress,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   IconPlus,
@@ -163,6 +165,8 @@ interface ComboFoodItem {
   isDraft?: boolean;
 }
 
+type BulkField = 'available' | 'veg' | 'preparation' | 'sticker';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
 
@@ -228,6 +232,8 @@ export default function FoodItemsPage() {
 
   // Column filters (veg, available, type, preparation type) + the rows ticked for the bulk update
   const [filters, setFilters] = useState<FoodItemFilters>(DEFAULT_FOOD_ITEM_FILTERS);
+  // which field the bulk bar is about to change: chosen first, then its options are shown
+  const [bulkField, setBulkField] = useState<BulkField | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
@@ -455,7 +461,10 @@ export default function FoodItemsPage() {
     }
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setBulkField(null);
+  };
 
   const applyPreparationType = async (preparationType: PreparationType | null) => {
     if (selectedIds.size === 0) return;
@@ -471,6 +480,32 @@ export default function FoodItemsPage() {
       const label = preparationType === 'cooked' ? 'Cooked' : preparationType === 'ready_to_eat' ? 'Ready to eat' : 'not set yet';
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
+      setBulkField(null);
+      await fetchItems();
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  // Available (on / off) and Veg / Non-Veg: both are shown to customers, so the server also refreshes the menu
+  const applyFlag = async (field: 'available' | 'veg', value: boolean) => {
+    if (selectedIds.size === 0) return;
+    try {
+      setBulkLoading(true);
+      const response = await fetch('/api/admin/food-items/bulk-flag', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: [...selectedIds], field, value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update items');
+      const label = field === 'available' ? (value ? 'Available' : 'Unavailable') : value ? 'Veg' : 'Non-Veg';
+      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
+      setSelectedIds(new Set());
+      setBulkField(null);
       await fetchItems();
     } catch (error) {
       console.error(error);
@@ -494,6 +529,7 @@ export default function FoodItemsPage() {
       const label = sticker === 'yes' ? 'Sticker: Yes' : sticker === 'no' ? 'Sticker: No' : 'Sticker: not set yet';
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
+      setBulkField(null);
       await fetchItems();
     } catch (error) {
       console.error(error);
@@ -782,9 +818,8 @@ export default function FoodItemsPage() {
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 1.5,
+            flexDirection: 'column',
+            gap: 1.25,
             mb: 2,
             p: 1.5,
             borderRadius: 2,
@@ -792,51 +827,90 @@ export default function FoodItemsPage() {
             backgroundColor: '#EEF2FF',
           }}
         >
-          <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#3730A3' }}>
-            {selectedIds.size} {selectedIds.size === 1 ? 'item' : 'items'} selected
-          </Typography>
-          {totalItems > selectedIds.size && (
-            <Button size="small" onClick={selectAllMatching} disabled={bulkLoading} sx={{ textTransform: 'none' }}>
-              Select all {totalItems} matching
-            </Button>
-          )}
-          <Box sx={{ flex: 1 }} />
-          <Button
-            size="small"
-            variant="contained"
-            disabled={bulkLoading}
-            onClick={() => applyPreparationType('cooked')}
-            sx={{ textTransform: 'none', backgroundColor: '#C2410C', '&:hover': { backgroundColor: '#9A3412' } }}
-          >
-            Mark as Cooked
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={bulkLoading}
-            onClick={() => applyPreparationType('ready_to_eat')}
-            sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}
-          >
-            Mark as Ready to eat
-          </Button>
-          <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
-            Clear (not set yet)
-          </Button>
-          <Box sx={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', justifyContent: 'flex-end' }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#3730A3' }}>Sticker:</Typography>
-            <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('yes')} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
-              Sticker Yes
-            </Button>
-            <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('no')} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
-              Sticker No
-            </Button>
-            <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null)} sx={{ textTransform: 'none' }}>
-              Clear (not set yet)
+          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#3730A3' }}>
+              {selectedIds.size} {selectedIds.size === 1 ? 'item' : 'items'} selected
+            </Typography>
+            {totalItems > selectedIds.size && (
+              <Button size="small" onClick={selectAllMatching} disabled={bulkLoading} sx={{ textTransform: 'none' }}>
+                Select all {totalItems} matching
+              </Button>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" disabled={bulkLoading} onClick={clearSelection} sx={{ textTransform: 'none' }}>
+              Deselect all
             </Button>
           </Box>
-          <Button size="small" disabled={bulkLoading} onClick={clearSelection} sx={{ textTransform: 'none' }}>
-            Deselect all
-          </Button>
+
+          {/* Step 1: which field to update */}
+          <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#3730A3' }}>Update which field?</Typography>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={bulkField}
+              disabled={bulkLoading}
+              onChange={(_, next: BulkField | null) => setBulkField(next)}
+              sx={{ backgroundColor: '#fff', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600, px: 1.5, py: 0.5 } }}
+            >
+              <ToggleButton value="available">Available</ToggleButton>
+              <ToggleButton value="veg">Veg/Non-Veg</ToggleButton>
+              <ToggleButton value="preparation">Preparation Type</ToggleButton>
+              <ToggleButton value="sticker">Sticker</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          {/* Step 2: the choices for that field */}
+          {bulkField === 'available' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Available to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('available', true)} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Available
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('available', false)} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+                Unavailable
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'veg' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Veg/Non-Veg to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('veg', true)} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Veg
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('veg', false)} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+                Non-Veg
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'preparation' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Preparation Type to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyPreparationType('cooked')} sx={{ textTransform: 'none', backgroundColor: '#C2410C', '&:hover': { backgroundColor: '#9A3412' } }}>
+                Cooked
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyPreparationType('ready_to_eat')} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Ready to eat
+              </Button>
+              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
+                Clear (not set yet)
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'sticker' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Sticker to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('yes')} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Yes
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('no')} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+                No
+              </Button>
+              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null)} sx={{ textTransform: 'none' }}>
+                Clear (not set yet)
+              </Button>
+            </Box>
+          )}
         </Box>
       )}
 
