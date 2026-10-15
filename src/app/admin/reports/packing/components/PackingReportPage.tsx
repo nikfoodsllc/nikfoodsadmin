@@ -75,7 +75,7 @@ function StopCard({ stop, warn }: { stop: PackStop; warn?: boolean }) {
   const units = stop.lines.reduce((n, l) => n + l.quantity, 0);
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.25, bgcolor: '#fff' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1, bgcolor: warn ? '#FDEFC4' : '#E4EAF2', borderBottom: '1px solid #CBD5E1' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, minWidth: 0 }}>
           {/* how many units to pack, first, so it is next to the name and not at the far right */}
           {units > 0 && <Typography sx={{ width: { xs: 56, sm: 64 }, flexShrink: 0, fontSize: 13, fontWeight: 800, color: '#374151', lineHeight: 1.7, whiteSpace: 'nowrap' }}>{units} unit{units === 1 ? '' : 's'}</Typography>}
