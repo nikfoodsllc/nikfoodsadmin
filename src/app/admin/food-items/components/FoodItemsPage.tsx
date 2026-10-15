@@ -165,7 +165,7 @@ interface ComboFoodItem {
   isDraft?: boolean;
 }
 
-type BulkField = 'preparation' | 'sticker';
+type BulkField = 'available' | 'veg' | 'preparation' | 'sticker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
@@ -478,6 +478,31 @@ export default function FoodItemsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to update items');
       const label = preparationType === 'cooked' ? 'Cooked' : preparationType === 'ready_to_eat' ? 'Ready to eat' : 'not set yet';
+      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
+      setSelectedIds(new Set());
+      setBulkField(null);
+      await fetchItems();
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  // Available (on / off) and Veg / Non-Veg: both are shown to customers, so the server also refreshes the menu
+  const applyFlag = async (field: 'available' | 'veg', value: boolean) => {
+    if (selectedIds.size === 0) return;
+    try {
+      setBulkLoading(true);
+      const response = await fetch('/api/admin/food-items/bulk-flag', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: [...selectedIds], field, value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update items');
+      const label = field === 'available' ? (value ? 'Available' : 'Unavailable') : value ? 'Veg' : 'Non-Veg';
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
       setBulkField(null);
@@ -828,12 +853,36 @@ export default function FoodItemsPage() {
               onChange={(_, next: BulkField | null) => setBulkField(next)}
               sx={{ backgroundColor: '#fff', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600, px: 1.5, py: 0.5 } }}
             >
+              <ToggleButton value="available">Available</ToggleButton>
+              <ToggleButton value="veg">Veg/Non-Veg</ToggleButton>
               <ToggleButton value="preparation">Preparation Type</ToggleButton>
               <ToggleButton value="sticker">Sticker</ToggleButton>
             </ToggleButtonGroup>
           </Box>
 
           {/* Step 2: the choices for that field */}
+          {bulkField === 'available' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Available to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('available', true)} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Available
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('available', false)} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+                Unavailable
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'veg' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Veg/Non-Veg to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('veg', true)} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Veg
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('veg', false)} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+                Non-Veg
+              </Button>
+            </Box>
+          )}
           {bulkField === 'preparation' && (
             <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
               <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Preparation Type to:</Typography>
