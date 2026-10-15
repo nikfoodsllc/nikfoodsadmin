@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, LinearProgress, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, LinearProgress, Paper, TextField, Typography } from '@mui/material';
 import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery, IconListDetails } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -347,14 +347,18 @@ export default function PackLivePage() {
 
   return (
     <Box sx={{ pb: { xs: status === 'packing' ? 12 : 2, md: status === 'packing' ? 12 : 2 } }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Button component={Link} href="/admin/reports/packing" size="small" startIcon={<IconArrowLeft size={16} />} sx={{ textTransform: 'none', fontWeight: 600, ml: -1 }}>
-          Packing Report
-        </Button>
-      </Box>
-      <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827', mb: 1.5 }}>
-        Packing Planner
-      </Typography>
+      {status !== 'packing' && (
+        <>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Button component={Link} href="/admin/reports/packing" size="small" startIcon={<IconArrowLeft size={16} />} sx={{ textTransform: 'none', fontWeight: 600, ml: -1 }}>
+              Packing Report
+            </Button>
+          </Box>
+          <Typography variant="h5" sx={{ fontWeight: 600, fontSize: '20px', color: '#111827', mb: 1.5 }}>
+            Packing Planner
+          </Typography>
+        </>
+      )}
 
       {pickerOpen && (
       <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
@@ -422,6 +426,31 @@ export default function PackLivePage() {
 
       {route && (
         <>
+          {status === 'packing' && (
+            <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, mb: 1.5, overflow: 'hidden' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1.25 }, px: { xs: 1, sm: 1.5 }, py: 0.75, minHeight: 48 }}>
+                <IconButton component={Link} href="/admin/reports/packing" size="small" aria-label="Back to Packing Report" sx={{ ml: -0.5 }}>
+                  <IconArrowLeft size={18} />
+                </IconButton>
+                <Typography noWrap sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 800, color: '#111827', minWidth: 0, flexShrink: 1 }}>{routeLabel(route)}</Typography>
+                <Typography noWrap sx={{ fontSize: 14, color: '#6B7280', flex: 1, minWidth: 'fit-content' }}>
+                  <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{date ? `${formatDayShort(date)} · ` : ''}</Box>
+                  <Box component="span" sx={{ fontWeight: 700, color: '#374151' }}>{Math.min(index + 1, stops.length)} of {stops.length}</Box>
+                </Typography>
+                <IconButton size="small" aria-label="Customer roster" onClick={() => setListOpen(true)} sx={{ color: ORANGE, display: { xs: 'inline-flex', md: 'none' } }}>
+                  <IconListDetails size={20} />
+                </IconButton>
+                <Button size="small" onClick={() => setShowPicker((v) => !v)} sx={{ textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 0 }}>
+                  {showPicker ? 'Hide' : 'Change'}
+                </Button>
+                <Button size="small" variant="outlined" color="error" aria-label="Stop packing" onClick={() => setConfirm('stop')} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700, whiteSpace: 'nowrap', minWidth: { xs: 36, sm: 0 }, px: { xs: 0.75, sm: 1.25 }, '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.5 }, ml: 0 } }} startIcon={<IconPlayerPause size={16} />}>
+                  <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Stop</Box>
+                </Button>
+              </Box>
+              <LinearProgress variant="determinate" value={stops.length > 0 ? (Math.min(index, stops.length) / stops.length) * 100 : 0} sx={{ height: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: '#126B2C' } }} />
+            </Paper>
+          )}
+          {status !== 'packing' && (
           <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Box sx={{ minWidth: 0 }}>
@@ -433,24 +462,11 @@ export default function PackLivePage() {
                   </Typography>
                 )}
                 {status !== 'not_started' && (
-                  <Typography sx={{ fontSize: 14, color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#374151', fontWeight: status === 'packing' ? 400 : 700 }}>
-                    {date ? `${formatDayShort(date)} · ` : ''}{status === 'done' ? 'Route done' : status === 'paused' ? 'Paused' : `${Math.min(index + 1, stops.length)} of ${stops.length}`}
+                  <Typography sx={{ fontSize: 14, color: status === 'done' ? '#126B2C' : status === 'paused' ? '#B45309' : '#374151', fontWeight: 700 }}>
+                    {date ? `${formatDayShort(date)} · ` : ''}{status === 'done' ? 'Route done' : status === 'paused' ? 'Paused' : ''}
                   </Typography>
                 )}
               </Box>
-              {status === 'packing' && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
-                  <Button size="small" startIcon={<IconListDetails size={16} />} onClick={() => setListOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, display: { xs: 'inline-flex', md: 'none' } }}>
-                    Customers
-                  </Button>
-                  <Button size="small" onClick={() => setShowPicker((v) => !v)} sx={{ textTransform: 'none', fontWeight: 600 }}>
-                    {showPicker ? 'Hide' : 'Change driver or day'}
-                  </Button>
-                  <Button size="small" variant="outlined" color="error" startIcon={<IconPlayerPause size={16} />} onClick={() => setConfirm('stop')} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
-                    Stop packing
-                  </Button>
-                </Box>
-              )}
             </Box>
             {status === 'not_started' && (
               <Box sx={{ mt: 1.5 }}>
@@ -473,12 +489,12 @@ export default function PackLivePage() {
               </Button>
             )}
           </Paper>
+          )}
 
           {status !== 'not_started' && stop && (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 280px' }, columnGap: 2, alignItems: 'stretch' }}>
               <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>Customer {index + 1} of {stops.length}</Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, flexWrap: 'wrap' }}>
                     <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>{stop.customerName}</Typography>
                     <Typography sx={{ fontSize: 14, color: '#374151', wordBreak: 'break-word', pt: 0.4 }}>Order # {stop.orderIds.join(', ')}</Typography>
@@ -551,7 +567,7 @@ export default function PackLivePage() {
               </Paper>
               {/* the side list is exactly as tall as the packing card on the left (it scrolls inside), so it never pushes the page down */}
               <Paper elevation={0} sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, alignSelf: 'stretch', minHeight: 340 }}>
-                <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>Customers</Typography>
+                <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>Customer Roster ({routeLabel(route)})</Typography>
                 <Box sx={{ position: 'relative', flex: 1, minHeight: 0 }}>
                   <CustomerList fill stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} />
                 </Box>
@@ -573,7 +589,7 @@ export default function PackLivePage() {
       )}
 
       <Dialog open={listOpen} onClose={() => setListOpen(false)} fullWidth maxWidth="xs" scroll="paper">
-        <DialogTitle sx={{ pb: 1 }}>Customers</DialogTitle>
+        <DialogTitle sx={{ pb: 1 }}>Customer Roster{route ? ` (${routeLabel(route)})` : ''}</DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
           <CustomerList stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => { setListOpen(false); void goTo(i, { jump: true }); }} />
         </DialogContent>
