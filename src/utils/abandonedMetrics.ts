@@ -1,4 +1,4 @@
-import type { DraftDoc } from '@/utils/abandonedCheckouts';
+import { personName, type DraftDoc } from '@/utils/abandonedCheckouts';
 
 /**
  * The numbers at the top of Abandoned Checkout, for the chosen days. Everything counts PEOPLE (one person with several
@@ -13,15 +13,30 @@ import type { DraftDoc } from '@/utils/abandonedCheckouts';
 
 export const RECOVERY_DAYS = 7;
 
-export interface MetricsDraft extends Pick<DraftDoc, 'userId' | 'status' | 'orderId' | 'createdAt' | 'lastActivityAt' | 'dismissedAt' | 'contacted' | 'reminderEmail'> {
+export interface MetricsDraft extends Pick<DraftDoc, 'userId' | 'status' | 'orderId' | 'createdAt' | 'lastActivityAt' | 'dismissedAt' | 'contacted' | 'reminderEmail' | 'customer' | 'deliveryDates'> {
   total?: number;
   items?: Array<{ name: string; quantity: number }>;
 }
 
 export interface PaidOrderForMetrics {
+  orderId?: string;
   user: string;
   createdAt: Date | string;
   totalPaid?: number;
+}
+
+/** One person of the reminder results, for the lists behind Successful / Unsuccessful Conversions. */
+export interface ConversionPerson {
+  userId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  /** when the (first) reminder email went out */
+  emailedAt: string;
+  /** successful ones: the order they paid after the email */
+  order?: { orderId?: string; amount: number; paidAt: string };
+  /** unsuccessful ones: what is still in their cart */
+  cart?: { total: number; itemCount: number; items: Array<{ name: string; quantity: number }> };
 }
 
 export interface AbandonedMetrics {
@@ -51,6 +66,16 @@ export interface AbandonedMetrics {
     recoveredRate: number | null;
   };
   topItems: Array<{ name: string; units: number; people: number }>;
+  /** the people with the biggest carts left behind (who left, not what) */
+  topPeople: Array<{ userId: string; name: string; total: number; itemCount: number }>;
+  /** the people we emailed, split by whether they ordered within RECOVERY_DAYS of the email */
+  conversions: {
+    successful: ConversionPerson[];
+    unsuccessful: ConversionPerson[];
+    /** each as a share of the people emailed, 0-100; null when nobody was emailed */
+    successfulRate: number | null;
+    unsuccessfulRate: number | null;
+  };
 }
 
 const ms = (d: Date | string | undefined) => (d ? new Date(d).getTime() : 0);
@@ -69,6 +94,7 @@ export function computeMetrics(drafts: MetricsDraft[], paidOrders: PaidOrderForM
   let contacted = 0;
   let cartValue = 0;
   const items = new Map<string, { units: number; people: number }>();
+  const left: AbandonedMetrics['topPeople'] = [];
   const reminded: Array<{ userId: string; sentAt: number; delivered: boolean; opened: boolean; clicked: boolean; problem: boolean }> = [];
 
   for (const [userId, list] of byUser) {
@@ -98,6 +124,12 @@ export function computeMetrics(drafts: MetricsDraft[], paidOrders: PaidOrderForM
     cartValue += Number(latest.total) || 0;
     if (latest.orderId) triedToPay += 1;
     if (list.some((d) => d.contacted)) contacted += 1;
+    left.push({
+      userId,
+      name: personName(latest.customer ?? list.find((d) => d.customer)?.customer),
+      total: cents(Number(latest.total) || 0),
+      itemCount: (latest.items ?? []).reduce((s, it) => s + Math.max(1, Number(it.quantity) || 1), 0),
+    });
     const seen = new Set<string>();
     for (const it of latest.items ?? []) {
       const name = String(it.name ?? '').trim();
@@ -127,15 +159,33 @@ export function computeMetrics(drafts: MetricsDraft[], paidOrders: PaidOrderForM
   const people = [...firstByUser.values()];
   let recovered = 0;
   let recoveredRevenue = 0;
+  const successful: ConversionPerson[] = [];
+  const unsuccessful: ConversionPerson[] = [];
   for (const p of people) {
     const order = paidOrders
       .filter((o) => o.user === p.userId && ms(o.createdAt) > p.sentAt && ms(o.createdAt) <= p.sentAt + RECOVERY_DAYS * 24 * 3600 * 1000)
       .sort((a, b) => ms(a.createdAt) - ms(b.createdAt))[0];
+    const mine = byUser.get(p.userId) ?? [];
+    const latest = [...mine].sort((a, b) => ms(b.lastActivityAt) - ms(a.lastActivityAt) || ms(b.createdAt) - ms(a.createdAt))[0];
+    const customer = latest?.customer ?? mine.find((d) => d.customer)?.customer;
+    const who = {
+      userId: p.userId,
+      name: personName(customer),
+      ...(customer?.email ? { email: customer.email } : {}),
+      ...(customer?.phone ? { phone: customer.phone } : {}),
+      emailedAt: new Date(p.sentAt).toISOString(),
+    };
     if (order) {
       recovered += 1;
       recoveredRevenue += Number(order.totalPaid) || 0;
+      successful.push({ ...who, order: { ...(order.orderId ? { orderId: order.orderId } : {}), amount: cents(Number(order.totalPaid) || 0), paidAt: new Date(order.createdAt).toISOString() } });
+    } else {
+      const cart = (latest?.items ?? []).map((it) => ({ name: String(it.name ?? ''), quantity: Math.max(1, Number(it.quantity) || 1) })).filter((it) => it.name);
+      unsuccessful.push({ ...who, cart: { total: cents(Number(latest?.total) || 0), itemCount: cart.reduce((s, it) => s + it.quantity, 0), items: cart } });
     }
   }
+  successful.sort((a, b) => ms(b.order?.paidAt) - ms(a.order?.paidAt));
+  unsuccessful.sort((a, b) => ms(b.emailedAt) - ms(a.emailedAt));
   const sent = people.length;
   const delivered = people.filter((p) => p.delivered).length;
   const opened = people.filter((p) => p.opened).length;
@@ -168,5 +218,7 @@ export function computeMetrics(drafts: MetricsDraft[], paidOrders: PaidOrderForM
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.units - a.units || b.people - a.people || a.name.localeCompare(b.name))
       .slice(0, 5),
+    topPeople: left.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)).slice(0, 5),
+    conversions: { successful, unsuccessful, successfulRate: pct(recovered, sent), unsuccessfulRate: pct(sent - recovered, sent) },
   };
 }

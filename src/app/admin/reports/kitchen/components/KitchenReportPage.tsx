@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
-import { IconColumns3, IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, MenuItem, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
+import { IconColumns3, IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconSortAscending, IconSortDescending, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
@@ -25,9 +25,16 @@ import {
   blockTotal,
   filterBlocksBySearch,
   filterStickersBySearch,
+  DEFAULT_SORT,
+  SORT_OPTIONS,
+  sortBlocks,
+  sortDayItems,
+  sortStickers,
   type KitchenReport,
   type PrepBlock,
   type PrepLine,
+  type SortChoice,
+  type SortKey,
   type StickerLine,
 } from '@/utils/kitchenReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
@@ -237,6 +244,8 @@ export default function KitchenReportPage() {
   const [tab, setTab] = useState<TabId>('prep');
   // search: an item, a customer, an order number or a combo
   const [search, setSearch] = useState('');
+  // how every sheet is ordered (the screen, the Excel file and the PDF)
+  const [sort, setSort] = useState<SortChoice>(DEFAULT_SORT);
   const [exporting, setExporting] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   // which columns go into the Excel file and the PDF, per sheet (saved in the admin's account)
@@ -299,11 +308,13 @@ export default function KitchenReportPage() {
   }, [authLoading, isAuthenticated, router]);
 
   const searching = search.trim().length > 0;
-  const cooked = useMemo(() => (data ? filterBlocksBySearch(data.cooked, search) : []), [data, search]);
-  const notSet = useMemo(() => (data ? filterBlocksBySearch(data.notSet, search) : []), [data, search]);
-  const readyToEat = useMemo(() => (data ? filterBlocksBySearch(data.readyToEat, search) : []), [data, search]);
-  const stickers = useMemo(() => (data ? filterStickersBySearch(data.stickers, search) : []), [data, search]);
-  const dayBlocks = useMemo(() => (data ? data.days.map((d) => (searching ? filterBlockBySearch(d, search) : d)) : []), [data, search, searching]);
+  const sortDay = (d: KitchenDay): KitchenDay => ({ ...d, items: sortDayItems(d.items, sort), combos: sortDayItems(d.combos, sort) });
+  const cooked = useMemo(() => (data ? sortBlocks(filterBlocksBySearch(data.cooked, search), sort) : []), [data, search, sort]);
+  const notSet = useMemo(() => (data ? sortBlocks(filterBlocksBySearch(data.notSet, search), sort) : []), [data, search, sort]);
+  const readyToEat = useMemo(() => (data ? sortBlocks(filterBlocksBySearch(data.readyToEat, search), sort) : []), [data, search, sort]);
+  const stickers = useMemo(() => (data ? sortStickers(filterStickersBySearch(data.stickers, search), sort) : []), [data, search, sort]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dayBlocks = useMemo(() => (data ? data.days.map((d) => sortDay(searching ? filterBlockBySearch(d, search) : d)) : []), [data, search, searching, sort]);
   const cookedCount = cooked.length;
   const notSetCount = notSet.length;
   const readyCount = readyToEat.length + notSetCount;
@@ -312,11 +323,11 @@ export default function KitchenReportPage() {
   const sheetsFrom = (src: ReportData) =>
     applyColumnChoice(
       buildReportSheets({
-        cooked: filterBlocksBySearch(src.cooked, search),
-        readyToEat: filterBlocksBySearch(src.readyToEat, search),
-        notSet: filterBlocksBySearch(src.notSet, search),
-        stickers: filterStickersBySearch(src.stickers, search),
-        days: src.days.map((d) => (searching ? filterBlockBySearch(d, search) : d)),
+        cooked: sortBlocks(filterBlocksBySearch(src.cooked, search), sort),
+        readyToEat: sortBlocks(filterBlocksBySearch(src.readyToEat, search), sort),
+        notSet: sortBlocks(filterBlocksBySearch(src.notSet, search), sort),
+        stickers: sortStickers(filterStickersBySearch(src.stickers, search), sort),
+        days: src.days.map((d) => sortDay(searching ? filterBlockBySearch(d, search) : d)),
       }),
       {
         prep: [...prepCols.hiddenKeys],
@@ -452,6 +463,7 @@ export default function KitchenReportPage() {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
+      <Box className="no-print" sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', mb: 1.5 }}>
       <TextField
         className="no-print"
         size="small"
@@ -474,8 +486,33 @@ export default function KitchenReportPage() {
             </InputAdornment>
           ) : undefined,
         }}
-        sx={{ maxWidth: 520, mb: 1.5, bgcolor: '#fff' }}
+        sx={{ flex: '1 1 260px', maxWidth: 520, bgcolor: '#fff' }}
       />
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+          <TextField
+            select
+            size="small"
+            label="Sort by"
+            value={sort.key}
+            onChange={(e) => setSort((c) => ({ ...c, key: e.target.value as SortKey }))}
+            sx={{ minWidth: 160, bgcolor: '#fff' }}
+            inputProps={{ 'aria-label': 'Sort the report by' }}
+          >
+            {SORT_OPTIONS.map((o) => (
+              <MenuItem key={o.key} value={o.key}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Tooltip title={sort.dir === 'asc' ? 'Smallest / A to Z first (tap to reverse)' : 'Largest / Z to A first (tap to reverse)'}>
+            <span>
+              <IconButton aria-label={sort.dir === 'asc' ? 'Sorted ascending, tap to reverse' : 'Sorted descending, tap to reverse'} disabled={sort.key === 'default'} onClick={() => setSort((c) => ({ ...c, dir: c.dir === 'asc' ? 'desc' : 'asc' }))}>
+                {sort.dir === 'asc' ? <IconSortAscending size={20} /> : <IconSortDescending size={20} />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      </Box>
 
       <Tabs className="no-print" value={tab} onChange={(_, v: TabId) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ borderBottom: '1px solid #E5E7EB', mb: 2 }}>
         <Tab value="prep" label={`Kitchen Prep${data ? ` (${cookedCount})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
