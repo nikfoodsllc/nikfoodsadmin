@@ -118,7 +118,7 @@ export default function OrderTableRow({
     // Order Status
     orderStatus: (
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
-        <StatusBadge status={order.status} type="order" />
+        <StatusBadge status={order.status} type="order" deliveries={order.optimo?.deliveries} />
       </TableCell>
     ),
     // Payment Status

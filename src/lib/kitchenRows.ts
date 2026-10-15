@@ -17,7 +17,7 @@ export async function fetchKitchenRows(range: DayRange, options: { report?: bool
         $or: [
           { paymentStatus: 'paid' },
           // handled by hand (for example paid in person): already being prepared or delivered
-          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
+          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
         ],
         'items.deliveryDate': within,
       },
@@ -101,7 +101,7 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
         status: { $ne: 'cancelled' },
         $or: [
           { paymentStatus: 'paid' },
-          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
+          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
         ],
         'items.actualDeliveryDate': within,
       },
