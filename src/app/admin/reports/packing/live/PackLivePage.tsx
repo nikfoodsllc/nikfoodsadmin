@@ -72,6 +72,8 @@ export default function PackLivePage() {
   const [showPicker, setShowPicker] = useState(false);
   const startRequest = useLatestRequest();
   const inFlight = useRef(0);
+  // when the packer last moved to another customer: a second tap right after the first (a double tap) must not skip a customer
+  const lastMoveAt = useRef(0);
 
   const date = preset === 'today' ? today : preset === 'tomorrow' ? addDays(today, 1) : isDayString(otherDate) ? otherDate : null;
 
@@ -228,7 +230,7 @@ export default function PackLivePage() {
     const keys = new Set(stops.map(stopKeyOf));
     if (currentKey && !keys.has(currentKey)) {
       const target = findMovedStop(stops, run.stops?.[currentKey]?.meta);
-      if (target >= 0) void goTo(target);
+      if (target >= 0) void goTo(target, { automatic: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, run, stops, status, currentKey]);
@@ -241,8 +243,12 @@ export default function PackLivePage() {
     setBusy(false);
   };
 
-  const goTo = async (target: number) => {
+  const goTo = async (target: number, options: { automatic?: boolean } = {}) => {
     if (!route || target < 0 || target >= stops.length) return;
+    if (!options.automatic) {
+      if (Date.now() - lastMoveAt.current < 900) return;
+      lastMoveAt.current = Date.now();
+    }
     setConfirm(null);
     // show it at once, the answer confirms it
     setRuns((prev) => prev.map((r) => (r.routeKey === route.key ? { ...r, currentStopKey: stopKeyOf(stops[target]) } : r)));
