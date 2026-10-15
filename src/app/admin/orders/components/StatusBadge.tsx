@@ -3,7 +3,7 @@
 import { Chip, Tooltip } from '@mui/material';
 import { OrderStatus } from '@/types/order';
 import type { DisplayPaymentStatus } from '@/utils/refunds';
-import { partialDeliveryTitle, type DayDeliveryRecord } from '@/utils/deliveryProgress';
+import { partialBadgeLabel, partialDeliveryTitle, type DayDeliveryRecord } from '@/utils/deliveryProgress';
 
 interface StatusBadgeProps {
   status: OrderStatus | DisplayPaymentStatus;
@@ -38,9 +38,11 @@ export default function StatusBadge({ status, type, deliveries }: StatusBadgePro
 
   if (!config) return null;
 
+  // Partially Delivered shows how far it is: 1/2 Delivered, 2/3 Delivered
+  const label = type === 'order' && status === 'partially_delivered' ? partialBadgeLabel(deliveries) : config.label;
   const chip = (
     <Chip
-      label={config.label}
+      label={label}
       sx={{
         backgroundColor: config.bgColor,
         color: config.color,
@@ -60,7 +62,7 @@ export default function StatusBadge({ status, type, deliveries }: StatusBadgePro
     const title = partialDeliveryTitle(deliveries);
     return (
       <Tooltip title={title} arrow disableTouchListener slotProps={{ tooltip: { sx: { whiteSpace: 'pre-line', fontSize: 13, lineHeight: 1.6 } } }}>
-        <span tabIndex={0} role="note" aria-label={`Partially Delivered. ${title.replace(/\n/g, '. ')}`} style={{ display: 'inline-flex' }}>
+        <span tabIndex={0} role="note" aria-label={`${label}. ${title.replace(/\n/g, '. ')}`} style={{ display: 'inline-flex' }}>
           {chip}
         </span>
       </Tooltip>
