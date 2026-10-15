@@ -116,6 +116,8 @@ export interface AbandonedRow {
   items: DraftItem[];
   deliveryDates: string[];
   zip?: string;
+  /** The minimum order value of this zip, when the list route looked it up (used to work out which day is delivered when) */
+  minCartValue?: number;
   lastActivityAt: string;
   /** More checkouts this person left behind before this one */
   earlierCheckouts: number;
