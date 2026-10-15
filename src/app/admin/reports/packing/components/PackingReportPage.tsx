@@ -77,6 +77,8 @@ function StopCard({ stop, warn }: { stop: PackStop; warn?: boolean }) {
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.25, bgcolor: '#fff' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, minWidth: 0 }}>
+          {/* how many units to pack, first, so it is next to the name and not at the far right */}
+          {units > 0 && <Typography sx={{ width: { xs: 56, sm: 64 }, flexShrink: 0, fontSize: 13, fontWeight: 800, color: '#374151', lineHeight: 1.7, whiteSpace: 'nowrap' }}>{units} unit{units === 1 ? '' : 's'}</Typography>}
           {stop.number > 0 && (
             <Box sx={{ minWidth: 30, height: 30, borderRadius: '50%', bgcolor: '#F89C35', color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{stop.number}</Box>
           )}
@@ -87,7 +89,6 @@ function StopCard({ stop, warn }: { stop: PackStop; warn?: boolean }) {
         </Box>
         <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
           {stop.scheduledAt && <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{stop.scheduledAt}</Typography>}
-          {units > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{units} unit{units === 1 ? '' : 's'}</Typography>}
         </Box>
       </Box>
       {stop.empty ? (

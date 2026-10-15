@@ -132,8 +132,10 @@ function LineRow({ line, showKitchenDay }: { line: PrepLine; showKitchenDay: boo
 function PrepCard({ block, warn, showKitchenDay }: { block: PrepBlock; warn?: boolean; showKitchenDay: boolean }) {
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
-        <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
+        {/* the item's total is on the left, in the same column as each line's amount, so the eye does not travel to the far right */}
+        <Typography sx={{ minWidth: { xs: 104, sm: 126 }, flexShrink: 0, fontWeight: 800, fontSize: block.totalText ? 16 : 20, color: '#92400E', lineHeight: 1.25 }}>{blockTotal(block)}</Typography>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 16, color: ITEM_COLOR, wordBreak: 'break-word', lineHeight: 1.3 }}>{block.name}</Typography>
           <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
             {block.quantity} unit{block.quantity === 1 ? '' : 's'} · {block.lines.length} order{block.lines.length === 1 ? '' : 's'}
@@ -141,7 +143,6 @@ function PrepCard({ block, warn, showKitchenDay }: { block: PrepBlock; warn?: bo
           </Typography>
           {block.eco > 0 && <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#126B2C' }}>♻️ Eco × {block.eco}</Typography>}
         </Box>
-        <Typography sx={{ fontWeight: 800, fontSize: block.totalText ? 18 : 22, color: '#92400E', textAlign: 'right', lineHeight: 1.2, flexShrink: 0 }}>{blockTotal(block)}</Typography>
       </Box>
       <Box>
         {block.lines.map((line, i) => (
