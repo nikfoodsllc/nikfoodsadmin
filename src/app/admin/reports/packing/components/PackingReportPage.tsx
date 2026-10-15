@@ -10,7 +10,7 @@ import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import { addDays, formatDayShort, isDayString, pacificDayOf, shortSpiceLabel } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
-import { applyColumnChoice, rowTone, TONE_COLORS, type RowTone } from '@/utils/kitchenReportSheets';
+import { applyColumnChoice, TONE_COLORS } from '@/utils/kitchenReportSheets';
 import { buildPackingSheets, PACKING_SHEET_CHOICES } from '@/utils/packingReportSheets';
 import { filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
@@ -37,7 +37,8 @@ const PRINT_CSS = `
 }
 `;
 
-const toneBg = (tone: RowTone) => `#${TONE_COLORS[tone]}`;
+/** On screen every row is white and only an ECO row is green (the red and white rows are kept in the Excel file and the PDF). */
+const rowBg = (isEco: boolean) => (isEco ? `#${TONE_COLORS.eco}` : '#FFFFFF');
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
 /** "11:32 PM" in Pacific time */
@@ -48,23 +49,23 @@ function pacificTime(value: string | null | undefined): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' }).format(d);
 }
 
-function LineRow({ line, index }: { line: PackLine; index: number }) {
+function LineRow({ line }: { line: PackLine }) {
   return (
-    <Box sx={{ py: 0.8, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(index, line.isEco)) }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{line.name}</Typography>
-          {line.choices.map((c) => (
-            <Typography key={c} sx={{ fontSize: 12, color: '#4B5563', wordBreak: 'break-word' }}>{c}</Typography>
-          ))}
-          {line.pickedFor && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Picked for {formatDayShort(line.pickedFor)}</Typography>}
-        </Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '58%' }}>
-          {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
-          {line.portion && <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>{line.portion}</Typography>}
-          <Typography sx={{ fontSize: 16, fontWeight: 800, color: '#111827', whiteSpace: 'nowrap' }}>× {line.quantity}</Typography>
-          {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
-        </Box>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, py: 0.8, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: rowBg(line.isEco) }}>
+      <Typography sx={{ width: { xs: 40, sm: 48 }, flexShrink: 0, fontSize: 16, fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', lineHeight: 1.3 }}>× {line.quantity}</Typography>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#111827', wordBreak: 'break-word' }}>{line.name}</Typography>
+        {(line.spice || line.portion || line.isEco) && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.3 }}>
+            {line.portion && <Typography sx={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{line.portion}</Typography>}
+            {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
+            {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+          </Box>
+        )}
+        {line.choices.map((c) => (
+          <Typography key={c} sx={{ fontSize: 12, color: '#4B5563', wordBreak: 'break-word' }}>{c}</Typography>
+        ))}
+        {line.pickedFor && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Picked for {formatDayShort(line.pickedFor)}</Typography>}
       </Box>
     </Box>
   );
@@ -74,8 +75,10 @@ function StopCard({ stop, warn }: { stop: PackStop; warn?: boolean }) {
   const units = stop.lines.reduce((n, l) => n + l.quantity, 0);
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.25, bgcolor: '#fff' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1, bgcolor: warn ? '#FDEFC4' : '#E4EAF2', borderBottom: '1px solid #CBD5E1' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, minWidth: 0 }}>
+          {/* how many units to pack, first, so it is next to the name and not at the far right */}
+          {units > 0 && <Typography sx={{ width: { xs: 56, sm: 64 }, flexShrink: 0, fontSize: 13, fontWeight: 800, color: '#374151', lineHeight: 1.7, whiteSpace: 'nowrap' }}>{units} unit{units === 1 ? '' : 's'}</Typography>}
           {stop.number > 0 && (
             <Box sx={{ minWidth: 30, height: 30, borderRadius: '50%', bgcolor: '#F89C35', color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{stop.number}</Box>
           )}
@@ -86,13 +89,12 @@ function StopCard({ stop, warn }: { stop: PackStop; warn?: boolean }) {
         </Box>
         <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
           {stop.scheduledAt && <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{stop.scheduledAt}</Typography>}
-          {units > 0 && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{units} unit{units === 1 ? '' : 's'}</Typography>}
         </Box>
       </Box>
       {stop.empty ? (
         <Typography sx={{ px: 2, py: 1, fontSize: 13, color: '#B45309' }}>Nothing to pack for this date. Check the order.</Typography>
       ) : (
-        stop.lines.map((line, i) => <LineRow key={`${line.orderId}-${i}`} line={line} index={i} />)
+        stop.lines.map((line, i) => <LineRow key={`${line.orderId}-${i}`} line={line} />)
       )}
     </Paper>
   );
@@ -125,8 +127,9 @@ function TotalsTab({ totals, searching }: { totals: PackTotal[]; searching: bool
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', bgcolor: '#fff' }}>
       {totals.map((t, i) => (
-        <Box key={`${t.isCombo}-${t.name}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, py: 0.8, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: toneBg(rowTone(i, false)) }}>
-          <Box sx={{ minWidth: 0 }}>
+        <Box key={`${t.isCombo}-${t.name}`} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.8, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: '#FFFFFF' }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 800, width: 44, flexShrink: 0, textAlign: 'right' }}>{t.quantity}</Typography>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>
               {t.name} {t.isCombo && <Typography component="span" sx={{ fontSize: 12, color: '#6B7280' }}>(combo)</Typography>}
             </Typography>
@@ -137,7 +140,6 @@ function TotalsTab({ totals, searching }: { totals: PackTotal[]; searching: bool
               </Typography>
             )}
           </Box>
-          <Typography sx={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'right' }}>{t.quantity}</Typography>
         </Box>
       ))}
     </Paper>
