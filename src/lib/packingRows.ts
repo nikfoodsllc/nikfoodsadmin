@@ -16,7 +16,7 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
         status: { $ne: 'cancelled' },
         $or: [
           { paymentStatus: 'paid' },
-          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
+          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
         ],
         $and: [{ $or: [{ 'items.actualDeliveryDate': within }, { 'items.deliveryDate': within }] }],
       },

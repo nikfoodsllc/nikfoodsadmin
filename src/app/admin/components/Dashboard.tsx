@@ -38,6 +38,7 @@ interface StatusBreakdown {
   preparing: number;
   ready: number;
   out_for_delivery: number;
+  partially_delivered: number;
   delivered: number;
   cancelled: number;
 }
@@ -628,6 +629,7 @@ export default function Dashboard() {
               { label: 'Preparing', value: stats.statusBreakdown.preparing, color: '#8E44AD', bgColor: '#F4ECFC' },
               { label: 'Ready', value: stats.statusBreakdown.ready, color: '#1DD1A1', bgColor: '#E6FBF5' },
               { label: 'Out for Delivery', value: stats.statusBreakdown.out_for_delivery, color: '#6C5CE7', bgColor: '#F0EEFF' },
+              { label: 'Partially Delivered', value: stats.statusBreakdown.partially_delivered ?? 0, color: '#14B8A6', bgColor: '#E6FAF7' },
               { label: 'Delivered', value: stats.statusBreakdown.delivered, color: '#5FD068', bgColor: '#EBFBEF' },
               { label: 'Cancelled', value: stats.statusBreakdown.cancelled, color: '#FF7675', bgColor: '#FFF0F0' },
             ].map((status, index) => (
@@ -636,8 +638,8 @@ export default function Dashboard() {
                 sx={{
                   flex: { xs: '1 1 100%', sm: '1 1 50%', md: '1 1 25%' },
                   padding: '20px',
-                  borderRight: { xs: 'none', md: index < 3 ? '1px solid #f0f0f0' : 'none' },
-                  borderBottom: { xs: index < 6 ? '1px solid #f0f0f0' : 'none', md: index < 4 ? '1px solid #f0f0f0' : 'none' },
+                  borderRight: { xs: 'none', md: index % 4 !== 3 ? '1px solid #f0f0f0' : 'none' },
+                  borderBottom: { xs: index < 7 ? '1px solid #f0f0f0' : 'none', md: index < 4 ? '1px solid #f0f0f0' : 'none' },
                   textAlign: 'center',
                 }}
               >

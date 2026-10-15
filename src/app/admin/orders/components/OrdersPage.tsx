@@ -488,6 +488,7 @@ export default function OrdersPage() {
                   <MenuItem value="preparing">Preparing</MenuItem>
                   <MenuItem value="ready">Ready</MenuItem>
                   <MenuItem value="out_for_delivery">Out for Delivery</MenuItem>
+                  <MenuItem value="partially_delivered">Partially Delivered</MenuItem>
                   <MenuItem value="delivered">Delivered</MenuItem>
                   <MenuItem value="cancelled">Cancelled</MenuItem>
                 </Select>

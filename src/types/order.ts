@@ -20,6 +20,7 @@ export type OrderStatus =
   | 'preparing'
   | 'ready'
   | 'out_for_delivery'
+  | 'partially_delivered'
   | 'delivered'
   | 'cancelled';
 
@@ -258,6 +259,8 @@ export interface Order {
     state?: 'sent' | 'failed' | 'removed' | string;
     at?: Date | string;
     stops?: Array<{ date?: string; result?: string; orderNo?: string; error?: string }>;
+    /** How each delivery day went, written when the drivers finish a stop: { date, status: 'delivered' | 'failed' | 'pending', at } */
+    deliveries?: Array<{ date?: string; status?: string; at?: string | null }>;
   };
   paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
   /** Delivery dates an admin moved (oldest first); each change keeps what the day line was before */

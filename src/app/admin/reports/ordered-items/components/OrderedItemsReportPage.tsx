@@ -88,6 +88,7 @@ export default function OrderedItemsReportPage() {
     { value: 'preparing', label: 'Preparing' },
     { value: 'ready', label: 'Ready' },
     { value: 'out_for_delivery', label: 'Out for Delivery' },
+    { value: 'partially_delivered', label: 'Partially Delivered' },
     { value: 'delivered', label: 'Delivered' },
     { value: 'cancelled', label: 'Cancelled' },
   ];
@@ -908,6 +909,7 @@ export default function OrderedItemsReportPage() {
                               item.orderStatus === 'preparing' ? '#FED7AA' :
                               item.orderStatus === 'ready' ? '#D1FAE5' :
                               item.orderStatus === 'out_for_delivery' ? '#E0E7FF' :
+                              item.orderStatus === 'partially_delivered' ? '#CCFBF1' :
                               item.orderStatus === 'delivered' ? '#D1FAE5' :
                               item.orderStatus === 'cancelled' ? '#FEE2E2' : '#F3F4F6',
                             color:
@@ -916,6 +918,7 @@ export default function OrderedItemsReportPage() {
                               item.orderStatus === 'preparing' ? '#C2410C' :
                               item.orderStatus === 'ready' ? '#065F46' :
                               item.orderStatus === 'out_for_delivery' ? '#3730A3' :
+                              item.orderStatus === 'partially_delivered' ? '#0F766E' :
                               item.orderStatus === 'delivered' ? '#065F46' :
                               item.orderStatus === 'cancelled' ? '#991B1B' : '#4B5563',
                           }}
