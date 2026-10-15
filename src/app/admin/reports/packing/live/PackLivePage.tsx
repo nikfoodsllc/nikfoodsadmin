@@ -52,7 +52,7 @@ function authHeaders(token: string) {
  * Every customer of the route by name, in route order. The ones the packer has been through carry a check mark, the one on screen is
  * highlighted, and tapping any name goes straight to that customer (while packing is on). Customers the packer skipped over stay unchecked.
  */
-function CustomerList({ stops, run, current, canJump, onJump, maxHeight }: { stops: PackStop[]; run: PackingRun | null; current: number; canJump: boolean; onJump: (index: number) => void; maxHeight?: string }) {
+function CustomerList({ stops, run, current, canJump, finished, onJump, maxHeight }: { stops: PackStop[]; run: PackingRun | null; current: number; canJump: boolean; finished?: boolean; onJump: (index: number) => void; maxHeight?: string }) {
   const currentRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     // keep the customer on screen in view inside the list (not the whole page)
@@ -64,8 +64,9 @@ function CustomerList({ stops, run, current, canJump, onJump, maxHeight }: { sto
     <Box sx={{ maxHeight, overflowY: 'auto' }}>
       {stops.map((s, i) => {
         const progress = run?.stops?.[stopKeyOf(s)];
-        const visited = i !== current && Boolean(progress && (Number(progress.timeMs) > 0 || progress.firstOpenedAt));
-        const isCurrent = i === current;
+        // once the route is finished every customer the packer reached (the last one too) is checked and nobody is "current"
+        const isCurrent = i === current && !finished;
+        const visited = !isCurrent && Boolean(progress && (Number(progress.timeMs) > 0 || progress.firstOpenedAt));
         return (
           <Box
             key={stopKeyOf(s)}
@@ -549,7 +550,7 @@ export default function PackLivePage() {
               </Paper>
               <Paper elevation={0} sx={{ display: { xs: 'none', md: 'block' }, border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, position: 'sticky', top: 80 }}>
                 <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>Customers</Typography>
-                <CustomerList stops={stops} run={run} current={index} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} maxHeight="calc(100vh - 230px)" />
+                <CustomerList stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} maxHeight="calc(100vh - 230px)" />
               </Paper>
             </Box>
           )}
@@ -570,7 +571,7 @@ export default function PackLivePage() {
       <Dialog open={listOpen} onClose={() => setListOpen(false)} fullWidth maxWidth="xs" scroll="paper">
         <DialogTitle sx={{ pb: 1 }}>Customers</DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
-          <CustomerList stops={stops} run={run} current={index} canJump={status === 'packing'} onJump={(i) => { setListOpen(false); void goTo(i, { jump: true }); }} />
+          <CustomerList stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => { setListOpen(false); void goTo(i, { jump: true }); }} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setListOpen(false)} sx={{ textTransform: 'none' }}>
