@@ -87,15 +87,16 @@ describe('summarizeRoute and startIndex', () => {
   const route = { key: '1', title: 'Route 1', driverName: 'Belred', stops: [s1, s2] };
   const k1 = stopKeyOf(s1);
   const k2 = stopKeyOf(s2);
-  it('counts packed customers and averages only the customers that took time', () => {
-    const run = { date: 'd', routeKey: '1', startedAt: 'x', stops: { [k1]: { checked: lineKeys(s1).map((k) => k.key), timeMs: 120000 }, [k2]: { checked: [], timeMs: 0 } } };
+  it('counts the customers the packer has been through and averages only the customers that took time', () => {
+    const run = { date: 'd', routeKey: '1', startedAt: 'x', stops: { [k1]: { checked: [], timeMs: 120000 }, [k2]: { checked: [], timeMs: 0 } } };
     const sum = summarizeRoute(route, run, Date.now());
     expect(sum).toMatchObject({ customers: 2, complete: 1, packed: 1, units: 2, totalMs: 120000, averageMs: 120000 });
     expect(sum.slowest?.stopKey).toBe(k1);
   });
-  it('starts on the saved customer, else the first one not finished', () => {
+  it('starts on the saved customer, else the first one with no time on it, else the first', () => {
     expect(startIndex(route, { date: 'd', routeKey: '1', currentStopKey: k2 })).toBe(1);
-    expect(startIndex(route, { date: 'd', routeKey: '1', stops: { [k1]: { checked: lineKeys(s1).map((k) => k.key) } } })).toBe(1);
+    expect(startIndex(route, { date: 'd', routeKey: '1', stops: { [k1]: { timeMs: 60000 } } })).toBe(1);
+    expect(startIndex(route, { date: 'd', routeKey: '1', stops: { [k1]: { timeMs: 60000 }, [k2]: { timeMs: 30000 } } })).toBe(0);
     expect(startIndex(route, null)).toBe(0);
   });
 });

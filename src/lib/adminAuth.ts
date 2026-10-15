@@ -12,7 +12,7 @@ export function verifyAdminRequest(request: NextRequest): { ok: true; userId: st
 }
 
 /**
- * The signed-in admin OR packer of a request. Only the few routes a packer may use call this (packing report, Pack live,
+ * The signed-in admin OR packer of a request. Only the few routes a packer may use call this (packing report, Packing Planner,
  * the money-free orders list); every other admin route keeps checking for role admin, so a packer's token is refused there.
  */
 export function verifyStaffRequest(request: NextRequest): { ok: true; userId: string; role: 'admin' | 'packer' } | { ok: false; error: string } {

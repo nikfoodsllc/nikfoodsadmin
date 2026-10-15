@@ -19,7 +19,7 @@ function verifyAuth(request: NextRequest) {
 /**
  * GET /api/admin/packing-metrics?from=YYYY-MM-DD&to=YYYY-MM-DD   (DELIVERY dates, both included, at most 62 days)
  * How long the packing took: totals, averages, per day, per driver and the slowest and fastest customers, from the saved
- * packing runs (Pack live). Read only.
+ * packing runs (Packing Planner). Read only.
  */
 export async function GET(request: NextRequest) {
   try {

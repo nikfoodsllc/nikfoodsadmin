@@ -1,8 +1,9 @@
 import type { Collection } from 'mongodb';
 import type { PackingRun, StopMeta } from '@/utils/packingProgress';
+import { MIN_COUNTED_MS } from '@/utils/packingMetrics';
 
 /**
- * The saved packing runs ("Pack live"): one document per delivery date and route in `packingRuns`. Every change is one small
+ * The saved packing runs ("Packing Planner"): one document per delivery date and route in `packingRuns`. Every change is one small
  * atomic update, so two people packing different customers at the same time never overwrite each other.
  */
 export const RUNS = 'packingRuns';
@@ -94,8 +95,26 @@ export async function setChecked(c: Collection<Doc>, p: { date: string; routeKey
   return clean(await c.findOne({ date: p.date, routeKey: p.routeKey }));
 }
 
-/** Moves to another customer: the time of the one being left is saved, the clock of the new one starts. */
-export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: string; toStopKey: string; meta?: StopMeta }, now: Date): Promise<Doc | null | false> {
+
+/**
+ * The time the LAST customer is given when the packers never press Finish: the average of the other customers that were timed.
+ * 0 when there is nothing to average (then the route is left for the packer to finish by hand).
+ */
+export function averageOfOthers(run: Pick<Doc, 'stops'>, lastStopKey: string): number {
+  const times = Object.entries(run.stops ?? {})
+    .filter(([key]) => key !== lastStopKey)
+    .map(([, progress]) => Math.max(0, Number(progress?.timeMs) || 0))
+    .filter((ms) => ms >= MIN_COUNTED_MS);
+  return times.length > 0 ? Math.round(times.reduce((n, ms) => n + ms, 0) / times.length) : 0;
+}
+
+/**
+ * Moves to another customer: the time of the one being left is saved, the clock of the new one starts.
+ * `finishIfLast`: the new customer is the last of the route. Nobody presses Finish for it, so it gets the average time of the other
+ * customers, its clock stops, and the route is finished with that time added (the route's end is the arrival plus that average).
+ * Without any timed customer to average the route stays open and the packer finishes it by hand.
+ */
+export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: string; toStopKey: string; meta?: StopMeta; finishIfLast?: boolean }, now: Date): Promise<Doc | null | false> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
     if (!run?.startedAt) return false;
@@ -106,6 +125,19 @@ export async function goToStop(c: Collection<Doc>, p: { date: string; routeKey: 
     if (p.meta) set[`${to}.meta`] = p.meta;
     const result = await c.updateOne({ date: p.date, routeKey: p.routeKey, currentStopKey: run.currentStopKey ?? null, finishedAt: null }, { $set: set });
     if (result.matchedCount > 0) break; // otherwise someone else moved first: read again
+  }
+  if (p.finishIfLast) {
+    const run = await c.findOne({ date: p.date, routeKey: p.routeKey });
+    if (run?.startedAt && !run.finishedAt && !run.pausedAt && run.currentStopKey === p.toStopKey) {
+      const average = averageOfOthers(run, p.toStopKey);
+      if (average > 0) {
+        const to = `stops.${p.toStopKey}`;
+        await c.updateOne(
+          { date: p.date, routeKey: p.routeKey, currentStopKey: p.toStopKey, finishedAt: null },
+          { $set: { [`${to}.timeMs`]: average, [`${to}.activeSince`]: null, [`${to}.auto`]: true, finishedAt: new Date(now.getTime() + average).toISOString(), currentStopKey: null, pausedAt: null, updatedAt: now } }
+        );
+      }
+    }
   }
   return clean(await c.findOne({ date: p.date, routeKey: p.routeKey }));
 }
