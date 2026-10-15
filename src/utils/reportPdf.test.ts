@@ -61,12 +61,11 @@ describe('sheetToPdfTables', () => {
 });
 
 describe('stickerQtyText', () => {
-  it('shows the whole amount for sized items and the count otherwise', () => {
+  it('shows one box: its size, or 1 without a size', () => {
     expect(stickerQtyText('12Oz', 1)).toBe('12oz');
-    expect(stickerQtyText('16Oz', 2)).toBe('32oz');
     expect(stickerQtyText('1/2Lb', 1)).toBe('8oz');
-    expect(stickerQtyText('1Lb', 3)).toBe('48oz');
-    expect(stickerQtyText(null, 2)).toBe(2);
+    expect(stickerQtyText('1Lb', 1)).toBe('16oz');
+    expect(stickerQtyText(null, 1)).toBe(1);
     expect(stickerQtyText('', 1)).toBe(1);
   });
 });

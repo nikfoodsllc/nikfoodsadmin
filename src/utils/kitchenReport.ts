@@ -208,7 +208,9 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
     entry.lines.push(atom.line);
     groups.set(key, entry);
     if (stickerOf({ id: atom.id, name: atom.name }) !== 'no') {
-      stickers.push({
+      // a sticker goes on each box, so 2 boxes of 8Oz are 2 sticker lines (never merged, never multiplied)
+      const boxes = Math.max(1, Math.min(99, Math.round(atom.line.quantity) || 1));
+      for (let box = 0; box < boxes; box += 1) stickers.push({
         item: atom.name,
         customerName: atom.line.customerName,
         orderId: atom.line.orderId,
@@ -218,7 +220,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
         deliveryDate: atom.line.deliveryDate,
         movedFrom: atom.line.movedFrom,
         portion: atom.line.portion,
-        quantity: atom.line.quantity,
+        quantity: 1,
         spice: atom.line.spice,
         isEco: atom.line.isEco,
         viaCombo: atom.line.viaCombo,
@@ -276,7 +278,7 @@ function sumText(lines: PrepLine[]): string {
   return formatAmount(amount);
 }
 
-/** The sticker's Qty: the whole amount for a sized item (12Oz x 2 -> '24oz'), the plain count when it has no size. */
+/** The sticker's Qty: the size of the one box (12Oz -> '12oz'), or 1 when it has no size. Sticker lines are one per box. */
 export function stickerQtyText(portion: string | null, quantity: number): number | string {
   const size = parsePortionAmount(portion);
   if (!size || !(size.oz > 0)) return quantity;
