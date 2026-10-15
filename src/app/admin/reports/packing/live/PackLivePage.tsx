@@ -52,7 +52,7 @@ function authHeaders(token: string) {
  * Every customer of the route by name, in route order. The ones the packer has been through carry a check mark, the one on screen is
  * highlighted, and tapping any name goes straight to that customer (while packing is on). Customers the packer skipped over stay unchecked.
  */
-function CustomerList({ stops, run, current, canJump, finished, onJump, maxHeight }: { stops: PackStop[]; run: PackingRun | null; current: number; canJump: boolean; finished?: boolean; onJump: (index: number) => void; maxHeight?: string }) {
+function CustomerList({ stops, run, current, canJump, finished, onJump, maxHeight, fill }: { stops: PackStop[]; run: PackingRun | null; current: number; canJump: boolean; finished?: boolean; onJump: (index: number) => void; maxHeight?: string; fill?: boolean }) {
   const currentRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     // keep the customer on screen in view inside the list (not the whole page)
@@ -61,7 +61,8 @@ function CustomerList({ stops, run, current, canJump, finished, onJump, maxHeigh
     if (el && box) box.scrollTop = Math.max(0, el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2);
   }, [current]);
   return (
-    <Box sx={{ maxHeight, overflowY: 'auto' }}>
+    // fill: the list takes exactly the height its parent has and scrolls inside it (it never makes the page taller)
+    <Box sx={fill ? { position: 'absolute', inset: 0, overflowY: 'auto' } : { maxHeight, overflowY: 'auto' }}>
       {stops.map((s, i) => {
         const progress = run?.stops?.[stopKeyOf(s)];
         // once the route is finished every customer the packer reached (the last one too) is checked and nobody is "current"
@@ -474,7 +475,7 @@ export default function PackLivePage() {
           </Paper>
 
           {status !== 'not_started' && stop && (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 280px' }, columnGap: 2, alignItems: 'start' }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 280px' }, columnGap: 2, alignItems: 'stretch' }}>
               <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
                   <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>Customer {index + 1} of {stops.length}</Typography>
@@ -548,9 +549,12 @@ export default function PackLivePage() {
                   });
                 })()}
               </Paper>
-              <Paper elevation={0} sx={{ display: { xs: 'none', md: 'block' }, border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, position: 'sticky', top: 80 }}>
-                <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>Customers</Typography>
-                <CustomerList stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} maxHeight="calc(100vh - 230px)" />
+              {/* the side list is exactly as tall as the packing card on the left (it scrolls inside), so it never pushes the page down */}
+              <Paper elevation={0} sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, alignSelf: 'stretch', minHeight: 340 }}>
+                <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>Customers</Typography>
+                <Box sx={{ position: 'relative', flex: 1, minHeight: 0 }}>
+                  <CustomerList fill stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} />
+                </Box>
               </Paper>
             </Box>
           )}
