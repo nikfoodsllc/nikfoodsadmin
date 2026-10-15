@@ -84,6 +84,7 @@ const getDefaultFormData = (): SimpleFoodItem => ({
   hasSpiceLevel: false,
   spiceLevel: [],
   isDraft: false,
+  sticker: 'yes', // a new item is on the Stickers sheet unless someone turns it off
 });
 
 const defaultTemplateProperties = {
@@ -555,7 +556,7 @@ export default function SimpleFoodItemDialog({
           />
 
           {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
-          <StickerField value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value }))} disabled={loading} />
+          <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value }))} disabled={loading} />
           <StickerField label="Split Sticker" caption="Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount." value={formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading} />
 
           <Divider />
