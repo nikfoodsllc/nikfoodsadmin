@@ -237,6 +237,8 @@ const foodItemSchema = z.object({
   preparationType: z.enum(['cooked', 'ready_to_eat']).nullish(),
   // Whether the item's orders get a packing sticker (Kitchen Report; No leaves it off). Optional: null on update means "back to not set yet".
   sticker: z.enum(['yes', 'no']).nullish(),
+  // Split Sticker: 'yes' = one sticker per box in the Stickers sheet; null on update = back to not set yet
+  splitSticker: z.enum(['yes', 'no']).nullish(),
 
   // Portions type fields
   portions: z.array(z.string()).optional(),
@@ -331,6 +333,7 @@ interface FoodItem {
   preparationType?: 'cooked' | 'ready_to_eat';
   // 'yes' = its orders appear on the Stickers sheet, 'no' = they do not; missing = not set yet
   sticker?: 'yes' | 'no';
+  splitSticker?: 'yes' | 'no';
 
   // Portions fields
   portions?: string[];
@@ -738,6 +741,8 @@ export async function POST(request: NextRequest) {
       spiceLevel: data.spiceLevel || [],
       ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
       ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
+  ...(isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
+      ...(isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1053,6 +1058,7 @@ const updateData: Partial<FoodItem> = {
     const unset: Record<string, ''> = {};
     if (data.preparationType === null) unset.preparationType = '';
     if (data.sticker === null) unset.sticker = '';
+    if (data.splitSticker === null) unset.splitSticker = '';
     const updateResult = await db.updateOne<FoodItem>(
       'fooditems',
       { _id: new ObjectId(_id) },

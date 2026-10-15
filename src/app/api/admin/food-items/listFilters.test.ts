@@ -35,6 +35,11 @@ describe('foodItemListFilters', () => {
     expect(f('preparationType=all')).toEqual({});
   });
 
+  it('splitSticker, including "not set yet"', () => {
+    expect(f('splitSticker=yes')).toEqual({ splitSticker: 'yes' });
+    expect(f('splitSticker=not_set')).toEqual({ splitSticker: { $nin: ['yes', 'no'] } });
+    expect(f('splitSticker=maybe')).toEqual({});
+  });
   it('sticker, including "not set yet"', () => {
     expect(f('sticker=yes')).toEqual({ sticker: 'yes' });
     expect(f('sticker=no')).toEqual({ sticker: 'no' });

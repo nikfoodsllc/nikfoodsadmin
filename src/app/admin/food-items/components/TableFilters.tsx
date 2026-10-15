@@ -122,6 +122,22 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="not_set">(not set yet)</MenuItem>
         </Select>
       </FormControl>
+
+      {/* Split Sticker */}
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>Split Sticker</InputLabel>
+        <Select
+          value={filters.splitSticker}
+          label="Split Sticker"
+          onChange={(e) => onFilterChange('splitSticker', e.target.value as FoodItemFilters['splitSticker'])}
+          sx={selectSx}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="yes">Yes</MenuItem>
+          <MenuItem value="no">No</MenuItem>
+          <MenuItem value="not_set">(not set yet)</MenuItem>
+        </Select>
+      </FormControl>
     </Box>
   );
 }

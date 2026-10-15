@@ -60,9 +60,11 @@ export async function GET(request: NextRequest) {
     const nameTypes = new Map<string, Set<string>>();
     const stickerById = new Map<string, StickerFlag | null>();
     const nameStickers = new Map<string, Set<string>>();
+    const splitById = new Map<string, StickerFlag | null>();
+    const nameSplits = new Map<string, Set<string>>();
     const objectIds = [...ids].filter((id) => /^[0-9a-fA-F]{24}$/.test(id)).map((id) => new ObjectId(id));
     if (objectIds.length > 0 || names.size > 0) {
-      const found = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown; sticker?: unknown }>('fooditems', {
+      const found = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown; sticker?: unknown; splitSticker?: unknown }>('fooditems', {
         $or: [{ _id: { $in: objectIds } }, { name: { $in: [...names] } }],
       } as never);
       for (const item of found.success ? found.data ?? [] : []) {
@@ -75,8 +77,12 @@ export async function GET(request: NextRequest) {
           const stickerSet = nameStickers.get(item.name.trim()) ?? new Set<string>();
           stickerSet.add(normalizeSticker(item.sticker) ?? 'none');
           nameStickers.set(item.name.trim(), stickerSet);
+          const splitSet = nameSplits.get(item.name.trim()) ?? new Set<string>();
+          splitSet.add(normalizeSticker(item.splitSticker) ?? 'none');
+          nameSplits.set(item.name.trim(), splitSet);
         }
         stickerById.set(String(item._id), normalizeSticker(item.sticker));
+        splitById.set(String(item._id), normalizeSticker(item.splitSticker));
       }
     }
     const typeOf: TypeLookup = ({ id, name }) => {
@@ -101,7 +107,17 @@ export async function GET(request: NextRequest) {
       return null;
     };
 
-    const report = buildKitchenReport(rows, typeOf, stickerOf);
+    const splitOf: StickerLookup = ({ id, name }) => {
+      if (id && splitById.has(id)) return splitById.get(id) ?? null;
+      const set = nameSplits.get(name.trim());
+      if (set && set.size === 1) {
+        const only = [...set][0];
+        return only === 'none' ? null : (only as StickerFlag);
+      }
+      return null;
+    };
+
+    const report = buildKitchenReport(rows, typeOf, stickerOf, splitOf);
     return NextResponse.json({
       data: {
         startDate: range.startDate,

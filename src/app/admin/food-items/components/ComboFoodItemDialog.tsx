@@ -81,6 +81,7 @@ interface ComboFoodItem {
   ecoContainerCharge: number;
   isDraft?: boolean;
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
+  splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
 }
 
@@ -534,6 +535,7 @@ export default function ComboFoodItemDialog({
 
           {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
           <StickerField value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value }))} disabled={loading} />
+          <StickerField label="Split Sticker" caption="Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount." value={formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading} />
 
           <Divider />
 

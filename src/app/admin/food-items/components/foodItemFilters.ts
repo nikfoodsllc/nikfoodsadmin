@@ -8,6 +8,7 @@ export interface FoodItemFilters {
   itemType: 'all' | 'simple' | 'portions' | 'combo';
   preparation: PreparationFilter;
   sticker: StickerFilter;
+  splitSticker: StickerFilter;
 }
 
 export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
@@ -16,6 +17,7 @@ export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
   itemType: 'all',
   preparation: 'all',
   sticker: 'all',
+  splitSticker: 'all',
 };
 
 /** The query parameters of the food items list API for these filters (filters that are off are left out). */
@@ -28,6 +30,7 @@ export function foodItemFilterParams(filters: FoodItemFilters): Array<[string, s
     params.push(['preparationType', filters.preparation]);
   }
   if (filters.sticker !== 'all' && isStickerFilter(filters.sticker)) params.push(['sticker', filters.sticker]);
+  if (filters.splitSticker !== 'all' && isStickerFilter(filters.splitSticker)) params.push(['splitSticker', filters.splitSticker]);
   return params;
 }
 

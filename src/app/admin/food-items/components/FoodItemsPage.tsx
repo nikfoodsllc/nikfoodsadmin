@@ -66,6 +66,7 @@ interface FoodItem {
   itemType: 'simple' | 'portions' | 'combo';
   preparationType?: PreparationType;
   sticker?: StickerFlag;
+  splitSticker?: StickerFlag;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -165,7 +166,7 @@ interface ComboFoodItem {
   isDraft?: boolean;
 }
 
-type BulkField = 'available' | 'veg' | 'preparation' | 'sticker';
+type BulkField = 'available' | 'veg' | 'preparation' | 'sticker' | 'splitSticker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
@@ -515,18 +516,19 @@ export default function FoodItemsPage() {
     }
   };
 
-  const applySticker = async (sticker: StickerFlag | null) => {
+  const applySticker = async (sticker: StickerFlag | null, field: 'sticker' | 'splitSticker' = 'sticker') => {
     if (selectedIds.size === 0) return;
     try {
       setBulkLoading(true);
       const response = await fetch('/api/admin/food-items/sticker', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ids: [...selectedIds], sticker }),
+        body: JSON.stringify({ ids: [...selectedIds], sticker, field }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to update items');
-      const label = sticker === 'yes' ? 'Sticker: Yes' : sticker === 'no' ? 'Sticker: No' : 'Sticker: not set yet';
+      const name = field === 'splitSticker' ? 'Split Sticker' : 'Sticker';
+      const label = sticker === 'yes' ? `${name}: Yes` : sticker === 'no' ? `${name}: No` : `${name}: not set yet`;
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
       setBulkField(null);
@@ -857,6 +859,7 @@ export default function FoodItemsPage() {
               <ToggleButton value="veg">Veg/Non-Veg</ToggleButton>
               <ToggleButton value="preparation">Preparation Type</ToggleButton>
               <ToggleButton value="sticker">Sticker</ToggleButton>
+              <ToggleButton value="splitSticker">Split Sticker</ToggleButton>
             </ToggleButtonGroup>
           </Box>
 
@@ -907,6 +910,20 @@ export default function FoodItemsPage() {
                 No
               </Button>
               <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null)} sx={{ textTransform: 'none' }}>
+                Clear (not set yet)
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'splitSticker' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Split Sticker to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('yes', 'splitSticker')} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
+                Yes
+              </Button>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('no', 'splitSticker')} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
+                No
+              </Button>
+              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null, 'splitSticker')} sx={{ textTransform: 'none' }}>
                 Clear (not set yet)
               </Button>
             </Box>

@@ -23,6 +23,7 @@ interface FoodItem {
   itemType: 'simple' | 'portions' | 'combo';
   preparationType?: 'cooked' | 'ready_to_eat';
   sticker?: 'yes' | 'no';
+  splitSticker?: 'yes' | 'no';
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -291,6 +292,12 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
     sticker: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
         <StickerBadge value={item.sticker} />
+      </TableCell>
+    ),
+    // Split Sticker: Yes / No / (not set yet)
+    splitSticker: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <StickerBadge value={item.splitSticker} />
       </TableCell>
     ),
     // Description

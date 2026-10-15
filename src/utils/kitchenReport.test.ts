@@ -110,6 +110,15 @@ describe('buildKitchenReport', () => {
     expect(r.stickers.map((s) => `${s.deliveredOn ?? s.day}:${s.customerName}`)).toEqual(['2026-10-13:Bob', '2026-10-14:Zed', '2026-10-14:Amy']);
     expect(r.stickers[2]).toMatchObject({ item: 'Pickle', portion: '16Oz', isEco: true });
   });
+  it('stickers: only Split Sticker = Yes items get one line per box; the others one line with the whole quantity', () => {
+    const rows = [row({ name: 'Pickle', customerName: 'Shrey', portion: '8Oz', quantity: 2 }), row({ name: 'Pickle', orderId: '2', customerName: 'Amy', portion: '8Oz', quantity: 1 }), row({ name: 'Achar', orderId: '3', customerName: 'Kay', portion: '12Oz', quantity: 2 })];
+    const split = ({ name }: { name: string }) => (name === 'Pickle' ? ('yes' as const) : null);
+    const r = buildKitchenReport(rows, byName, stickerYes, split);
+    expect(r.stickers.filter((s) => s.item === 'Pickle').map((s) => `${s.customerName}:${s.quantity}`).sort()).toEqual(['Amy:1', 'Shrey:1', 'Shrey:1']);
+    expect(r.stickers.filter((s) => s.item === 'Achar').map((s) => `${s.customerName}:${s.quantity}`)).toEqual(['Kay:2']);
+    // without any split flag nothing is split
+    expect(buildKitchenReport(rows, byName, stickerYes).stickers).toHaveLength(3);
+  });
   it('items marked No are left off the stickers; Yes and not set yet are listed, cooked or ready to eat', () => {
     const marks: Record<string, 'yes' | 'no'> = { Rajma: 'yes', Pickle: 'no' };
     const r = buildKitchenReport([row({ name: 'Rajma' }), row({ name: 'Pickle', orderId: '2' }), row({ name: 'Chapati', orderId: '3' })], byName, ({ name }) => marks[name] ?? null);
