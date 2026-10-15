@@ -276,6 +276,14 @@ function sumText(lines: PrepLine[]): string {
   return formatAmount(amount);
 }
 
+/** The sticker's Qty: the whole amount for a sized item (12Oz x 2 -> '24oz'), the plain count when it has no size. */
+export function stickerQtyText(portion: string | null, quantity: number): number | string {
+  const size = parsePortionAmount(portion);
+  if (!size || !(size.oz > 0)) return quantity;
+  const oz = Math.round(size.oz * quantity * 100) / 100;
+  return `${oz}oz`;
+}
+
 /** A number with the unit it is written in (oz, lb or units). */
 export interface Measured {
   n: number;

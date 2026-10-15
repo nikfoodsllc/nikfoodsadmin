@@ -6,7 +6,7 @@
  * red row), and an ECO row is green whatever its place in the pattern.
  */
 import { deliveryNote, formatDayShort, type KitchenDay } from './kitchenDashboard';
-import { sheetAmounts, type PrepBlock, type StickerLine } from './kitchenReport';
+import { sheetAmounts, stickerQtyText, type PrepBlock, type StickerLine } from './kitchenReport';
 import type { ColumnDef } from './columnPreferences';
 
 export type RowTone = 'red' | 'white' | 'eco';
@@ -70,9 +70,9 @@ export const STICKER_COLUMNS: ColumnDef[] = [
   col('item', 'Item', 30),
   col('customer', 'Customer Name', 22),
   col('size', 'Size', 9),
-  col('qty', 'Qty', 6),
+  col('qty', 'Qty', 9),
   col('spice', 'Spice', 14),
-  col('eco', 'Eco', 6),
+  col('eco', 'Eco', 8),
   col('combo', 'With combo', 24),
   col('order', 'Order', 24),
   col('kitchenDate', 'Kitchen date', 17),
@@ -158,7 +158,7 @@ export function stickersSheet(stickers: StickerLine[]): SheetModel {
     rows.push({
       kind: 'data',
       tone: rowTone(i, s.isEco),
-      cells: [date(s.deliveryDate), s.item, s.customerName, s.portion ?? '', s.quantity, s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.day)],
+      cells: [date(s.deliveryDate), s.item, s.customerName, s.portion ?? '', stickerQtyText(s.portion, s.quantity), s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.day)],
     });
   });
   return { key: 'stickers', columnKeys: STICKER_COLUMNS.map((c) => c.key), name: 'Stickers', widths: STICKER_COLUMNS.map((c) => c.defaultWidth), rows };

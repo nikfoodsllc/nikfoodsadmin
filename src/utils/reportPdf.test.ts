@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildKitchenReport, type StickerLookup, type TypeLookup } from './kitchenReport';
 import { buildKitchenDays, type KitchenRow } from './kitchenDashboard';
+import { stickerQtyText } from './kitchenReport';
 import { buildReportSheets, cellText, prepSheet, readyToEatSheet, sheetToPdfTables, stickersSheet } from './kitchenReportSheets';
 import { buildReportPdf } from './reportPdf';
 
@@ -56,6 +57,17 @@ describe('sheetToPdfTables', () => {
   it('stickers are one plain table', () => {
     const tables = sheetToPdfTables(stickersSheet(report.stickers));
     expect(tables).toHaveLength(1); expect(tables[0].kind).toBe('plain'); expect(tables[0].rows).toHaveLength(1);
+  });
+});
+
+describe('stickerQtyText', () => {
+  it('shows the whole amount for sized items and the count otherwise', () => {
+    expect(stickerQtyText('12Oz', 1)).toBe('12oz');
+    expect(stickerQtyText('16Oz', 2)).toBe('32oz');
+    expect(stickerQtyText('1/2Lb', 1)).toBe('8oz');
+    expect(stickerQtyText('1Lb', 3)).toBe('48oz');
+    expect(stickerQtyText(null, 2)).toBe(2);
+    expect(stickerQtyText('', 1)).toBe(1);
   });
 });
 
