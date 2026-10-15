@@ -32,7 +32,7 @@ function verifyAuth(request: NextRequest) {
 
 /**
  * PATCH /api/admin/food-items/sticker
- * Body: { ids: string[], sticker: 'yes' | 'no' | null }
+ * Body: { ids: string[], sticker: 'yes' | 'no' | null, field?: 'sticker' | 'splitSticker' }
  *
  * Sets whether a whole batch of food items gets a packing sticker (null puts them back to "not set yet").
  * Only the sticker field (and updatedAt) is touched. The customer menu does not use this
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: authResult.error }, { status: 401 });
     }
 
-    let body: { ids?: unknown; sticker?: unknown };
+    let body: { ids?: unknown; sticker?: unknown; field?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -53,6 +53,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { ids, sticker } = body;
+    // which field to set: the Sticker (default) or the Split Sticker
+    if (body.field !== undefined && body.field !== 'sticker' && body.field !== 'splitSticker') {
+      return NextResponse.json({ error: 'field must be "sticker" or "splitSticker"' }, { status: 400 });
+    }
+    const field: 'sticker' | 'splitSticker' = body.field === 'splitSticker' ? 'splitSticker' : 'sticker';
     if (sticker !== null && !isStickerFlag(sticker)) {
       return NextResponse.json(
         { error: 'sticker must be "yes", "no" or null' },
@@ -74,15 +79,15 @@ export async function PATCH(request: NextRequest) {
       'fooditems',
       { _id: { $in: objectIds } },
       sticker === null
-        ? { $unset: { sticker: '' }, $set: { updatedAt: new Date() } }
-        : { $set: { sticker, updatedAt: new Date() } }
+        ? { $unset: { [field]: '' }, $set: { updatedAt: new Date() } }
+        : { $set: { [field]: sticker, updatedAt: new Date() } }
     );
     if (!result.success) {
       throw new Error(result.error || 'Failed to update food items');
     }
 
     return NextResponse.json({
-      data: { requested: objectIds.length, modified: result.modifiedCount ?? 0, sticker },
+      data: { requested: objectIds.length, modified: result.modifiedCount ?? 0, sticker, field },
       message: 'Food items updated successfully',
     });
   } catch (error) {

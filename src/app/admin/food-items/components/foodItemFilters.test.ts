@@ -13,12 +13,15 @@ describe('foodItemFilterParams', () => {
     expect(hasActiveFilters({ ...DEFAULT_FOOD_ITEM_FILTERS, available: 'true' })).toBe(true);
   });
 
+  it('sends the split sticker filter', () => {
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, splitSticker: 'no' })).toEqual([['splitSticker', 'no']]);
+  });
   it('sends the sticker filter', () => {
     expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, sticker: 'yes' })).toEqual([['sticker', 'yes']]);
   });
 
   it('sends all four together', () => {
-    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', sticker: 'all' })).toEqual([
+    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', sticker: 'all', splitSticker: 'all' })).toEqual([
       ['veg', 'true'],
       ['available', 'false'],
       ['itemType', 'combo'],

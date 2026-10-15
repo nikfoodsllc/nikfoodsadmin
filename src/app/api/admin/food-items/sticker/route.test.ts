@@ -81,7 +81,16 @@ describe('updating', () => {
     expect(change.$set.sticker).toBe('no');
     expect(Object.keys(change.$set).sort()).toEqual(['sticker', 'updatedAt']);
     const json = await res.json();
-    expect(json.data).toEqual({ requested: 2, modified: 2, sticker: 'no' });
+    expect(json.data).toEqual({ requested: 2, modified: 2, sticker: 'no', field: 'sticker' });
+  });
+  it('sets or clears the split sticker field only when asked', async () => {
+    expect((await PATCH(req({ body: { ids: [A], sticker: 'yes', field: 'splitSticker' } }))).status).toBe(200);
+    const [, , change] = update.mock.calls[update.mock.calls.length - 1];
+    expect(Object.keys(change.$set).sort()).toEqual(['splitSticker', 'updatedAt']);
+    expect((await PATCH(req({ body: { ids: [A], sticker: null, field: 'splitSticker' } }))).status).toBe(200);
+    const [, , clear] = update.mock.calls[update.mock.calls.length - 1];
+    expect(clear.$unset).toEqual({ splitSticker: '' });
+    expect((await PATCH(req({ body: { ids: [A], sticker: 'yes', field: 'price' } }))).status).toBe(400);
   });
 
   it('ignores duplicate ids', async () => {

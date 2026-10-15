@@ -7,18 +7,21 @@ interface StickerFieldProps {
   value?: StickerFlag | null;
   onChange: (value: StickerFlag | null) => void;
   disabled?: boolean;
+  /** the heading and the helper line (default: the Sticker field) */
+  label?: string;
+  caption?: string;
 }
 
 /**
  * Sticker: Yes / No / Not set yet, for the edit dialogs. Items marked No are left off the Kitchen Report's
  * Stickers sheet. Admin-only: the customer site never sees it.
  */
-export default function StickerField({ value, onChange, disabled }: StickerFieldProps) {
+export default function StickerField({ value, onChange, disabled, label = 'Sticker', caption = "Yes or not set yet: this item's orders appear on the Kitchen Report's Stickers sheet. No: they do not." }: StickerFieldProps) {
   const current = isStickerFlag(value) ? value : 'not_set';
   return (
     <Box>
       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-        Sticker
+        {label}
       </Typography>
       <ToggleButtonGroup
         exclusive
@@ -41,7 +44,7 @@ export default function StickerField({ value, onChange, disabled }: StickerField
         <ToggleButton value="not_set">Not set yet</ToggleButton>
       </ToggleButtonGroup>
       <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#6B7280' }}>
-        Yes or not set yet: this item&apos;s orders appear on the Kitchen Report&apos;s Stickers sheet. No: they do not.
+        {caption}
       </Typography>
     </Box>
   );

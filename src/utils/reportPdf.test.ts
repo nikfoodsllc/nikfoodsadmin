@@ -61,11 +61,14 @@ describe('sheetToPdfTables', () => {
 });
 
 describe('stickerQtyText', () => {
-  it('shows one box: its size, or 1 without a size', () => {
+  it('writes the amount in the size\'s own unit', () => {
     expect(stickerQtyText('12Oz', 1)).toBe('12oz');
-    expect(stickerQtyText('1/2Lb', 1)).toBe('8oz');
-    expect(stickerQtyText('1Lb', 1)).toBe('16oz');
-    expect(stickerQtyText(null, 1)).toBe(1);
+    expect(stickerQtyText('12Oz', 2)).toBe('24oz');
+    expect(stickerQtyText('1/2Lb', 1)).toBe('0.5lb');
+    expect(stickerQtyText('1Lb', 1)).toBe('1lb');
+    expect(stickerQtyText('1Lb', 3)).toBe('3lb');
+    expect(stickerQtyText('1.5Lb', 2)).toBe('3lb');
+    expect(stickerQtyText(null, 2)).toBe(2);
     expect(stickerQtyText('', 1)).toBe(1);
   });
 });

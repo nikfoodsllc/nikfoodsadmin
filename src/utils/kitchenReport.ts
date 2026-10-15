@@ -196,7 +196,7 @@ function blockOf(name: string, group: PrepGroup, lines: PrepLine[]): PrepBlock {
 }
 
 /** `stickerOf`: every item gets a line on the Stickers sheet except the ones it answers 'no' for (items not set yet are included). */
-export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stickerOf: StickerLookup = () => null): KitchenReport {
+export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stickerOf: StickerLookup = () => null, splitOf: StickerLookup = () => null): KitchenReport {
   const groups = new Map<string, { name: string; group: PrepGroup; lines: PrepLine[] }>();
   const stickers: StickerLine[] = [];
   for (const atom of atomsOf(rows)) {
@@ -208,8 +208,10 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
     entry.lines.push(atom.line);
     groups.set(key, entry);
     if (stickerOf({ id: atom.id, name: atom.name }) !== 'no') {
-      // a sticker goes on each box, so 2 boxes of 8Oz are 2 sticker lines (never merged, never multiplied)
-      const boxes = Math.max(1, Math.min(99, Math.round(atom.line.quantity) || 1));
+      // only items marked Split Sticker = Yes get a sticker per box (2 boxes of 8Oz = 2 lines, never merged or multiplied);
+      // every other item is one line for the whole order line, with the total amount
+      const split = splitOf({ id: atom.id, name: atom.name }) === 'yes';
+      const boxes = split ? Math.max(1, Math.min(99, Math.round(atom.line.quantity) || 1)) : 1;
       for (let box = 0; box < boxes; box += 1) stickers.push({
         item: atom.name,
         customerName: atom.line.customerName,
@@ -220,7 +222,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
         deliveryDate: atom.line.deliveryDate,
         movedFrom: atom.line.movedFrom,
         portion: atom.line.portion,
-        quantity: 1,
+        quantity: split ? 1 : atom.line.quantity,
         spice: atom.line.spice,
         isEco: atom.line.isEco,
         viaCombo: atom.line.viaCombo,
@@ -278,12 +280,16 @@ function sumText(lines: PrepLine[]): string {
   return formatAmount(amount);
 }
 
-/** The sticker's Qty: the size of the one box (12Oz -> '12oz'), or 1 when it has no size. Sticker lines are one per box. */
+/**
+ * The sticker's Qty: the amount in the size's own unit (12Oz -> '12oz', 2 x 1Lb -> '2lb', 1/2Lb -> '0.5lb'),
+ * or the plain count when the item has no size. A split sticker line passes quantity 1 (one box).
+ */
 export function stickerQtyText(portion: string | null, quantity: number): number | string {
   const size = parsePortionAmount(portion);
   if (!size || !(size.oz > 0)) return quantity;
-  const oz = Math.round(size.oz * quantity * 100) / 100;
-  return `${oz}oz`;
+  const inPounds = /lb|pound/i.test(portion ?? '');
+  const amount = Math.round((inPounds ? size.oz / 16 : size.oz) * quantity * 100) / 100;
+  return `${amount}${inPounds ? 'lb' : 'oz'}`;
 }
 
 /** A number with the unit it is written in (oz, lb or units). */
