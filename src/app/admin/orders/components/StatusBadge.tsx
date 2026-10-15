@@ -55,11 +55,11 @@ export default function StatusBadge({ status, type, deliveries }: StatusBadgePro
     />
   );
 
-  // Partially Delivered: say which days are delivered and which are still to come (hover, tap or keyboard focus)
+  // Partially Delivered: say which days are delivered and which are still to come (hover or keyboard focus; on a phone a tap on the row opens the order details, which list the days)
   if (type === 'order' && status === 'partially_delivered') {
     const title = partialDeliveryTitle(deliveries);
     return (
-      <Tooltip title={title} arrow enterTouchDelay={0} leaveTouchDelay={6000} slotProps={{ tooltip: { sx: { whiteSpace: 'pre-line', fontSize: 13, lineHeight: 1.6 } } }}>
+      <Tooltip title={title} arrow disableTouchListener slotProps={{ tooltip: { sx: { whiteSpace: 'pre-line', fontSize: 13, lineHeight: 1.6 } } }}>
         <span tabIndex={0} role="note" aria-label={`Partially Delivered. ${title.replace(/\n/g, '. ')}`} style={{ display: 'inline-flex' }}>
           {chip}
         </span>
