@@ -39,7 +39,7 @@ import {
 } from '@/utils/kitchenReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
-import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, rowTone, STICKER_COLUMNS, TONE_COLORS, TOTALS_COLUMNS, type RowTone } from '@/utils/kitchenReportSheets';
+import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, STICKER_COLUMNS, TONE_COLORS, TOTALS_COLUMNS } from '@/utils/kitchenReportSheets';
 import ReportColumnsDialog from './ReportColumnsDialog';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
@@ -75,8 +75,14 @@ const PRINT_CSS = `
 }
 `;
 
-/** The row colour: red and white take turns so no row is missed, an ECO row is green (same as the Excel file). */
-const toneBg = (tone: RowTone) => `#${TONE_COLORS[tone]}`;
+/**
+ * On screen every row is white and only an ECO row is green. (The red and white rows that make a row hard to miss are kept
+ * in the Excel file and the PDF only.)
+ */
+const rowBg = (isEco: boolean) => (isEco ? `#${TONE_COLORS.eco}` : '#FFFFFF');
+
+/** Items are written in a soft blue so they are easy to tell apart from the customers' names (dark). */
+const ITEM_COLOR = '#4F7CAC';
 
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
@@ -85,40 +91,40 @@ const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
  * spice and ECO as small tags. Dates are only shown when they matter: the kitchen day when the report covers several
  * days, and the delivery day when it is a later day than the kitchen day. (The day the order was placed is left out.)
  */
-function LineRow({ line, index, showKitchenDay }: { line: PrepLine; index: number; showKitchenDay: boolean }) {
+function LineRow({ line, showKitchenDay }: { line: PrepLine; showKitchenDay: boolean }) {
   const later = line.deliveryDate !== line.day;
   const amount = line.amountText || `× ${line.quantity}`;
   return (
-    <Box sx={{ py: 1.1, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(index, line.isEco)) }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1.5 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#111827', wordBreak: 'break-word', minWidth: 0, lineHeight: 1.3 }}>{line.customerName}</Typography>
-        <Typography sx={{ fontSize: 16, fontWeight: 800, color: '#92400E', whiteSpace: 'nowrap', flexShrink: 0 }}>{amount}</Typography>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 1.1, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: rowBg(line.isEco) }}>
+      <Typography sx={{ width: { xs: 104, sm: 126 }, flexShrink: 0, fontSize: 15, fontWeight: 800, color: '#92400E', whiteSpace: 'nowrap', lineHeight: 1.35 }}>{amount}</Typography>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#111827', wordBreak: 'break-word', lineHeight: 1.3 }}>{line.customerName}</Typography>
+        {(line.portion || line.spice || line.isEco) && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
+            {line.portion && <Typography sx={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{`${line.portion} × ${line.quantity}`}</Typography>}
+            {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, fontWeight: 600, ...SPICE_CHIP }} />}
+            {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+          </Box>
+        )}
+        {line.viaCombo && (
+          <Typography sx={{ fontSize: 12.5, color: '#4B5563', mt: 0.4 }}>
+            From {line.viaCombo}
+            {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
+          </Typography>
+        )}
+        {(showKitchenDay || later || line.movedFrom) && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.15, mt: 0.4, fontSize: 12.5, lineHeight: 1.45 }}>
+            {showKitchenDay && <Box component="span" sx={{ color: '#4B5563' }}>Cook {formatDayShort(line.day)}</Box>}
+            {later && (
+              <Box component="span" sx={{ color: '#B45309', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
+                Delivered {formatDayShort(line.deliveryDate)}
+              </Box>
+            )}
+            {line.movedFrom && <Box component="span" sx={{ color: '#B45309', fontWeight: 600 }}>Moved from {formatDayShort(line.movedFrom)}</Box>}
+          </Box>
+        )}
       </Box>
-      {(line.portion || line.spice || line.isEco) && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
-          {line.portion && <Typography sx={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{`${line.portion} × ${line.quantity}`}</Typography>}
-          {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 22, fontSize: 12, fontWeight: 600, ...SPICE_CHIP }} />}
-          {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
-        </Box>
-      )}
-      {line.viaCombo && (
-        <Typography sx={{ fontSize: 12.5, color: '#4B5563', mt: 0.4 }}>
-          From {line.viaCombo}
-          {line.viaSpice ? ` (${shortSpiceLabel(line.viaSpice)})` : ''}
-        </Typography>
-      )}
-      {(showKitchenDay || later || line.movedFrom) && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.15, mt: 0.4, fontSize: 12.5, lineHeight: 1.45 }}>
-          {showKitchenDay && <Box component="span" sx={{ color: '#4B5563' }}>Cook {formatDayShort(line.day)}</Box>}
-          {later && (
-            <Box component="span" sx={{ color: '#B45309', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-              <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
-              Delivered {formatDayShort(line.deliveryDate)}
-            </Box>
-          )}
-          {line.movedFrom && <Box component="span" sx={{ color: '#B45309', fontWeight: 600 }}>Moved from {formatDayShort(line.movedFrom)}</Box>}
-        </Box>
-      )}
     </Box>
   );
 }
@@ -128,7 +134,7 @@ function PrepCard({ block, warn, showKitchenDay }: { block: PrepBlock; warn?: bo
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#111827', wordBreak: 'break-word', lineHeight: 1.3 }}>{block.name}</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: 16, color: ITEM_COLOR, wordBreak: 'break-word', lineHeight: 1.3 }}>{block.name}</Typography>
           <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
             {block.quantity} unit{block.quantity === 1 ? '' : 's'} · {block.lines.length} order{block.lines.length === 1 ? '' : 's'}
             {block.unsized > 0 && block.totalText ? ` · ${block.unsized} without a size` : ''}
@@ -139,7 +145,7 @@ function PrepCard({ block, warn, showKitchenDay }: { block: PrepBlock; warn?: bo
       </Box>
       <Box>
         {block.lines.map((line, i) => (
-          <LineRow key={`${line.orderId}-${i}`} line={line} index={i} showKitchenDay={showKitchenDay} />
+          <LineRow key={`${line.orderId}-${i}`} line={line} showKitchenDay={showKitchenDay} />
         ))}
       </Box>
     </Paper>
@@ -166,26 +172,26 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
           </Box>
           <Box>
             {list.map((s, i) => (
-              <Box key={`${s.orderId}-${i}`} sx={{ py: 0.9, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: toneBg(rowTone(i, s.isEco)) }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: 14, wordBreak: 'break-word' }}>{s.item}</Typography>
-                  <Typography sx={{ fontSize: 13, color: '#374151', wordBreak: 'break-word' }}>{s.customerName}</Typography>
+              <Box key={`${s.orderId}-${i}`} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, py: 0.9, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: rowBg(s.isEco) }}>
+                <Typography sx={{ width: { xs: 74, sm: 96 }, flexShrink: 0, fontSize: 15, fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', lineHeight: 1.35 }}>{s.portion ? `${s.portion} × ${s.quantity}` : `× ${s.quantity}`}</Typography>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 14.5, color: ITEM_COLOR, wordBreak: 'break-word', lineHeight: 1.3 }}>{s.item}</Typography>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: '#111827', wordBreak: 'break-word' }}>{s.customerName}</Typography>
+                  {(s.spice || s.isEco) && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.4 }}>
+                      {s.spice && <Chip size="small" label={shortSpiceLabel(s.spice)} sx={{ height: 22, fontSize: 12, fontWeight: 600, ...SPICE_CHIP }} />}
+                      {s.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
+                    </Box>
+                  )}
                   {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
                   {s.movedFrom && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Moved from {formatDayShort(s.movedFrom)}</Typography>}
+                  {s.day !== s.deliveryDate && (
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 0.4, fontSize: 12.5, fontWeight: 700, color: '#B45309' }}>
+                      <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
+                      Picked for {formatDayShort(s.day)}
+                    </Box>
+                  )}
                 </Box>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 0.5, flexShrink: 0, maxWidth: '55%' }}>
-                  {s.spice && <Chip size="small" label={shortSpiceLabel(s.spice)} sx={{ height: 22, fontSize: 12, ...SPICE_CHIP }} />}
-                  <Typography sx={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>{s.portion ? `${s.portion} × ${s.quantity}` : `× ${s.quantity}`}</Typography>
-                  {s.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
-                </Box>
-              </Box>
-              {s.day !== s.deliveryDate && (
-                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 0.4, fontSize: 12.5, fontWeight: 700, color: '#B45309' }}>
-                  <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
-                  Picked for {formatDayShort(s.day)}
-                </Box>
-              )}
               </Box>
             ))}
           </Box>
@@ -212,22 +218,20 @@ function DayTotalsTab({ days, searching }: { days: KitchenDay[]; searching: bool
             {day.items.map((item, i) => {
               const note = deliveryNote(item.deliveries, item.quantity);
               return (
-                <Box key={item.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1, py: 0.8, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: toneBg(rowTone(i, false)) }}>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.name}</Typography>
+                <Box key={item.name} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.8, px: 2, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: '#FFFFFF' }}>
+                  <Typography sx={{ fontSize: 18, fontWeight: 800, width: 44, flexShrink: 0, textAlign: 'right' }}>{item.quantity}</Typography>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography sx={{ fontSize: 14.5, fontWeight: 700, color: ITEM_COLOR, wordBreak: 'break-word' }}>{item.name}</Typography>
                     {note && <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#B45309' }}>{note}</Typography>}
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, flexShrink: 0 }}>
-                    {item.totalText && <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap' }}>{item.totalText}</Typography>}
-                    <Typography sx={{ fontSize: 18, fontWeight: 700, minWidth: 24, textAlign: 'right' }}>{item.quantity}</Typography>
-                  </Box>
+                  {item.totalText && <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#92400E', whiteSpace: 'nowrap', flexShrink: 0 }}>{item.totalText}</Typography>}
                 </Box>
               );
             })}
-            {day.combos.map((combo, ci) => (
-              <Box key={combo.name} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, py: 0.8, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: toneBg(rowTone(day.items.length + ci, false)) }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{combo.name} <Typography component="span" sx={{ fontSize: 12, color: '#6B7280' }}>(combo)</Typography></Typography>
-                <Typography sx={{ fontSize: 18, fontWeight: 700 }}>{combo.quantity}</Typography>
+            {day.combos.map((combo) => (
+              <Box key={combo.name} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, py: 0.8, px: 2, borderTop: '1px solid #F3F4F6', bgcolor: '#FFFFFF' }}>
+                <Typography sx={{ fontSize: 18, fontWeight: 800, width: 44, flexShrink: 0, textAlign: 'right' }}>{combo.quantity}</Typography>
+                <Typography sx={{ fontSize: 14.5, fontWeight: 700, color: ITEM_COLOR, wordBreak: 'break-word' }}>{combo.name} <Typography component="span" sx={{ fontSize: 12, color: '#6B7280' }}>(combo)</Typography></Typography>
               </Box>
             ))}
           </Box>
