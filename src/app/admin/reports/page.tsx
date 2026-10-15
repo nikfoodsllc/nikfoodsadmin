@@ -9,7 +9,7 @@ export default function ReportsDashboardPage() {
 
   const reportCards = [
     {
-      title: 'Kitchen Report (BETA)',
+      title: 'Kitchen Report',
       description: 'View item-wise and order-wise kitchen details including quantities and spice levels',
       icon: IconToolsKitchen2,
       iconColor: '#4F8CFF',

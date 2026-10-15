@@ -93,6 +93,7 @@ interface StatusBreakdown {
   preparing: number;
   ready: number;
   out_for_delivery: number;
+  partially_delivered: number;
   delivered: number;
   cancelled: number;
 }
@@ -424,6 +425,7 @@ export async function GET(request: NextRequest) {
         preparing: 0,
         ready: 0,
         out_for_delivery: 0,
+        partially_delivered: 0,
         delivered: 0,
         cancelled: 0,
       };

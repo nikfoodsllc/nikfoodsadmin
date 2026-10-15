@@ -1,12 +1,15 @@
 'use client';
 
-import { Chip } from '@mui/material';
+import { Chip, Tooltip } from '@mui/material';
 import { OrderStatus } from '@/types/order';
 import type { DisplayPaymentStatus } from '@/utils/refunds';
+import { partialBadgeLabel, partialDeliveryTitle, type DayDeliveryRecord } from '@/utils/deliveryProgress';
 
 interface StatusBadgeProps {
   status: OrderStatus | DisplayPaymentStatus;
   type: 'order' | 'payment';
+  /** For a Partially Delivered order: how each delivery day went (shown when you hover over, tap or focus the status) */
+  deliveries?: DayDeliveryRecord[] | null;
 }
 
 const orderStatusConfig: Record<OrderStatus, { label: string; color: string; bgColor: string }> = {
@@ -15,6 +18,7 @@ const orderStatusConfig: Record<OrderStatus, { label: string; color: string; bgC
   preparing: { label: 'Preparing', color: '#8B5CF6', bgColor: '#EDE9FE' },
   ready: { label: 'Ready', color: '#10B981', bgColor: '#D1FAE5' },
   out_for_delivery: { label: 'Out for Delivery', color: '#10B981', bgColor: '#D1FAE5' },
+  partially_delivered: { label: 'Partially Delivered', color: '#0F766E', bgColor: '#CCFBF1' },
   delivered: { label: 'Delivered', color: '#047857', bgColor: '#A7F3D0' },
   cancelled: { label: 'Cancelled', color: '#EF4444', bgColor: '#FEE2E2' },
 };
@@ -27,16 +31,18 @@ const paymentStatusConfig: Record<DisplayPaymentStatus, { label: string; color: 
   partially_refunded: { label: 'Partially refunded', color: '#0369A1', bgColor: '#E0F2FE' },
 };
 
-export default function StatusBadge({ status, type }: StatusBadgeProps) {
+export default function StatusBadge({ status, type, deliveries }: StatusBadgeProps) {
   const config = type === 'order'
     ? orderStatusConfig[status as OrderStatus]
     : paymentStatusConfig[status as DisplayPaymentStatus];
 
   if (!config) return null;
 
-  return (
+  // Partially Delivered shows how far it is: 1/2 Delivered, 2/3 Delivered
+  const label = type === 'order' && status === 'partially_delivered' ? partialBadgeLabel(deliveries) : config.label;
+  const chip = (
     <Chip
-      label={config.label}
+      label={label}
       sx={{
         backgroundColor: config.bgColor,
         color: config.color,
@@ -50,4 +56,18 @@ export default function StatusBadge({ status, type }: StatusBadgeProps) {
       }}
     />
   );
+
+  // Partially Delivered: say which days are delivered and which are still to come (hover or keyboard focus; on a phone a tap on the row opens the order details, which list the days)
+  if (type === 'order' && status === 'partially_delivered') {
+    const title = partialDeliveryTitle(deliveries);
+    return (
+      <Tooltip title={title} arrow disableTouchListener slotProps={{ tooltip: { sx: { whiteSpace: 'pre-line', fontSize: 13, lineHeight: 1.6 } } }}>
+        <span tabIndex={0} role="note" aria-label={`${label}. ${title.replace(/\n/g, '. ')}`} style={{ display: 'inline-flex' }}>
+          {chip}
+        </span>
+      </Tooltip>
+    );
+  }
+
+  return chip;
 }

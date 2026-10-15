@@ -28,6 +28,7 @@ import {
 import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
+import { deliveryProgressLines } from '@/utils/deliveryProgress';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
 import { Order, OrderStatus } from '@/types/order';
@@ -195,7 +196,16 @@ export default function OrderDetailsDialog({
               <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', display: 'block', marginBottom: 0.5 }}>
                 Order Status
               </Typography>
-              <StatusBadge status={order.status} type="order" />
+              <StatusBadge status={order.status} type="order" deliveries={order.optimo?.deliveries} />
+              {order.status === 'partially_delivered' && (
+                <Box sx={{ mt: 0.75 }}>
+                  {deliveryProgressLines(order.optimo?.deliveries).map((line) => (
+                    <Typography key={line.date} sx={{ fontSize: 12.5, lineHeight: 1.5, color: line.state === 'delivered' ? '#047857' : line.state === 'failed' ? '#B91C1C' : '#B45309', fontWeight: 600 }}>
+                      {line.label}: {line.text}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
             </Box>
             <Box>
               <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', display: 'block', marginBottom: 0.5 }}>
@@ -751,6 +761,7 @@ export default function OrderDetailsDialog({
               <MenuItem value="preparing">Preparing</MenuItem>
               <MenuItem value="ready">Ready</MenuItem>
               <MenuItem value="out_for_delivery">Out for Delivery</MenuItem>
+              <MenuItem value="partially_delivered">Partially Delivered</MenuItem>
               <MenuItem value="delivered">Delivered</MenuItem>
               <MenuItem value="cancelled">Cancelled</MenuItem>
             </Select>

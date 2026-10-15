@@ -34,7 +34,7 @@ function verifyAuth(request: NextRequest) {
  *   - startDate (optional): Filter from date (ISO format)
  *   - endDate (optional): Filter to date (ISO format)
  *   - status (optional): Filter by order status (single or comma-separated list)
- *       Valid values: pending, confirmed, preparing, ready, out_for_delivery, delivered, cancelled
+ *       Valid values: pending, confirmed, preparing, ready, out_for_delivery, partially_delivered, delivered, cancelled
  *
  * Returns:
  *   - items: Array of ordered items with all details
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     const statusParam = searchParams.get('status');
 
     // Valid order statuses
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered', 'cancelled'];
 
     // Parse status parameter (comma-separated)
     let statusFilter: string[] = [];
