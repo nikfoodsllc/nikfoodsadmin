@@ -80,21 +80,6 @@ const toneBg = (tone: RowTone) => `#${TONE_COLORS[tone]}`;
 
 const SPICE_CHIP = { bgcolor: '#FDE7E2', color: '#A12A14' };
 
-/** When the order was placed, the day the kitchen cooks it and the day it is delivered (amber when that is a later day). */
-function DatesLine({ orderedOn, kitchenDay, deliveryDate }: { orderedOn: string | null; kitchenDay: string; deliveryDate: string }) {
-  const later = deliveryDate !== kitchenDay;
-  return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.25, rowGap: 0, fontSize: 12, color: '#6B7280', lineHeight: 1.45, mt: 0.15 }}>
-      {orderedOn && <span>Ordered {formatDayShort(orderedOn)}</span>}
-      <span>Kitchen {formatDayShort(kitchenDay)}</span>
-      <Box component="span" sx={later ? { color: '#B45309', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 0.4 } : undefined}>
-        {later && <IconTruckDelivery size={13} style={{ flexShrink: 0 }} />}
-        Delivery {formatDayShort(deliveryDate)}
-      </Box>
-    </Box>
-  );
-}
-
 /**
  * One order line of an item card, easy to scan: who and how much first (the amount big on the right), then the size,
  * spice and ECO as small tags. Dates are only shown when they matter: the kitchen day when the report covers several
@@ -195,7 +180,12 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
                   {s.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
                 </Box>
               </Box>
-              <DatesLine orderedOn={s.orderedOn} kitchenDay={s.day} deliveryDate={s.deliveryDate} />
+              {s.day !== s.deliveryDate && (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 0.4, fontSize: 12.5, fontWeight: 700, color: '#B45309' }}>
+                  <IconTruckDelivery size={14} style={{ flexShrink: 0 }} />
+                  Picked for {formatDayShort(s.day)}
+                </Box>
+              )}
               </Box>
             ))}
           </Box>
