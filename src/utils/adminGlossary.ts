@@ -196,7 +196,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Abandoned Checkout', 'Paid after the reminder email', 'Abandoned Checkout, Recovered tab', 'The reminder email went out before they paid, but we did not see them open the cart from it. They may still have used it, or come back on their own.', 'good'),
   e('Abandoned Checkout', 'Paid after you contacted them', 'Abandoned Checkout, Recovered tab', 'You marked them as contacted before they paid.', 'info'),
   e('Abandoned Checkout', 'Came back on their own', 'Abandoned Checkout, Recovered tab', 'No reminder email or contact from you came before the payment.'),
-  e('Abandoned Checkout', 'Date range (Today, 2, 5, 7 days)', 'Abandoned Checkout', 'Which days of leftovers to show: today, or the last 2, 5 or 7 days. Checkouts are only kept for 7 days, because older ones are no longer worth following up.'),
+  e('Abandoned Checkout', 'Date range (Today, 2, 5, 7 days)', 'Abandoned Checkout', 'Which days of leftovers to show: today (the page opens on Today), or the last 2, 5 or 7 days. Checkouts are only kept for 7 days, because older ones are no longer worth following up.'),
 
   // ---- kitchen dashboard
   e('Kitchen Dashboard', 'Delivered Wed, Oct 14 (amber truck line)', 'Kitchen Dashboard, under an item or combo', 'The item stays on the day it is cooked (its menu day) but goes out on a later day: a small day the cart combined into the next delivery, or items an admin moved to another delivery date. The line says when. If only some of the units go later it says how many ("1 of 3 delivered Wed, Oct 14"). Tap the item to see which order goes out when.', 'warn', 'delivery later clubbed moved deliver date'),
