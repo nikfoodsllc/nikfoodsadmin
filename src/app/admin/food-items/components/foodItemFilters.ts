@@ -1,4 +1,5 @@
 import { PreparationFilter, isPreparationFilter } from '@/utils/preparationType';
+import { StickerFilter, isStickerFilter } from '@/utils/stickerFlag';
 
 /** The column filters above the Food Items table. 'all' means the filter is off. */
 export interface FoodItemFilters {
@@ -6,6 +7,7 @@ export interface FoodItemFilters {
   available: 'all' | 'true' | 'false';
   itemType: 'all' | 'simple' | 'portions' | 'combo';
   preparation: PreparationFilter;
+  sticker: StickerFilter;
 }
 
 export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
@@ -13,6 +15,7 @@ export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
   available: 'all',
   itemType: 'all',
   preparation: 'all',
+  sticker: 'all',
 };
 
 /** The query parameters of the food items list API for these filters (filters that are off are left out). */
@@ -24,6 +27,7 @@ export function foodItemFilterParams(filters: FoodItemFilters): Array<[string, s
   if (filters.preparation !== 'all' && isPreparationFilter(filters.preparation)) {
     params.push(['preparationType', filters.preparation]);
   }
+  if (filters.sticker !== 'all' && isStickerFilter(filters.sticker)) params.push(['sticker', filters.sticker]);
   return params;
 }
 

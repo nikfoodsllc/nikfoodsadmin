@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, sortBlocks, sortDayItems, sortStickers, type SortChoice, type TypeLookup } from './kitchenReport';
+import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, sortBlocks, sortDayItems, sortStickers, type SortChoice, type StickerLookup, type TypeLookup } from './kitchenReport';
 import type { KitchenRow } from './kitchenDashboard';
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
 const types: Record<string, 'cooked' | 'ready_to_eat'> = { Rajma: 'cooked', 'Kale Chane': 'cooked', Chapati: 'cooked', Pickle: 'ready_to_eat' };
 const byName: TypeLookup = ({ name }) => types[name] ?? null;
+// the items marked Sticker = Yes
+const yes = new Set(['Pickle', 'Achar']);
+const stickerYes: StickerLookup = ({ name }) => (yes.has(name) ? 'yes' : null);
 
 const combo = {
   name: 'Veg Combo',
@@ -97,15 +100,26 @@ describe('buildKitchenReport', () => {
     const r = buildKitchenReport([row({ name: 'Same Name', foodId: 'f-1' }), row({ orderId: '2', name: 'Same Name', foodId: 'f-2' })], byId);
     expect(r.readyToEat.map((b) => b.name)).toEqual(['Same Name']); expect(r.cooked.map((b) => b.name)).toEqual(['Same Name']);
   });
-  it('stickers: only ready to eat, one line per order line, in item, spice, amount order', () => {
+  it('stickers: only items marked Yes, one line per order line, in item, spice, amount order', () => {
     const r = buildKitchenReport([
       row({ name: 'Pickle', orderId: '1', customerName: 'Zed', day: '2026-10-14' }),
       row({ name: 'Pickle', orderId: '2', customerName: 'Amy', day: '2026-10-13', deliveredOn: '2026-10-14', portion: '16Oz', isEco: true }),
       row({ name: 'Pickle', orderId: '3', customerName: 'Bob', day: '2026-10-13' }),
       row({}),
-    ], byName);
+    ], byName, stickerYes);
     expect(r.stickers.map((s) => `${s.deliveredOn ?? s.day}:${s.customerName}`)).toEqual(['2026-10-13:Bob', '2026-10-14:Zed', '2026-10-14:Amy']);
     expect(r.stickers[2]).toMatchObject({ item: 'Pickle', portion: '16Oz', isEco: true });
+  });
+  it('only items marked Sticker = Yes get a sticker, whether cooked or ready to eat', () => {
+    const marks: Record<string, 'yes' | 'no'> = { Rajma: 'yes', Pickle: 'no' };
+    const r = buildKitchenReport([row({ name: 'Rajma' }), row({ name: 'Pickle', orderId: '2' }), row({ name: 'Chapati', orderId: '3' })], byName, ({ name }) => marks[name] ?? null);
+    expect(r.stickers.map((x) => x.item)).toEqual(['Rajma']);
+    // nothing changes on the prep sheets
+    expect(r.cooked.map((b) => b.name)).toEqual(['Chapati', 'Rajma']);
+    expect(r.readyToEat.map((b) => b.name)).toEqual(['Pickle']);
+  });
+  it('without a sticker lookup there are no stickers', () => {
+    expect(buildKitchenReport([row({ name: 'Pickle' })], byName).stickers).toEqual([]);
   });
   it('says a delivery is later only when it is', () => {
     const r = buildKitchenReport([row({ deliveredOn: '2026-10-14' }), row({ orderId: '2', deliveredOn: '2026-10-13' }), row({ orderId: '3', deliveredOn: null })], byName);
@@ -125,7 +139,7 @@ describe('report search', () => {
     row({ orderId: 'ORD-22', customerName: 'Beena Shah', portion: '8Oz' }),
     row({ orderId: 'ORD-33', name: 'Pickle', customerName: 'Asha Rao', portion: '16Oz' }),
     row({ orderId: 'ORD-44', ...combo, customerName: 'Dev Patel' }),
-  ], byName);
+  ], byName, stickerYes);
   it('an item name keeps the whole card', () => {
     const out = filterBlocksBySearch(report.cooked, 'rajma');
     expect(out.map((b) => b.name)).toEqual(['Rajma']); expect(out[0].lines).toHaveLength(2); expect(out[0].quantity).toBe(3);
@@ -197,7 +211,7 @@ describe('sorting', () => {
       row({ name: 'Pickle', orderId: 'A', customerName: 'Zed', spiceLevel: 'Hot', portion: '8Oz' }),
       row({ name: 'Achar', orderId: 'B', customerName: 'Amy', spiceLevel: 'Mild', portion: '16Oz' }),
       row({ name: 'Pickle', orderId: 'C', customerName: 'Amy', spiceLevel: 'Mild', portion: '8Oz' }),
-    ], ({ name }) => t[name] ?? null);
+    ], ({ name }) => t[name] ?? null, stickerYes);
     const ids = (k: SortChoice) => sortStickers(r.stickers, k).map((s) => s.orderId);
     expect(ids(asc('item'))).toEqual(['B', 'C', 'A']);
     expect(ids(asc('spice'))).toEqual(['B', 'C', 'A']);
@@ -212,7 +226,7 @@ describe('sorting', () => {
       row({ name: 'Achar', orderId: 'B', customerName: 'Zed', spiceLevel: 'Mild', portion: '16Oz' }),
       row({ name: 'Pickle', orderId: 'C', customerName: 'Zed', spiceLevel: 'Mild', portion: '16Oz' }),
       row({ name: 'Pickle', orderId: 'D', customerName: 'Bob', spiceLevel: 'Mild', portion: '8Oz' }),
-    ], ({ name }) => t[name] ?? null);
+    ], ({ name }) => t[name] ?? null, stickerYes);
     expect(r.stickers.map((x) => x.orderId)).toEqual(['B', 'D', 'C', 'A']);
   });
   it('day totals sort by name or quantity only', () => {

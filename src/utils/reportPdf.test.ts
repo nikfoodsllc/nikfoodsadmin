@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildKitchenReport, type TypeLookup } from './kitchenReport';
+import { buildKitchenReport, type StickerLookup, type TypeLookup } from './kitchenReport';
 import { buildKitchenDays, type KitchenRow } from './kitchenDashboard';
 import { buildReportSheets, cellText, prepSheet, readyToEatSheet, sheetToPdfTables, stickersSheet } from './kitchenReportSheets';
 import { buildReportPdf } from './reportPdf';
@@ -7,6 +7,7 @@ import { buildReportPdf } from './reportPdf';
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
 const types: Record<string, 'cooked' | 'ready_to_eat'> = { Rajma: 'cooked', Chapati: 'cooked', Pickle: 'ready_to_eat' };
 const lookup: TypeLookup = ({ name }) => types[name] ?? null;
+const stickerLookup: StickerLookup = ({ name }) => (types[name] === 'ready_to_eat' ? 'yes' : null);
 
 const rows: KitchenRow[] = [
   row({ orderId: '1', customerName: 'Amy', portion: '12Oz', isEco: true, spiceLevel: 'Mild' }),
@@ -31,7 +32,7 @@ describe('cellText', () => {
 });
 
 describe('sheetToPdfTables', () => {
-  const report = buildKitchenReport(rows, lookup);
+  const report = buildKitchenReport(rows, lookup, stickerLookup);
   it('one table per box, the header on the first, a band for the not-set section', () => {
     const tables = sheetToPdfTables(readyToEatSheet(report.readyToEat, report.notSet));
     expect(tables.map((t) => t.kind)).toEqual(['box', 'section', 'box']);
@@ -59,7 +60,7 @@ describe('sheetToPdfTables', () => {
 });
 
 describe('buildReportPdf', () => {
-  const report = buildKitchenReport(rows, lookup);
+  const report = buildKitchenReport(rows, lookup, stickerLookup);
   const sheets = buildReportSheets({ cooked: report.cooked, notSet: report.notSet, stickers: report.stickers, days: buildKitchenDays(rows, ['2026-10-13']) });
   const text = async (blob: Blob) => Buffer.from(await blob.arrayBuffer()).toString('latin1');
 

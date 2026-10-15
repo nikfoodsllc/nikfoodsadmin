@@ -6,6 +6,7 @@ import { IconEdit, IconTrash, IconCopy  } from '@tabler/icons-react';
 import Image from 'next/image';
 import TypeBadge from './TypeBadge';
 import PreparationBadge from './PreparationBadge';
+import StickerBadge from './StickerBadge';
 import { safeFormatCurrency } from '@/utils/currency';
 
 interface FoodItem {
@@ -21,6 +22,7 @@ interface FoodItem {
   public_id?: string;
   itemType: 'simple' | 'portions' | 'combo';
   preparationType?: 'cooked' | 'ready_to_eat';
+  sticker?: 'yes' | 'no';
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -283,6 +285,12 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
     preparation: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
         <PreparationBadge value={item.preparationType} />
+      </TableCell>
+    ),
+    // Sticker: Yes / No / (not set yet)
+    sticker: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <StickerBadge value={item.sticker} />
       </TableCell>
     ),
     // Description
