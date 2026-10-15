@@ -132,7 +132,7 @@ function LineRow({ line, showKitchenDay }: { line: PrepLine; showKitchenDay: boo
 function PrepCard({ block, warn, showKitchenDay }: { block: PrepBlock; warn?: boolean; showKitchenDay: boolean }) {
   return (
     <Paper className="print-card" elevation={0} sx={{ border: '1px solid', borderColor: warn ? '#FCD34D' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FFFBEB' : '#F9FAFB' }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.25, bgcolor: warn ? '#FDEFC4' : '#E4EAF2', borderBottom: '1px solid #CBD5E1' }}>
         {/* the item's total is on the left, in the same column as each line's amount, so the eye does not travel to the far right */}
         <Typography sx={{ minWidth: { xs: 104, sm: 126 }, flexShrink: 0, fontWeight: 800, fontSize: block.totalText ? 16 : 20, color: '#92400E', lineHeight: 1.25 }}>{blockTotal(block)}</Typography>
         <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -167,7 +167,7 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
     <>
       {groups.map(([day, list]) => (
         <Paper key={day} className="print-card" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
-          <Box sx={{ px: 2, py: 1, bgcolor: '#F9FAFB', display: 'flex', justifyContent: 'space-between' }}>
+          <Box sx={{ px: 2, py: 1, bgcolor: '#E4EAF2', borderBottom: '1px solid #CBD5E1', display: 'flex', justifyContent: 'space-between' }}>
             <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Delivery {formatDayShort(day)}</Typography>
             <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{list.length} sticker{list.length === 1 ? '' : 's'}</Typography>
           </Box>
@@ -209,7 +209,7 @@ function DayTotalsTab({ days, searching }: { days: KitchenDay[]; searching: bool
     <>
       {filled.map((day) => (
         <Paper key={day.day} className="print-card" elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 1.5, bgcolor: '#fff' }}>
-          <Box sx={{ px: 2, py: 1, bgcolor: '#F9FAFB', display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ px: 2, py: 1, bgcolor: '#E4EAF2', borderBottom: '1px solid #CBD5E1', display: 'flex', justifyContent: 'space-between', gap: 1 }}>
             <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
               {day.weekday} <Typography component="span" sx={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>{formatDayShort(day.day)}</Typography>
             </Typography>
