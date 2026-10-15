@@ -550,7 +550,7 @@ export default function PackLivePage() {
                 })()}
               </Paper>
               {/* the side list is exactly as tall as the packing card on the left (it scrolls inside), so it never pushes the page down */}
-              <Paper elevation={0} sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, alignSelf: 'stretch', minHeight: 260 }}>
+              <Paper elevation={0} sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, alignSelf: 'stretch', minHeight: 340 }}>
                 <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', flexShrink: 0 }}>Customers</Typography>
                 <Box sx={{ position: 'relative', flex: 1, minHeight: 0 }}>
                   <CustomerList fill stops={stops} run={run} current={index} finished={status === 'done'} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} />
