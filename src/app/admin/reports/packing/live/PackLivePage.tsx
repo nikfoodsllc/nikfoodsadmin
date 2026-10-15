@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, LinearProgress, Paper, TextField, Typography } from '@mui/material';
-import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconPlayerPause, IconPlayerPlay, IconCheck, IconTruckDelivery, IconListDetails } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
@@ -48,6 +48,45 @@ function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
+/**
+ * Every customer of the route by name, in route order. The ones the packer has been through carry a check mark, the one on screen is
+ * highlighted, and tapping any name goes straight to that customer (while packing is on). Customers the packer skipped over stay unchecked.
+ */
+function CustomerList({ stops, run, current, canJump, onJump, maxHeight }: { stops: PackStop[]; run: PackingRun | null; current: number; canJump: boolean; onJump: (index: number) => void; maxHeight?: string }) {
+  const currentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // keep the customer on screen in view inside the list (not the whole page)
+    const el = currentRef.current;
+    const box = el?.parentElement;
+    if (el && box) box.scrollTop = Math.max(0, el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2);
+  }, [current]);
+  return (
+    <Box sx={{ maxHeight, overflowY: 'auto' }}>
+      {stops.map((s, i) => {
+        const progress = run?.stops?.[stopKeyOf(s)];
+        const visited = i !== current && Boolean(progress && (Number(progress.timeMs) > 0 || progress.firstOpenedAt));
+        const isCurrent = i === current;
+        return (
+          <Box
+            key={stopKeyOf(s)}
+            ref={isCurrent ? currentRef : undefined}
+            {...(canJump ? { role: 'button', tabIndex: 0, onClick: () => onJump(i), onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onJump(i)) } : {})}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.9, minHeight: 44, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6', bgcolor: isCurrent ? '#FFF1DC' : '#fff', cursor: canJump ? 'pointer' : 'default', '&:hover': canJump ? { bgcolor: isCurrent ? '#FFF1DC' : '#FAFAFA' } : undefined, '&:focus-visible': { outline: '2px solid #F5C77E', outlineOffset: -2 } }}
+          >
+            <Box sx={{ width: 22, height: 22, flexShrink: 0, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: visited ? '#126B2C' : 'transparent', border: visited ? 'none' : `1.5px solid ${isCurrent ? ORANGE : '#D1D5DB'}`, color: '#fff' }}>
+              {visited && <IconCheck size={14} stroke={3} />}
+            </Box>
+            <Typography sx={{ fontSize: 14, fontWeight: isCurrent ? 800 : 600, color: visited ? '#6B7280' : '#111827', wordBreak: 'break-word', lineHeight: 1.3 }}>
+              <Box component="span" sx={{ color: '#9CA3AF', fontWeight: 600, mr: 0.75 }}>{i + 1}</Box>
+              {s.customerName || 'Customer'}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
 export default function PackLivePage() {
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -70,6 +109,8 @@ export default function PackLivePage() {
   const [confirm, setConfirm] = useState<null | 'reset' | 'stop'>(null);
   const [busy, setBusy] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  // the list of all customers: always at the side on a computer, in a window on a phone
+  const [listOpen, setListOpen] = useState(false);
   const startRequest = useLatestRequest();
   const inFlight = useRef(0);
   // when the packer last moved to another customer: a second tap right after the first (a double tap) must not skip a customer
@@ -243,9 +284,9 @@ export default function PackLivePage() {
     setBusy(false);
   };
 
-  const goTo = async (target: number, options: { automatic?: boolean } = {}) => {
+  const goTo = async (target: number, options: { automatic?: boolean; jump?: boolean } = {}) => {
     if (!route || target < 0 || target >= stops.length) return;
-    if (!options.automatic) {
+    if (!options.automatic && !options.jump) {
       if (Date.now() - lastMoveAt.current < 900) return;
       lastMoveAt.current = Date.now();
     }
@@ -397,6 +438,9 @@ export default function PackLivePage() {
               </Box>
               {status === 'packing' && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                  <Button size="small" startIcon={<IconListDetails size={16} />} onClick={() => setListOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, display: { xs: 'inline-flex', md: 'none' } }}>
+                    Customers
+                  </Button>
                   <Button size="small" onClick={() => setShowPicker((v) => !v)} sx={{ textTransform: 'none', fontWeight: 600 }}>
                     {showPicker ? 'Hide' : 'Change driver or day'}
                   </Button>
@@ -429,7 +473,7 @@ export default function PackLivePage() {
           </Paper>
 
           {status !== 'not_started' && stop && (
-            <Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) 280px' }, columnGap: 2, alignItems: 'start' }}>
               <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
                 <Box sx={{ px: 2, py: 1.25, bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
                   <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>Customer {index + 1} of {stops.length}</Typography>
@@ -503,6 +547,10 @@ export default function PackLivePage() {
                   });
                 })()}
               </Paper>
+              <Paper elevation={0} sx={{ display: { xs: 'none', md: 'block' }, border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', mb: 2, position: 'sticky', top: 80 }}>
+                <Typography sx={{ px: 1.5, py: 1, fontSize: 13, fontWeight: 700, color: '#6B7280', bgcolor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>Customers</Typography>
+                <CustomerList stops={stops} run={run} current={index} canJump={status === 'packing'} onJump={(i) => void goTo(i, { jump: true })} maxHeight="calc(100vh - 230px)" />
+              </Paper>
             </Box>
           )}
         </>
@@ -519,6 +567,17 @@ export default function PackLivePage() {
         </Box>
       )}
 
+      <Dialog open={listOpen} onClose={() => setListOpen(false)} fullWidth maxWidth="xs" scroll="paper">
+        <DialogTitle sx={{ pb: 1 }}>Customers</DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <CustomerList stops={stops} run={run} current={index} canJump={status === 'packing'} onJump={(i) => { setListOpen(false); void goTo(i, { jump: true }); }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setListOpen(false)} sx={{ textTransform: 'none' }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={confirm === 'stop'} onClose={() => setConfirm(null)} fullWidth maxWidth="xs">
         <DialogTitle>Stop packing?</DialogTitle>
         <DialogContent>
