@@ -41,6 +41,17 @@ export function deliveryProgressLines(records: DayDeliveryRecord[] | null | unde
   return lines.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * The short text on the Partially Delivered badge: how many delivery days are done out of all of them ("1/2 Delivered",
+ * "2/3 Delivered"). An order set to this status by hand has no per-day record, so it says "Part Delivered".
+ */
+export function partialBadgeLabel(records: DayDeliveryRecord[] | null | undefined): string {
+  const lines = deliveryProgressLines(records);
+  if (lines.length === 0) return 'Part Delivered';
+  const done = lines.filter((l) => l.state === 'delivered').length;
+  return `${done}/${lines.length} Delivered`;
+}
+
 /** The words for a tooltip, or a general sentence when the order has no per-day record (a status set by hand). */
 export function partialDeliveryTitle(records: DayDeliveryRecord[] | null | undefined): string {
   const lines = deliveryProgressLines(records);

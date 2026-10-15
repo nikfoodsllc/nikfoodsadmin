@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryProgressLines, partialDeliveryTitle } from './deliveryProgress';
+import { deliveryProgressLines, partialBadgeLabel, partialDeliveryTitle } from './deliveryProgress';
 
 describe('deliveryProgressLines', () => {
   it('Wednesday delivered, Friday still to come', () => {
@@ -17,6 +17,19 @@ describe('deliveryProgressLines', () => {
     expect(deliveryProgressLines([{ date: 'x', status: 'delivered' }, { status: 'delivered' }, null as never])).toEqual([]);
     expect(deliveryProgressLines(undefined)).toEqual([]);
     expect(deliveryProgressLines(null)).toEqual([]);
+  });
+});
+
+describe('partialBadgeLabel', () => {
+  it('counts the days that are delivered out of all of them', () => {
+    expect(partialBadgeLabel([{ date: '2026-10-14', status: 'delivered' }, { date: '2026-10-16', status: 'pending' }])).toBe('1/2 Delivered');
+    expect(partialBadgeLabel([{ date: '2026-10-14', status: 'delivered' }, { date: '2026-10-15', status: 'delivered' }, { date: '2026-10-16', status: 'pending' }])).toBe('2/3 Delivered');
+    expect(partialBadgeLabel([{ date: '2026-10-14', status: 'delivered' }, { date: '2026-10-15', status: 'failed' }, { date: '2026-10-16', status: 'pending' }])).toBe('1/3 Delivered');
+  });
+  it('a status set by hand has no record: Part Delivered', () => {
+    expect(partialBadgeLabel(undefined)).toBe('Part Delivered');
+    expect(partialBadgeLabel([])).toBe('Part Delivered');
+    expect(partialBadgeLabel([{ date: 'bad', status: 'delivered' }])).toBe('Part Delivered');
   });
 });
 
