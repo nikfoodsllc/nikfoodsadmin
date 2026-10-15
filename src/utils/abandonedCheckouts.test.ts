@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAbandonedRows, reminderView, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
+import { buildAbandonedRows, splitByReminder, reminderView, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
 
 const NOW = new Date('2026-10-07T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60 * 1000);
@@ -213,5 +213,27 @@ describe('reminder email status', () => {
     const d = draft({ paymentIntentId: 'pi_r', userId: 'u9', reminderEmail: { status: 'sent', sentAt: at } });
     expect(build([d]).to_contact[0].reminder).toMatchObject({ state: 'sent' });
     expect(build([draft({ paymentIntentId: 'pi_n', userId: 'u8' })]).to_contact[0].reminder).toBeUndefined();
+  });
+});
+
+describe('splitByReminder', () => {
+  it('waiting = no reminder yet (or still sending / failed); emailed = sent, delivered, bounced or spam', () => {
+    const rows = build([
+      draft({ paymentIntentId: 'pi_waiting0001', userId: 'w', lastActivityAt: ago(60) }),
+      draft({ paymentIntentId: 'pi_sending0001', userId: 's', lastActivityAt: ago(61), reminderEmail: { status: 'claimed' } }),
+      draft({ paymentIntentId: 'pi_failed00001', userId: 'f', lastActivityAt: ago(62), reminderEmail: { status: 'failed' } }),
+      draft({ paymentIntentId: 'pi_sent0000001', userId: 'e1', lastActivityAt: ago(63), reminderEmail: { status: 'sent', sentAt: ago(30) } }),
+      draft({ paymentIntentId: 'pi_deliv000001', userId: 'e2', lastActivityAt: ago(64), reminderEmail: { status: 'delivered', sentAt: ago(20), deliveredAt: ago(19) } }),
+      draft({ paymentIntentId: 'pi_bounce00001', userId: 'e3', lastActivityAt: ago(65), reminderEmail: { status: 'bounced', sentAt: ago(10) } }),
+    ]);
+    const all = [...rows.to_contact, ...rows.contacted];
+    const { waiting, emailed } = splitByReminder(all);
+    expect(waiting.map((r) => r.userId).sort()).toEqual(['f', 's', 'w']);
+    expect(emailed.map((r) => r.userId)).toEqual(['e3', 'e2', 'e1']); // most recently emailed first
+  });
+  it('a person marked contacted before still sits where their email says', () => {
+    const rows = build([draft({ paymentIntentId: 'pi_contacted01', userId: 'c', lastActivityAt: ago(60), contacted: { at: ago(30), by: 'A' } })]);
+    expect(rows.contacted).toHaveLength(1);
+    expect(splitByReminder([...rows.to_contact, ...rows.contacted]).waiting).toHaveLength(1);
   });
 });

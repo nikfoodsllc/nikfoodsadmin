@@ -98,6 +98,12 @@ export function reminderView(r: DraftDoc['reminderEmail']): ReminderView | undef
   };
 }
 
+/** The name shown for a person: their name, else the start of their email, else "Customer". */
+export function personName(customer: { name?: string; email?: string } | undefined): string {
+  const c = customer ?? {};
+  return (c.name ?? '').trim() || (c.email ? c.email.split('@')[0] : 'Customer');
+}
+
 export interface AbandonedRow {
   /** The payment id of the latest checkout of this person (what the actions use) */
   id: string;
@@ -201,7 +207,7 @@ export function buildAbandonedRows(
     const row: AbandonedRow = {
       id: latest.paymentIntentId,
       userId,
-      name: (c.name ?? '').trim() || (c.email ? c.email.split('@')[0] : 'Customer'),
+      name: personName(c),
       ...(c.email ? { email: c.email } : {}),
       ...(c.phone ? { phone: c.phone } : {}),
       total: Number(latest.total) || 0,
@@ -226,6 +232,23 @@ export function buildAbandonedRows(
   out.to_contact.sort(newest);
   out.contacted.sort((a, b) => ms(b.contacted?.at) - ms(a.contacted?.at));
   return out;
+}
+
+/**
+ * The two lists of people who have not paid: those still WAITING for the reminder email (none sent yet, or it is still going out
+ * or failed to send) and those whose reminder email was SENT (delivered, bounced or marked as spam too). The contacted marker is not
+ * used any more: where a person sits only depends on the email.
+ */
+export function splitByReminder(rows: AbandonedRow[]): { waiting: AbandonedRow[]; emailed: AbandonedRow[] } {
+  const waiting: AbandonedRow[] = [];
+  const emailed: AbandonedRow[] = [];
+  for (const row of rows) {
+    const state = row.reminder?.state;
+    (state === 'sent' || state === 'delivered' || state === 'bounced' || state === 'spam' ? emailed : waiting).push(row);
+  }
+  const newest = (a: AbandonedRow, b: AbandonedRow) => ms(b.lastActivityAt) - ms(a.lastActivityAt);
+  const sentLast = (a: AbandonedRow, b: AbandonedRow) => ms(b.reminder?.sentAt) - ms(a.reminder?.sentAt);
+  return { waiting: waiting.sort(newest), emailed: emailed.sort(sentLast) };
 }
 
 /** Totals for the tabs and the headline. */

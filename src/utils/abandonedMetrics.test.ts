@@ -94,4 +94,42 @@ describe('abandoned metrics', () => {
     ]);
     expect(m).toMatchObject({ started: 3, completed: 1, abandoned: 2 });
   });
+
+  it('lists who ordered after the email (successful) and who did not (unsuccessful), as shares of the people emailed', () => {
+    const r = { status: 'delivered', sentAt: at(6), deliveredAt: at(6) };
+    const m = computeMetrics(
+      [
+        d({ userId: 'a', customer: { name: 'Asha K', email: 'a@x.invalid' }, reminderEmail: r }),
+        d({ userId: 'b', customer: { name: 'Bo L' }, total: 55, items: [{ name: 'Rajma', quantity: 2 }, { name: 'Chapati', quantity: 1 }], reminderEmail: r }),
+        d({ userId: 'c', customer: { email: 'cat@x.invalid' }, reminderEmail: r }),
+        d({ userId: 'e', customer: { name: 'Not emailed' } }),
+      ],
+      [{ orderId: 'ORD-1', user: 'a', createdAt: at(9), totalPaid: 41.25 }]
+    );
+    expect(m.conversions.successfulRate).toBe(33.3);
+    expect(m.conversions.unsuccessfulRate).toBe(66.7);
+    expect(m.conversions.successful).toHaveLength(1);
+    expect(m.conversions.successful[0]).toMatchObject({ userId: 'a', name: 'Asha K', order: { orderId: 'ORD-1', amount: 41.25 } });
+    expect(m.conversions.unsuccessful.map((p) => p.name).sort()).toEqual(['Bo L', 'cat']);
+    expect(m.conversions.unsuccessful.find((p) => p.userId === 'b')?.cart).toEqual({ total: 55, itemCount: 3, items: [{ name: 'Rajma', quantity: 2 }, { name: 'Chapati', quantity: 1 }] });
+  });
+
+  it('has no conversion rates when nobody was emailed', () => {
+    const m = computeMetrics([d({ userId: 'a' })], []);
+    expect(m.conversions).toEqual({ successful: [], unsuccessful: [], successfulRate: null, unsuccessfulRate: null });
+  });
+
+  it('Most left behind lists people with the biggest carts, not items', () => {
+    const m = computeMetrics(
+      [
+        d({ userId: 'a', customer: { name: 'Asha' }, total: 20 }),
+        d({ userId: 'b', customer: { name: 'Bo' }, total: 90, items: [{ name: 'X', quantity: 2 }, { name: 'Y', quantity: 3 }] }),
+        d({ userId: 'c', customer: { name: 'Cy' }, total: 40 }),
+        d({ userId: 'p', customer: { name: 'Paid' }, total: 500 }),
+      ],
+      [{ user: 'p', createdAt: at(5), totalPaid: 500 }]
+    );
+    expect(m.topPeople.map((p) => [p.name, p.total, p.itemCount])).toEqual([['Bo', 90, 5], ['Cy', 40, 2], ['Asha', 20, 2]]);
+    expect(m.topPeople[0].userId).toBe('b');
+  });
 });

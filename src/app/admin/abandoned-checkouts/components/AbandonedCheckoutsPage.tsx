@@ -17,17 +17,16 @@ import {
   Snackbar,
   Tab,
   Tabs,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronUp, IconMail, IconPhone, IconRefresh, IconShoppingCartOff, IconShoppingCartPlus } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AbandonedMetricsPanel from './AbandonedMetricsPanel';
-import type { AbandonedMetrics } from '@/utils/abandonedMetrics';
+import type { AbandonedMetrics, ConversionPerson } from '@/utils/abandonedMetrics';
 import type { PaidReason, PaidRow } from '@/utils/abandonedPaid';
-import { CONTACT_NOTES, pacificToday, QUIET_MINUTES, reachOutEmail, RETENTION_DAYS, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
+import { pacificToday, QUIET_MINUTES, reachOutEmail, RETENTION_DAYS, splitByReminder, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -150,7 +149,7 @@ function PaidCard({ row }: { row: PaidRow }) {
   );
 }
 
-function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: AbandonedRow; onContacted: (row: AbandonedRow) => void; onUndo: (row: AbandonedRow) => void; onHide: (row: AbandonedRow) => void; onRemind: (row: AbandonedRow) => void }) {
+function PersonCard({ row, onHide, onRemind, onCreateOrder }: { row: AbandonedRow; onHide: (row: AbandonedRow) => void; onRemind: (row: AbandonedRow) => void; onCreateOrder: (row: AbandonedRow) => void }) {
   const [open, setOpen] = useState(false);
   const mail = reachOutEmail(row);
   const mailto = row.email ? `mailto:${row.email}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}` : '';
@@ -177,7 +176,6 @@ function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: Aband
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
         {row.triedToPay ? <Chip size="small" color="warning" label="Pressed Pay, payment did not go through" sx={{ fontWeight: 600 }} /> : <Chip size="small" label="Never pressed Pay" sx={{ fontWeight: 600 }} />}
         {row.earlierCheckouts > 0 && <Chip size="small" variant="outlined" label={`${row.earlierCheckouts} earlier checkout${row.earlierCheckouts === 1 ? '' : 's'}`} />}
-        {row.previouslyContactedAt && <Chip size="small" variant="outlined" label={`Contacted before (${when(row.previouslyContactedAt)})`} />}
       </Box>
       {row.problem && <Typography sx={{ fontSize: 13, color: '#B45309', mt: 0.75 }}>{row.problem}</Typography>}
       {row.reminder && <ReminderLine reminder={row.reminder} />}
@@ -216,22 +214,77 @@ function PersonCard({ row, onContacted, onUndo, onHide, onRemind }: { row: Aband
         {!row.phone && !row.email && <Typography sx={{ fontSize: 13, color: '#B45309' }}>No phone or email saved for this person.</Typography>}
       </Box>
 
-      {row.contacted ? (
-        <Box sx={{ mt: 1.25, p: 1.25, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 1.5, display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Typography sx={{ fontSize: 13 }}>
-            Contacted {when(row.contacted.at)}{row.contacted.by ? ` by ${row.contacted.by}` : ''}{row.contacted.note ? `: ${row.contacted.note}` : ''}
-          </Typography>
-          <Button size="small" onClick={() => onUndo(row)} sx={{ textTransform: 'none' }}>Undo</Button>
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', gap: 1, mt: 1.25 }}>
-          <Button variant="contained" onClick={() => onContacted(row)} sx={{ textTransform: 'none', fontWeight: 800, minHeight: 42, flex: 1, bgcolor: '#F59E0B', color: '#111', '&:hover': { bgcolor: '#D97706' } }}>
-            Mark as contacted
-          </Button>
-          <Button onClick={() => onHide(row)} sx={{ textTransform: 'none', minHeight: 42 }}>Hide</Button>
-        </Box>
-      )}
+      <Box sx={{ display: 'flex', gap: 1, mt: 1.25 }}>
+        <Button
+          variant="contained"
+          onClick={() => onCreateOrder(row)}
+          startIcon={<IconShoppingCartPlus size={18} />}
+          sx={{ textTransform: 'none', fontWeight: 800, minHeight: 42, flex: 1, bgcolor: '#F59E0B', color: '#111', '&:hover': { bgcolor: '#D97706' } }}
+        >
+          Create offline order
+        </Button>
+        <Button onClick={() => onHide(row)} sx={{ textTransform: 'none', minHeight: 42 }}>Hide</Button>
+      </Box>
     </Paper>
+  );
+}
+
+/** The people behind Successful / Unsuccessful Conversions: who we emailed, and what they ordered (or what is still in their cart). */
+function ConversionDialog({ kind, people, onClose, onOpenPerson, hasRow }: { kind: 'successful' | 'unsuccessful' | null; people: ConversionPerson[]; onClose: () => void; onOpenPerson: (userId: string) => void; hasRow: (userId: string) => boolean }) {
+  const ok = kind === 'successful';
+  return (
+    <Dialog open={Boolean(kind)} onClose={onClose} fullWidth maxWidth="sm" scroll="paper">
+      <DialogTitle sx={{ pb: 0.5 }}>{ok ? 'Successful Conversions' : 'Unsuccessful Conversions'}</DialogTitle>
+      <DialogContent dividers>
+        <Typography sx={{ fontSize: 13, color: '#6B7280', mb: 1.5 }}>
+          {ok ? 'People we emailed who then ordered within 7 days of the email.' : 'People we emailed who have not ordered since. Tap a name to see their cart.'}
+        </Typography>
+        {people.length === 0 && <Typography sx={{ fontSize: 14, color: '#6B7280' }}>{ok ? 'Nobody has ordered after a reminder yet.' : 'Everyone we emailed has ordered.'}</Typography>}
+        <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+          {people.map((p) => {
+            const canOpen = !ok && hasRow(p.userId);
+            return (
+              <Paper
+                key={p.userId}
+                elevation={0}
+                {...(canOpen ? { role: 'button', tabIndex: 0, onClick: () => onOpenPerson(p.userId), onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpenPerson(p.userId)) } : {})}
+                sx={{ p: 1.25, border: `1px solid ${ok ? '#BBF7D0' : '#E5E7EB'}`, borderRadius: 1.5, minWidth: 0, ...(canOpen ? { cursor: 'pointer', '&:hover': { bgcolor: '#FFF8EC' } } : {}) }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start' }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: 15, wordBreak: 'break-word' }}>{p.name}</Typography>
+                    <Typography sx={{ fontSize: 12, color: '#6B7280' }}>Emailed {when(p.emailedAt)}</Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                    {p.order ? (
+                      <>
+                        <Typography sx={{ fontWeight: 800, fontSize: 16, color: '#047857' }}>{money(p.order.amount)}</Typography>
+                        {p.order.orderId && <Typography sx={{ fontSize: 11.5, color: '#6B7280', wordBreak: 'break-all' }}>{p.order.orderId}</Typography>}
+                      </>
+                    ) : p.cart ? (
+                      <>
+                        <Typography sx={{ fontWeight: 800, fontSize: 16 }}>{money(p.cart.total)}</Typography>
+                        <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{p.cart.itemCount} item{p.cart.itemCount === 1 ? '' : 's'}</Typography>
+                      </>
+                    ) : null}
+                  </Box>
+                </Box>
+                {p.order && <Typography sx={{ fontSize: 12, color: '#047857', fontWeight: 600, mt: 0.25 }}>Ordered {when(p.order.paidAt)}</Typography>}
+                {p.cart && p.cart.items.length > 0 && (
+                  <Typography sx={{ fontSize: 12.5, color: '#4B5563', mt: 0.5, overflowWrap: 'anywhere' }}>
+                    {p.cart.items.slice(0, 4).map((i) => `${i.quantity} × ${i.name}`).join(' · ')}
+                    {p.cart.items.length > 4 ? ` · + ${p.cart.items.length - 4} more` : ''}
+                  </Typography>
+                )}
+              </Paper>
+            );
+          })}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Close</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -242,12 +295,13 @@ export default function AbandonedCheckoutsPage() {
   const today = pacificToday();
   // what to ask the server for
   const queryString = preset === 'today' ? `from=${today}&to=${today}` : `days=${preset}`;
-  const [tab, setTab] = useState<View | 'paid'>('to_contact');
+  const [tab, setTab] = useState<'waiting' | 'sent' | 'recovered'>('waiting');
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [contactRow, setContactRow] = useState<AbandonedRow | null>(null);
-  const [note, setNote] = useState('');
+  // the details of one person (from Most left behind or a conversion list), and the Successful / Unsuccessful Conversions lists
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [conversionKind, setConversionKind] = useState<'successful' | 'unsuccessful' | null>(null);
   const [hideRow, setHideRow] = useState<AbandonedRow | null>(null);
   const [remindRow, setRemindRow] = useState<AbandonedRow | null>(null);
   const remindAgain = Boolean(remindRow?.reminder) && remindRow?.reminder?.state !== 'failed' && remindRow?.reminder?.state !== 'sending';
@@ -290,14 +344,14 @@ export default function AbandonedCheckoutsPage() {
     };
   }, [load]);
 
-  const act = async (row: AbandonedRow, action: 'contacted' | 'undo_contacted' | 'dismiss', noteText?: string, message?: string) => {
+  const act = async (row: AbandonedRow, action: 'dismiss', message?: string) => {
     if (!token) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/abandoned-checkouts/${encodeURIComponent(row.id)}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...(noteText ? { note: noteText } : {}) }),
+        body: JSON.stringify({ action }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.success) throw new Error(body.error || 'Could not save that');
@@ -333,8 +387,14 @@ export default function AbandonedCheckoutsPage() {
     return <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}><CircularProgress /></Box>;
   }
 
-  const rows = tab === 'paid' ? [] : data?.rows[tab] ?? [];
+  // everyone still unpaid, split by whether the reminder email went out (the old "contacted" marker no longer matters)
+  const split = splitByReminder([...(data?.rows.to_contact ?? []), ...(data?.rows.contacted ?? [])]);
+  const rows = tab === 'waiting' ? split.waiting : tab === 'sent' ? split.emailed : [];
   const paidRows = data?.paid ?? [];
+  const allRows = [...split.waiting, ...split.emailed];
+  const waitingValue = Math.round(split.waiting.reduce((sum, r) => sum + r.total, 0) * 100) / 100;
+  const detailRow = detailUserId ? allRows.find((r) => r.userId === detailUserId) ?? null : null;
+  const createOrderFor = (row: AbandonedRow) => router.push(`/admin/create-order?fromCheckout=${encodeURIComponent(row.id)}`);
 
   return (
     <Box sx={{ maxWidth: 820, mx: 'auto', pb: 6 }}>
@@ -368,10 +428,10 @@ export default function AbandonedCheckoutsPage() {
 
       {data && (
         <>
-          {data.metrics && <AbandonedMetricsPanel metrics={data.metrics} />}
+          {data.metrics && <AbandonedMetricsPanel metrics={data.metrics} onOpenConversions={setConversionKind} onOpenPerson={setDetailUserId} />}
           <Paper elevation={0} sx={{ p: 1.5, mb: 1.5, border: '1px solid #FBD38D', bgcolor: '#FFF8EC', borderRadius: 2 }}>
             <Typography sx={{ fontWeight: 800, fontSize: 16 }}>
-              {data.to_contact === 0 ? 'No one is waiting to be contacted' : `${data.to_contact} ${data.to_contact === 1 ? 'person' : 'people'} to contact · ${money(data.valueToContact)} in their carts`}
+              {split.waiting.length === 0 ? 'No one is waiting for the reminder email' : `${split.waiting.length} ${split.waiting.length === 1 ? 'person' : 'people'} waiting for the reminder email · ${money(waitingValue)} in their carts`}
             </Typography>
             {data.orderedSince > 0 && (
               <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
@@ -380,77 +440,76 @@ export default function AbandonedCheckoutsPage() {
             )}
           </Paper>
 
-          <Tabs value={tab} onChange={(_, v: View | 'paid') => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1.25, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
-            <Tab value="to_contact" label={`To contact (${data.to_contact})`} />
-            <Tab value="contacted" label={`Contacted (${data.contacted})`} />
-            <Tab value="paid" label={`Paid (${paidRows.length})`} />
+          <Tabs value={tab} onChange={(_, v: 'waiting' | 'sent' | 'recovered') => setTab(v)} variant="scrollable" scrollButtons={false} sx={{ mb: 1.25, minHeight: 40, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, minHeight: 40 } }}>
+            <Tab value="waiting" label={`Waiting to send email (${split.waiting.length})`} />
+            <Tab value="sent" label={`Email sent (${split.emailed.length})`} />
+            <Tab value="recovered" label={`Recovered (${paidRows.length})`} />
           </Tabs>
 
-          {tab === 'paid' && paidRows.length === 0 && (
+          {tab === 'recovered' && paidRows.length === 0 && (
             <Paper elevation={0} sx={{ p: 3, border: '1px dashed #D1D5DB', borderRadius: 2, textAlign: 'center' }}>
               <Box sx={{ color: '#9CA3AF', mb: 0.5 }}><IconShoppingCartOff size={32} /></Box>
-              <Typography sx={{ fontWeight: 700 }}>Nobody has come back and paid yet</Typography>
+              <Typography sx={{ fontWeight: 700 }}>Nobody has been recovered yet</Typography>
               <Typography sx={{ fontSize: 13, color: '#6B7280' }}>People who leave checkout and later pay show up here, with what brought them back.</Typography>
             </Paper>
           )}
-          {tab === 'paid' && paidRows.length > 0 && (
+          {tab === 'recovered' && paidRows.length > 0 && (
             <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
               {paidRows.map((row) => <PaidCard key={row.orderId} row={row} />)}
             </Box>
           )}
-          {tab !== 'paid' && rows.length === 0 && (
+          {tab !== 'recovered' && rows.length === 0 && (
             <Paper elevation={0} sx={{ p: 3, border: '1px dashed #D1D5DB', borderRadius: 2, textAlign: 'center' }}>
               <Box sx={{ color: '#9CA3AF', mb: 0.5 }}><IconShoppingCartOff size={32} /></Box>
-              <Typography sx={{ fontWeight: 700 }}>{tab === 'to_contact' ? 'Nobody to follow up with right now' : 'Nobody has been contacted yet'}</Typography>
+              <Typography sx={{ fontWeight: 700 }}>{tab === 'waiting' ? 'Nobody is waiting for the reminder email' : 'No reminder email has gone out yet'}</Typography>
               <Typography sx={{ fontSize: 13, color: '#6B7280' }}>
-                {tab === 'to_contact' ? `When someone opens checkout and leaves without paying, they appear here after ${QUIET_MINUTES} minutes.` : 'People you mark as contacted move here, with your note.'}
+                {tab === 'waiting' ? `When someone opens checkout and leaves without paying, they appear here after ${QUIET_MINUTES} minutes, until their reminder email goes out (about 30 minutes after they left).` : 'People who got the reminder email and have not ordered yet are listed here.'}
               </Typography>
             </Paper>
           )}
           <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
             {rows.map((row) => (
-              <PersonCard
-                key={row.id}
-                row={row}
-                onContacted={(r) => {
-                  setNote('');
-                  setContactRow(r);
-                }}
-                onUndo={(r) => void act(r, 'undo_contacted', undefined, 'Moved back to To contact')}
-                onHide={setHideRow}
-                onRemind={setRemindRow}
-              />
+              <PersonCard key={row.id} row={row} onHide={setHideRow} onRemind={setRemindRow} onCreateOrder={createOrderFor} />
             ))}
           </Box>
         </>
       )}
 
-      <Dialog open={Boolean(contactRow)} onClose={() => setContactRow(null)} fullWidth maxWidth="xs">
-        <DialogTitle>How did you reach {contactRow?.name.split(' ')[0] ?? 'them'}?</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
-            {CONTACT_NOTES.map((n) => (
-              <Chip key={n} label={n} onClick={() => setNote(n)} color={note === n ? 'warning' : 'default'} variant={note === n ? 'filled' : 'outlined'} sx={{ fontWeight: 600 }} />
-            ))}
-          </Box>
-          <TextField label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} size="small" fullWidth placeholder="Anything you want to remember" />
+      <Dialog open={Boolean(detailUserId)} onClose={() => setDetailUserId(null)} fullWidth maxWidth="sm" scroll="paper">
+        <DialogTitle sx={{ pb: 0.5 }}>{detailRow?.name ?? 'Details'}</DialogTitle>
+        <DialogContent dividers>
+          {detailRow ? (
+            <PersonCard
+              row={detailRow}
+              onHide={(r) => {
+                setDetailUserId(null);
+                setHideRow(r);
+              }}
+              onRemind={(r) => {
+                setDetailUserId(null);
+                setRemindRow(r);
+              }}
+              onCreateOrder={createOrderFor}
+            />
+          ) : (
+            <Typography sx={{ fontSize: 14, color: '#6B7280' }}>This person is not on the list any more (they may have ordered or been hidden since).</Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setContactRow(null)} sx={{ textTransform: 'none' }}>Back</Button>
-          <Button
-            variant="contained"
-            disabled={saving}
-            onClick={async () => {
-              const row = contactRow;
-              setContactRow(null);
-              if (row) await act(row, 'contacted', note.trim(), 'Marked as contacted');
-            }}
-            sx={{ textTransform: 'none', fontWeight: 700 }}
-          >
-            Save
-          </Button>
+          <Button onClick={() => setDetailUserId(null)} sx={{ textTransform: 'none' }}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      <ConversionDialog
+        kind={conversionKind}
+        people={conversionKind ? data?.metrics?.conversions[conversionKind] ?? [] : []}
+        onClose={() => setConversionKind(null)}
+        onOpenPerson={(userId) => {
+          setConversionKind(null);
+          setDetailUserId(userId);
+        }}
+        hasRow={(userId) => allRows.some((r) => r.userId === userId)}
+      />
 
       <Dialog open={Boolean(remindRow)} onClose={() => setRemindRow(null)} fullWidth maxWidth="xs">
         <DialogTitle>{remindAgain ? 'Send another reminder to' : 'Send the reminder to'} {remindRow?.name.split(' ')[0] ?? 'them'}?</DialogTitle>
@@ -492,7 +551,7 @@ export default function AbandonedCheckoutsPage() {
             onClick={async () => {
               const row = hideRow;
               setHideRow(null);
-              if (row) await act(row, 'dismiss', undefined, 'Hidden');
+              if (row) await act(row, 'dismiss', 'Hidden');
             }}
             sx={{ textTransform: 'none', fontWeight: 700 }}
           >
