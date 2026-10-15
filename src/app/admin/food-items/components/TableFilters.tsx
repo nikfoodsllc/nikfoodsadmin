@@ -119,7 +119,6 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="all">All</MenuItem>
           <MenuItem value="yes">Yes</MenuItem>
           <MenuItem value="no">No</MenuItem>
-          <MenuItem value="not_set">(not set yet)</MenuItem>
         </Select>
       </FormControl>
 

@@ -909,9 +909,6 @@ export default function FoodItemsPage() {
               <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applySticker('no')} sx={{ textTransform: 'none', backgroundColor: '#B91C1C', '&:hover': { backgroundColor: '#991B1B' } }}>
                 No
               </Button>
-              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null)} sx={{ textTransform: 'none' }}>
-                Clear (not set yet)
-              </Button>
             </Box>
           )}
           {bulkField === 'splitSticker' && (

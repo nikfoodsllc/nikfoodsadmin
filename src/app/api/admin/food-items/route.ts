@@ -740,7 +740,8 @@ export async function POST(request: NextRequest) {
       hasSpiceLevel: data.hasSpiceLevel,
       spiceLevel: data.spiceLevel || [],
       ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
-      ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
+      // a new item is on the Stickers sheet unless it was created with Sticker = No
+      sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
   ...(isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       ...(isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       createdAt: new Date(),
