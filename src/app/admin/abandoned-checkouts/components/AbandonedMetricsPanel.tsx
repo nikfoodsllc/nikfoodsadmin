@@ -43,17 +43,10 @@ function FunnelRow({ label, count, of, color, note }: { label: string; count: nu
 export default function AbandonedMetricsPanel({ metrics, onOpenConversions, onOpenPerson }: { metrics: AbandonedMetrics; onOpenConversions: (kind: 'successful' | 'unsuccessful') => void; onOpenPerson: (userId: string) => void }) {
   const m = metrics;
   const r = m.reminders;
-  if (m.started === 0) {
-    return (
-      <Paper elevation={0} sx={{ p: 1.5, mb: 1.5, border: '1px solid #E5E7EB', borderRadius: 2 }}>
-        <Typography sx={{ fontWeight: 700 }}>No one opened checkout in these days</Typography>
-        <Typography sx={{ fontSize: 13, color: '#6B7280' }}>Pick a longer range to see how checkout is doing.</Typography>
-      </Paper>
-    );
-  }
   return (
     <Box sx={{ mb: 2 }}>
       <Typography sx={{ fontSize: 13, fontWeight: 800, color: '#374151', mb: 0.75 }}>Overview</Typography>
+      {m.started === 0 && <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 0.75 }}>No one opened checkout in these days yet. Pick a longer range to compare.</Typography>}
       <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' } }}>
         <Tile
           label="Successful Conversions"
