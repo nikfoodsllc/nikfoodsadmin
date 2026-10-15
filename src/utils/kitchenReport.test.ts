@@ -110,6 +110,10 @@ describe('buildKitchenReport', () => {
     expect(r.stickers.map((s) => `${s.deliveredOn ?? s.day}:${s.customerName}`)).toEqual(['2026-10-13:Bob', '2026-10-14:Zed', '2026-10-14:Amy']);
     expect(r.stickers[2]).toMatchObject({ item: 'Pickle', portion: '16Oz', isEco: true });
   });
+  it('stickers: one line per box, never merged or multiplied', () => {
+    const r = buildKitchenReport([row({ name: 'Pickle', customerName: 'Shrey', portion: '8Oz', quantity: 2 }), row({ name: 'Pickle', orderId: '2', customerName: 'Amy', portion: '8Oz', quantity: 1 })], byName, stickerYes);
+    expect(r.stickers.map((s) => `${s.customerName}:${s.portion}:${s.quantity}`).sort()).toEqual(['Amy:8Oz:1', 'Shrey:8Oz:1', 'Shrey:8Oz:1']);
+  });
   it('items marked No are left off the stickers; Yes and not set yet are listed, cooked or ready to eat', () => {
     const marks: Record<string, 'yes' | 'no'> = { Rajma: 'yes', Pickle: 'no' };
     const r = buildKitchenReport([row({ name: 'Rajma' }), row({ name: 'Pickle', orderId: '2' }), row({ name: 'Chapati', orderId: '3' })], byName, ({ name }) => marks[name] ?? null);
