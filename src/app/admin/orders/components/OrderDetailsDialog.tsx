@@ -28,6 +28,7 @@ import {
 import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
+import DeleteOrdersDialog from './DeleteOrdersDialog';
 import { deliveryProgressLines } from '@/utils/deliveryProgress';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
@@ -51,6 +52,8 @@ interface OrderDetailsDialogProps {
   token?: string | null;
   /** Reload the order after its delivery date was moved or the customer was emailed */
   onOrderChanged?: () => Promise<void> | void;
+  /** The order was deleted (the dialog has closed itself): reload the list */
+  onDeleted?: () => void;
 }
 
 export default function OrderDetailsDialog({
@@ -61,7 +64,9 @@ export default function OrderDetailsDialog({
   onStatusUpdate,
   token = null,
   onOrderChanged,
+  onDeleted,
 }: OrderDetailsDialogProps) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('pending');
   const [updating, setUpdating] = useState(false);
   const [expandedCombos, setExpandedCombos] = useState<Set<string>>(new Set());
@@ -779,7 +784,12 @@ export default function OrderDetailsDialog({
         />
       </DialogContent>
 
-      <DialogActions sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 2, borderTop: '1px solid #E5E7EB' }}>
+      <DialogActions sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 2, borderTop: '1px solid #E5E7EB', flexWrap: 'wrap', gap: 1 }}>
+        {token && (
+          <Button color="error" variant="outlined" onClick={() => setDeleteOpen(true)} disabled={updating} sx={{ textTransform: 'none', mr: 'auto' }}>
+            Delete order
+          </Button>
+        )}
         <Button
           onClick={onClose}
           disabled={updating}
@@ -809,6 +819,19 @@ export default function OrderDetailsDialog({
           {updating ? <CircularProgress size={20} /> : 'Update Status'}
         </Button>
       </DialogActions>
+      <DeleteOrdersDialog
+        open={deleteOpen}
+        orders={order ? [order] : []}
+        token={token}
+        onClose={() => setDeleteOpen(false)}
+        onDone={(deleted) => {
+          setDeleteOpen(false);
+          if (deleted.length > 0) {
+            onClose();
+            onDeleted?.();
+          }
+        }}
+      />
     </Dialog>
   );
 }

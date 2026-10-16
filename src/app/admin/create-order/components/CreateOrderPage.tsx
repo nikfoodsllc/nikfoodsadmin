@@ -71,7 +71,11 @@ export default function CreateOrderPage() {
   };
   const changePayment = (next: PaymentChoice) => {
     setPayment(next);
-    if (!feeTouched.current) setWaiveFee(next === 'zelle');
+    // a quote always starts with the fee waived (the admin can untick it afterwards)
+    if (next === 'quote') {
+      feeTouched.current = false;
+      setWaiveFee(true);
+    } else if (!feeTouched.current) setWaiveFee(next === 'zelle');
   };
   // dollars off, as typed
   const [discount, setDiscount] = useState('');
@@ -217,7 +221,7 @@ export default function CreateOrderPage() {
       tipPercentage: tip,
       waivePlatformFee: waiveFee,
       discount: discountValue,
-      payment: payment === 'link' ? { mode: 'link' } : payment === 'zelle' ? { mode: 'zelle' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
+      payment: payment === 'link' ? { mode: 'link' } : payment === 'zelle' ? { mode: 'zelle' } : payment === 'quote' ? { mode: 'quote' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
       ...(editing ? { replacesOrderId: editing } : {}),
     };
@@ -418,7 +422,9 @@ export default function CreateOrderPage() {
               ? `A payment link will be emailed to ${customer.email}.`
               : payment === 'zelle'
                 ? `Zelle instructions will be emailed to ${customer.email}. The order waits until you mark the Zelle as received.`
-                : `It will be saved as paid (${paidMethodValue(paidChoice, paidTyped) ?? '?'}) and a confirmation emailed to ${customer.email}.`}
+                : payment === 'quote'
+                  ? 'It will be saved as a quote (paid, method “Quote”). No email is sent to the customer or to support.'
+                  : `It will be saved as paid (${paidMethodValue(paidChoice, paidTyped) ?? '?'}) and a confirmation emailed to ${customer.email}.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
