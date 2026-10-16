@@ -71,3 +71,90 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
   }
   return rows;
 }
+
+/** An order line made on the date's kitchen day that does NOT go out that day. */
+export interface HeldRow extends PackingRow {
+  /** An admin moved the delivery date (otherwise the day was combined into a later delivery day) */
+  movedByAdmin: boolean;
+}
+
+/**
+ * Every order line whose KITCHEN day (the menu day it was picked for) is this date but whose delivery date is later: the food is
+ * made on this day and waits in the fridge until it goes out. Same orders as fetchPackingRows (really going out: not cancelled,
+ * refunded, failed or unpaid).
+ */
+export async function fetchHeldRows(date: string): Promise<HeldRow[]> {
+  const within = { $gte: date, $lte: `${date}￿` };
+  const pipeline = [
+    {
+      $match: {
+        status: { $ne: 'cancelled' },
+        $or: [
+          { paymentStatus: 'paid' },
+          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
+        ],
+        'items.deliveryDate': within,
+      },
+    },
+    { $unwind: '$items' },
+    {
+      $match: {
+        $expr: {
+          $and: [
+            { $gte: [{ $toString: '$items.deliveryDate' }, date] },
+            { $lt: [{ $toString: '$items.deliveryDate' }, `${date}￿`] },
+            { $gt: [{ $toString: { $ifNull: ['$items.actualDeliveryDate', ''] } }, `${date}￿`] },
+          ],
+        },
+      },
+    },
+    { $unwind: '$items.items' },
+    {
+      $project: {
+        _id: 0,
+        orderId: 1,
+        orderStatus: '$status',
+        orderedAt: '$createdAt',
+        customerName: '$customerInfo.name',
+        street: '$address.street',
+        day: '$items.deliveryDate',
+        deliveredOn: '$items.actualDeliveryDate',
+        moved: '$items.originalDeliveryDate',
+        name: '$items.items.food.name',
+        foodId: '$items.items.food._id',
+        quantity: '$items.items.quantity',
+        portion: '$items.items.selectedPortion',
+        spiceLevel: '$items.items.spiceLevel',
+        isEco: '$items.items.isEcoFriendlyContainer',
+        sections: '$items.items.food.sections',
+        comboSelections: '$items.items.comboSelections',
+      },
+    },
+  ];
+  const result = await db.aggregate('orders', pipeline);
+  if (!result.success) throw new Error(result.error || 'Failed to read orders');
+  const rows: HeldRow[] = [];
+  for (const raw of (result.data ?? []) as Array<Record<string, any>>) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const day = toDayString(raw.day);
+    if (!day) continue;
+    rows.push({
+      orderId: String(raw.orderId ?? ''),
+      day,
+      name: String(raw.name ?? ''),
+      foodId: raw.foodId ? String(raw.foodId) : null,
+      quantity: Number(raw.quantity),
+      portion: raw.portion ?? null,
+      spiceLevel: raw.spiceLevel ?? null,
+      isEco: Boolean(raw.isEco),
+      sections: Array.isArray(raw.sections) ? raw.sections : null,
+      comboSelections: raw.comboSelections && typeof raw.comboSelections === 'object' ? raw.comboSelections : null,
+      customerName: typeof raw.customerName === 'string' ? raw.customerName : null,
+      deliveredOn: toDayString(raw.deliveredOn),
+      orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
+      orderedOn: pacificDayOf(raw.orderedAt),
+      street: typeof raw.street === 'string' ? raw.street : null,
+      movedByAdmin: Boolean(raw.moved),
+    });
+  }
+  return rows;
+}
