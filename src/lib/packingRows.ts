@@ -119,7 +119,7 @@ export async function fetchHeldRows(date: string): Promise<HeldRow[]> {
         street: '$address.street',
         day: '$items.deliveryDate',
         deliveredOn: '$items.actualDeliveryDate',
-        moved: '$items.originalDeliveryDate',
+        moved: '$items.items.originalDeliveryDate',
         name: '$items.items.food.name',
         foodId: '$items.items.food._id',
         quantity: '$items.items.quantity',
