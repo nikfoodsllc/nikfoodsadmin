@@ -8,7 +8,7 @@ import PaidMethodPicker from './PaidMethodPicker';
 export interface CreatedOrder {
   orderId: string;
   totalPaid: number;
-  mode: 'link' | 'offline' | 'zelle';
+  mode: 'link' | 'offline' | 'zelle' | 'quote';
   accountCreated: boolean;
   payLink?: string;
   emailSent: boolean;
@@ -84,7 +84,7 @@ export default function OrderResult({ result, token, onAnother, onChanged, liste
     <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, border: '1px solid #BBF7D0', bgcolor: '#F0FDF4', borderRadius: 2 }}>
       <Typography sx={{ fontWeight: 800, fontSize: 20 }}>{cancelled ? 'Order cancelled' : 'Order created'}</Typography>
       <Typography sx={{ fontSize: 15, mt: 0.5 }}>
-        Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {cancelled ? 'cancelled' : result.mode !== 'offline' && !paid ? 'waiting for payment' : 'paid'}
+        Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {cancelled ? 'cancelled' : (result.mode === 'link' || result.mode === 'zelle') && !paid ? 'waiting for payment' : 'paid'}
       </Typography>
       {result.accountCreated && <Alert severity="info" sx={{ mt: 1.5 }}>A new customer account was created for this email (the customer sets a password with Forgot password).</Alert>}
       {cancelled ? (
@@ -120,6 +120,8 @@ export default function OrderResult({ result, token, onAnother, onChanged, liste
             </>
           )}
         </>
+      ) : result.mode === 'quote' ? (
+        <Alert severity="info" sx={{ mt: 1.5 }}>Saved as a quote. No email was sent to the customer or to support. To remove it later, delete it in the Orders tab.</Alert>
       ) : (
         <Alert severity={result.emailSent ? 'success' : 'warning'} sx={{ mt: 1.5 }}>
           {result.emailSent ? 'The order confirmation was emailed to the customer.' : `The confirmation email could not be sent (${result.emailError || 'unknown error'}).`}

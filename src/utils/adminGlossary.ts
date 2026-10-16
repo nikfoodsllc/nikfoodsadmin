@@ -78,6 +78,9 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: payment method', 'Cash on Delivery', 'Orders table, Payment Method; Create Offline Order shows it as "Cash"', 'The customer pays in cash. Entered through Create Offline Order and marked Paid right away.', undefined, 'cash'),
   e('Orders: payment method', 'Other', 'Orders table, Payment Method', 'Paid some other way that an admin typed in (for example Zelle or a cheque). The typed name and note are on the order.', undefined, 'zelle'),
 
+  e('Orders: payment method', 'Quote', 'Orders table, Payment Method; Create Order, "Send a quote"', 'An order entered as a quote. It is saved like a cash order (paid, confirmed), shows in every report and goes onto the delivery route, but NO email goes to the customer or to support. Delete the whole order later from the Orders tab if the quote does not go ahead.', undefined, 'quote quotation estimate no email'),
+  e('Orders: payment method', 'Delete order', 'Order details (red button) and the Orders table (tick rows, Delete Selected)', 'Deletes an order completely, whatever its status. It disappears from every report and its delivery stop is removed from OptimoRoute; an unpaid card payment is closed. It does NOT refund a card payment: refund in Stripe first. The customer is not told. A copy of the deleted order is kept in the database (who and when) in case of a mistake.', 'warn', 'delete remove order bulk quote'),
+
   // ---- confirmation email
   e('Orders: Confirmation Email column', 'Sent', 'Orders table, Confirmation Email', 'We handed the confirmation email to the email service. We have not heard back yet whether it arrived. Orders from before the tracking started stay on Sent.', 'good'),
   e('Orders: Confirmation Email column', 'Delivered', 'Orders table, Confirmation Email', "The email reached the customer's mail server. Not opened yet, as far as we know. The cell shows the time.", 'good'),

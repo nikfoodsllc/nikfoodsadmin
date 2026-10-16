@@ -526,10 +526,11 @@ export async function GET(request: NextRequest) {
               count: item.count,
               revenue: item.revenue,
             };
-          } else if (item._id === 'Cash on Delivery') {
+          } else if (item._id === 'Cash on Delivery' || item._id === 'Quote') {
+            // a quote is counted like a cash order
             paymentMethodBreakdown.cashOnDelivery = {
-              count: item.count,
-              revenue: item.revenue,
+              count: paymentMethodBreakdown.cashOnDelivery.count + item.count,
+              revenue: paymentMethodBreakdown.cashOnDelivery.revenue + item.revenue,
             };
           } else {
             // Apple Pay, Google Pay, Bank, Link, Klarna, Other (and any unknown value) so no order
