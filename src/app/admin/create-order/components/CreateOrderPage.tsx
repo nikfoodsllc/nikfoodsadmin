@@ -71,7 +71,11 @@ export default function CreateOrderPage() {
   };
   const changePayment = (next: PaymentChoice) => {
     setPayment(next);
-    if (!feeTouched.current) setWaiveFee(next === 'zelle');
+    // a quote always starts with the fee waived (the admin can untick it afterwards)
+    if (next === 'quote') {
+      feeTouched.current = false;
+      setWaiveFee(true);
+    } else if (!feeTouched.current) setWaiveFee(next === 'zelle');
   };
   // dollars off, as typed
   const [discount, setDiscount] = useState('');
