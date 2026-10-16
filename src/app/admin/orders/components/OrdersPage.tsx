@@ -23,6 +23,7 @@ import { ORDERS_COLUMNS, ORDERS_COLUMNS_STORAGE_KEY } from './ordersColumns';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ExportToCsvDialog from './ExportToCsvDialog';
+import DeleteOrdersDialog from './DeleteOrdersDialog';
 import { IconDownload, IconRefresh } from '@tabler/icons-react';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
@@ -64,6 +65,7 @@ export default function OrdersPage() {
   useReloadWhenStale(loadedAt, () => quietReload.current(), loadedAt !== null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | ''>('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
@@ -391,6 +393,14 @@ export default function OrdersPage() {
     setSelectedOrderIds(new Set(selectableOrderIds));
   };
 
+  const handleDeleteDone = async (deleted: string[], failed: Array<{ orderId: string; error: string }>) => {
+    setBulkDeleteOpen(false);
+    setSelectedOrderIds(new Set());
+    if (failed.length === 0) showSnackbar(`Deleted ${deleted.length} order${deleted.length === 1 ? '' : 's'}`);
+    else showSnackbar(`Deleted ${deleted.length}, could not delete ${failed.length}: ${failed[0].orderId} (${failed[0].error})`, 'error');
+    await fetchOrders();
+  };
+
   const handleClearSelection = () => {
     setSelectedOrderIds(new Set());
     setBulkStatus('');
@@ -512,6 +522,15 @@ export default function OrdersPage() {
                 }}
               >
                 {bulkUpdating ? 'Updating...' : `Update Selected (${selectedOrderIds.size})`}
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => setBulkDeleteOpen(true)}
+                disabled={bulkUpdating}
+                sx={{ textTransform: 'none', borderRadius: 2, px: 2.5 }}
+              >
+                {`Delete Selected (${selectedOrderIds.size})`}
               </Button>
               <Button
                 variant="outlined"
@@ -639,6 +658,18 @@ export default function OrdersPage() {
         onStatusUpdate={handleStatusUpdate}
         token={token}
         onOrderChanged={handleOrderChanged}
+        onDeleted={() => {
+          showSnackbar('Order deleted');
+          void fetchOrders();
+        }}
+      />
+
+      <DeleteOrdersDialog
+        open={bulkDeleteOpen}
+        orders={orders.filter((o) => o._id && selectedOrderIds.has(o._id))}
+        token={token}
+        onClose={() => setBulkDeleteOpen(false)}
+        onDone={handleDeleteDone}
       />
 
       {/* Export to CSV Dialog */}

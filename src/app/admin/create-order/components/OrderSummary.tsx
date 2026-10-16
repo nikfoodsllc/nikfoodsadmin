@@ -30,7 +30,7 @@ export interface PreviewData {
   deliveryMessages: string[];
 }
 
-export type PaymentChoice = 'link' | 'zelle' | 'paid';
+export type PaymentChoice = 'link' | 'zelle' | 'paid' | 'quote';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -164,6 +164,7 @@ export default function OrderSummary(props: {
         <FormControlLabel value="link" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email a payment link (card or Apple Pay)</Typography>} />
         <FormControlLabel value="zelle" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Email Zelle instructions (the customer pays by Zelle)</Typography>} />
         <FormControlLabel value="paid" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid (cash, Zelle, other…)</Typography>} />
+        <FormControlLabel value="quote" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Send a quote (no emails)</Typography>} />
       </RadioGroup>
       {props.payment === 'paid' && (
         <Box sx={{ mt: 1 }}>
@@ -177,7 +178,9 @@ export default function OrderSummary(props: {
           ? 'The customer gets an email with a secure pay link. The order is confirmed (and the confirmation email sent) once they pay.'
           : props.payment === 'zelle'
             ? 'The customer gets an email asking them to pay by Zelle. The order waits for payment: when the Zelle arrives, press “Zelle received” in Recent orders and the customer gets the confirmation email.'
-            : 'The order is saved as paid with the method you chose, and the customer gets the usual order confirmation email.'}
+            : props.payment === 'quote'
+              ? 'A quote: the order is saved like a cash order (paid, payment method “Quote”) and shows in all reports and on the delivery route. No email goes to the customer or to support. You can delete the whole order later from the Orders tab.'
+              : 'The order is saved as paid with the method you chose, and the customer gets the usual order confirmation email.'}
       </Typography>
 
       {props.missing.length > 0 && lines.length > 0 && (
@@ -192,7 +195,7 @@ export default function OrderSummary(props: {
         onClick={props.onSubmit}
         sx={{ mt: 2, textTransform: 'none', fontWeight: 800, bgcolor: '#F59E0B', color: '#111', '&:hover': { bgcolor: '#D97706' } }}
       >
-        {props.submitting ? <CircularProgress size={22} sx={{ color: '#111' }} /> : props.payment === 'link' ? 'Create order and email the payment link' : props.payment === 'zelle' ? 'Create order and email Zelle instructions' : 'Create order as paid'}
+        {props.submitting ? <CircularProgress size={22} sx={{ color: '#111' }} /> : props.payment === 'link' ? 'Create order and email the payment link' : props.payment === 'zelle' ? 'Create order and email Zelle instructions' : props.payment === 'quote' ? 'Create quote (no emails)' : 'Create order as paid'}
       </Button>
     </Paper>
   );
