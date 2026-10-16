@@ -7,6 +7,8 @@
  */
 import { comboChoiceLines, comboParts, spicedPartNames, type KitchenRow } from './kitchenDashboard';
 import { isEcoEligiblePart } from './kitchenReport';
+import type { HeldReport } from './packingHeld';
+import { filterHeld } from './packingHeld';
 
 /** One ordered line delivered on the report's date. */
 export interface PackingRow extends KitchenRow {
@@ -57,6 +59,8 @@ export interface PackLine {
   choices: string[];
   /** The menu day it was picked for, when that is not the delivery date (cart clubbing or a moved date) */
   pickedFor: string | null;
+  /** The food was made on an EARLIER day than it goes out: it has been waiting in the fridge */
+  madeEarlier?: boolean;
   /** The menu day of the line (always set), used to group a customer's items by day */
   day: string;
   /** A combo's picked options as separate items (empty / missing for a plain item or a combo with no picks saved) */
@@ -101,13 +105,15 @@ export interface PackingReport {
   unrouted: PackStop[];
   totals: PackTotal[];
   stats: { stops: number; orders: number; units: number; eco: number; unroutedStops: number };
+  /** Customers with food made on this date that goes out on a LATER date (not on today's routes) */
+  held?: HeldReport;
 }
 
 const clean = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
 const norm = (v: unknown) => clean(v).toLowerCase().replace(/[^a-z0-9]/g, '');
 const streetKey = (v: unknown) => norm(clean(v).split(',')[0]);
 
-function toLine(row: PackingRow, date: string): PackLine {
+export function toLine(row: PackingRow, date: string): PackLine {
   const choices = comboChoiceLines(row);
   const picked = comboParts(row);
   const spiced = spicedPartNames(row);
@@ -121,6 +127,7 @@ function toLine(row: PackingRow, date: string): PackLine {
     isEco: Boolean(row.isEco),
     choices,
     pickedFor: row.day && row.day !== date ? row.day : null,
+    ...(row.day && row.day < date ? { madeEarlier: true } : {}),
     day: row.day,
     ...(parts.length > 0 ? { parts } : {}),
   };
@@ -222,5 +229,5 @@ export function filterPackingReport(report: PackingReport, query: string): Packi
   const routes = report.routes
     .map((route) => ({ ...route, stops: route.stops.filter((s) => hit(route.driverName) || hit(route.title) || stopHits(s)) }))
     .filter((route) => route.stops.length > 0);
-  return { ...report, routes, unrouted: report.unrouted.filter(stopHits), totals: report.totals.filter((t) => hit(t.name)) };
+  return { ...report, routes, unrouted: report.unrouted.filter(stopHits), totals: report.totals.filter((t) => hit(t.name)), ...(report.held ? { held: filterHeld(report.held, q) } : {}) };
 }

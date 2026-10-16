@@ -6,6 +6,7 @@
 import type { ColumnDef } from './columnPreferences';
 import { rowTone, type SheetModel, type SheetRow } from './kitchenReportSheets';
 import type { PackLine, PackStop, PackingReport } from './packingReport';
+import { heldReasonText, type HeldReport } from './packingHeld';
 
 const col = (key: string, label: string, defaultWidth: number): ColumnDef => ({ key, label, defaultWidth });
 
@@ -120,8 +121,44 @@ export function packTotalsSheet(report: PackingReport): SheetModel {
   return { key: 'packTotals', columnKeys: PACK_TOTAL_COLUMNS.map((c) => c.key), name: 'Item totals', widths: PACK_TOTAL_COLUMNS.map((c) => c.defaultWidth), rows };
 }
 
+const HELD_COLUMNS: ColumnDef[] = [
+  col('customer', 'Customer', 24),
+  col('order', 'Order', 20),
+  col('item', 'Item', 26),
+  col('size', 'Size', 10),
+  col('qty', 'Qty', 8),
+  col('spice', 'Spice', 14),
+  col('eco', 'Eco', 10),
+  col('picks', 'Combo picks', 28),
+  col('goesOut', 'Goes out', 14),
+  col('why', 'Why', 30),
+];
+
+/** Food made on the report's date that goes out on a later day: who, what, and when it goes out. */
+export function heldSheet(held: HeldReport): SheetModel {
+  const qty = HELD_COLUMNS.findIndex((c) => c.key === 'qty');
+  const rows: SheetRow[] = [
+    { kind: 'header', cells: HELD_COLUMNS.map((c) => c.label), box: { top: true, bottom: false }, boldCells: HELD_COLUMNS.map((_, i) => i), rightCells: [qty] },
+    { kind: 'section', cells: [`Not going out today · ${held.stats.customers} customer${held.stats.customers === 1 ? '' : 's'} · ${held.stats.units} unit${held.stats.units === 1 ? '' : 's'}`] },
+  ];
+  held.customers.forEach((c, ci) => {
+    if (ci > 0) rows.push({ kind: 'blank', cells: [] });
+    c.lines.forEach((line, i) => {
+      rows.push({
+        kind: 'data',
+        tone: rowTone(i, line.isEco),
+        box: { top: i === 0, bottom: i === c.lines.length - 1 },
+        rightCells: [qty],
+        cells: [c.customerName, line.orderId, line.name, line.portion ?? '', line.quantity, line.spice ?? '', line.isEco ? 'ECO' : '', line.choices.join('\n'), dayLabel(line.goesOutOn), heldReasonText(line.reason) + (c.alsoToday ? ' (also delivering today)' : '')],
+      });
+    });
+  });
+  return { key: 'packHeld', columnKeys: HELD_COLUMNS.map((c) => c.key), name: 'Not going out today', widths: HELD_COLUMNS.map((c) => c.defaultWidth), margin: 2, rows };
+}
+
 export function buildPackingSheets(report: PackingReport): SheetModel[] {
   const routes = packingRouteSheets(report);
+  const held = report.held && report.held.customers.length > 0 ? [heldSheet(report.held)] : [];
   // a day with nothing at all still gets one (empty) packing sheet, so the file is never without one
-  return [...(routes.length > 0 ? routes : [stopsSheet('Packing List', 'Nothing to deliver on this date', '-', [])]), packTotalsSheet(report)];
+  return [...(routes.length > 0 ? routes : [stopsSheet('Packing List', 'Nothing to deliver on this date', '-', [])]), packTotalsSheet(report), ...held];
 }

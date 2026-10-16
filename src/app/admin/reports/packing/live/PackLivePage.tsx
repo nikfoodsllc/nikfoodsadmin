@@ -12,6 +12,7 @@ import { comparePackingReports, describeChanges, type PackingChanges } from '@/u
 import { addDays, formatDayShort, isDayString, shortSpiceLabel, weekdayName } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
 import type { PackingReport, PackStop } from '@/utils/packingReport';
+import HeldList from '../components/HeldList';
 import {
   findMovedStop,
   groupByDay,
@@ -111,6 +112,7 @@ export default function PackLivePage() {
   const [confirm, setConfirm] = useState<null | 'reset' | 'stop'>(null);
   const [busy, setBusy] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [heldOpen, setHeldOpen] = useState(false);
   // the list of all customers: always at the side on a computer, in a window on a phone
   const [listOpen, setListOpen] = useState(false);
   const startRequest = useLatestRequest();
@@ -422,6 +424,29 @@ export default function PackLivePage() {
             })}
           </Box>
         </>
+      )}
+
+      {!loading && pickerOpen && report?.held && report.held.customers.length > 0 && (
+        <Paper elevation={0} sx={{ border: '1px solid #F5D98A', bgcolor: '#FFFBEB', borderRadius: 2, mb: 2, overflow: 'hidden' }}>
+          <Box
+            role="button"
+            tabIndex={0}
+            aria-expanded={heldOpen}
+            onClick={() => setHeldOpen((v) => !v)}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setHeldOpen((v) => !v))}
+            sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 2, py: 1.25, cursor: 'pointer' }}
+          >
+            <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#92400E' }}>
+              Not going out today ({report.held.stats.customers} customer{report.held.stats.customers === 1 ? '' : 's'} · {report.held.stats.units} unit{report.held.stats.units === 1 ? '' : 's'})
+            </Typography>
+            <Typography sx={{ fontSize: 13, color: '#92400E', fontWeight: 600 }}>{heldOpen ? 'Hide' : 'Show'}</Typography>
+          </Box>
+          {heldOpen && (
+            <Box sx={{ px: 1.5, pb: 1.5 }}>
+              <HeldList held={report.held} date={report.date} />
+            </Box>
+          )}
+        </Paper>
       )}
 
       {route && (
