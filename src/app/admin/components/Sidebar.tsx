@@ -46,7 +46,7 @@ interface NavItem {
 }
 
 /**
- * The admin menu: Order, Reporting (Kitchen Dashboard first: the page admins land on), Manage Days, Delivery Zones,
+ * The admin menu: Order (incl. Abandoned Checkout), Reporting (Kitchen Dashboard first: the page admins land on), Manage Days, Delivery Zones,
  * Food Catalog and User Administration. Pages that are no longer in the menu (the old stats Dashboard at
  * /admin/dashboard, Modifiers) still work when opened by their address.
  */
@@ -57,6 +57,7 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'Order', href: '/admin/orders', icon: IconShoppingCart },
       { title: 'Create Offline Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
+      { title: 'Abandoned Checkout', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
     ],
   },
   {
@@ -64,11 +65,10 @@ const adminNavItems: NavItem[] = [
     icon: IconChartBar,
     children: [
       { title: 'Kitchen Dashboard', href: '/admin/kitchen-dashboard', icon: IconChefHat },
-      { title: '(OLD) Ordered Items', href: '/admin/reports/ordered-items', icon: IconShoppingCart },
       { title: 'Kitchen Report', href: '/admin/reports/kitchen', icon: IconToolsKitchen2 },
       { title: 'Packing Report', href: '/admin/reports/packing', icon: IconPackage },
+      { title: '(OLD) Ordered Items', href: '/admin/reports/ordered-items', icon: IconShoppingCart },
       { title: '(OLD) Delivery Report', href: '/admin/reports/delivery', icon: IconMapPin },
-      { title: 'Abandoned Checkout', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
     ],
   },
   {
