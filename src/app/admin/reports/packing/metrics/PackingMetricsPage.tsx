@@ -178,7 +178,7 @@ function DetailDialog({ stack, onChange, onClose, token }: { stack: View[]; onCh
                 first={i === 0}
                 left={`${formatDayShort(r.date)} · ${r.driver}`}
                 sub={routeSub(r)}
-                right={r.customers ? `${formatDuration(r.averageMs)} avg` : '–'}
+                right={r.finishedAt ? `${formatDuration(r.routeMs)} total` : r.startedAt ? 'Packing…' : '–'}
                 onClick={() => onChange([...stack, { kind: 'customers', title: `${r.driver} · ${formatDayShort(r.date)}`, list: r.list, sort: 'order' }])}
               />
             ))}
@@ -304,7 +304,7 @@ export default function PackingMetricsPage() {
                 first={i === 0}
                 left={formatDayShort(d.date)}
                 sub={`${d.routes} route${d.routes === 1 ? '' : 's'} · ${d.customers} customers`}
-                right={d.customers ? `${formatDuration(d.averageMs)} avg` : '–'}
+                right={d.routeMs ? `${formatDuration(d.routeMs)} total` : '–'}
                 onClick={() => setStack([{ kind: 'routes', title: formatDayShort(d.date), runs: data.runs.filter((r) => r.date === d.date) }])}
               />
             ))}
@@ -316,7 +316,7 @@ export default function PackingMetricsPage() {
                 first={i === 0}
                 left={d.driver}
                 sub={`${d.routes} route${d.routes === 1 ? '' : 's'} · ${d.customers} customers`}
-                right={d.customers ? `${formatDuration(d.averageMs)} avg` : '–'}
+                right={d.routeMs ? `${formatDuration(d.routeMs)} total` : '–'}
                 onClick={() => setStack([{ kind: 'routes', title: d.driver, runs: data.runs.filter((r) => r.driver === d.driver) }])}
               />
             ))}
