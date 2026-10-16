@@ -7,12 +7,18 @@ import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, Dial
 import { IconArrowLeft } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
-import { formatDayShort, formatRangeLabel, getPresetRange, validateRange, type DayRange, type WeekPreset } from '@/utils/kitchenDashboard';
+import { addDays, formatDayShort, formatRangeLabel, getPresetRange, validateRange, type DayRange, type WeekPreset } from '@/utils/kitchenDashboard';
 import { formatPSTDateISO } from '@/utils/timezone';
 import { formatDuration } from '@/utils/packingProgress';
 import type { CustomerTime, PackingMetrics, RunSummary } from '@/utils/packingMetrics';
 
 const ORANGE = '#F89C35';
+type Preset = WeekPreset | 'today' | 'yesterday' | 'dayBefore';
+const DAY_PRESETS: Array<{ id: 'today' | 'yesterday' | 'dayBefore'; label: string; back: number }> = [
+  { id: 'today', label: 'Today', back: 0 },
+  { id: 'yesterday', label: 'Yesterday', back: 1 },
+  { id: 'dayBefore', label: 'Day before', back: 2 },
+];
 const PRESETS: Array<{ id: WeekPreset; label: string }> = [
   { id: 'thisWeek', label: 'This week' },
   { id: 'lastWeek', label: 'Last week' },
@@ -197,7 +203,7 @@ export default function PackingMetricsPage() {
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const today = useMemo(() => formatPSTDateISO(new Date()), []);
-  const [preset, setPreset] = useState<WeekPreset>('thisWeek');
+  const [preset, setPreset] = useState<Preset>('thisWeek');
   const [custom, setCustom] = useState<DayRange>(() => getPresetRange('lastWeek', formatPSTDateISO(new Date())));
   const [data, setData] = useState<(PackingMetrics & { from: string; to: string }) | null>(null);
   const [loading, setLoading] = useState(true);
@@ -205,7 +211,10 @@ export default function PackingMetricsPage() {
   const [stack, setStack] = useState<View[]>([]);
   const startRequest = useLatestRequest();
 
-  const range: DayRange = preset === 'custom' ? custom : getPresetRange(preset as Exclude<WeekPreset, 'custom'>, today);
+  const dayPreset = DAY_PRESETS.find((d) => d.id === preset);
+  const range: DayRange = dayPreset
+    ? { startDate: addDays(today, -dayPreset.back), endDate: addDays(today, -dayPreset.back) }
+    : preset === 'custom' ? custom : getPresetRange(preset as Exclude<WeekPreset, 'custom'>, today);
   const problem = preset === 'custom' ? validateRange(custom) : null;
 
   const load = useCallback(async () => {
@@ -252,6 +261,12 @@ export default function PackingMetricsPage() {
 
       <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+          {DAY_PRESETS.map((d) => {
+            const day = addDays(today, -d.back);
+            return (
+              <Chip key={d.id} label={`${d.label} · ${formatDayShort(day)}`} clickable onClick={() => setPreset(d.id)} variant={preset === d.id ? 'filled' : 'outlined'} sx={{ fontWeight: 600, ...(preset === d.id ? { bgcolor: ORANGE, color: '#fff', '&:hover': { bgcolor: '#E08A28' } } : {}) }} />
+            );
+          })}
           {PRESETS.map((p) => (
             <Chip key={p.id} label={p.label} clickable onClick={() => setPreset(p.id)} variant={preset === p.id ? 'filled' : 'outlined'} sx={{ fontWeight: 600, ...(preset === p.id ? { bgcolor: ORANGE, color: '#fff', '&:hover': { bgcolor: '#E08A28' } } : {}) }} />
           ))}
@@ -262,7 +277,7 @@ export default function PackingMetricsPage() {
             <TextField label="To" type="date" size="small" value={custom.endDate} onChange={(e) => setCustom({ ...custom, endDate: e.target.value })} InputLabelProps={{ shrink: true }} />
           </Box>
         )}
-        <Typography sx={{ fontSize: 14, color: problem ? '#B91C1C' : '#374151', fontWeight: 600, mt: 1.25 }}>{problem ?? formatRangeLabel(range)}</Typography>
+        <Typography sx={{ fontSize: 14, color: problem ? '#B91C1C' : '#374151', fontWeight: 600, mt: 1.25 }}>{problem ?? (range.startDate === range.endDate ? `${formatDayShort(range.startDate)}, ${range.startDate.slice(0, 4)}` : formatRangeLabel(range))}</Typography>
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
