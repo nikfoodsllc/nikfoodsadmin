@@ -15,11 +15,12 @@ function HeldCard({ customer, showDate }: { customer: HeldCustomer; showDate: bo
             <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#111827', wordBreak: 'break-word', lineHeight: 1.3 }}>{customer.customerName || 'Customer'}</Typography>
             <Typography sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{customer.orderIds.join(', ')}</Typography>
           </Box>
-          <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 800, color: '#92400E' }}>Goes out {customer.goesOutOn.map(formatDayShort).join(', ')}</Typography>
-            <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{units} unit{units === 1 ? '' : 's'}</Typography>
-          </Box>
+          <Typography sx={{ fontSize: 12, color: '#6B7280', flexShrink: 0, whiteSpace: 'nowrap' }}>{units} unit{units === 1 ? '' : 's'}</Typography>
         </Box>
+        {/* the day it goes out is the point of this list: a note under the name, not a label at the far edge */}
+        <Typography sx={{ mt: 0.75, px: 1.25, py: 0.6, bgcolor: '#FFFFFF', border: '1px solid #F5C77E', borderLeft: '4px solid #F89C35', borderRadius: 1, fontSize: 14, fontWeight: 800, color: '#92400E', lineHeight: 1.35 }}>
+          Goes out {customer.goesOutOn.map(formatDayShort).join(', ')}
+        </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 0.75, mt: 0.5 }}>
           {customer.alsoToday && <Chip size="small" label="Also delivering today (other items)" sx={{ height: 22, fontSize: 12, bgcolor: '#E2F4E7', color: '#126B2C', fontWeight: 600 }} />}
           <Typography sx={{ fontSize: 12, color: '#4B5563' }}>{reasons.join(' · ')}</Typography>
