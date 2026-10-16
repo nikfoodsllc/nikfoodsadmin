@@ -64,11 +64,83 @@ function Row({ left, sub, right, first, onClick }: { left: string; sub: string; 
 }
 
 /** What the tap opened: a list of customers or a list of routes, one level deep from a route into its customers. */
-type View = { kind: 'customers'; title: string; list: CustomerTime[]; sort: 'slow' | 'fast' | 'order' } | { kind: 'routes'; title: string; runs: RunSummary[] };
+type View = { kind: 'customers'; title: string; list: CustomerTime[]; sort: 'slow' | 'fast' | 'order' } | { kind: 'routes'; title: string; runs: RunSummary[] } | { kind: 'order'; title: string; customer: CustomerTime };
 
 const routeSub = (r: RunSummary) => `${r.customers} customer${r.customers === 1 ? '' : 's'} · ${r.units} unit${r.units === 1 ? '' : 's'}${r.packer ? ` · ${r.packer}` : ''}${r.startedAt ? ` · ${pacificTime(r.startedAt)}${r.finishedAt ? `–${pacificTime(r.finishedAt)}` : ' · still packing'}` : ''}`;
 
-function DetailDialog({ stack, onChange, onClose }: { stack: View[]; onChange: (next: View[]) => void; onClose: () => void }) {
+interface OrderLineItem {
+  name: string;
+  quantity: number;
+  portion: string;
+  spice: string;
+  eco: boolean;
+  notes: string;
+  choices: string[];
+}
+
+/** What one packed customer had in their order for that delivery day, next to the time it took. */
+function CustomerOrder({ customer, token }: { customer: CustomerTime; token: string | null }) {
+  const [orders, setOrders] = useState<Array<{ orderId: string; items: OrderLineItem[] }> | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!token || customer.orderIds.length === 0) return;
+    const controller = new AbortController();
+    fetch(`/api/admin/packing-metrics/order?date=${customer.date}&orderIds=${encodeURIComponent(customer.orderIds.join(','))}`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
+      .then(async (r) => {
+        const json = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(json.error || 'Could not load the order');
+        setOrders(json.data.orders);
+      })
+      .catch((e) => {
+        if (!(e instanceof DOMException && e.name === 'AbortError')) setError(e instanceof Error ? e.message : 'Could not load the order');
+      });
+    return () => controller.abort();
+  }, [customer, token]);
+  return (
+    <Box>
+      <Box sx={{ px: 2, py: 1.25, bgcolor: '#FFFBF2', borderBottom: '1px solid #F3F4F6' }}>
+        <Typography sx={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+          {customer.auto ? '~' : ''}
+          {formatDuration(customer.ms)}
+        </Typography>
+        <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
+          {formatDayShort(customer.date)} · {customer.driver} · {customer.units} unit{customer.units === 1 ? '' : 's'} · {customer.lines} line{customer.lines === 1 ? '' : 's'}
+          {customer.auto ? ' · average time (last customer)' : ''}
+        </Typography>
+      </Box>
+      {error && <Alert severity="error" sx={{ m: 1.5 }}>{error}</Alert>}
+      {!error && !orders && customer.orderIds.length > 0 && (
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress size={22} />
+        </Box>
+      )}
+      {customer.orderIds.length === 0 && <Typography sx={{ p: 2, color: '#9CA3AF' }}>No order is saved for this stop.</Typography>}
+      {orders?.map((o) => (
+        <Box key={o.orderId}>
+          <Typography sx={{ px: 2, pt: 1.25, pb: 0.5, fontSize: 12, fontWeight: 700, color: '#6B7280' }}>{o.orderId}</Typography>
+          {o.items.length === 0 && <Typography sx={{ px: 2, pb: 1.5, color: '#9CA3AF', fontSize: 14 }}>Nothing for this day.</Typography>}
+          {o.items.map((it, i) => (
+            <Box key={`${o.orderId}-${i}`} sx={{ display: 'flex', gap: 1.5, px: 2, py: 0.9, borderTop: '1px solid #F3F4F6' }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 800, minWidth: 28, fontVariantNumeric: 'tabular-nums' }}>{it.quantity}×</Typography>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, wordBreak: 'break-word' }}>{it.name}</Typography>
+                {[it.portion, it.spice, it.eco ? 'Eco' : ''].filter(Boolean).length > 0 && (
+                  <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{[it.portion, it.spice, it.eco ? 'Eco' : ''].filter(Boolean).join(' · ')}</Typography>
+                )}
+                {it.choices.map((c) => (
+                  <Typography key={c} sx={{ fontSize: 12, color: '#6B7280', wordBreak: 'break-word' }}>{c}</Typography>
+                ))}
+                {it.notes && <Typography sx={{ fontSize: 12, color: '#B45309', wordBreak: 'break-word' }}>Note: {it.notes}</Typography>}
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function DetailDialog({ stack, onChange, onClose, token }: { stack: View[]; onChange: (next: View[]) => void; onClose: () => void; token: string | null }) {
   const view = stack[stack.length - 1];
   if (!view) return null;
   const back = stack.length > 1 ? () => onChange(stack.slice(0, -1)) : undefined;
@@ -77,7 +149,9 @@ function DetailDialog({ stack, onChange, onClose }: { stack: View[]; onChange: (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm" scroll="paper">
       <DialogTitle sx={{ pb: 0.5 }}>{view.title}</DialogTitle>
       <DialogContent dividers sx={{ p: 0 }}>
-        {view.kind === 'customers' ? (
+        {view.kind === 'order' ? (
+          <CustomerOrder customer={view.customer} token={token} />
+        ) : view.kind === 'customers' ? (
           <>
             <Box sx={{ display: 'flex', gap: 1, p: 1.5, borderBottom: '1px solid #F3F4F6', flexWrap: 'wrap' }}>
               {([['slow', 'Slowest first'], ['fast', 'Fastest first'], ['order', 'In packing order']] as const).map(([id, label]) => (
@@ -86,7 +160,7 @@ function DetailDialog({ stack, onChange, onClose }: { stack: View[]; onChange: (
             </Box>
             {sortedList.length === 0 && <Typography sx={{ p: 2, color: '#9CA3AF' }}>No customers yet.</Typography>}
             {sortedList.map((c, i) => (
-              <Row key={`${c.date}-${c.driver}-${c.orderIds.join('_')}-${i}`} first={i === 0} left={`${i + 1}. ${c.name}`} sub={`${formatDayShort(c.date)} · ${c.driver} · ${c.units} unit${c.units === 1 ? '' : 's'}${c.orderIds.length ? ` · ${c.orderIds.join(', ')}` : ''}${c.auto ? ' · average time (last customer)' : ''}`} right={`${c.auto ? '~' : ''}${formatDuration(c.ms)}`} />
+              <Row key={`${c.date}-${c.driver}-${c.orderIds.join('_')}-${i}`} first={i === 0} left={`${i + 1}. ${c.name}`} sub={`${formatDayShort(c.date)} · ${c.driver} · ${c.units} unit${c.units === 1 ? '' : 's'}${c.orderIds.length ? ` · ${c.orderIds.join(', ')}` : ''}${c.auto ? ' · average time (last customer)' : ''}`} right={`${c.auto ? '~' : ''}${formatDuration(c.ms)}`} onClick={() => onChange([...stack, { kind: 'order', title: c.name, customer: c }])} />
             ))}
           </>
         ) : (
@@ -209,7 +283,7 @@ export default function PackingMetricsPage() {
           </Box>
 
           <Section title="By day">
-            {data.days.map((d, i) => (
+            {[...data.days].sort((x, y) => y.date.localeCompare(x.date)).map((d, i) => (
               <Row
                 key={d.date}
                 first={i === 0}
@@ -232,7 +306,7 @@ export default function PackingMetricsPage() {
               />
             ))}
           </Section>
-          <DetailDialog stack={stack} onChange={setStack} onClose={() => setStack([])} />
+          <DetailDialog stack={stack} onChange={setStack} onClose={() => setStack([])} token={token} />
         </>
       )}
     </Box>
