@@ -209,7 +209,7 @@ export default function PackingMetricsPage() {
           </Box>
 
           <Section title="By day">
-            {data.days.map((d, i) => (
+            {[...data.days].sort((x, y) => y.date.localeCompare(x.date)).map((d, i) => (
               <Row
                 key={d.date}
                 first={i === 0}
