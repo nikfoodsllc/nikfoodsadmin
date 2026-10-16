@@ -889,13 +889,13 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                   }}
                   size="small"
                 >
-                  <ToggleButton value="enabled" sx={{ textTransform: 'none' }}>
+                  <ToggleButton value="enabled" sx={{ textTransform: 'none', '&.Mui-selected': { bgcolor: '#1E8E3E', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#187533' } } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <IconCheck size={16} />
                       <span>Enabled</span>
                     </Box>
                   </ToggleButton>
-                  <ToggleButton value="disabled" sx={{ textTransform: 'none' }}>
+                  <ToggleButton value="disabled" sx={{ textTransform: 'none', '&.Mui-selected': { bgcolor: '#D32F2F', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#B71C1C' } } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <IconX size={16} />
                       <span>Disabled</span>
@@ -943,13 +943,13 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                   }}
                   size="small"
                 >
-                  <ToggleButton value="enabled" sx={{ textTransform: 'none' }}>
+                  <ToggleButton value="enabled" sx={{ textTransform: 'none', '&.Mui-selected': { bgcolor: '#1E8E3E', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#187533' } } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <IconCheck size={16} />
                       <span>Enabled</span>
                     </Box>
                   </ToggleButton>
-                  <ToggleButton value="disabled" sx={{ textTransform: 'none' }}>
+                  <ToggleButton value="disabled" sx={{ textTransform: 'none', '&.Mui-selected': { bgcolor: '#D32F2F', color: '#fff', fontWeight: 600, '&:hover': { bgcolor: '#B71C1C' } } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <IconX size={16} />
                       <span>Disabled</span>
