@@ -338,6 +338,31 @@ export default function PackLivePage() {
     else void goTo(index + 1);
   };
 
+  // "Not going out today": collapsed, read only. Shown with the driver choices at the top, and at the bottom while someone is packing.
+  const heldBox =
+    !loading && report?.held && report.held.customers.length > 0 ? (
+      <Paper elevation={0} sx={{ border: '1px solid #F5D98A', bgcolor: '#FFFBEB', borderRadius: 2, mb: 2, overflow: 'hidden' }}>
+        <Box
+          role="button"
+          tabIndex={0}
+          aria-expanded={heldOpen}
+          onClick={() => setHeldOpen((v) => !v)}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setHeldOpen((v) => !v))}
+          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 2, py: 1.25, cursor: 'pointer' }}
+        >
+          <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#92400E' }}>
+            Not going out today ({report.held.stats.customers} customer{report.held.stats.customers === 1 ? '' : 's'} · {report.held.stats.units} unit{report.held.stats.units === 1 ? '' : 's'})
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#92400E', fontWeight: 600 }}>{heldOpen ? 'Hide' : 'Show'}</Typography>
+        </Box>
+        {heldOpen && (
+          <Box sx={{ px: 1.5, pb: 1.5 }}>
+            <HeldList held={report.held} date={report.date} />
+          </Box>
+        )}
+      </Paper>
+    ) : null;
+
   const presets: Array<{ id: Preset; label: string }> = [
     { id: 'today', label: formatDayShort(today) },
     { id: 'tomorrow', label: formatDayShort(addDays(today, 1)) },
@@ -426,28 +451,7 @@ export default function PackLivePage() {
         </>
       )}
 
-      {!loading && pickerOpen && report?.held && report.held.customers.length > 0 && (
-        <Paper elevation={0} sx={{ border: '1px solid #F5D98A', bgcolor: '#FFFBEB', borderRadius: 2, mb: 2, overflow: 'hidden' }}>
-          <Box
-            role="button"
-            tabIndex={0}
-            aria-expanded={heldOpen}
-            onClick={() => setHeldOpen((v) => !v)}
-            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setHeldOpen((v) => !v))}
-            sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, px: 2, py: 1.25, cursor: 'pointer' }}
-          >
-            <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#92400E' }}>
-              Not going out today ({report.held.stats.customers} customer{report.held.stats.customers === 1 ? '' : 's'} · {report.held.stats.units} unit{report.held.stats.units === 1 ? '' : 's'})
-            </Typography>
-            <Typography sx={{ fontSize: 13, color: '#92400E', fontWeight: 600 }}>{heldOpen ? 'Hide' : 'Show'}</Typography>
-          </Box>
-          {heldOpen && (
-            <Box sx={{ px: 1.5, pb: 1.5 }}>
-              <HeldList held={report.held} date={report.date} />
-            </Box>
-          )}
-        </Paper>
-      )}
+      {pickerOpen && heldBox}
 
       {route && (
         <>
@@ -601,6 +605,8 @@ export default function PackLivePage() {
           )}
         </>
       )}
+
+      {!pickerOpen && heldBox && <Box sx={{ mt: 2, pb: 1 }}>{heldBox}</Box>}
 
       {status === 'packing' && stop && (
         <Box sx={{ position: 'fixed', left: { xs: 0, md: 270 }, right: 0, bottom: 0, zIndex: 1200, p: 1.25, bgcolor: '#fff', borderTop: '1px solid #E5E7EB', boxShadow: '0 -4px 16px rgba(0,0,0,0.08)', display: 'flex', gap: 1.25 }}>
