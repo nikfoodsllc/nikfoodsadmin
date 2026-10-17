@@ -236,6 +236,10 @@ export interface Order {
   paymentAttempts?: number; // Failed Stripe attempts (webhook count)
   clientPaymentErrors?: ClientPaymentError[]; // Last errors the checkout page reported (max 10)
   paymentActionRequiredAt?: Date | string; // Stripe asked for extra authentication (e.g. 3D Secure)
+  storeCreditUsed?: number; // Store credit that paid part (or all) of this order, in dollars; the card was charged the total minus this
+  storeCreditState?: 'held' | 'applied' | 'released'; // held while the card payment is open, applied once paid, released when given back
+  creditShortfall?: number; // dollars of store credit that could not be taken again when a retried payment succeeded
+  creditsIssued?: Array<{ at: string; by: string; note?: string; amount: number; items: Array<{ line: number; item: number; name: string; quantity: number; amount: number }> }>; // Store credit given for items of this order
   refundedAmount?: number; // Total refunded so far, in dollars (a partial refund keeps the order active)
   stripeFee?: number; // What Stripe charged us for this payment, in dollars (saved for orders paid after it was added)
   stripeNet?: number; // Amount that reached our balance after Stripe's fee, in dollars

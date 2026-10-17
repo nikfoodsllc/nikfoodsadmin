@@ -40,3 +40,22 @@ export async function forwardPostToLivesite(request: NextRequest, path: string, 
     return NextResponse.json({ success: false, error: 'Could not reach the customer site. Please try again.' }, { status: 502 });
   }
 }
+
+export async function forwardGetToLivesite(request: NextRequest, path: string, label: string): Promise<NextResponse> {
+  const auth = verifyAdminHeader(request);
+  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const response = await fetch(`${livesiteBase()}${path}`, { method: 'GET', headers: { Authorization: auth }, cache: 'no-store' });
+    const text = await response.text();
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = { success: false, error: 'The customer site did not answer properly. Please try again.' };
+    }
+    return NextResponse.json(body, { status: response.ok ? 200 : response.status });
+  } catch (error) {
+    console.error(`[${label}] could not reach the customer site`, error instanceof Error ? error.message : error);
+    return NextResponse.json({ success: false, error: 'Could not reach the customer site. Please try again.' }, { status: 502 });
+  }
+}

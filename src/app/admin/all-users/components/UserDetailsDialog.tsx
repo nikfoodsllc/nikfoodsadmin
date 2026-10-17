@@ -31,6 +31,7 @@ import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDate } from '@/utils/timezone';
 import { AddressEditor, ProfileEditor } from './UserEditSections';
 import SmsConsentSection from './SmsConsentSection';
+import StoreCreditSection from './StoreCreditSection';
 
 interface UserDetailsDialogProps {
   open: boolean;
@@ -294,6 +295,11 @@ export default function UserDetailsDialog({ open, user, onClose, startEditing, o
 
           {/* Text messages */}
           {userKey && <SmsConsentSection userId={userKey} token={token} />}
+
+          <Divider sx={{ marginY: 2 }} />
+
+          {/* Store credit */}
+          {userKey && <StoreCreditSection userId={userKey} token={token} />}
 
           <Divider sx={{ marginY: 2 }} />
 
