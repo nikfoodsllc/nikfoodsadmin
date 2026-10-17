@@ -294,6 +294,8 @@ export interface OrderListRow {
   linkViews?: { firstAt: string; lastAt: string; count: number };
   deliveryDates: string[];
   offlinePaymentNote?: string;
+  /** Store credit the customer applied on the pay page (the card pays the rest) */
+  storeCreditUsed?: number;
   /** What was ordered (missing from an older server) */
   details?: OrderDetails;
 }
