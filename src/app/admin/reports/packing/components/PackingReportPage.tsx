@@ -16,10 +16,11 @@ import { filterPackingReport, type PackLine, type PackRoute, type PackStop, type
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
 import ReportColumnsDialog from '../../kitchen/components/ReportColumnsDialog';
+import HeldList from './HeldList';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
 
-type TabId = 'routes' | 'totals';
+type TabId = 'routes' | 'totals' | 'held';
 type Preset = 'today' | 'tomorrow' | 'other';
 
 interface ReportData extends PackingReport {
@@ -65,7 +66,9 @@ function LineRow({ line }: { line: PackLine }) {
         {line.choices.map((c) => (
           <Typography key={c} sx={{ fontSize: 12, color: '#4B5563', wordBreak: 'break-word' }}>{c}</Typography>
         ))}
-        {line.pickedFor && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Picked for {formatDayShort(line.pickedFor)}</Typography>}
+        {line.pickedFor && (
+          <Typography sx={{ fontSize: 12, color: '#B45309' }}>{line.madeEarlier ? `Made ${formatDayShort(line.pickedFor)} · from the fridge` : `Picked for ${formatDayShort(line.pickedFor)}`}</Typography>
+        )}
       </Box>
     </Box>
   );
@@ -401,6 +404,7 @@ export default function PackingReportPage() {
       <Tabs className="no-print" value={tab} onChange={(_, v: TabId) => setTab(v)} sx={{ borderBottom: '1px solid #E5E7EB', mb: 2 }}>
         <Tab value="routes" label={`By route${data ? ` (${stopCount + (shown?.unrouted.length ?? 0)})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
         <Tab value="totals" label="Item totals" sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab value="held" label={`Not going out today${data?.held ? ` (${shown?.held?.customers.length ?? data.held.customers.length})` : ''}`} sx={{ textTransform: 'none', fontWeight: 600 }} />
       </Tabs>
 
       {loading && (
@@ -428,6 +432,7 @@ export default function PackingReportPage() {
         </>
       )}
       {!loading && shown && tab === 'totals' && <TotalsTab totals={shown.totals} searching={searching} />}
+      {!loading && shown && tab === 'held' && <HeldList held={shown.held} date={shown.date} searching={searching} />}
 
       <ReportColumnsDialog
         open={columnsOpen}

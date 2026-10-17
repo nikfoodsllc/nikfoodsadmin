@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { jwtHandler } from '@/lib/jwt';
-import { fetchPackingRows } from '@/lib/packingRows';
+import { fetchHeldRows, fetchPackingRows } from '@/lib/packingRows';
+import { buildHeldReport } from '@/utils/packingHeld';
 import { isDayString } from '@/utils/kitchenDashboard';
 import { buildPackingReport, type RosterRouteInput, type StopRecord } from '@/utils/packingReport';
 
@@ -20,7 +21,7 @@ function verifyAuth(request: NextRequest) {
  *
  * What to pack for one DELIVERY date, in route order: the order lines delivered that day, the roster (drivers and their stops)
  * the customer site copied from OptimoRoute once it had planned the routes (`optimoRosters`), and our record of which orders
- * sit in which stop (`optimoStops`). Read only.
+ * sit in which stop (`optimoStops`). Also `held`: the customers whose food is MADE on this date but goes out later. Read only.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -31,17 +32,20 @@ export async function GET(request: NextRequest) {
     if (!isDayString(date)) return NextResponse.json({ error: 'date must be a real day, YYYY-MM-DD' }, { status: 400 });
 
     const conn = await db.getDb();
-    const [rows, rosterDoc, stopDocs] = await Promise.all([
+    const [rows, heldRows, rosterDoc, stopDocs] = await Promise.all([
       fetchPackingRows(date),
+      fetchHeldRows(date),
       conn.collection('optimoRosters').findOne({ date }),
       conn.collection('optimoStops').find({ date, state: { $in: ['sent', 'adopted'] } }, { projection: { _id: 0, orderIds: 1, optimoId: 1, optimoOrderNo: 1 } }).toArray(),
     ]);
 
     const roster = (Array.isArray(rosterDoc?.routes) ? rosterDoc.routes : []) as RosterRouteInput[];
     const report = buildPackingReport(date, rows, roster, stopDocs as unknown as StopRecord[]);
+    const held = buildHeldReport(date, heldRows, rows);
     return NextResponse.json({
       data: {
         ...report,
+        held,
         roster: rosterDoc ? { fetchedAt: rosterDoc.fetchedAt ?? null, changedAt: rosterDoc.changedAt ?? null, drivers: roster.length } : null,
       },
       message: 'Packing report generated successfully',
