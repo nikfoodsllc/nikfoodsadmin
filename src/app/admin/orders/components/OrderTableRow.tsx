@@ -44,6 +44,7 @@ export default function OrderTableRow({
   const emailView = orderEmailStatusView(order.emailStatus, order.emailDelivery);
   const optimoView = orderOptimoView(order.optimo);
   const resched = rescheduleView(order);
+  const creditGiven = Math.round((order.creditsIssued ?? []).reduce((sum, c) => sum + (c.amount || 0), 0) * 100) / 100;
   const reschedTitle = resched.rescheduled
     ? `${resched.summary}${resched.lastBy ? ` \u00b7 moved by ${resched.lastBy}` : ''}${resched.email === 'pending' ? ' \u00b7 the customer has not been emailed yet' : resched.email === 'sent' ? ' \u00b7 the customer was emailed' : ''}`
     : 'The delivery date was never moved';
@@ -95,6 +96,17 @@ export default function OrderTableRow({
         >
           {order.orderId}
         </Typography>
+        {/* store credit: given for items of this order, and/or used to pay for it */}
+        {creditGiven > 0 && (
+          <Tooltip title="Store credit was given to the customer for items of this order">
+            <Chip size="small" label={`Credit given ${safeFormatCurrency(creditGiven)}`} sx={{ mt: 0.5, height: 20, fontSize: '11px', fontWeight: 600, bgcolor: '#DCFCE7', color: '#166534' }} />
+          </Tooltip>
+        )}
+        {(order.storeCreditUsed ?? 0) > 0 && order.storeCreditState !== 'released' && (
+          <Tooltip title="Store credit paid for part or all of this order">
+            <Chip size="small" label={`Credit used ${safeFormatCurrency(order.storeCreditUsed ?? 0)}`} sx={{ mt: 0.5, ml: creditGiven > 0 ? 0.5 : 0, height: 20, fontSize: '11px', fontWeight: 600, bgcolor: '#E0F2FE', color: '#075985' }} />
+          </Tooltip>
+        )}
       </TableCell>
     ),
     // Customer Name
