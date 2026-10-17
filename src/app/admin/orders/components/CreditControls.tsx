@@ -183,11 +183,13 @@ export function ItemActionsBar({ order, token, selected, onClear, onChanged }: O
         <ToggleButton value="move">Move delivery date</ToggleButton>
         <ToggleButton value="credit">Store credit</ToggleButton>
       </ToggleButtonGroup>
-      {mode === 'move' ? (
+      {/* both stay mounted, so what was typed or chosen in one is still there after a look at the other */}
+      <Box sx={{ display: mode === 'move' ? 'block' : 'none' }}>
         <MoveItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} plain />
-      ) : (
+      </Box>
+      <Box sx={{ display: mode === 'credit' ? 'block' : 'none' }}>
         <CreditItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} plain />
-      )}
+      </Box>
     </Box>
   );
 }
