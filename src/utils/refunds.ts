@@ -7,6 +7,8 @@ interface RefundableOrder {
   paymentStatus: PaymentStatus;
   totalPaid: number;
   refundedAmount?: number;
+  /** Store credit that paid part of the order: the card (and any Stripe refund) only covers the rest */
+  storeCreditUsed?: number;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -25,7 +27,8 @@ export function getRefundedAmount(order: RefundableOrder): number {
 
 /** The order total after refunds: 0 for a full refund, never negative. */
 export function getNetTotal(order: RefundableOrder): number {
-  return round2(Math.max(0, (order.totalPaid || 0) - getRefundedAmount(order)));
+  const cardTotal = Math.max(0, (order.totalPaid || 0) - (order.storeCreditUsed || 0));
+  return round2(Math.max(0, cardTotal - getRefundedAmount(order)));
 }
 
 /** A paid order with part of its total refunded shows "Partially refunded" instead of "Paid". */

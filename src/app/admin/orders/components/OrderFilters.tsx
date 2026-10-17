@@ -178,6 +178,7 @@ export default function OrderFilters({
             <MenuItem value="Other">Other</MenuItem>
             <MenuItem value="Cash on Delivery">Cash on Delivery</MenuItem>
             <MenuItem value="Quote">Quote</MenuItem>
+            <MenuItem value="Store Credit">Store Credit</MenuItem>
           </Select>
         </FormControl>
 
