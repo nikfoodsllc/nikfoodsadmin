@@ -7,6 +7,8 @@ import { MoveItemsBar } from './RescheduleControls';
 import { centsToMoney, creditPicks, entireOrderPreview, feeCreditCents, whyNotCreditable } from '@/utils/storeCredit';
 import { whyNotReschedulable } from '@/utils/orderReschedule';
 
+const toCentsText = (v: string): number => Math.round((Number(v) || 0) * 100 + 1e-9);
+
 async function postCredit(token: string | null, orderId: string, body: unknown) {
   const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/credit`, {
     method: 'POST',
@@ -35,12 +37,14 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
   const [note, setNote] = useState('');
   const [includeTax, setIncludeTax] = useState(false);
   const [includeFee, setIncludeFee] = useState(false);
+  /** Amounts the admin typed over the worked-out ones ('line:item' -> text) */
+  const [typed, setTyped] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
 
-  const picks = useMemo(() => creditPicks(order, selected, quantities, includeTax), [order, selected, quantities, includeTax]);
+  const picks = useMemo(() => creditPicks(order, selected, quantities, includeTax, Object.fromEntries(Object.entries(typed).map(([k, v]) => [k, Number(v)]))), [order, selected, quantities, includeTax, typed]);
   const feeCents = feeCreditCents(order);
   const total = picks.reduce((n, p) => n + p.cents, 0) + (includeFee ? feeCents : 0);
   if (whyNotCreditable(order) !== null) return null;
@@ -51,7 +55,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
     setError('');
     try {
       const data = await postCredit(token, order.orderId, {
-        items: picks.map((p) => ({ line: p.line, item: p.item, quantity: p.quantity })),
+        items: picks.map((p) => ({ line: p.line, item: p.item, quantity: p.quantity, ...(p.overridden ? { amount: p.cents / 100 } : {}) })),
         note: note.trim() || undefined,
         includeTax,
         includeFee: includeFee && feeCents > 0,
@@ -62,6 +66,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
       setNote('');
       setIncludeFee(false);
       setQuantities({});
+      setTyped({});
       onClear();
       await onChanged();
       setDone(`${centsToMoney(total)} credit given.${balance}${emailed}`);
@@ -97,7 +102,10 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
               <Select
                 size="small"
                 value={p.quantity}
-                onChange={(e) => setQuantities((prev) => ({ ...prev, [key(p)]: Number(e.target.value) }))}
+                onChange={(e) => {
+                  setQuantities((prev) => ({ ...prev, [key(p)]: Number(e.target.value) }));
+                  setTyped((prev) => { const next = { ...prev }; delete next[key(p)]; return next; });
+                }}
                 inputProps={{ 'aria-label': `How many ${p.name}` }}
                 sx={{ bgcolor: '#fff', minWidth: 70, '& .MuiSelect-select': { py: 0.5 } }}
               >
@@ -108,7 +116,26 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
                 ))}
               </Select>
             )}
-            <Typography sx={{ fontSize: 13, fontWeight: 700, minWidth: 64, textAlign: 'right' }}>{centsToMoney(p.cents)}</Typography>
+            <TextField
+              size="small"
+              value={typed[key(p)] ?? (p.cents / 100).toFixed(2)}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9.]/g, '').slice(0, 8);
+                setTyped((prev) => ({ ...prev, [key(p)]: v }));
+              }}
+              onBlur={() => {
+                // typing the worked-out amount again (or clearing the box) goes back to the automatic amount
+                const v = typed[key(p)];
+                if (v !== undefined && (v === '' || toCentsText(v) === creditPicks(order, [`${p.line}:${p.item}`], { [key(p)]: p.quantity }, includeTax)[0]?.cents)) {
+                  setTyped((prev) => { const next = { ...prev }; delete next[key(p)]; return next; });
+                }
+              }}
+              inputProps={{ inputMode: 'decimal', 'aria-label': `Amount to credit for ${p.name}`, style: { textAlign: 'right', padding: '4px 8px', width: 64, fontWeight: 700, fontSize: 13 } }}
+              InputProps={{ startAdornment: <Typography sx={{ fontSize: 13, color: '#6B7280' }}>$</Typography> }}
+              sx={{ bgcolor: '#fff', '& .MuiOutlinedInput-root': { pl: 1 } }}
+              color={p.overridden ? 'warning' : undefined}
+              focused={p.overridden ? true : undefined}
+            />
           </Box>
         ))}
       </Box>
@@ -141,7 +168,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
         </Button>
       </Box>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-        {includeTax ? 'The item price and the 10.3% tax on it.' : 'The item price only; its tax is withheld.'} {includeFee ? 'The Platform Fee and its tax are included.' : 'The Platform Fee and its tax are withheld.'} The tip is never credited.
+        {includeTax ? 'The item price and the 10.3% tax on it.' : 'The item price only; its tax is withheld.'}{picks.some((p) => p.overridden) ? ' An amount you typed replaces the worked-out one (at most the item price with tax).' : ''} {includeFee ? 'The Platform Fee and its tax are included.' : 'The Platform Fee and its tax are withheld.'} The tip is never credited.
       </Typography>
       {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
 
