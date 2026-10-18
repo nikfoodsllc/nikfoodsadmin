@@ -14,13 +14,21 @@ export function creditForItemCents(unitPrice: number, quantity: number, includeT
   return includeTax ? base + Math.round(base * CREDIT_TAX_RATE) : base;
 }
 
+/** The Platform Fee plus the 10.3% tax on it (credited only when the admin chooses, and only once per order). */
+export function creditForFeeCents(platformFee: number): number {
+  const base = toCents(platformFee);
+  return base > 0 ? base + Math.round(base * CREDIT_TAX_RATE) : 0;
+}
+
 export interface CreditOrderLike {
+  platformFee?: number | null;
+  platformFeeWaived?: boolean | null;
   status?: string | null;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   user?: string | null;
   items?: Array<{ items?: Array<{ quantity?: number | null; price?: number | null; food?: { name?: string | null } | null }> | null }> | null;
-  creditsIssued?: Array<{ items?: Array<{ line: number; item: number; quantity: number }> | null }> | null;
+  creditsIssued?: Array<{ fee?: number | null; items?: Array<{ line: number; item: number; quantity: number }> | null }> | null;
 }
 
 /** Why credit cannot be given on this order, or null when it can (the same rule the live site applies). */
@@ -73,6 +81,13 @@ export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quan
     picks.push({ line, item, name: dayItem.food?.name ?? 'Item', quantity, left, cents: creditForItemCents(dayItem.price ?? 0, quantity, includeTax) });
   }
   return picks.sort((a, b) => a.line - b.line || a.item - b.item);
+}
+
+/** What the Platform Fee credit would be, or 0 when there is none or it was already credited. */
+export function feeCreditCents(order: CreditOrderLike): number {
+  if (order.platformFeeWaived) return 0;
+  if ((order.creditsIssued ?? []).some((c) => (Number(c.fee) || 0) > 0)) return 0;
+  return creditForFeeCents(order.platformFee ?? 0);
 }
 
 export const centsToMoney = (cents: number): string => `$${(Math.round(cents) / 100).toFixed(2)}`;

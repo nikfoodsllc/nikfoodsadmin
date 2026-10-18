@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Radio, RadioGroup, Select, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel, MenuItem, Radio, RadioGroup, Select, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { Order } from '@/types/order';
 import { MoveItemsBar } from './RescheduleControls';
-import { centsToMoney, creditPicks, whyNotCreditable } from '@/utils/storeCredit';
+import { centsToMoney, creditPicks, feeCreditCents, whyNotCreditable } from '@/utils/storeCredit';
 import { whyNotReschedulable } from '@/utils/orderReschedule';
 
 async function postCredit(token: string | null, orderId: string, body: unknown) {
@@ -34,13 +34,15 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [note, setNote] = useState('');
   const [includeTax, setIncludeTax] = useState(false);
+  const [includeFee, setIncludeFee] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
 
   const picks = useMemo(() => creditPicks(order, selected, quantities, includeTax), [order, selected, quantities, includeTax]);
-  const total = picks.reduce((n, p) => n + p.cents, 0);
+  const feeCents = feeCreditCents(order);
+  const total = picks.reduce((n, p) => n + p.cents, 0) + (includeFee ? feeCents : 0);
   if (whyNotCreditable(order) !== null) return null;
   const key = (p: { line: number; item: number }) => `${p.line}:${p.item}`;
 
@@ -52,11 +54,13 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
         items: picks.map((p) => ({ line: p.line, item: p.item, quantity: p.quantity })),
         note: note.trim() || undefined,
         includeTax,
+        includeFee: includeFee && feeCents > 0,
       });
       const balance = typeof data.balance === 'number' ? ` Their balance is now ${centsToMoney(Math.round(data.balance * 100))}.` : '';
       const emailed = data.email?.sent ? ' The customer was emailed.' : ` The customer could not be emailed${data.email?.error ? ` (${data.email.error})` : ''}.`;
       setConfirmOpen(false);
       setNote('');
+      setIncludeFee(false);
       setQuantities({});
       onClear();
       await onChanged();
@@ -112,6 +116,13 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
         <FormControlLabel value="without" control={<Radio size="small" />} label={<Typography sx={{ fontSize: 13 }}>Withhold tax</Typography>} />
         <FormControlLabel value="with" control={<Radio size="small" />} label={<Typography sx={{ fontSize: 13 }}>Include tax (10.3%)</Typography>} />
       </RadioGroup>
+      {feeCents > 0 && (
+        <FormControlLabel
+          sx={{ mt: 0.25, ml: 0 }}
+          control={<Checkbox size="small" checked={includeFee} onChange={(e) => setIncludeFee(e.target.checked)} />}
+          label={<Typography sx={{ fontSize: 13 }}>Also credit the Platform Fee and its tax ({centsToMoney(feeCents)})</Typography>}
+        />
+      )}
       <TextField
         size="small"
         fullWidth
@@ -130,7 +141,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
         </Button>
       </Box>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-        {includeTax ? 'The item price and the 10.3% tax on it.' : 'The item price only; its tax is withheld.'} The Platform Fee, the tax on it and the tip are not credited.
+        {includeTax ? 'The item price and the 10.3% tax on it.' : 'The item price only; its tax is withheld.'} {includeFee ? 'The Platform Fee and its tax are included.' : 'The Platform Fee and its tax are withheld.'} The tip is never credited.
       </Typography>
       {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
 
@@ -138,7 +149,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
         <DialogTitle sx={{ fontWeight: 700 }}>Give {centsToMoney(total)} store credit?</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14, mb: 1 }}>
-            {order.customerInfo?.name || 'The customer'} gets the credit on their account for {picks.map((p) => `${p.quantity} × ${p.name}`).join(', ')}. It does not expire and cannot be turned into cash.
+            {order.customerInfo?.name || 'The customer'} gets the credit on their account for {[...picks.map((p) => `${p.quantity} × ${p.name}`), ...(includeFee && feeCents > 0 ? ['the Platform Fee'] : [])].join(', ')}. It does not expire and cannot be turned into cash.
           </Typography>
           <Typography sx={{ fontSize: 14, color: '#6B7280' }}>They are emailed about it. This cannot be undone here.</Typography>
         </DialogContent>
