@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel, MenuItem, Radio, RadioGroup, Select, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { Order } from '@/types/order';
 import { MoveItemsBar } from './RescheduleControls';
-import { centsToMoney, creditPicks, feeCreditCents, whyNotCreditable } from '@/utils/storeCredit';
+import { centsToMoney, creditPicks, entireOrderPreview, feeCreditCents, whyNotCreditable } from '@/utils/storeCredit';
 import { whyNotReschedulable } from '@/utils/orderReschedule';
 
 async function postCredit(token: string | null, orderId: string, body: unknown) {
@@ -170,7 +170,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
  * Shown while items are ticked in an order's details: move their delivery date and/or give store credit for them.
  * When the order allows both there is a switch; with one, just that bar.
  */
-export function ItemActionsBar({ order, token, selected, onClear, onChanged }: Omit<BarProps, 'plain'>) {
+function ItemActionsBarInner({ order, token, selected, onClear, onChanged }: Omit<BarProps, 'plain'>) {
   const canMove = whyNotReschedulable(order) === null;
   const canCredit = whyNotCreditable(order) === null;
   const [mode, setMode] = useState<'move' | 'credit'>(canMove ? 'move' : 'credit');
@@ -208,5 +208,74 @@ export function ItemActionsBar({ order, token, selected, onClear, onChanged }: O
         <CreditItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} plain />
       </Box>
     </Box>
+  );
+}
+
+/** One button to credit everything left on the order: all items with their tax, the Platform Fee with its tax, and the tip. */
+function EntireOrderCredit({ order, token, onChanged }: Pick<BarProps, 'order' | 'token' | 'onChanged'>) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+  const preview = useMemo(() => entireOrderPreview(order), [order]);
+  if (whyNotCreditable(order) !== null || preview.totalCents <= 0) return done ? <Alert severity="success" sx={{ mt: 1, py: 0 }}>{done}</Alert> : null;
+
+  const give = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await postCredit(token, order.orderId, { entireOrder: true, note: note.trim() || undefined });
+      const emailed = data.email?.sent ? ' The customer was emailed.' : ' The customer could not be emailed.';
+      setOpen(false);
+      setNote('');
+      await onChanged();
+      setDone(`${centsToMoney(preview.totalCents)} credit given for the entire order.${emailed}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not give the credit.');
+      setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Box sx={{ mt: 1 }}>
+      <Button variant="outlined" color="success" size="small" onClick={() => setOpen(true)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+        Credit entire order · {centsToMoney(preview.totalCents)}
+      </Button>
+      {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
+      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700 }}>Credit the entire order?</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1.5 }}>
+            <Typography sx={{ fontSize: 14 }}>Items and their 10.3% tax: {centsToMoney(preview.itemsCents)}</Typography>
+            {preview.feeCents > 0 && <Typography sx={{ fontSize: 14 }}>Platform Fee and its tax: {centsToMoney(preview.feeCents)}</Typography>}
+            {preview.tipCents > 0 && <Typography sx={{ fontSize: 14 }}>Tip: {centsToMoney(preview.tipCents)}</Typography>}
+            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Total: {centsToMoney(preview.totalCents)}</Typography>
+          </Box>
+          <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 1 }}>
+            {order.customerInfo?.name || 'The customer'} gets this as store credit. It does not expire, cannot be turned into cash, and they are emailed. This cannot be undone here.
+          </Typography>
+          <TextField size="small" fullWidth placeholder="Note for the customer (optional)" value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} inputProps={{ 'aria-label': 'Note for the customer' }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)} disabled={busy} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button variant="contained" color="success" onClick={give} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {busy ? <CircularProgress size={18} color="inherit" /> : 'Give credit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
+/** Shown in an order's details: the whole-order credit button, and (while items are ticked) the item actions. */
+export function ItemActionsBar(props: Omit<BarProps, 'plain'>) {
+  return (
+    <>
+      <EntireOrderCredit order={props.order} token={props.token} onChanged={props.onChanged} />
+      <ItemActionsBarInner {...props} />
+    </>
   );
 }
