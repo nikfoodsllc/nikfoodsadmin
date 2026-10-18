@@ -1,3 +1,4 @@
+import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
@@ -90,6 +91,8 @@ export async function GET(request: NextRequest) {
           'items.deliveryDate': dateFilter,
         },
       },
+      // items an admin gave store credit for are not made or delivered: they are left out
+      CREDIT_ADJUST_STAGE,
       // Preserve full OrderDay[] before unwinding for order-level delivery date columns
       { $addFields: { allOrderDays: '$items' } },
       // Unwind the items array to process each OrderDay separately

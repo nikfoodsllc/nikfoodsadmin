@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { verifyStaffRequest } from '@/lib/adminAuth';
 import { isDayString } from '@/utils/kitchenDashboard';
 import { PACKER_ORDER_PROJECTION, toPackerOrder } from '@/utils/packerOrders';
+import { withoutCreditedItems } from '@/lib/creditAdjust';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,14 @@ export async function GET(request: NextRequest) {
     if (!result.success) throw new Error(result.error || 'Failed to load orders');
 
     return NextResponse.json({
-      data: { items: (result.data ?? []).map(toPackerOrder), total: counted.count ?? 0, page, pageSize: limit },
+      data: { items: (result.data ?? [])
+          // items an admin gave store credit for are not packed; an order with nothing left drops out
+          .filter((raw) => {
+            const o = raw as { creditsIssued?: unknown[] };
+            if (!Array.isArray(o.creditsIssued) || o.creditsIssued.length === 0) return true;
+            return (withoutCreditedItems(raw as { items?: { items?: { quantity?: number }[] }[]; creditsIssued?: never }).items ?? []).length > 0;
+          })
+          .map((raw) => toPackerOrder(withoutCreditedItems(raw as { items?: { items?: { quantity?: number }[] }[]; creditsIssued?: never }))), total: counted.count ?? 0, page, pageSize: limit },
       message: 'Orders fetched successfully',
     });
   } catch (error) {
