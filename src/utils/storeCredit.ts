@@ -3,15 +3,15 @@
  * (see livesite/src/lib/storeCredit.ts and lib/server/storeCreditIssue.ts): keep these rules in step.
  *
  * A credited item is worth its price (portion and eco container included, as stored on the order line) x quantity,
- * plus the 10.3% tax charged on it. The Platform Fee, the tax on it and the tip are never credited.
+ * plus, only when the admin chooses, the 10.3% tax charged on it (withheld by default). The Platform Fee, the tax on it and the tip are never credited.
  */
 export const CREDIT_TAX_RATE = 0.103;
 
 export const toCents = (dollars: number): number => Math.round((Number(dollars) || 0) * 100 + 1e-9);
 
-export function creditForItemCents(unitPrice: number, quantity: number): number {
+export function creditForItemCents(unitPrice: number, quantity: number, includeTax = false): number {
   const base = toCents(unitPrice) * Math.max(0, Math.floor(Number(quantity) || 0));
-  return base + Math.round(base * CREDIT_TAX_RATE);
+  return includeTax ? base + Math.round(base * CREDIT_TAX_RATE) : base;
 }
 
 export interface CreditOrderLike {
@@ -61,7 +61,7 @@ export interface CreditPick {
 }
 
 /** The picked items ('line:item' keys) with how much each is worth; items already credited in full are skipped. */
-export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quantities: Record<string, number> = {}): CreditPick[] {
+export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quantities: Record<string, number> = {}, includeTax = false): CreditPick[] {
   const picks: CreditPick[] = [];
   for (const key of keys) {
     const [line, item] = key.split(':').map(Number);
@@ -70,7 +70,7 @@ export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quan
     const left = creditLeft(order, line, item);
     if (left === 0) continue;
     const quantity = Math.min(left, Math.max(1, Math.floor(quantities[key] ?? left)));
-    picks.push({ line, item, name: dayItem.food?.name ?? 'Item', quantity, left, cents: creditForItemCents(dayItem.price ?? 0, quantity) });
+    picks.push({ line, item, name: dayItem.food?.name ?? 'Item', quantity, left, cents: creditForItemCents(dayItem.price ?? 0, quantity, includeTax) });
   }
   return picks.sort((a, b) => a.line - b.line || a.item - b.item);
 }

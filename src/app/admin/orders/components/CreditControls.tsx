@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, MenuItem, Radio, RadioGroup, Select, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { Order } from '@/types/order';
 import { MoveItemsBar } from './RescheduleControls';
 import { centsToMoney, creditPicks, whyNotCreditable } from '@/utils/storeCredit';
@@ -33,12 +33,13 @@ interface BarProps {
 export function CreditItemsBar({ order, token, selected, onClear, onChanged, plain }: BarProps) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [note, setNote] = useState('');
+  const [includeTax, setIncludeTax] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
 
-  const picks = useMemo(() => creditPicks(order, selected, quantities), [order, selected, quantities]);
+  const picks = useMemo(() => creditPicks(order, selected, quantities, includeTax), [order, selected, quantities, includeTax]);
   const total = picks.reduce((n, p) => n + p.cents, 0);
   if (whyNotCreditable(order) !== null) return null;
   const key = (p: { line: number; item: number }) => `${p.line}:${p.item}`;
@@ -50,6 +51,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
       const data = await postCredit(token, order.orderId, {
         items: picks.map((p) => ({ line: p.line, item: p.item, quantity: p.quantity })),
         note: note.trim() || undefined,
+        includeTax,
       });
       const balance = typeof data.balance === 'number' ? ` Their balance is now ${centsToMoney(Math.round(data.balance * 100))}.` : '';
       const emailed = data.email?.sent ? ' The customer was emailed.' : ` The customer could not be emailed${data.email?.error ? ` (${data.email.error})` : ''}.`;
@@ -106,6 +108,10 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
           </Box>
         ))}
       </Box>
+      <RadioGroup row value={includeTax ? 'with' : 'without'} onChange={(e) => setIncludeTax(e.target.value === 'with')} aria-label="Tax on the credited items" sx={{ mt: 0.5 }}>
+        <FormControlLabel value="without" control={<Radio size="small" />} label={<Typography sx={{ fontSize: 13 }}>Withhold tax</Typography>} />
+        <FormControlLabel value="with" control={<Radio size="small" />} label={<Typography sx={{ fontSize: 13 }}>Include tax (10.3%)</Typography>} />
+      </RadioGroup>
       <TextField
         size="small"
         fullWidth
@@ -124,7 +130,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
         </Button>
       </Box>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-        The item price and the 10.3% tax on it. The Platform Fee, the tax on it and the tip are not credited.
+        {includeTax ? 'The item price and the 10.3% tax on it.' : 'The item price only; its tax is withheld.'} The Platform Fee, the tax on it and the tip are not credited.
       </Typography>
       {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
 
