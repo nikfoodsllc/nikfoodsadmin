@@ -26,6 +26,7 @@ import {
   IconChartBar,
   IconUsers,
   IconUserShield,
+  IconCoin,
   IconChevronDown,
   IconChevronRight,
   IconX,
@@ -95,6 +96,7 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'All Users', href: '/admin/all-users', icon: IconUsers },
       { title: 'Admin Users', href: '/admin/admin-users', icon: IconUserShield },
+      { title: 'Store Credit', href: '/admin/store-credit', icon: IconCoin },
     ],
   },
   {

@@ -672,6 +672,16 @@ export default function OrderDetailsDialog({
                 </Typography>
               </Box>
             )}
+            {(order.stripeRefunds ?? []).map((r) => (
+              <Box key={r.id} sx={{ backgroundColor: '#FFFBEB', borderRadius: 1, padding: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#92400E' }}>
+                  Refund in Stripe: {safeFormatCurrency(r.amount)}
+                  {r.reason ? ` (${r.reason.replace(/_/g, ' ')})` : ''}
+                </Typography>
+                {r.note && <Typography variant="body2" sx={{ color: '#78350F', overflowWrap: 'anywhere' }}>Note: {r.note}</Typography>}
+                <Typography variant="caption" sx={{ color: '#6B7280' }}>{new Date(r.at).toLocaleString()}</Typography>
+              </Box>
+            ))}
             {typeof order.paymentAttempts === 'number' && order.paymentAttempts > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" sx={{ color: '#6B7280' }}>Failed attempts</Typography>
