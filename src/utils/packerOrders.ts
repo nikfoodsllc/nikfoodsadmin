@@ -66,6 +66,10 @@ export const PACKER_ORDER_PROJECTION = {
   'items.items.food.sections.selectedItems.portion': 1,
   'items.items.food.sections.selectedItems.quantity': 1,
   'items.items.food.sections.selectedItems.item.name': 1,
+  // only to leave out items an admin gave store credit for (never sent on: toPackerOrder copies fields one by one)
+  'creditsIssued.items.line': 1,
+  'creditsIssued.items.item': 1,
+  'creditsIssued.items.quantity': 1,
 } as const;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
