@@ -68,7 +68,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: payment status', 'Refunded', 'Orders table, Payment Status', 'The whole amount was given back to the customer (done in the Stripe dashboard).', 'info'),
   e('Orders: money columns', 'Store Credit page (User Administration)', 'Menu > User Administration > Store Credit', 'Lists every customer who holds store credit with their balance, the total owed, and a search. Tap a customer to see everything that happened: credit given with the items, the order it was for and who gave it, credit used on orders, credit given back, and manual changes. "Change credit" adds or removes an amount (a reason is required).', undefined, 'store credit ledger balance history adjust'),
   e('Orders: payment status', 'Refund in Stripe (note)', 'Order details, Payment Information', 'Shows each refund made in the Stripe dashboard with its reason and the note written on it. It appears after Stripe tells us about the refund.', 'info', 'refund note stripe reason'),
-  e('Orders: payment status', 'Partially refunded', 'Orders table, Payment Status and filter', 'Part of the amount was given back. The order stays Paid for the rest; the "Refunded Amt" column and the order details show how much.', 'info', 'partial refund'),
+  e('Orders: payment status', 'Partially refunded', 'Orders table, Payment Status and filter', 'Part of the amount was given back. The order stays Paid for the rest; the "Refund/Credit" column and the order details show how much.', 'info', 'partial refund'),
 
   // ---- payment method
   e('Orders: payment method', 'Credit Card', 'Orders table, Payment Method', 'A plain card payment through Stripe.'),
@@ -129,13 +129,13 @@ export const GLOSSARY: GlossaryEntry[] = [
 
   // ---- money columns
   e('Orders: money columns', 'Subtotal', 'Orders table, order details', 'The food total before taxes, fees and tip.'),
-  e('Orders: money columns', 'Platform Fee', 'Orders table, order details', 'The customer-facing fee for digital payment processing: 4% of the subtotal plus $0.31. It does not depend on the tip. On the website and in emails it is included in "Taxes & Fees".'),
+  e('Orders: money columns', 'Platform Fee', 'Orders table, order details', 'The customer-facing fee for digital payment processing: 4% of the subtotal plus $0.31. It does not depend on the tip. When store credit pays part of an order, the fee is worked out only on the part paid by card (0 when credit pays everything), so it matches what Stripe charges. On the website and in emails it is included in "Taxes & Fees".'),
   e('Orders: money columns', 'Taxes', 'Orders table, order details', 'Sales tax, 10.3% of the subtotal plus the Platform Fee. On the website and in emails it is included in "Taxes & Fees".', undefined, 'tax 10.3'),
   e('Orders: money columns', 'Taxes & Fees', 'Website, emails, My Orders (customers see this one line)', 'What customers see instead of separate tax, Platform Fee and delivery fee lines: all of them added together. Admin screens keep the breakdown.'),
   e('Orders: money columns', 'Tip', 'Orders table, order details', 'The tip the customer chose at checkout (0, 5, 10 or 15% of the subtotal).'),
   e('Orders: money columns', 'Total Paid', 'Orders table, order details', 'Subtotal + Taxes + Platform Fee + Tip: what the customer was charged. After a refund, the order details also show "Refunded" and "Total after refund".'),
   e('Orders: money columns', 'Stripe Fee', 'Orders table', "What Stripe charged us for this payment (about 2.9% + 30 cents), saved when the payment succeeds. A dash means it is not saved: cash and other offline orders have none, and orders from before it was tracked have none."),
-  e('Orders: money columns', 'Refunded Amt', 'Orders table', 'How much of the order has been given back so far. Empty when nothing was refunded.'),
+  e('Orders: money columns', 'Refund/Credit', 'Orders table', 'How much of the order has been given back so far: money refunded in Stripe (red, with a minus) and store credit given for it (green, "Credit $X"). A dash when neither happened.'),
 
   // ---- card payment problems
   e('Orders: card payment problems', 'card_declined', 'Order details, Payment Information', "The card company declined the payment. The second code (decline code) says why.", 'bad'),

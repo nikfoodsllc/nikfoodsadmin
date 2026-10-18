@@ -32,7 +32,7 @@ export const ORDERS_COLUMNS: OrdersColumnDef[] = [
   { key: 'tax', label: 'Tax', defaultWidth: 70, align: 'right', skeleton: 'text', skeletonWidth: 50 },
   { key: 'tip', label: 'Tip', defaultWidth: 70, align: 'right', skeleton: 'text', skeletonWidth: 50 },
   { key: 'stripeFee', label: 'Stripe Fee', defaultWidth: 100, align: 'right', skeleton: 'text', skeletonWidth: 50 },
-  { key: 'refunded', label: 'Refunded Amt', defaultWidth: 115, align: 'right', skeleton: 'text', skeletonWidth: 55 },
+  { key: 'refunded', label: 'Refund/Credit', defaultWidth: 130, align: 'right', skeleton: 'text', skeletonWidth: 55 },
   { key: 'grandTotal', label: 'Grand Total', defaultWidth: 105, align: 'right', skeleton: 'text', skeletonWidth: 55 },
   { key: 'phone', label: 'Phone', defaultWidth: 120, skeleton: 'text', skeletonWidth: 85 },
   { key: 'email', label: 'Email', defaultWidth: 210, skeleton: 'text', skeletonWidth: 160 },
