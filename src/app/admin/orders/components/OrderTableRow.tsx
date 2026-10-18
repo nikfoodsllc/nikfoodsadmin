@@ -310,8 +310,11 @@ export default function OrderTableRow({
             color: refundedAmount > 0 ? '#B91C1C' : '#9CA3AF',
           }}
         >
-          {refundedAmount > 0 ? `-${safeFormatCurrency(refundedAmount)}` : '-'}
+          {refundedAmount > 0 ? `-${safeFormatCurrency(refundedAmount)}` : creditGiven > 0 ? '' : '-'}
         </Typography>
+        {creditGiven > 0 && (
+          <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#166534' }}>Credit {safeFormatCurrency(creditGiven)}</Typography>
+        )}
       </TableCell>
     ),
     // Grand Total (after refunds)
