@@ -22,6 +22,7 @@ export function creditForFeeCents(platformFee: number): number {
 
 export interface CreditOrderLike {
   platformFee?: number | null;
+  totalPaid?: number | null;
   tip?: number | null;
   platformFeeWaived?: boolean | null;
   status?: string | null;
@@ -61,6 +62,8 @@ export function creditLeft(order: CreditOrderLike, line: number, item: number): 
 }
 
 export interface CreditPick {
+  /** The amount was typed in by the admin instead of price x quantity (+ tax) */
+  overridden?: boolean;
   line: number;
   item: number;
   name: string;
@@ -70,7 +73,7 @@ export interface CreditPick {
 }
 
 /** The picked items ('line:item' keys) with how much each is worth; items already credited in full are skipped. */
-export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quantities: Record<string, number> = {}, includeTax = false): CreditPick[] {
+export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quantities: Record<string, number> = {}, includeTax = false, overrides: Record<string, number> = {}): CreditPick[] {
   const picks: CreditPick[] = [];
   for (const key of keys) {
     const [line, item] = key.split(':').map(Number);
@@ -79,7 +82,10 @@ export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quan
     const left = creditLeft(order, line, item);
     if (left === 0) continue;
     const quantity = Math.min(left, Math.max(1, Math.floor(quantities[key] ?? left)));
-    picks.push({ line, item, name: dayItem.food?.name ?? 'Item', quantity, left, cents: creditForItemCents(dayItem.price ?? 0, quantity, includeTax) });
+    const most = creditForItemCents(dayItem.price ?? 0, quantity, true);
+    const typed = overrides[key];
+    const overridden = typed !== undefined && Number.isFinite(typed) && toCents(typed) > 0;
+    picks.push({ line, item, name: dayItem.food?.name ?? 'Item', quantity, left, cents: overridden ? Math.min(toCents(typed), most) : creditForItemCents(dayItem.price ?? 0, quantity, includeTax), ...(overridden ? { overridden: true } : {}) });
   }
   return picks.sort((a, b) => a.line - b.line || a.item - b.item);
 }
@@ -116,6 +122,11 @@ export function entireOrderPreview(order: CreditOrderLike): EntireOrderPreview {
   const feeCents = feeCreditCents(order);
   const tipDone = (order.creditsIssued ?? []).some((c) => (Number(c.tip) || 0) > 0);
   const tipCents = tipDone ? 0 : toCents(order.tip ?? 0);
+  // nothing credited before: the credit is exactly what the customer paid (the items absorb the rounding of the taxes)
+  if (lines > 0 && (order.creditsIssued ?? []).length === 0 && order.totalPaid != null) {
+    const target = toCents(order.totalPaid) - feeCents - tipCents;
+    if (target > 0 && Math.abs(target - itemsCents) <= 100) itemsCents = target;
+  }
   return { itemsCents, feeCents, tipCents, totalCents: itemsCents + feeCents + tipCents, lines };
 }
 

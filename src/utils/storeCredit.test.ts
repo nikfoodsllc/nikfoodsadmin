@@ -32,6 +32,16 @@ describe('item credit', () => {
     const again = entireOrderPreview({ ...order, platformFee: 1.75, tip: 2, creditsIssued: [{ fee: 1.93, tip: 2, items: [] }] });
     expect(again.feeCents + again.tipCents).toBe(0);
   });
+  it('an amount typed by the admin replaces the worked-out one, capped at price with tax', () => {
+    const p = creditPicks(order, ['0:0'], {}, false, { '0:0': 7.5 })[0];
+    expect([p.cents, p.overridden]).toEqual([750, true]);
+    expect(creditPicks(order, ['0:0'], {}, false, { '0:0': 9999 })[0].cents).toBe(1103);
+    expect(creditPicks(order, ['0:0'], {}, false, { '0:0': 0 })[0].overridden).toBeUndefined();
+  });
+  it('the entire-order credit equals what was paid when nothing was credited before', () => {
+    const fresh = { ...order, creditsIssued: [], platformFee: 1.75, tip: 0, totalPaid: 24.43, items: [{ items: [{ quantity: 1, price: 20.5, food: { name: 'X' } }] }] };
+    expect(entireOrderPreview(fresh).totalCents).toBe(2443);
+  });
   it('knows what was credited and what is left', () => {
     expect(creditedQuantities(order).get('0:0')).toBe(1);
     expect(creditLeft(order, 0, 0)).toBe(1);
