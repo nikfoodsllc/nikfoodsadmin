@@ -742,8 +742,8 @@ export async function POST(request: NextRequest) {
       ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
       // a new item is on the Stickers sheet unless it was created with Sticker = No
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
-  ...(isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
-      ...(isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
+      // an item with no sticker has no split sticker either
+      ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -970,6 +970,8 @@ const updateData: Partial<FoodItem> = {
   spiceLevel: data.spiceLevel || [],
   ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
+  // an item with no sticker has no split sticker either; otherwise the Split Sticker choice is saved as sent
+  ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
   updatedAt: new Date(),
 };
 
@@ -1059,7 +1061,7 @@ const updateData: Partial<FoodItem> = {
     const unset: Record<string, ''> = {};
     if (data.preparationType === null) unset.preparationType = '';
     if (data.sticker === null) unset.sticker = '';
-    if (data.splitSticker === null) unset.splitSticker = '';
+    if (data.splitSticker === null && data.sticker !== 'no') unset.splitSticker = '';
     const updateResult = await db.updateOne<FoodItem>(
       'fooditems',
       { _id: new ObjectId(_id) },
