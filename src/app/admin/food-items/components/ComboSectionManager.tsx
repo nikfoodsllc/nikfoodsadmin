@@ -551,29 +551,6 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
                               </Box>
                             )}
 
-                            {/* How many of this item come with one combo (Chapati x 4); reports and the customer's cart multiply it */}
-                            <Box sx={{ flex: '0 0 110px' }}>
-                              <TextField
-                                label="Qty per combo"
-                                type="number"
-                                value={comboItem.quantity ?? 1}
-                                onChange={(e) => handleQuantityChange(sectionIndex, itemIndex, e.target.value)}
-                                onFocus={(e) => e.target.select()}
-                                disabled={disabled}
-                                size="small"
-                                inputProps={{ min: 1, max: 99, step: 1, 'aria-label': `Quantity of ${comboItem.item} per combo` }}
-                                fullWidth
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    backgroundColor: '#fff',
-                                    '&.Mui-focused fieldset': {
-                                      borderColor: '#4F8CFF',
-                                    },
-                                  },
-                                }}
-                              />
-                            </Box>
-
                             {/* Additional Price */}
                             <Box sx={{ flex: '0 0 120px' }}>
                               <TextField
@@ -586,6 +563,29 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
                                 disabled={disabled}
                                 size="small"
                                 inputProps={{ min: 0, step: 0.01 }}
+                                fullWidth
+                                sx={{
+                                  '& .MuiOutlinedInput-root': {
+                                    backgroundColor: '#fff',
+                                    '&.Mui-focused fieldset': {
+                                      borderColor: '#4F8CFF',
+                                    },
+                                  },
+                                }}
+                              />
+                            </Box>
+
+                            {/* How many of this item come with one combo (Chapati x 4); reports and the customer's cart multiply it */}
+                            <Box sx={{ flex: '0 0 110px' }}>
+                              <TextField
+                                label="Qty per combo"
+                                type="number"
+                                value={comboItem.quantity ?? 1}
+                                onChange={(e) => handleQuantityChange(sectionIndex, itemIndex, e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                disabled={disabled}
+                                size="small"
+                                inputProps={{ min: 1, max: 99, step: 1, 'aria-label': `Quantity of ${comboItem.item} per combo` }}
                                 fullWidth
                                 sx={{
                                   '& .MuiOutlinedInput-root': {

@@ -71,17 +71,29 @@ describe('validation', () => {
 
 describe('updating', () => {
   it('sets the flag on exactly the chosen items and nothing else', async () => {
-    const res = await PATCH(req({ body: { ids: [A, B], sticker: 'no' } }));
+    const res = await PATCH(req({ body: { ids: [A, B], sticker: 'yes' } }));
     expect(res.status).toBe(200);
     expect(update).toHaveBeenCalledTimes(1);
     const [collection, filter, change] = update.mock.calls[0];
     expect(collection).toBe('fooditems');
     expect(filter._id.$in.map(String)).toEqual([A, B]);
     expect(Object.keys(change)).toEqual(['$set']);
-    expect(change.$set.sticker).toBe('no');
+    expect(change.$set.sticker).toBe('yes');
     expect(Object.keys(change.$set).sort()).toEqual(['sticker', 'updatedAt']);
     const json = await res.json();
-    expect(json.data).toEqual({ requested: 2, modified: 2, sticker: 'no', field: 'sticker' });
+    expect(json.data).toEqual({ requested: 2, modified: 2, sticker: 'yes', field: 'sticker' });
+  });
+  it('Sticker = No also sets the Split Sticker to No', async () => {
+    const res = await PATCH(req({ body: { ids: [A, B], sticker: 'no' } }));
+    expect(res.status).toBe(200);
+    const [, , change] = update.mock.calls[update.mock.calls.length - 1];
+    expect(change.$set.sticker).toBe('no');
+    expect(change.$set.splitSticker).toBe('no');
+    expect(Object.keys(change.$set).sort()).toEqual(['splitSticker', 'sticker', 'updatedAt']);
+    // Split Sticker = No on its own does not touch the Sticker
+    await PATCH(req({ body: { ids: [A], sticker: 'no', field: 'splitSticker' } }));
+    const [, , own] = update.mock.calls[update.mock.calls.length - 1];
+    expect(Object.keys(own.$set).sort()).toEqual(['splitSticker', 'updatedAt']);
   });
   it('sets or clears the split sticker field only when asked', async () => {
     expect((await PATCH(req({ body: { ids: [A], sticker: 'yes', field: 'splitSticker' } }))).status).toBe(200);

@@ -80,7 +80,10 @@ export async function PATCH(request: NextRequest) {
       { _id: { $in: objectIds } },
       sticker === null
         ? { $unset: { [field]: '' }, $set: { updatedAt: new Date() } }
-        : { $set: { [field]: sticker, updatedAt: new Date() } }
+        : // Sticker = No also turns the Split Sticker off (no sticker, so nothing to split)
+          field === 'sticker' && sticker === 'no'
+          ? { $set: { sticker: 'no', splitSticker: 'no', updatedAt: new Date() } }
+          : { $set: { [field]: sticker, updatedAt: new Date() } }
     );
     if (!result.success) {
       throw new Error(result.error || 'Failed to update food items');
