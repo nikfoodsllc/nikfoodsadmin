@@ -10,6 +10,9 @@ interface HistoryRow {
   type: 'issued' | 'used' | 'restored' | 'adjusted';
   orderId?: string;
   reason?: string;
+  byName?: string;
+  items?: Array<{ name: string; quantity: number; amount: number }>;
+  order?: { placedAt?: string; total?: number; status?: string };
   balanceAfter?: number;
 }
 
@@ -21,12 +24,17 @@ function whenText(value: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 }
 
+function dayText(value: string): string {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+}
+
 /** All Users > customer details: the customer's store credit balance, what happened to it, and a manual change (reason required). */
-export default function StoreCreditSection({ userId, token }: { userId: string; token: string | null }) {
+export default function StoreCreditSection({ userId, token, detailed = false }: { userId: string; token: string | null; detailed?: boolean }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [error, setError] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(detailed);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -108,7 +116,7 @@ export default function StoreCreditSection({ userId, token }: { userId: string; 
             <Button size="small" variant="outlined" onClick={() => setAdjustOpen((v) => !v)} sx={{ textTransform: 'none' }}>
               Change credit
             </Button>
-            {history.length > 0 && (
+            {history.length > 0 && !detailed && (
               <Button size="small" onClick={() => setShowHistory((v) => !v)} sx={{ textTransform: 'none' }}>
                 {showHistory ? 'Hide history' : `History (${history.length})`}
               </Button>
@@ -138,10 +146,24 @@ export default function StoreCreditSection({ userId, token }: { userId: string; 
                       {LABEL[row.type]}
                       {row.orderId ? ` · ${row.orderId}` : ''}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#6B7280', overflowWrap: 'anywhere' }}>
+                    <Typography variant="caption" sx={{ color: '#6B7280', overflowWrap: 'anywhere', display: 'block' }}>
                       {whenText(row.at)}
+                      {row.byName ? ` · by ${row.byName}` : ''}
                       {row.reason ? ` · ${row.reason}` : ''}
                     </Typography>
+                    {row.order && (
+                      <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+                        Order {row.orderId}
+                        {row.order.placedAt ? ` placed ${dayText(row.order.placedAt)}` : ''}
+                        {typeof row.order.total === 'number' ? ` · total ${money(row.order.total)}` : ''}
+                        {row.order.status ? ` · ${row.order.status}` : ''}
+                      </Typography>
+                    )}
+                    {(row.items ?? []).map((it, i) => (
+                      <Typography key={i} variant="caption" sx={{ color: '#374151', display: 'block', pl: 1, overflowWrap: 'anywhere' }}>
+                        {it.quantity} × {it.name} · {money(it.amount)}
+                      </Typography>
+                    ))}
                   </Box>
                   <Typography variant="body2" sx={{ fontWeight: 600, color: row.amount >= 0 ? '#166534' : '#374151', whiteSpace: 'nowrap' }}>
                     {row.amount >= 0 ? '+' : '-'}
