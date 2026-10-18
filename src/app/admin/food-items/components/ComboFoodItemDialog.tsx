@@ -535,8 +535,8 @@ export default function ComboFoodItemDialog({
           />
 
           {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
-          <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value }))} disabled={loading} />
-          <StickerField label="Split Sticker" caption="Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount." value={formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading} />
+          <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
+          <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Not needed: this item has no sticker.' : 'Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount.'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
 
           <Divider />
 
