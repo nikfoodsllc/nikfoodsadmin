@@ -239,7 +239,7 @@ export interface Order {
   storeCreditUsed?: number; // Store credit that paid part (or all) of this order, in dollars; the card was charged the total minus this
   storeCreditState?: 'held' | 'applied' | 'released'; // held while the card payment is open, applied once paid, released when given back
   creditShortfall?: number; // dollars of store credit that could not be taken again when a retried payment succeeded
-  creditsIssued?: Array<{ at: string; by: string; note?: string; includeTax?: boolean; fee?: number; amount: number; items: Array<{ line: number; item: number; name: string; quantity: number; amount: number }> }>; // Store credit given for items of this order
+  creditsIssued?: Array<{ at: string; by: string; note?: string; includeTax?: boolean; fee?: number; tip?: number; entireOrder?: boolean; amount: number; items: Array<{ line: number; item: number; name: string; quantity: number; amount: number }> }>; // Store credit given for items of this order
   stripeRefunds?: Array<{ id: string; amount: number; at: string; reason?: string; note?: string; status?: string }>; // Refunds made in Stripe with the note written on each
   refundedAmount?: number; // Total refunded so far, in dollars (a partial refund keeps the order active)
   stripeFee?: number; // What Stripe charged us for this payment, in dollars (saved for orders paid after it was added)

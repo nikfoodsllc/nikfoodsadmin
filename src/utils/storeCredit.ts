@@ -22,13 +22,14 @@ export function creditForFeeCents(platformFee: number): number {
 
 export interface CreditOrderLike {
   platformFee?: number | null;
+  tip?: number | null;
   platformFeeWaived?: boolean | null;
   status?: string | null;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   user?: string | null;
   items?: Array<{ items?: Array<{ quantity?: number | null; price?: number | null; food?: { name?: string | null } | null }> | null }> | null;
-  creditsIssued?: Array<{ fee?: number | null; items?: Array<{ line: number; item: number; quantity: number }> | null }> | null;
+  creditsIssued?: Array<{ fee?: number | null; tip?: number | null; items?: Array<{ line: number; item: number; quantity: number }> | null }> | null;
 }
 
 /** Why credit cannot be given on this order, or null when it can (the same rule the live site applies). */
@@ -88,6 +89,34 @@ export function feeCreditCents(order: CreditOrderLike): number {
   if (order.platformFeeWaived) return 0;
   if ((order.creditsIssued ?? []).some((c) => (Number(c.fee) || 0) > 0)) return 0;
   return creditForFeeCents(order.platformFee ?? 0);
+}
+
+export interface EntireOrderPreview {
+  itemsCents: number;
+  feeCents: number;
+  tipCents: number;
+  totalCents: number;
+  /** Item lines still left to credit */
+  lines: number;
+}
+
+/** What crediting the whole order gives now: every item still left with its tax, the Platform Fee with its tax, and the tip (each fee/tip only if not credited before). */
+export function entireOrderPreview(order: CreditOrderLike): EntireOrderPreview {
+  let itemsCents = 0;
+  let lines = 0;
+  (order.items ?? []).forEach((day, line) =>
+    (day.items ?? []).forEach((it, item) => {
+      const left = creditLeft(order, line, item);
+      if (left > 0) {
+        itemsCents += creditForItemCents(it.price ?? 0, left, true);
+        lines += 1;
+      }
+    })
+  );
+  const feeCents = feeCreditCents(order);
+  const tipDone = (order.creditsIssued ?? []).some((c) => (Number(c.tip) || 0) > 0);
+  const tipCents = tipDone ? 0 : toCents(order.tip ?? 0);
+  return { itemsCents, feeCents, tipCents, totalCents: itemsCents + feeCents + tipCents, lines };
 }
 
 export const centsToMoney = (cents: number): string => `$${(Math.round(cents) / 100).toFixed(2)}`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centsToMoney, creditForFeeCents, creditForItemCents, creditLeft, feeCreditCents, creditPicks, creditedQuantities, whyNotCreditable } from './storeCredit';
+import { centsToMoney, creditForFeeCents, creditForItemCents, creditLeft, entireOrderPreview, feeCreditCents, creditPicks, creditedQuantities, whyNotCreditable } from './storeCredit';
 
 const order = {
   status: 'delivered',
@@ -23,6 +23,14 @@ describe('item credit', () => {
     expect(feeCreditCents({ ...order, platformFee: 1.75 })).toBe(193);
     expect(feeCreditCents({ ...order, platformFee: 1.75, platformFeeWaived: true })).toBe(0);
     expect(feeCreditCents({ ...order, platformFee: 1.75, creditsIssued: [{ fee: 1.93, items: [] }] })).toBe(0);
+  });
+  it('previews crediting the entire order', () => {
+    const p = entireOrderPreview({ ...order, platformFee: 1.75, tip: 2 });
+    expect(p.feeCents).toBe(193);
+    expect(p.tipCents).toBe(200);
+    expect(p.totalCents).toBe(p.itemsCents + 193 + 200);
+    const again = entireOrderPreview({ ...order, platformFee: 1.75, tip: 2, creditsIssued: [{ fee: 1.93, tip: 2, items: [] }] });
+    expect(again.feeCents + again.tipCents).toBe(0);
   });
   it('knows what was credited and what is left', () => {
     expect(creditedQuantities(order).get('0:0')).toBe(1);
