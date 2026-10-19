@@ -39,6 +39,7 @@ import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
 import { MoveItemsBar, RescheduleBanner, shortDate } from './RescheduleControls';
+import OrderTranscript from './OrderTranscript';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 import { comboQuantityText } from '@/utils/comboQuantity';
 
@@ -746,6 +747,11 @@ export default function OrderDetailsDialog({
             </Box>
           </>
         )}
+
+        <Divider sx={{ marginY: 2 }} />
+
+        {/* Everything that happened to the order */}
+        <OrderTranscript orderId={order.orderId} token={token} version={String(order.updatedAt ?? '')} />
 
         <Divider sx={{ marginY: 2 }} />
 

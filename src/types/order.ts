@@ -264,6 +264,8 @@ export interface Order {
   };
   paymentFailedEmailStatus?: EmailStatusInfo; // Track payment failed email status
   /** Delivery dates an admin moved (oldest first); each change keeps what the day line was before */
+  /** Status changes made in the admin (oldest first): who, when, from what */
+  statusHistory?: Array<{ at: Date | string; by?: { id?: string }; from?: string; to?: string }>;
   reschedules?: Array<{
     at: Date | string;
     by?: { id?: string; name?: string };
