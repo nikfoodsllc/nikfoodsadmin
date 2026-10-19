@@ -35,7 +35,7 @@ import DeleteConfirmDialog from './DeleteConfirmDialog';
 import TableFilters from './TableFilters';
 import { PreparationType } from '@/utils/preparationType';
 import { StickerFlag } from '@/utils/stickerFlag';
-import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, foodItemFilterParams } from './foodItemFilters';
+import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, buildCategoryTree, foodItemFilterParams, type CategoryTree } from './foodItemFilters';
 import TablePagination from './TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
@@ -211,6 +211,9 @@ export default function FoodItemsPage() {
   const [allFoodItems, setAllFoodItems] = useState<AllFoodItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategoryOption[]>([]);
+  // the categories as the Category / Sub Category filters need them
+  const [categoryTree, setCategoryTree] = useState<CategoryTree>({ children: new Map() });
+  const [categoryFilterOptions, setCategoryFilterOptions] = useState<{ top: Array<{ _id: string; name: string }>; subs: Array<{ _id: string; name: string; parentId: string; parentName: string }> }>({ top: [], subs: [] });
 
   const [loading, setLoading] = useState(true);
 
@@ -349,6 +352,21 @@ export default function FoodItemsPage() {
 
       setCategories(allCategories);
       setSubCategories(subs);
+      setCategoryTree(buildCategoryTree(raw));
+      const hasParent = (c: RawCategory) => c.parentCategoryId != null && String(c.parentCategoryId).trim() !== '';
+      // the same order as the Food Category page: by sequence, then name; sub-categories grouped under their category
+      const bySequence = (a: RawCategory & { sequence?: number }, b: RawCategory & { sequence?: number }) =>
+        (a.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sequence ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name);
+      const topList = raw.filter((c) => !hasParent(c)).sort(bySequence).map((c) => ({ _id: String(c._id), name: c.name }));
+      const nameOf = new Map(topList.map((c) => [c._id, c.name]));
+      const topRank = new Map(topList.map((c, i) => [c._id, i]));
+      setCategoryFilterOptions({
+        top: topList,
+        subs: raw
+          .filter(hasParent)
+          .sort((a, b) => (topRank.get(String(a.parentCategoryId)) ?? 1e9) - (topRank.get(String(b.parentCategoryId)) ?? 1e9) || bySequence(a, b))
+          .map((c) => ({ _id: String(c._id), name: c.name, parentId: String(c.parentCategoryId), parentName: nameOf.get(String(c.parentCategoryId)) ?? '' })),
+      });
     } catch (error) {
       console.error(error);
     }
@@ -365,7 +383,7 @@ export default function FoodItemsPage() {
         params.append('search', searchQuery);
       }
 
-      for (const [key, value] of foodItemFilterParams(filters)) {
+      for (const [key, value] of foodItemFilterParams(filters, categoryTree)) {
         params.append(key, value);
       }
 
@@ -399,6 +417,7 @@ export default function FoodItemsPage() {
     token,
     searchQuery,
     filters,
+    categoryTree,
     currentPage,
     itemsPerPage,
     beginRequest,
@@ -444,7 +463,7 @@ export default function FoodItemsPage() {
       setBulkLoading(true);
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      for (const [key, value] of foodItemFilterParams(filters)) params.append(key, value);
+      for (const [key, value] of foodItemFilterParams(filters, categoryTree)) params.append(key, value);
       params.append('page', '1');
       params.append('limit', '1000');
       const response = await fetch(`/api/admin/food-items?${params.toString()}`, {
@@ -809,6 +828,7 @@ export default function FoodItemsPage() {
         searchValue={searchBox.input}
         onSearchChange={(value) => searchBox.setInput(value)}
         filters={filters}
+        categoryOptions={categoryFilterOptions}
         onFilterChange={(key, value) => {
           setFilters((prev) => ({ ...prev, [key]: value }));
           setCurrentPage(1);
