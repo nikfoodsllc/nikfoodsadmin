@@ -354,11 +354,18 @@ export default function FoodItemsPage() {
       setSubCategories(subs);
       setCategoryTree(buildCategoryTree(raw));
       const hasParent = (c: RawCategory) => c.parentCategoryId != null && String(c.parentCategoryId).trim() !== '';
-      const topList = raw.filter((c) => !hasParent(c)).map((c) => ({ _id: String(c._id), name: c.name }));
+      // the same order as the Food Category page: by sequence, then name; sub-categories grouped under their category
+      const bySequence = (a: RawCategory & { sequence?: number }, b: RawCategory & { sequence?: number }) =>
+        (a.sequence ?? Number.MAX_SAFE_INTEGER) - (b.sequence ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name);
+      const topList = raw.filter((c) => !hasParent(c)).sort(bySequence).map((c) => ({ _id: String(c._id), name: c.name }));
       const nameOf = new Map(topList.map((c) => [c._id, c.name]));
+      const topRank = new Map(topList.map((c, i) => [c._id, i]));
       setCategoryFilterOptions({
         top: topList,
-        subs: raw.filter(hasParent).map((c) => ({ _id: String(c._id), name: c.name, parentId: String(c.parentCategoryId), parentName: nameOf.get(String(c.parentCategoryId)) ?? '' })),
+        subs: raw
+          .filter(hasParent)
+          .sort((a, b) => (topRank.get(String(a.parentCategoryId)) ?? 1e9) - (topRank.get(String(b.parentCategoryId)) ?? 1e9) || bySequence(a, b))
+          .map((c) => ({ _id: String(c._id), name: c.name, parentId: String(c.parentCategoryId), parentName: nameOf.get(String(c.parentCategoryId)) ?? '' })),
       });
     } catch (error) {
       console.error(error);
