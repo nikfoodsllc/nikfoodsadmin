@@ -11,6 +11,7 @@ interface HistoryRow {
   orderId?: string;
   reason?: string;
   byName?: string;
+  internalNote?: string;
   items?: Array<{ name: string; quantity: number; amount: number }>;
   order?: { placedAt?: string; total?: number; status?: string };
   balanceAfter?: number;
@@ -191,7 +192,14 @@ export default function StoreCreditSection({ userId, token, detailed = false }: 
                       </Box>
                     )}
 
-                    {row.reason && <Typography sx={{ fontSize: 12, color: '#6B7280', fontStyle: 'italic', mt: 1, overflowWrap: 'anywhere' }}>Note: {row.reason}</Typography>}
+                    {row.reason && (
+                      <Typography sx={{ fontSize: 12, color: '#6B7280', fontStyle: 'italic', mt: 1, overflowWrap: 'anywhere' }}>
+                        {row.type === 'issued' ? 'Note to customer' : 'Reason'}: {row.reason}
+                      </Typography>
+                    )}
+                    {row.internalNote && (
+                      <Typography sx={{ fontSize: 12, color: '#92400E', bgcolor: '#FEF3C7', borderRadius: 1, px: 1, py: 0.5, mt: 0.75, overflowWrap: 'anywhere' }}>Internal note: {row.internalNote}</Typography>
+                    )}
                     {row.balanceAfter !== undefined && <Typography sx={{ fontSize: 11, color: '#9CA3AF', mt: 0.75, textAlign: 'right' }}>Balance after: {money(row.balanceAfter)}</Typography>}
                   </Box>
                 );

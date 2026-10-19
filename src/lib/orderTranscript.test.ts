@@ -30,7 +30,7 @@ describe('buildOrderTranscript', () => {
     expect(events[2].text).toBe('Delivery date changed: 2 items moved from Thu, Oct 22 to Tue, Oct 20');
     expect(events[2].details).toEqual(['Kadhai Chicken', '2 × Spl. Punjabi Kadhi Pakora']);
     expect(events[2].by).toBe('Nikita');
-    expect(events[1].details).toContain('Note: late');
+    expect(events[1].details).toContain('Note to customer: late');
   });
   it('wording for store credit payments, an admin order, a failed email and a plain cancel', () => {
     const e = buildOrderTranscript({ createdAt: '2026-10-19T17:00:00Z', source: 'admin', createdByAdmin: 'x', paymentStatus: 'paid', totalPaid: 10, storeCreditUsed: 10, storeCreditState: 'applied', status: 'cancelled', updatedAt: '2026-10-20T00:00:00Z', emailStatus: { status: 'failed', lastAttempt: '2026-10-19T17:02:00Z', error: 'boom' } });
