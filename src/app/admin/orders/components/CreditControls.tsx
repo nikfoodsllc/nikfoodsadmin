@@ -35,6 +35,7 @@ interface BarProps {
 export function CreditItemsBar({ order, token, selected, onClear, onChanged, plain }: BarProps) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [note, setNote] = useState('');
+  const [internalNote, setInternalNote] = useState('');
   const [includeTax, setIncludeTax] = useState(false);
   const [includeFee, setIncludeFee] = useState(false);
   /** Amounts the admin typed over the worked-out ones ('line:item' -> text) */
@@ -57,6 +58,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
       const data = await postCredit(token, order.orderId, {
         items: picks.map((p) => ({ line: p.line, item: p.item, quantity: p.quantity, ...(p.overridden ? { amount: p.cents / 100 } : {}) })),
         note: note.trim() || undefined,
+        internalNote: internalNote.trim() || undefined,
         includeTax,
         includeFee: includeFee && feeCents > 0,
       });
@@ -64,6 +66,7 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
       const emailed = data.email?.sent ? ' The customer was emailed.' : ` The customer could not be emailed${data.email?.error ? ` (${data.email.error})` : ''}.`;
       setConfirmOpen(false);
       setNote('');
+      setInternalNote('');
       setIncludeFee(false);
       setQuantities({});
       setTyped({});
@@ -153,10 +156,19 @@ export function CreditItemsBar({ order, token, selected, onClear, onChanged, pla
       <TextField
         size="small"
         fullWidth
-        placeholder="Note for the customer (optional)"
+        placeholder="Note for the customer (optional): shown in their email and account"
         value={note}
         onChange={(e) => setNote(e.target.value.slice(0, 200))}
         inputProps={{ 'aria-label': 'Note for the customer' }}
+        sx={{ bgcolor: '#fff', mt: 1 }}
+      />
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="Internal note (optional): only admins see this"
+        value={internalNote}
+        onChange={(e) => setInternalNote(e.target.value.slice(0, 300))}
+        inputProps={{ 'aria-label': 'Internal note' }}
         sx={{ bgcolor: '#fff', mt: 1 }}
       />
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mt: 1 }}>
@@ -242,6 +254,7 @@ function ItemActionsBarInner({ order, token, selected, onClear, onChanged }: Omi
 function EntireOrderCredit({ order, token, onChanged }: Pick<BarProps, 'order' | 'token' | 'onChanged'>) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [internalNote, setInternalNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
@@ -252,10 +265,11 @@ function EntireOrderCredit({ order, token, onChanged }: Pick<BarProps, 'order' |
     setBusy(true);
     setError('');
     try {
-      const data = await postCredit(token, order.orderId, { entireOrder: true, note: note.trim() || undefined });
+      const data = await postCredit(token, order.orderId, { entireOrder: true, note: note.trim() || undefined, internalNote: internalNote.trim() || undefined });
       const emailed = data.email?.sent ? ' The customer was emailed.' : ' The customer could not be emailed.';
       setOpen(false);
       setNote('');
+      setInternalNote('');
       await onChanged();
       setDone(`${centsToMoney(preview.totalCents)} credit given for the entire order.${emailed}`);
     } catch (e) {
@@ -284,7 +298,8 @@ function EntireOrderCredit({ order, token, onChanged }: Pick<BarProps, 'order' |
           <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 1 }}>
             {order.customerInfo?.name || 'The customer'} gets this as store credit. It does not expire, cannot be turned into cash, and they are emailed. This cannot be undone here.
           </Typography>
-          <TextField size="small" fullWidth placeholder="Note for the customer (optional)" value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} inputProps={{ 'aria-label': 'Note for the customer' }} />
+          <TextField size="small" fullWidth placeholder="Note for the customer (optional): shown in their email and account" value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} inputProps={{ 'aria-label': 'Note for the customer' }} />
+          <TextField size="small" fullWidth placeholder="Internal note (optional): only admins see this" value={internalNote} onChange={(e) => setInternalNote(e.target.value.slice(0, 300))} inputProps={{ 'aria-label': 'Internal note' }} sx={{ mt: 1 }} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)} disabled={busy} sx={{ textTransform: 'none' }}>Cancel</Button>
