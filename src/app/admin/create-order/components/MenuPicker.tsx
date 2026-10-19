@@ -7,6 +7,8 @@ import {
   allMenuNodes,
   allNodeIds,
   dayMenuNodes,
+  defaultDayFor,
+  menuDayIndex,
   uniqueIds,
   filterNodes,
   isValidDate,
@@ -45,13 +47,15 @@ export default function MenuPicker({
   lines: CartLine[];
   /** Items already in the order, per day (shown on the day chips) */
   counts: Record<string, number>;
-  onAdd: (item: MenuItem) => void;
-  onRemove: (item: MenuItem) => void;
+  /** `forDate` is the day the item goes on (the item's menu day when looked up in the whole menu) */
+  onAdd: (item: MenuItem, forDate: string) => void;
+  onRemove: (item: MenuItem, forDate: string) => void;
 }) {
   const [view, setView] = useState<View>('day');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState<Set<string>>(() => new Set());
 
+  const menuDays = useMemo(() => menuDayIndex(catalog), [catalog]);
   const baseNodes = useMemo(() => (view === 'all' ? allMenuNodes(catalog) : dayMenuNodes(catalog, date)), [catalog, view, date]);
   const nodes = useMemo(() => filterNodes(baseNodes, catalog.items, search), [baseNodes, catalog.items, search]);
   const searching = search.trim().length > 0;
@@ -77,7 +81,10 @@ export default function MenuPicker({
   const renderItem = (id: string) => {
     const item = catalog.items[id];
     if (!item) return null;
-    const qty = quantityFor(lines, date, id);
+    // in the whole menu an item goes on the day it is on the menu (when that is not the day being worked on, the earliest one)
+    const days = view === 'all' ? menuDays.get(id) ?? [] : [];
+    const target = view === 'all' ? defaultDayFor(menuDays.get(id), date) : date;
+    const qty = quantityFor(lines, target, id);
     return (
       <Box key={id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
         <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: item.veg ? '#16A34A' : '#DC2626' }} aria-label={item.veg ? 'Vegetarian' : 'Non-vegetarian'} />
@@ -88,8 +95,30 @@ export default function MenuPicker({
             {item.hasCombo ? ' · combo' : ''}
             {(item as MenuItem & { available?: boolean }).available === false ? ' · hidden on the website' : ''}
           </Typography>
+          {view === 'all' && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5, alignItems: 'center' }}>
+              {days.length > 0 ? (
+                <>
+                  <Typography sx={{ fontSize: 11, color: '#6B7280', mr: 0.25 }}>Menu:</Typography>
+                  {days.map((d) => (
+                    <Chip
+                      key={d}
+                      size="small"
+                      label={dayChipLabel(d)}
+                      color={d === target ? 'warning' : 'default'}
+                      variant={d === target ? 'filled' : 'outlined'}
+                      onClick={() => onDate(d)}
+                      sx={{ height: 22, fontSize: 11, fontWeight: 700 }}
+                    />
+                  ))}
+                </>
+              ) : (
+                <Typography sx={{ fontSize: 11, color: '#6B7280' }}>Any day{date ? ` · adding to ${dayChipLabel(date)}` : ''}</Typography>
+              )}
+            </Box>
+          )}
         </Box>
-        <ItemStepper quantity={qty} hasOptions={needsOptions(item)} name={item.name} onAdd={() => onAdd(item)} onRemove={() => onRemove(item)} />
+        <ItemStepper quantity={qty} hasOptions={needsOptions(item)} name={item.name} onAdd={() => onAdd(item, target)} onRemove={() => onRemove(item, target)} />
       </Box>
     );
   };
@@ -97,7 +126,7 @@ export default function MenuPicker({
   const renderNode = (node: MenuNode, depth: number) => {
     const isOpen = expanded.has(node.id);
     // what is already in the order from this category, so it is visible while the category is closed
-    const inOrder = uniqueIds([node]).reduce((sum, id) => sum + quantityFor(lines, date, id), 0);
+    const inOrder = uniqueIds([node]).reduce((sum, id) => sum + quantityFor(lines, view === 'all' ? defaultDayFor(menuDays.get(id), date) : date, id), 0);
     return (
       <Box key={node.id} sx={{ mb: depth === 0 ? 1 : 0.5, ml: depth * 1.5 }}>
         <Box
@@ -171,7 +200,7 @@ export default function MenuPicker({
         <Button size="small" onClick={() => setOpen(new Set())} disabled={searching} sx={{ textTransform: 'none' }}>Collapse all</Button>
       </Box>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 1 }}>
-        {view === 'all' ? `Whole menu: ${totalItems} items` : `${totalItems} items on the menu for this day`} · adding to {date ? dayChipLabel(date) : 'no date'}
+        {view === 'all' ? `Whole menu: ${totalItems} items · each item goes on the day it is on the menu` : `${totalItems} items on the menu for this day · adding to ${date ? dayChipLabel(date) : 'no date'}`}
       </Typography>
 
       {nodes.length === 0 && <Typography sx={{ color: '#6B7280', fontSize: 14 }}>{searching ? 'Nothing matches your search.' : 'Nothing is on the menu for this day. Try "All menu".'}</Typography>}

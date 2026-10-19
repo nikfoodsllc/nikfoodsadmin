@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   addLine,
+  defaultDayFor,
+  menuDayIndex,
   estimateUnitPrice,
   itemGroupsForDay,
   lineSignature,
@@ -545,5 +547,32 @@ describe('delivery day per item', () => {
   it('makes a different line from the same pick delivered on its kitchen day', () => {
     expect(lineSignature({ ...base, deliverOn: '2026-10-16' })).not.toBe(lineSignature(base));
     expect(lineSignature({ ...base, deliverOn: '2026-10-14' })).toBe(lineSignature(base));
+  });
+});
+
+describe('menu day of an item', () => {
+  const catalog = {
+    items: {},
+    today: '2026-10-19',
+    dates: [],
+    categories: [
+      {
+        _id: 'fm', name: 'Food Menu', listingType: 'day-wise', flatItemIds: [], allItemIds: [], dayWise: { '2026-10-20': ['a'] },
+        children: [{ _id: 'mc', name: 'Main Course', listingType: 'day-wise', flatItemIds: [], allItemIds: [], dayWise: { '2026-10-22': ['a', 'b'], '2026-10-12': ['b'] }, children: [] }],
+      },
+      { _id: 'fl', name: 'Batters', listingType: 'flat', flatItemIds: ['c'], allItemIds: ['c'], dayWise: {}, children: [] },
+    ],
+  } as unknown as Parameters<typeof menuDayIndex>[0];
+  it('lists the upcoming days an item is on a day-wise menu, earliest first, never past days or flat items', () => {
+    const index = menuDayIndex(catalog);
+    expect(index.get('a')).toEqual(['2026-10-20', '2026-10-22']);
+    expect(index.get('b')).toEqual(['2026-10-22']);
+    expect(index.has('c')).toBe(false);
+  });
+  it('defaults to the day being worked on when the item is on it or has no menu day, else its earliest menu day', () => {
+    expect(defaultDayFor(['2026-10-20', '2026-10-22'], '2026-10-22')).toBe('2026-10-22');
+    expect(defaultDayFor(['2026-10-22'], '2026-10-20')).toBe('2026-10-22');
+    expect(defaultDayFor(undefined, '2026-10-20')).toBe('2026-10-20');
+    expect(defaultDayFor([], '2026-10-20')).toBe('2026-10-20');
   });
 });
