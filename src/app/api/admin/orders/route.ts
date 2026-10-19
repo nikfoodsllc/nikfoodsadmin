@@ -245,10 +245,18 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid Order ID format' }, { status: 400 });
       }
 
+      // the order's transcript keeps who changed the status and from what
+      const before = await db.readOne<Order>('orders', { _id: objectId } as Record<string, unknown>);
+      const now = new Date();
       const updateResult = await db.updateOne<Order>(
         'orders',
         { _id: objectId } as Record<string, unknown>,
-        { $set: { status, updatedAt: new Date() } }
+        {
+          $set: { status, updatedAt: now },
+          ...(before.success && before.data?.status !== status
+            ? { $push: { statusHistory: { at: now, by: { id: authResult.userId }, from: before.data?.status, to: status } } }
+            : {}),
+        } as never
       );
 
       if (!updateResult.success) {
@@ -305,7 +313,7 @@ export async function PUT(request: NextRequest) {
     const updateResult = await db.update<Order>(
       'orders',
       { _id: { $in: objectIds } } as Record<string, unknown>,
-      { $set: { status, updatedAt: new Date() } }
+      { $set: { status, updatedAt: new Date() }, $push: { statusHistory: { at: new Date(), by: { id: authResult.userId }, to: status } } } as never
     );
 
     if (!updateResult.success) {

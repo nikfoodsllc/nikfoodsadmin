@@ -40,6 +40,7 @@ import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
 import { RescheduleBanner, shortDate } from './RescheduleControls';
 import { ItemActionsBar } from './CreditControls';
+import OrderTranscript from './OrderTranscript';
 import { creditLeft, whyNotCreditable } from '@/utils/storeCredit';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 import { comboQuantityText } from '@/utils/comboQuantity';
@@ -801,6 +802,11 @@ export default function OrderDetailsDialog({
             </Box>
           </>
         )}
+
+        <Divider sx={{ marginY: 2 }} />
+
+        {/* Everything that happened to the order */}
+        <OrderTranscript orderId={order.orderId} token={token} version={String(order.updatedAt ?? '')} />
 
         <Divider sx={{ marginY: 2 }} />
 
