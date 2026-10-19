@@ -66,7 +66,7 @@ export default function OrderTranscript({ orderId, token, version }: { orderId: 
             <Box component="li" key={`${e.at}-${i}`} sx={{ display: 'flex', gap: 1.5, pb: i === shown.length - 1 ? 0 : 1.75, position: 'relative' }}>
               <Box sx={{ position: 'relative', width: 14, flexShrink: 0 }}>
                 <Box sx={{ position: 'absolute', top: 5, left: 2, width: 10, height: 10, borderRadius: '50%', bgcolor: TONE[e.kind].dot }} />
-                {i < shown.length - 1 && <Box sx={{ position: 'absolute', top: 18, bottom: -8, left: 6.5, width: 1, bgcolor: '#E5E7EB' }} />}
+                {i < shown.length - 1 && <Box sx={{ position: 'absolute', top: 18, bottom: -8, left: '6px', width: '2px', bgcolor: '#E5E7EB' }} />}
               </Box>
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#111827', overflowWrap: 'anywhere' }}>{e.text}</Typography>
