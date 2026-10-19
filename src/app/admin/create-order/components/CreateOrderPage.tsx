@@ -93,6 +93,8 @@ export default function CreateOrderPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // a refused order gets a message that cannot be missed (on a phone the summary with the red text sits in a drawer that has closed)
+  const [errorOpen, setErrorOpen] = useState(false);
   const [result, setResult] = useState<CreatedOrder | null>(null);
   // one id for this order form: the site refuses a second request with it, so a double tap or a retry cannot create the order twice
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
@@ -237,7 +239,10 @@ export default function CreateOrderPage() {
       setResult(r.body.data);
       setListVersion((v) => v + 1);
     }
-    else setSubmitError(r.body?.error || 'The order could not be created');
+    else {
+      setSubmitError(r.body?.error || 'The order could not be created');
+      setErrorOpen(true);
+    }
   };
 
   const reset = () => {
@@ -416,6 +421,26 @@ export default function CreateOrderPage() {
           setEditLine(null);
         }}
       />
+
+      <Dialog open={errorOpen} onClose={() => setErrorOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 800, color: '#B91C1C' }}>The order was NOT created</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: '#111827' }}>{submitError}</DialogContentText>
+          <DialogContentText sx={{ mt: 1, fontSize: 13 }}>Nothing was saved and nothing was sent. Fix this and press Create again.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setErrorOpen(false);
+              if (!wide) setDrawerOpen(true);
+            }}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Create this order?</DialogTitle>
