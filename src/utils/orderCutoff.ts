@@ -15,7 +15,7 @@ export const DEFAULT_CUTOFF_HOUR = 13;
 
 /** The two kinds of items that have their own cutoff. */
 export type ItemKind = 'flat' | 'day-wise';
-export const ITEM_KINDS: readonly ItemKind[] = ['flat', 'day-wise'];
+export const ITEM_KINDS: readonly ItemKind[] = ['day-wise', 'flat']; // day-wise is shown first everywhere
 /** Standard cutoff per kind: this hour (24h clock, Pacific) on the day before the delivery date. */
 export const DEFAULT_CUTOFF_HOUR_BY_KIND: Record<ItemKind, number> = { flat: 17, 'day-wise': 13 };
 /** What the admin calls each kind. */
