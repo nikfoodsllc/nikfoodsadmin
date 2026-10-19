@@ -631,20 +631,6 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 sx={{
                   width: 16,
                   height: 16,
-                  backgroundColor: '#DBEAFE',
-                  border: '2px solid #4F8CFF',
-                  borderRadius: 1,
-                }}
-              />
-              <Typography variant="caption" sx={{ color: '#374151', fontSize: '12px', fontWeight: 500 }}>
-                Flat
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <Box
-                sx={{
-                  width: 16,
-                  height: 16,
                   backgroundColor: '#EDE9FE',
                   border: '2px solid #8B5CF6',
                   borderRadius: 1,
@@ -652,6 +638,20 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
               />
               <Typography variant="caption" sx={{ color: '#374151', fontSize: '12px', fontWeight: 500 }}>
                 Day-wise
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box
+                sx={{
+                  width: 16,
+                  height: 16,
+                  backgroundColor: '#DBEAFE',
+                  border: '2px solid #4F8CFF',
+                  borderRadius: 1,
+                }}
+              />
+              <Typography variant="caption" sx={{ color: '#374151', fontSize: '12px', fontWeight: 500 }}>
+                Flat
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -784,8 +784,8 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                     {/* Status Indicators - only show for current month */}
                     {!dateData.isPadding && (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <KindChip label="Flat" state={flatState} onColor={{ bg: 'rgba(16, 185, 129, 0.2)', text: '#065F46', border: '#10B981' }} />
                         <KindChip label="Day-wise" state={dayWiseState} onColor={{ bg: 'rgba(139, 92, 246, 0.2)', text: '#5B21B6', border: '#8B5CF6' }} />
+                        <KindChip label="Flat" state={flatState} onColor={{ bg: 'rgba(16, 185, 129, 0.2)', text: '#065F46', border: '#10B981' }} />
                         {ITEM_KINDS.some((k) => parseCutoff(overrideForKind(dateData.availability, k))) && (
                           <Chip
                             icon={<IconClock size={12} />}
@@ -864,12 +864,12 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
               >
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                    Flat Category
+                    Day-wise Category
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                    Enable flat listing categories
+                    Enable day-wise listing categories
                   </Typography>
-                  {selectedDate && kindState(selectedDate, datesData[selectedDate], 'flat') === 'closed' && (
+                  {selectedDate && kindState(selectedDate, datesData[selectedDate], 'day-wise') === 'closed' && (
                     <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 600, display: 'block', mt: 0.25 }}>
                       Enabled, but closed for orders: the cutoff passed
                     </Typography>
@@ -877,14 +877,16 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 </Box>
                 <ToggleButtonGroup
                   value={
-                    selectedDate && datesData[selectedDate]?.flatCategoryEnabled ? 'enabled' : 'disabled'
+                    selectedDate && datesData[selectedDate]?.dayWiseCategoryEnabled
+                      ? 'enabled'
+                      : 'disabled'
                   }
                   exclusive
                   onChange={(event, value) => {
                     if (value && selectedDate) {
                       const enabled = value === 'enabled';
-                      const dayWiseEnabled = datesData[selectedDate]?.dayWiseCategoryEnabled ?? false;
-                      updateDateAvailability(selectedDate, enabled, dayWiseEnabled);
+                      const flatEnabled = datesData[selectedDate]?.flatCategoryEnabled ?? false;
+                      updateDateAvailability(selectedDate, flatEnabled, enabled);
                     }
                   }}
                   size="small"
@@ -916,12 +918,12 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
               >
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                    Day-wise Category
+                    Flat Category
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                    Enable day-wise listing categories
+                    Enable flat listing categories
                   </Typography>
-                  {selectedDate && kindState(selectedDate, datesData[selectedDate], 'day-wise') === 'closed' && (
+                  {selectedDate && kindState(selectedDate, datesData[selectedDate], 'flat') === 'closed' && (
                     <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 600, display: 'block', mt: 0.25 }}>
                       Enabled, but closed for orders: the cutoff passed
                     </Typography>
@@ -929,16 +931,14 @@ export default function AvailabilityCalendar({ onDateClick, initialMonth }: Avai
                 </Box>
                 <ToggleButtonGroup
                   value={
-                    selectedDate && datesData[selectedDate]?.dayWiseCategoryEnabled
-                      ? 'enabled'
-                      : 'disabled'
+                    selectedDate && datesData[selectedDate]?.flatCategoryEnabled ? 'enabled' : 'disabled'
                   }
                   exclusive
                   onChange={(event, value) => {
                     if (value && selectedDate) {
                       const enabled = value === 'enabled';
-                      const flatEnabled = datesData[selectedDate]?.flatCategoryEnabled ?? false;
-                      updateDateAvailability(selectedDate, flatEnabled, enabled);
+                      const dayWiseEnabled = datesData[selectedDate]?.dayWiseCategoryEnabled ?? false;
+                      updateDateAvailability(selectedDate, enabled, dayWiseEnabled);
                     }
                   }}
                   size="small"
