@@ -199,14 +199,19 @@ export default function CreateOrderPage() {
   const counts = useMemo(() => lines.reduce<Record<string, number>>((acc, l) => ({ ...acc, [l.date]: (acc[l.date] ?? 0) + l.quantity }), {}), [lines]);
   const missing = missingForCreate(customer, address, lines.length);
 
-  const choose = (item: MenuItem) => {
+  // the day the item being chosen goes on (an item picked from the whole menu goes on its own menu day)
+  const [optionsDate, setOptionsDate] = useState('');
+  const choose = (item: MenuItem, forDate: string = date) => {
+    // the picker follows the item, so the order and the picker show the same day
+    if (forDate && forDate !== date) setDate(forDate);
     if (needsOptions(item)) {
+      setOptionsDate(forDate);
       setOptionsItem(item);
       return;
     }
-    setLines((cur) => addLine(cur, { date, foodItemId: item._id, quantity: 1, name: item.name, unitPrice: estimateUnitPrice(item, {}), tags: lineTags(item, {}) }));
+    setLines((cur) => addLine(cur, { date: forDate, foodItemId: item._id, quantity: 1, name: item.name, unitPrice: estimateUnitPrice(item, {}), tags: lineTags(item, {}) }));
   };
-  const takeOne = (item: MenuItem) => setLines((cur) => removeOne(cur, date, item._id));
+  const takeOne = (item: MenuItem, forDate: string = date) => setLines((cur) => removeOne(cur, forDate, item._id));
 
   const submit = async () => {
     if (!token || submittingRef.current) return;
@@ -398,8 +403,8 @@ export default function CreateOrderPage() {
         open={Boolean(optionsItem) || Boolean(editItem)}
         item={editItem ?? optionsItem}
         editing={editItem ? editLine : null}
-        date={editItem && editLine ? editLine.date : date}
-        dayLabel={editItem && editLine ? dayChipLabel(editLine.date) : date ? dayChipLabel(date) : ''}
+        date={editItem && editLine ? editLine.date : optionsDate || date}
+        dayLabel={editItem && editLine ? dayChipLabel(editLine.date) : (optionsDate || date) ? dayChipLabel(optionsDate || date) : ''}
         onClose={() => {
           setOptionsItem(null);
           setEditLine(null);

@@ -465,6 +465,38 @@ export function dayMenuNodes(catalog: CatalogPayload, date: string): MenuNode[] 
     .filter((n): n is MenuNode => n !== null);
 }
 
+/**
+ * The upcoming menu days of every item that is on a day-wise menu: item id -> days (YYYY-MM-DD, today or later, earliest first).
+ * Items of flat categories (any day) are not in it.
+ */
+export function menuDayIndex(catalog: CatalogPayload): Map<string, string[]> {
+  const index = new Map<string, Set<string>>();
+  const walk = (cat: CatalogCategory) => {
+    if (cat.listingType === 'day-wise') {
+      for (const [day, ids] of Object.entries(cat.dayWise ?? {})) {
+        if (day < catalog.today) continue;
+        for (const id of ids) {
+          const set = index.get(id) ?? new Set<string>();
+          set.add(day);
+          index.set(id, set);
+        }
+      }
+    }
+    for (const child of cat.children ?? []) walk(child);
+  };
+  for (const c of catalog.categories) walk(c);
+  return new Map([...index].map(([id, days]) => [id, [...days].sort()]));
+}
+
+/**
+ * The day an item should be added to: the day being worked on when the item is on that day's menu (or has no menu day),
+ * otherwise the earliest upcoming day it is on the menu.
+ */
+export function defaultDayFor(menuDays: string[] | undefined, currentDate: string): string {
+  if (!menuDays || menuDays.length === 0 || !currentDate || menuDays.includes(currentDate)) return currentDate;
+  return menuDays[0];
+}
+
 /** Every item of every category, whatever its date. */
 export function allMenuNodes(catalog: CatalogPayload): MenuNode[] {
   return catalog.categories.map((c) => toNode(c, (cat) => cat.allItemIds ?? [], null, false)).filter((n): n is MenuNode => n !== null);
