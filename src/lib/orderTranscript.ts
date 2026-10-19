@@ -208,5 +208,7 @@ export function buildOrderTranscript(order: TranscriptOrder, names: Record<strin
 
   if (order.deliveredAt) add(order.deliveredAt, { kind: 'delivery', text: 'Order delivered', by: order.deliveredBy === 'optimoroute' ? 'OptimoRoute' : who(order.deliveredBy, names) });
 
-  return events.sort((a, b) => b.at.localeCompare(a.at));
+  // newest first; events at the same moment keep the order they happen in (placed, paid, then the rest)
+  const rank: Record<TranscriptKind, number> = { order: 0, payment: 1, email: 2, date: 3, credit: 3, refund: 3, route: 3, status: 4, delivery: 5, cancel: 5 };
+  return events.sort((a, b) => b.at.localeCompare(a.at) || rank[b.kind] - rank[a.kind]);
 }
