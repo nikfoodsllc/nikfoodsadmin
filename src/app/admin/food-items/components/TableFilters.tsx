@@ -9,10 +9,13 @@ interface TableFiltersProps {
   onSearchChange: (value: string) => void;
   filters: FoodItemFilters;
   onFilterChange: <K extends keyof FoodItemFilters>(key: K, value: FoodItemFilters[K]) => void;
+  /** Top-level categories and sub-categories (with their parent), for the Category and Sub Category filters */
+  categoryOptions?: { top: Array<{ _id: string; name: string }>; subs: Array<{ _id: string; name: string; parentId: string; parentName: string }> };
 }
 
 /** One dropdown per table column that can be filtered; the labels are the column names. */
-export default function TableFilters({ searchValue, onSearchChange, filters, onFilterChange }: TableFiltersProps) {
+export default function TableFilters({ searchValue, onSearchChange, filters, onFilterChange, categoryOptions }: TableFiltersProps) {
+  const subsShown = (categoryOptions?.subs ?? []).filter((s) => filters.category === 'all' || s.parentId === filters.category);
   const selectSx = { backgroundColor: '#fff' };
   return (
     <Box
@@ -59,6 +62,42 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="false">Unavailable</MenuItem>
         </Select>
       </FormControl>
+
+      {/* Category, then Sub Category (only the sub-categories of the picked category) */}
+      {categoryOptions && categoryOptions.top.length > 0 && (
+        <>
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={filters.category}
+              label="Category"
+              onChange={(e) => {
+                onFilterChange('category', e.target.value as string);
+                onFilterChange('subCategory', 'all');
+              }}
+              sx={selectSx}
+            >
+              <MenuItem value="all">All</MenuItem>
+              {categoryOptions.top.map((c) => (
+                <MenuItem key={c._id} value={c._id}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 190 }}>
+            <InputLabel>Sub Category</InputLabel>
+            <Select value={filters.subCategory} label="Sub Category" onChange={(e) => onFilterChange('subCategory', e.target.value as string)} sx={selectSx}>
+              <MenuItem value="all">All</MenuItem>
+              {subsShown.map((s) => (
+                <MenuItem key={s._id} value={s._id}>
+                  {filters.category === 'all' ? `${s.parentName} › ${s.name}` : s.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </>
+      )}
 
       {/* Veg/Non-Veg */}
       <FormControl size="small" sx={{ minWidth: 150 }}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FOOD_ITEM_FILTERS, foodItemFilterParams, hasActiveFilters } from './foodItemFilters';
+import { DEFAULT_FOOD_ITEM_FILTERS, buildCategoryTree, categoryFilterIds, foodItemFilterParams, hasActiveFilters } from './foodItemFilters';
 
 describe('foodItemFilterParams', () => {
   it('sends nothing when every filter is off', () => {
@@ -21,11 +21,32 @@ describe('foodItemFilterParams', () => {
   });
 
   it('sends all four together', () => {
-    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', sticker: 'all', splitSticker: 'all' })).toEqual([
+    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', sticker: 'all', splitSticker: 'all', category: 'all', subCategory: 'all' })).toEqual([
       ['veg', 'true'],
       ['available', 'false'],
       ['itemType', 'combo'],
       ['preparationType', 'cooked'],
     ]);
+  });
+});
+
+describe('category filters', () => {
+  const tree = buildCategoryTree([
+    { _id: 'app' },
+    { _id: 'veg-app', parentCategoryId: 'app' },
+    { _id: 'nonveg-app', parentCategoryId: 'app' },
+    { _id: 'sweets' },
+  ]);
+  it('a category matches itself and all its sub-categories', () => {
+    expect(categoryFilterIds({ category: 'app', subCategory: 'all' }, tree)).toEqual(['app', 'veg-app', 'nonveg-app']);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, category: 'app' }, tree)).toEqual([['category', 'app,veg-app,nonveg-app']]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, category: 'sweets' }, tree)).toEqual([['category', 'sweets']]);
+  });
+  it('a sub-category matches only itself, even with its category picked', () => {
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, category: 'app', subCategory: 'veg-app' }, tree)).toEqual([['category', 'veg-app']]);
+    expect(hasActiveFilters({ ...DEFAULT_FOOD_ITEM_FILTERS, subCategory: 'veg-app' })).toBe(true);
+  });
+  it('with both off nothing is sent', () => {
+    expect(categoryFilterIds(DEFAULT_FOOD_ITEM_FILTERS, tree)).toEqual([]);
   });
 });

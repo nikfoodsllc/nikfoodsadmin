@@ -500,9 +500,16 @@ export async function GET(request: NextRequest) {
     // We'll fetch the food item IDs from the mapping collection first
     let categoryFoodItemIds: ObjectId[] | null = null;
     if (categoryId) {
-      const categoryIdObj = new ObjectId(categoryId);
+      // one category id, or several separated by commas (a category and its sub-categories): an item in any of them matches
+      const categoryIdObjs = categoryId
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (categoryIdObjs.length === 0 || categoryIdObjs.length > 100 || categoryIdObjs.some((id) => !ObjectId.isValid(id))) {
+        return NextResponse.json({ error: 'category must be one or more category ids' }, { status: 400 });
+      }
       const mappingResult = await db.read<CategoryFoodMapping>('categoryfoodmapping', {
-        categoryId: categoryIdObj
+        categoryId: { $in: categoryIdObjs.map((id) => new ObjectId(id)) }
       });
 
       if (mappingResult.success && mappingResult.data) {
