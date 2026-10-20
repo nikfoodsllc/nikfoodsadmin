@@ -273,6 +273,8 @@ export interface Order {
   /** Delivery dates an admin moved (oldest first); each change keeps what the day line was before */
   /** Status changes made in the admin (oldest first): who, when, from what */
   statusHistory?: Array<{ at: Date | string; by?: { id?: string }; from?: string; to?: string }>;
+  /** Delivery address changes made in the admin (oldest first): who, when and {field: [before, after]} */
+  addressChanges?: Array<{ at: Date | string; by?: { id?: string; name?: string }; changes: Record<string, [string, string]> }>;
   reschedules?: Array<{
     at: Date | string;
     by?: { id?: string; name?: string };

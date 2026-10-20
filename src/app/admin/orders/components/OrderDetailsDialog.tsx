@@ -40,6 +40,7 @@ import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
 import { RescheduleBanner, shortDate } from './RescheduleControls';
 import { ItemActionsBar } from './CreditControls';
+import AddressEditor from './AddressEditor';
 import OrderTranscript from './OrderTranscript';
 import { creditLeft, whyNotCreditable } from '@/utils/storeCredit';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
@@ -275,12 +276,15 @@ export default function OrderDetailsDialog({
 
         {/* Delivery Address */}
        <Box sx={{ marginBottom: 3 }}>
-  <Typography
-    variant="subtitle2"
-    sx={{ fontWeight: 600, marginBottom: 1.5, color: '#111827' }}
-  >
-    Delivery Address
-  </Typography>
+  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, marginBottom: 1.5 }}>
+    <Typography
+      variant="subtitle2"
+      sx={{ fontWeight: 600, color: '#111827' }}
+    >
+      Delivery Address
+    </Typography>
+    <AddressEditor order={order} token={token} onChanged={async () => { await onOrderChanged?.(); }} />
+  </Box>
 
   <Box
     sx={{
@@ -332,6 +336,16 @@ export default function OrderDetailsDialog({
         Gate Code: {order.address.entrance}
       </Typography>
     )}
+
+    {order.addressChanges && order.addressChanges.length > 0 && (() => {
+      const last = order.addressChanges[order.addressChanges.length - 1];
+      const when = new Date(last.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+      return (
+        <Typography variant="caption" sx={{ color: '#B45309', display: 'block', mt: 1 }}>
+          Address changed {when} PT{last.by?.name ? ` by ${last.by.name}` : ''}
+        </Typography>
+      );
+    })()}
 
     {/* landmark */}
     {order.address.landmark && (
