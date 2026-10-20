@@ -6,6 +6,7 @@ import { ObjectId } from 'mongodb';
 import { optimoFilterFor } from '@/utils/orderOptimoView';
 import { channelFilterFor } from '@/utils/orderChannel';
 import { rescheduledFilterFor } from '@/utils/orderReschedule';
+import { announceStatusChange, isAnnouncedStatus } from '@/lib/pushStatus';
 
 const VALID_ORDER_STATUSES: OrderStatus[] = [
   'pending',
@@ -277,6 +278,11 @@ export async function PUT(request: NextRequest) {
         _id: objectId,
       } as Record<string, unknown>);
 
+      // tell the customer's phone (once per delivery day, paid orders only; the customer site decides)
+      if (isAnnouncedStatus(status) && before.data?.status !== status && updatedOrder.data?.orderId) {
+        await announceStatusChange(request, [String(updatedOrder.data.orderId)], status);
+      }
+
       return NextResponse.json({
         data: updatedOrder.data,
         message: 'Order status updated successfully',
@@ -323,6 +329,11 @@ export async function PUT(request: NextRequest) {
 
     if (!updateResult.success) {
       throw new Error(updateResult.error || 'Failed to update order statuses');
+    }
+
+    if (isAnnouncedStatus(status)) {
+      const changed = await db.read<Order>('orders', { _id: { $in: objectIds } } as Record<string, unknown>, { projection: { orderId: 1 } });
+      await announceStatusChange(request, (changed.data ?? []).map((o) => String(o.orderId)), status);
     }
 
     return NextResponse.json({
