@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, Typography, useMediaQuery, type Theme } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, Tab, Tabs, Typography, useMediaQuery, type Theme } from '@mui/material';
 import { IconShoppingCart, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -48,6 +48,8 @@ export default function CreateOrderPage() {
   // wide screens show the order next to the items; on a phone or narrow window it opens from a bar at the bottom
   const wide = useMediaQuery((theme: Theme) => theme.breakpoints.up('lg'));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // the entry form and the list of orders (other customers' details) live on separate tabs so entering an order shows nothing else
+  const [tab, setTab] = useState<'create' | 'orders'>('create');
   const [menuError, setMenuError] = useState('');
   const [date, setDate] = useState('');
 
@@ -280,6 +282,7 @@ export default function CreateOrderPage() {
       return;
     }
     const o = r.body.data;
+    setTab('create');
     setResult(null);
     setRequestId(crypto.randomUUID());
     setCustomer(o.customer);
@@ -343,10 +346,11 @@ export default function CreateOrderPage() {
     />
   );
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
-  const form = menu && !result && !menuError;
+  const onCreate = tab === 'create';
+  const form = onCreate && menu && !result && !menuError;
 
   return (
-    <Box sx={{ maxWidth: form && wide ? 1320 : 760, mx: 'auto', pb: form && !wide ? 11 : 6 }}>
+    <Box sx={{ maxWidth: form && wide ? 1320 : onCreate ? 760 : 960, mx: 'auto', pb: form && !wide ? 11 : 6 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <Typography variant="h5" sx={{ fontWeight: 800 }}>Create Offline Order</Typography>
       </Box>
@@ -354,6 +358,18 @@ export default function CreateOrderPage() {
         Enter an order for a customer who ordered by phone or in person. Prices come from the live menu. This is a master tool: no cutoff, delivery area or day rules apply.
       </Typography>
 
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="fullWidth"
+        sx={{ mb: 2, borderBottom: '1px solid #E5E7EB', '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: 15 }, '& .Mui-selected': { color: '#B45309' }, '& .MuiTabs-indicator': { bgcolor: '#F59E0B' } }}
+      >
+        <Tab value="create" label="Create order" />
+        <Tab value="orders" label="Recent orders" />
+      </Tabs>
+
+      {editError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError('')}>{editError}</Alert>}
+      {onCreate && (<>
       {fromCheckout && !result && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setFromCheckout(null)}>
           Started from the abandoned checkout of {fromCheckout.name}.
@@ -361,7 +377,6 @@ export default function CreateOrderPage() {
           {fromCheckout.skipped > 0 ? ` ${fromCheckout.skipped} item${fromCheckout.skipped === 1 ? ' is' : 's are'} no longer on the menu and ${fromCheckout.skipped === 1 ? 'was' : 'were'} left out.` : ''}
         </Alert>
       )}
-      {editError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError('')}>{editError}</Alert>}
       {editing && !result && (
         <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>Stop editing</Button>}>
           Editing {editing}. Change anything, then press Create: the new order replaces it, the old payment link stops working and the customer gets a new email.
@@ -390,8 +405,12 @@ export default function CreateOrderPage() {
           {wide && <Box sx={{ position: 'sticky', top: 77, maxHeight: 'calc(100vh - 89px)', overflowY: 'auto', borderRadius: 2 }}>{summary}</Box>}
         </Box>
       )}
+      </>)}
 
-      <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} onEdit={(id) => void startEdit(id)} onRows={setListRows} />
+      {/* stays mounted (hidden on the create tab) so the list keeps refreshing and a just-created order can be found in it */}
+      <Box sx={{ display: onCreate ? 'none' : 'block' }}>
+        <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} onEdit={(id) => void startEdit(id)} onRows={setListRows} />
+      </Box>
 
       {form && !wide && (
         <>
