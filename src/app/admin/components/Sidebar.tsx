@@ -59,6 +59,7 @@ const adminNavItems: NavItem[] = [
       { title: 'Order', href: '/admin/orders', icon: IconShoppingCart },
       { title: 'Create Offline Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
       { title: 'Abandoned Checkout', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
+      { title: 'Store Credit', href: '/admin/store-credit', icon: IconCoin },
     ],
   },
   {
@@ -96,7 +97,6 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'All Users', href: '/admin/all-users', icon: IconUsers },
       { title: 'Admin Users', href: '/admin/admin-users', icon: IconUserShield },
-      { title: 'Store Credit', href: '/admin/store-credit', icon: IconCoin },
     ],
   },
   {

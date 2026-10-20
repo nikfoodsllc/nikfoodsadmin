@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPackingReport, filterPackingReport, type PackingRow, type RosterRouteInput } from './packingReport';
+import { ALL_ROUTES, UNROUTED_ROUTE, buildPackingReport, filterByRoute, filterPackingReport, type PackingRow, type RosterRouteInput } from './packingReport';
 
 const DATE = '2026-10-13';
 const row = (o: Partial<PackingRow>): PackingRow => ({ orderId: 'ORD-1', day: DATE, name: 'Rajma', quantity: 1, customerName: 'Asha Rao', street: '12 Pine St, Seattle', ...o });
@@ -120,5 +120,33 @@ describe('combo parts', () => {
   it('a plain item has no parts', () => {
     const asha = buildPackingReport(DATE, rows, [], []).unrouted.find((s) => s.customerName === 'Asha Rao')!;
     expect(asha.lines.every((l) => l.parts === undefined)).toBe(true);
+  });
+});
+
+describe('filterByRoute', () => {
+  const report = buildPackingReport(DATE, rows, roster, records);
+  it('all routes (or no choice) changes nothing', () => {
+    expect(filterByRoute(report, ALL_ROUTES)).toBe(report);
+    expect(filterByRoute(report, '')).toBe(report);
+  });
+  it('one route shows only that route and drops the customers who are on no route', () => {
+    const only = filterByRoute(report, report.routes[1].key);
+    expect(only.routes.map((r) => r.driverName)).toEqual(['Driver A']);
+    expect(only.unrouted).toEqual([]);
+    expect(only.totals).toEqual(report.totals);
+  });
+  it('"not on a route yet" shows only those customers', () => {
+    const only = filterByRoute(report, UNROUTED_ROUTE);
+    expect(only.routes).toEqual([]);
+    expect(only.unrouted).toEqual(report.unrouted);
+  });
+  it('a route that is not in the report (another day) shows everything', () => {
+    expect(filterByRoute(report, 'gone')).toBe(report);
+  });
+  it('works together with the search box', () => {
+    const both = filterByRoute(filterPackingReport(report, 'rajma'), report.routes[0].key);
+    expect(both.routes).toHaveLength(1);
+    expect(both.routes[0].driverName).toBe('Driver B');
+    expect(both.routes[0].stops.map((s) => s.customerName)).toEqual(['Bob Smith']); // Dev Patel (no Rajma) is gone
   });
 });

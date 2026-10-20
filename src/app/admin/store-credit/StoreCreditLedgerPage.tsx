@@ -24,7 +24,7 @@ const dateText = (v: string | null) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
 };
 
-/** User Administration > Store Credit: everyone who holds store credit, with a way to open one customer's full history and change the balance. */
+/** Order > Store Credit: everyone who holds store credit, with a way to open one customer's full history and change the balance. */
 export default function StoreCreditLedgerPage() {
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   const [page, setPage] = useState(1);

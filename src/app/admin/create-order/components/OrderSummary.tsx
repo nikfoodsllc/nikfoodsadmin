@@ -56,6 +56,9 @@ export default function OrderSummary(props: {
   onTip: (t: number) => void;
   waiveFee: boolean;
   onWaiveFee: (v: boolean) => void;
+  /** Count the order in the reports and send it to OptimoRoute now, before it is paid (payment link and Zelle orders) */
+  countNow: boolean;
+  onCountNow: (v: boolean) => void;
   /** Dollars off the order, as typed ('' = none) */
   discount: string;
   onDiscount: (v: string) => void;
@@ -137,6 +140,19 @@ export default function OrderSummary(props: {
         sx={{ mb: 1 }}
       />
       <FormControlLabel sx={{ display: 'flex' }} control={<Checkbox size="small" color="warning" checked={props.waiveFee} onChange={(e) => props.onWaiveFee(e.target.checked)} />} label={<Typography sx={{ fontSize: 14 }}>Waive the Platform Fee{props.payment === 'zelle' ? <Box component="span" sx={{ color: '#6B7280' }}> (on for Zelle: the fee only covers card fees)</Box> : null}</Typography>} />
+
+      {(props.payment === 'link' || props.payment === 'zelle') && (
+        <Box sx={{ mb: 0.5 }}>
+          <FormControlLabel
+            sx={{ display: 'flex', mr: 0 }}
+            control={<Checkbox size="small" color="warning" checked={props.countNow} onChange={(e) => props.onCountNow(e.target.checked)} />}
+            label={<Typography sx={{ fontSize: 14 }}>Count it now, before it is paid</Typography>}
+          />
+          <Typography sx={{ fontSize: 12, color: '#6B7280', ml: 4, mt: -0.5 }}>
+            Adds the order to the Kitchen, Packing and Delivery reports and to OptimoRoute right away. If the payment fails or the order is cancelled it comes out again.
+          </Typography>
+        </Box>
+      )}
 
       {props.previewError && <Alert severity="warning" sx={{ my: 1 }}>{props.previewError}</Alert>}
       {!preview && !props.previewError && lines.length > 0 && (
