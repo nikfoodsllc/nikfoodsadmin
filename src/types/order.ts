@@ -259,6 +259,8 @@ export interface Order {
     openCount?: number;
     filledFromHistory?: boolean;
   };
+  /** Where the customer placed the order: the website or the iPhone app (absent on older orders = website; admin-entered orders have `source: 'admin'`) */
+  channel?: 'web' | 'mobile';
   /** Where the delivery stop(s) stand in OptimoRoute, written by the live site when it sends them */
   optimo?: {
     state?: 'sent' | 'failed' | 'removed' | string;

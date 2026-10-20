@@ -10,6 +10,7 @@ import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils
 import { formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView, type EmailTone } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
+import { CHANNEL_LABELS, channelOf } from '@/utils/orderChannel';
 import { rescheduleView } from '@/utils/orderReschedule';
 
 const EMAIL_TONES: Record<EmailTone, { bg: string; color: string }> = {
@@ -162,6 +163,16 @@ export default function OrderTableRow({
         <Typography variant="body2" sx={{ fontSize: '13px', color: order.paymentMethod ? '#111827' : '#9CA3AF', whiteSpace: 'nowrap' }}>
           {order.paymentMethod || '-'}
         </Typography>
+      </TableCell>
+    ),
+    // Order Source (key channel): where the customer placed it: the website, the iPhone app, or an admin entered it
+    channel: (
+      <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
+        <Chip
+          size="small"
+          label={CHANNEL_LABELS[channelOf(order)]}
+          sx={{ height: 22, fontSize: 12, fontWeight: 700, ...(channelOf(order) === 'mobile' ? { bgcolor: '#EEF2FF', color: '#3730A3' } : channelOf(order) === 'admin' ? { bgcolor: '#F3F4F6', color: '#374151' } : { bgcolor: '#ECFDF5', color: '#065F46' }) }}
+        />
       </TableCell>
     ),
     // Confirmation Email (key emailStatus): the order confirmation email (sent, failed, retrying, pending; a dash when none was sent)

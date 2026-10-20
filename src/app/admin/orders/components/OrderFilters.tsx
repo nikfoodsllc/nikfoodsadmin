@@ -3,6 +3,7 @@
 import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment, Button } from '@mui/material';
 import { IconSearch, IconFilterOff } from '@tabler/icons-react';
 import { OPTIMO_FILTER_OPTIONS } from '@/utils/orderOptimoView';
+import { CHANNEL_FILTER_OPTIONS } from '@/utils/orderChannel';
 
 interface OrderFiltersProps {
   searchValue: string;
@@ -10,6 +11,7 @@ interface OrderFiltersProps {
   selectedPaymentStatus: string;
   selectedPaymentMethod: string;
   selectedOptimo: string;
+  selectedChannel: string;
   selectedRescheduled: string;
   startDate: string;
   endDate: string;
@@ -19,6 +21,7 @@ interface OrderFiltersProps {
   onPaymentStatusChange: (value: string) => void;
   onPaymentMethodChange: (value: string) => void;
   onOptimoChange: (value: string) => void;
+  onChannelChange: (value: string) => void;
   onRescheduledChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
@@ -32,6 +35,7 @@ export default function OrderFilters({
   selectedPaymentStatus,
   selectedPaymentMethod,
   selectedOptimo,
+  selectedChannel,
   selectedRescheduled,
   startDate,
   endDate,
@@ -41,6 +45,7 @@ export default function OrderFilters({
   onPaymentStatusChange,
   onPaymentMethodChange,
   onOptimoChange,
+  onChannelChange,
   onRescheduledChange,
   onStartDateChange,
   onEndDateChange,
@@ -53,6 +58,7 @@ export default function OrderFilters({
     selectedPaymentStatus !== 'all' ||
     selectedPaymentMethod !== 'all' ||
     selectedOptimo !== 'all' ||
+    selectedChannel !== 'all' ||
     selectedRescheduled !== 'all' ||
     startDate ||
     endDate ||
@@ -194,6 +200,23 @@ export default function OrderFilters({
             {OPTIMO_FILTER_OPTIONS.map((option) => (
               <MenuItem key={option.value} value={option.value}>
                 {option.value === 'all' ? 'All' : option.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Order source filter (website, mobile app, entered by an admin) */}
+        <FormControl size="small" sx={{ minWidth: 170 }}>
+          <InputLabel>Order Source</InputLabel>
+          <Select
+            value={selectedChannel}
+            label="Order Source"
+            onChange={(e) => onChannelChange(e.target.value)}
+            sx={{ backgroundColor: '#fff' }}
+          >
+            {CHANNEL_FILTER_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
               </MenuItem>
             ))}
           </Select>

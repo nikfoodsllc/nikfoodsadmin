@@ -24,6 +24,7 @@ export const GLOSSARY_SECTIONS = [
   'Orders: payment status',
   'Orders: payment method',
   'Orders: Confirmation Email column',
+  'Orders: Order Source column',
   'Orders: OptimoRoute column',
   'Orders: moving a delivery date',
   'Orders: money columns',
@@ -103,6 +104,11 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: Confirmation Email column', 'Pending', 'Orders table, Confirmation Email', 'The send is on its way.', 'warn'),
   e('Orders: Confirmation Email column', 'Delayed', 'Orders table, Confirmation Email', "The customer's mail server has not accepted it yet. It is still being tried.", 'warn'),
   e('Orders: Confirmation Email column', '- (dash)', 'Orders table, Confirmation Email', 'No confirmation email was ever sent, for example an unpaid order.', 'none', 'dash empty blank'),
+
+  // ---- order source
+  e('Orders: Order Source column', 'Website', 'Orders table, Order Source and filter', 'The customer placed the order on the website. Orders from before this column existed also show Website.', 'none', 'channel source website web'),
+  e('Orders: Order Source column', 'Mobile app', 'Orders table, Order Source and filter', 'The customer placed the order in the iPhone app. The app uses the same menu, prices and checkout rules as the website.', 'none', 'channel source mobile app ios iphone'),
+  e('Orders: Order Source column', 'Admin', 'Orders table, Order Source and filter', 'An admin entered the order on the Create Order screen (a phone or in-person order). The filter calls it Entered by admin.', 'none', 'channel source admin create order offline'),
 
   // ---- optimoroute
   e('Orders: OptimoRoute column', 'In OptimoRoute', 'Orders table, OptimoRoute; order details', 'The delivery stop for this order is in OptimoRoute (the route planner). The cell shows the delivery day(s). A customer with two orders on one day shares one stop.', 'good', 'optimo routes delivery stop'),
