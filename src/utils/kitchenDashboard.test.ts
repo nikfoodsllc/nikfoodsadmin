@@ -26,8 +26,7 @@ import {
   toDayString,
   validateRange,
   weekdayName,
-  type KitchenRow,
-} from './kitchenDashboard';
+  type KitchenRow, namesIn, withPreparation } from './kitchenDashboard';
 
 describe('week math (weeks run Saturday to Friday)', () => {
   it('knows the weekday of a day', () => {
@@ -817,5 +816,21 @@ describe('a combo item that comes several to a combo (Chapati x 4)', () => {
   it('who ordered Chapati lists 8 for 2 combos', () => {
     const lines = buildItemOrders(rows(2, 'c2'), 'Chapati', '2026-10-07');
     expect(lines.map((l) => l.quantity)).toEqual([8]);
+  });
+});
+
+describe('preparation split', () => {
+  const block = {
+    items: [{ name: 'Rajma' }, { name: 'Gulab Jamun ' }, { name: 'Mystery' }] as never[],
+    combos: [{ name: 'Veg Combo', parts: [] }] as never[],
+  };
+  it('lists the names of every item and combo, trimmed and once', () => {
+    expect(namesIn([block as never, block as never]).sort()).toEqual(['Gulab Jamun', 'Mystery', 'Rajma', 'Veg Combo']);
+  });
+  it('marks each item and combo with its type by name, and leaves unknown names null', () => {
+    const types = new Map<string, 'cooked' | 'ready_to_eat' | null>([['Rajma', 'cooked'], ['Gulab Jamun', 'ready_to_eat'], ['Veg Combo', 'cooked']]);
+    const out = withPreparation(block as unknown as Parameters<typeof withPreparation>[0], types) as unknown as { items: Array<{ name: string; prep: unknown }>; combos: Array<{ prep: unknown }> };
+    expect(out.items.map((i) => [i.name, i.prep])).toEqual([['Rajma', 'cooked'], ['Gulab Jamun ', 'ready_to_eat'], ['Mystery', null]]);
+    expect(out.combos[0].prep).toBe('cooked');
   });
 });
