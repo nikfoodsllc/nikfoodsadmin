@@ -11,8 +11,6 @@ import {
   CircularProgress,
   Alert,
   Box,
-  FormControlLabel,
-  Switch,
   RadioGroup,
   Radio,
   FormLabel,
@@ -49,7 +47,6 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
   const [sequence, setSequence] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isDraft, setIsDraft] = useState(false);
   const [listingType, setListingType] = useState<CategoryListingType>('flat');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -63,7 +60,6 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
         setParentCategoryId(parentIdFromCategory(category));
         setSequence(category.sequence || 0);
         setImagePreview(category.url || null);
-        setIsDraft(category.isDraft || false);
         setListingType(category.listingType || 'flat');
       } else {
         setName('');
@@ -71,7 +67,6 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
         setParentCategoryId('');
         setSequence(0);
         setImagePreview(null);
-        setIsDraft(false);
         setListingType('flat');
       }
       setImageFile(null);
@@ -100,7 +95,7 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
     return null;
   };
 
-  const handleSubmit = async (saveAsDraft: boolean = false) => {
+  const handleSubmit = async () => {
     setError('');
 
     // Validate
@@ -132,7 +127,7 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
         sequence: sequence,
         url: imageUrl,
         public_id: publicId,
-        isDraft: saveAsDraft,
+        isDraft: false,
         listingType: listingType,
         dayWiseItems: [],
         parentCategoryId: parentCategoryId.trim() || '',
@@ -174,7 +169,6 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
     >
       <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
         {category ? 'Edit Category' : 'Add New Category'}
-        {isDraft && ' (Draft)'}
       </DialogTitle>
       <DialogContent sx={{ overflowY: 'auto' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 2 }}>
@@ -285,99 +279,6 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
             }}
           />
 
-          <Box sx={{
-            backgroundColor: '#F6FAFF',
-            padding: 2,
-            borderRadius: 1,
-            border: '1px solid #E0E0E0'
-          }}>
-            <FormLabel sx={{
-              fontWeight: 500,
-              color: '#333',
-              marginBottom: 1,
-              display: 'block'
-            }}>
-              Listing Type
-            </FormLabel>
-            <RadioGroup
-              value={listingType}
-              onChange={(e) => setListingType(e.target.value as CategoryListingType)}
-              row
-            >
-              <FormControlLabel
-                value="flat"
-                control={<Radio
-                  sx={{
-                    '&.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                  }}
-                />}
-                label="Flat"
-                disabled={loading}
-              />
-              <FormControlLabel
-                value="day-wise"
-                control={<Radio
-                  sx={{
-                    '&.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                  }}
-                />}
-                label="Day-wise"
-                disabled={loading}
-              />
-            </RadioGroup>
-            <Typography variant="caption" sx={{ color: '#666', marginTop: 0.5, display: 'block' }}>
-              {listingType === 'flat'
-                ? 'All items in this category will be displayed together'
-                : 'Items will be displayed based on the day of the week. Manage items through the dedicated items page.'
-              }
-            </Typography>
-          </Box>
-
-          <Box sx={{
-            backgroundColor: '#F6FAFF',
-            padding: 2,
-            borderRadius: 1,
-            border: '1px solid #E0E0E0'
-          }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isDraft}
-                  onChange={(e) => setIsDraft(e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#4F8CFF',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Box>
-                  <Box sx={{ fontWeight: 500, color: '#333' }}>
-                    Save as Draft
-                  </Box>
-                  <Box sx={{ fontSize: '0.875rem', color: '#666' }}>
-                    Draft categories won't be visible to customers
-                  </Box>
-                </Box>
-              }
-              sx={{
-                alignItems: 'flex-start',
-                marginLeft: 0,
-                '& .MuiFormControlLabel-label': {
-                  marginLeft: 1,
-                }
-              }}
-            />
-          </Box>
 
           <Box>
             <ImageUpload
@@ -400,24 +301,7 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
           Cancel
         </Button>
         <Button
-          onClick={() => handleSubmit(true)}
-          disabled={loading}
-          variant="outlined"
-          sx={{
-            textTransform: 'none',
-            borderColor: '#4F8CFF',
-            color: '#4F8CFF',
-            minWidth: 120,
-            '&:hover': {
-              borderColor: '#3B7AE8',
-              backgroundColor: 'rgba(79, 140, 255, 0.04)',
-            },
-          }}
-        >
-          {loading ? <CircularProgress size={20} color="inherit" /> : 'Save as Draft'}
-        </Button>
-        <Button
-          onClick={() => handleSubmit(false)}
+          onClick={() => handleSubmit()}
           disabled={loading}
           variant="contained"
           sx={{
