@@ -142,6 +142,8 @@ export interface CountLine {
 
 export interface KitchenItem {
   name: string;
+  /** How the item is prepared (cooked or ready to eat); null when it is not set yet. Added by the API from the food items. */
+  prep?: 'cooked' | 'ready_to_eat' | null;
   /** Everything to cook of this item: ordered on its own plus the parts of combos. */
   quantity: number;
   /** How much of `quantity` is a part of a combo. */
@@ -164,6 +166,8 @@ export interface KitchenItem {
 
 export interface KitchenCombo {
   name: string;
+  /** How the combo is prepared; null when it is not set yet. Added by the API. */
+  prep?: 'cooked' | 'ready_to_eat' | null;
   quantity: number;
   spice: CountLine[];
   /** How many of these combos come in an eco container. */
@@ -371,6 +375,25 @@ export function buildKitchenDays(rows: KitchenRow[], days: string[]): KitchenDay
     const block = buildKitchenBlock(byDay.get(day) ?? []);
     return { day, weekday: weekdayName(day), ...block };
   });
+}
+
+/**
+ * Marks every item and combo with how it is prepared, by name: the type of the food item(s) with that name, only when they all
+ * agree (an unknown name or a disagreement stays null = "not set yet"). `typeByName` maps a trimmed item name to its type.
+ */
+export function withPreparation<T extends { items: KitchenItem[]; combos: KitchenCombo[] }>(block: T, typeByName: Map<string, 'cooked' | 'ready_to_eat' | null>): T {
+  const prep = (name: string) => typeByName.get(name.trim()) ?? null;
+  return { ...block, items: block.items.map((i) => ({ ...i, prep: prep(i.name) })), combos: block.combos.map((c) => ({ ...c, prep: prep(c.name) })) };
+}
+
+/** The names of every item and combo in these blocks (for the preparation lookup). */
+export function namesIn(blocks: Array<{ items: KitchenItem[]; combos: KitchenCombo[] }>): string[] {
+  const names = new Set<string>();
+  for (const b of blocks) {
+    for (const i of b.items) names.add(i.name.trim());
+    for (const c of b.combos) names.add(c.name.trim());
+  }
+  return [...names];
 }
 
 /** Everything the kitchen has to make for a set of lines, whatever their days: the same counting as one day. */

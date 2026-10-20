@@ -13,6 +13,8 @@ import {
   Paper,
   Skeleton,
   Tab,
+  ToggleButton,
+  ToggleButtonGroup,
   Tabs,
   TextField,
   Tooltip,
@@ -149,38 +151,60 @@ function ItemRow({ item, onSelect }: { item: KitchenItem; onSelect?: () => void 
   );
 }
 
-/** The items and the combos to pack of one day or of the whole range. Tapping an item or combo traces it to the orders. */
+export type PrepView = 'all' | 'cooked' | 'ready_to_eat';
+
+const PREP_GROUPS: Array<{ key: 'cooked' | 'ready_to_eat' | 'none'; label: string; color: string; bg: string }> = [
+  { key: 'cooked', label: 'Cooked', color: '#9A3412', bg: '#FFEDD5' },
+  { key: 'ready_to_eat', label: 'Ready to eat', color: '#166534', bg: '#DCFCE7' },
+  { key: 'none', label: 'Not set yet', color: '#6B7280', bg: '#F3F4F6' },
+];
+const prepKey = (prep: 'cooked' | 'ready_to_eat' | null | undefined): 'cooked' | 'ready_to_eat' | 'none' => (prep === 'cooked' ? 'cooked' : prep === 'ready_to_eat' ? 'ready_to_eat' : 'none');
+
+/** The items and the combos to pack of one day or of the whole range, split into Cooked, Ready to eat and Not set yet. Tapping an item or combo traces it to the orders. */
 function BlockBody({
   items,
   combos,
   emptyText,
   onSelectItem,
+  view = 'all',
 }: {
   items: KitchenItem[];
   combos: KitchenCombo[];
   emptyText: string;
   onSelectItem: (name: string) => void;
+  view?: PrepView;
 }) {
+  const sections = PREP_GROUPS.filter((g) => view === 'all' || view === g.key)
+    .map((g) => ({ ...g, items: items.filter((i) => prepKey(i.prep) === g.key), combos: combos.filter((c) => prepKey(c.prep) === g.key) }))
+    .filter((g) => g.items.length > 0 || g.combos.length > 0);
+  if (sections.length === 0) {
+    return (
+      <Box sx={{ px: 2, py: 0.5 }}>
+        <Typography sx={{ color: '#9CA3AF', fontSize: 14, py: 2 }}>{items.length === 0 && combos.length === 0 ? emptyText : 'Nothing of this kind.'}</Typography>
+      </Box>
+    );
+  }
   return (
     <>
-      <Box sx={{ px: 2, py: 0.5 }}>
-        {items.length === 0 && combos.length === 0 ? (
-          <Typography sx={{ color: '#9CA3AF', fontSize: 14, py: 2 }}>{emptyText}</Typography>
-        ) : (
-          <>
-            {items.map((item) => (
+      {sections.map((g) => (
+        <Box key={g.key}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 0.75, bgcolor: g.bg, borderTop: '1px solid #E5E7EB' }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: g.color }}>{g.label}</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: g.color }}>
+              {g.items.length + g.combos.length} {g.items.length + g.combos.length === 1 ? 'item' : 'items'}
+            </Typography>
+          </Box>
+          <Box sx={{ px: 2, py: 0.5 }}>
+            {g.items.map((item) => (
               <ItemRow key={item.name} item={item} onSelect={() => onSelectItem(item.name)} />
             ))}
-          </>
-        )}
-      </Box>
-
-      {combos.length > 0 && (
+          </Box>
+      {g.combos.length > 0 && (
         <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid #E5E7EB', bgcolor: '#FFFBEB' }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mb: 0.5 }}>
             Combos to pack
           </Typography>
-          {combos.map((combo) => (
+          {g.combos.map((combo) => (
             <Box key={combo.name} sx={{ py: 0.75 }}>
               <Box
                 role="button"
@@ -212,11 +236,13 @@ function BlockBody({
           ))}
         </Box>
       )}
+        </Box>
+      ))}
     </>
   );
 }
 
-function DayCard({ day, isToday, onSelectItem }: { day: KitchenDay; isToday: boolean; onSelectItem: (name: string) => void }) {
+function DayCard({ day, isToday, onSelectItem, view }: { day: KitchenDay; isToday: boolean; onSelectItem: (name: string) => void; view: PrepView }) {
   const empty = day.items.length === 0 && day.combos.length === 0;
   return (
     <Paper
@@ -251,13 +277,13 @@ function DayCard({ day, isToday, onSelectItem }: { day: KitchenDay; isToday: boo
         )}
       </Box>
 
-      <BlockBody items={day.items} combos={day.combos} emptyText="Nothing ordered for this day." onSelectItem={onSelectItem} />
+      <BlockBody items={day.items} combos={day.combos} emptyText="Nothing ordered for this day." onSelectItem={onSelectItem} view={view} />
     </Paper>
   );
 }
 
 /** The whole date range added up: every item once, whatever its menu day or delivery day. */
-function WeekCard({ block, title, subtitle, onSelectItem }: { block: KitchenBlock; title: string; subtitle: string; onSelectItem: (name: string) => void }) {
+function WeekCard({ block, title, subtitle, onSelectItem, view }: { block: KitchenBlock; title: string; subtitle: string; onSelectItem: (name: string) => void; view: PrepView }) {
   const empty = block.items.length === 0 && block.combos.length === 0;
   return (
     <Paper elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, overflow: 'hidden', bgcolor: empty ? '#FAFAFA' : '#fff', maxWidth: 760 }}>
@@ -273,7 +299,7 @@ function WeekCard({ block, title, subtitle, onSelectItem }: { block: KitchenBloc
           </Typography>
         )}
       </Box>
-      <BlockBody items={block.items} combos={block.combos} emptyText="Nothing ordered in these dates." onSelectItem={onSelectItem} />
+      <BlockBody items={block.items} combos={block.combos} emptyText="Nothing ordered in these dates." onSelectItem={onSelectItem} view={view} />
     </Paper>
   );
 }
@@ -294,6 +320,8 @@ export default function KitchenDashboardPage() {
   const [tab, setTab] = useState<'days' | 'week'>('days');
   // search by item name (a combo also by the parts chosen in it)
   const [search, setSearch] = useState('');
+  // which kind of items to show: all (split into Cooked / Ready to eat / Not set yet), or just one kind
+  const [prepView, setPrepView] = useState<PrepView>('all');
   // the item whose orders are shown (day null = every day of the range)
   const [trace, setTrace] = useState<{ item: string; day: string | null } | null>(null);
   // which weekdays to show and in what order; saved per admin (same mechanism as the table columns)
@@ -477,6 +505,20 @@ export default function KitchenDashboardPage() {
         </Tabs>
       )}
       {range && !error && (
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={prepView}
+          onChange={(_, v: PrepView | null) => v && setPrepView(v)}
+          aria-label="Kind of items"
+          sx={{ mb: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 1.75 }, '& .Mui-selected': { bgcolor: '#E8F1FF !important', color: '#2F6FED' } }}
+        >
+          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="cooked">Cooked</ToggleButton>
+          <ToggleButton value="ready_to_eat">Ready to eat</ToggleButton>
+        </ToggleButtonGroup>
+      )}
+      {range && !error && (
         <TextField
           size="small"
           fullWidth
@@ -530,6 +572,7 @@ export default function KitchenDashboardPage() {
             title={preset === 'custom' ? 'Total for these dates' : 'Week total'}
             subtitle={formatRangeLabel(range)}
             onSelectItem={(name) => setTrace({ item: name, day: null })}
+            view={prepView}
           />
         ) : null
       ) : (
@@ -537,7 +580,7 @@ export default function KitchenDashboardPage() {
           {loading
             ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="rounded" height={220} />)
             : days.map((day) => (
-                <DayCard key={day.day} day={day} isToday={day.day === today} onSelectItem={(name) => setTrace({ item: name, day: day.day })} />
+                <DayCard key={day.day} day={day} isToday={day.day === today} onSelectItem={(name) => setTrace({ item: name, day: day.day })} view={prepView} />
               ))}
           {!loading && searching && days.length === 0 && (
             <Typography sx={{ color: '#6B7280', gridColumn: '1 / -1' }}>No item matches “{search.trim()}” on these days.</Typography>
