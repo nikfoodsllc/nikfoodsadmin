@@ -576,3 +576,19 @@ describe('menu day of an item', () => {
     expect(defaultDayFor([], '2026-10-20')).toBe('2026-10-20');
   });
 });
+
+import { onlyAvailable, type MenuNode } from './createOrder';
+
+describe('onlyAvailable', () => {
+  const item = (id: string, available?: boolean) => ({ _id: id, name: id, price: 1, ...(available === undefined ? {} : { available }) }) as MenuItem;
+  const items = { a: item('a', true), b: item('b', false), c: item('c'), d: item('d', false) };
+  const node = (id: string, itemIds: string[], children: MenuNode[] = []): MenuNode => ({ id, name: id, itemIds, children, total: 0 }) as MenuNode;
+
+  it('drops unavailable items, keeps ones with no flag, and removes categories left empty', () => {
+    const out = onlyAvailable([node('p', ['a', 'b'], [node('k', ['d']), node('m', ['c'])])], items);
+    expect(out).toHaveLength(1);
+    expect(out[0].itemIds).toEqual(['a']);
+    expect(out[0].children.map((n) => n.id)).toEqual(['m']);
+    expect(onlyAvailable([node('x', ['b', 'd'])], items)).toEqual([]);
+  });
+});
