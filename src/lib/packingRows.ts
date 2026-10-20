@@ -1,4 +1,5 @@
 import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
+import { COUNTED_ORDER_CLAUSES } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString } from '@/utils/kitchenDashboard';
 import type { PackingRow } from '@/utils/packingReport';
@@ -15,10 +16,7 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
     {
       $match: {
         status: { $ne: 'cancelled' },
-        $or: [
-          { paymentStatus: 'paid' },
-          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
-        ],
+        $or: COUNTED_ORDER_CLAUSES,
         $and: [{ $or: [{ 'items.actualDeliveryDate': within }, { 'items.deliveryDate': within }] }],
       },
     },
@@ -91,10 +89,7 @@ export async function fetchHeldRows(date: string): Promise<HeldRow[]> {
     {
       $match: {
         status: { $ne: 'cancelled' },
-        $or: [
-          { paymentStatus: 'paid' },
-          { status: { $in: ['preparing', 'ready', 'out_for_delivery', 'partially_delivered', 'delivered'] }, paymentStatus: { $nin: ['failed', 'refunded'] } },
-        ],
+        $or: COUNTED_ORDER_CLAUSES,
         'items.deliveryDate': within,
       },
     },

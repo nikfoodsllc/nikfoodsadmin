@@ -287,6 +287,8 @@ export interface OrderListRow {
   payKind?: 'link' | 'zelle' | 'offline';
   /** An order (payment link or Zelle) the customer has not paid yet */
   awaitingPayment: boolean;
+  /** Counted in the reports and sent to OptimoRoute before it is paid */
+  countBeforePayment?: boolean;
   linkSentAt?: string;
   /** What the email provider reported about the latest pay-link email */
   linkEmail?: { status: string; sentAt?: string; deliveredAt?: string; bounceReason?: string; opened?: { firstAt: string; lastAt: string; count: number } };

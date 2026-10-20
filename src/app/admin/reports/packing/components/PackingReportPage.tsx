@@ -12,7 +12,7 @@ import { addDays, formatDayShort, isDayString, pacificDayOf, shortSpiceLabel } f
 import { formatPSTDateISO } from '@/utils/timezone';
 import { applyColumnChoice, TONE_COLORS } from '@/utils/kitchenReportSheets';
 import { buildPackingSheets, PACKING_SHEET_CHOICES } from '@/utils/packingReportSheets';
-import { filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
+import { ALL_ROUTES, UNROUTED_ROUTE, filterByRoute, filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
 import ReportColumnsDialog from '../../kitchen/components/ReportColumnsDialog';
@@ -73,6 +73,17 @@ function LineRow({ line }: { line: PackLine }) {
     </Box>
   );
 }
+
+/** A route button: the chosen one is filled with the brand orange (amber for the customers who are on no route yet). */
+const routeChipSx = (active: boolean, amber = false) => ({
+  fontWeight: 600,
+  height: 34,
+  borderRadius: '17px',
+  borderColor: active ? (amber ? '#FCD34D' : '#F89C35') : '#D1D5DB',
+  bgcolor: active ? (amber ? '#FDEFC4' : '#F89C35') : '#fff',
+  color: active ? (amber ? '#92400E' : '#fff') : '#374151',
+  '&:hover': { bgcolor: active ? (amber ? '#FBE3A0' : '#E88B26') : '#F3F4F6' },
+});
 
 function StopCard({ stop, warn }: { stop: PackStop; warn?: boolean }) {
   const units = stop.lines.reduce((n, l) => n + l.quantity, 0);
@@ -164,6 +175,8 @@ export default function PackingReportPage() {
   const [otherDate, setOtherDate] = useState(addDays(today, 2));
   const [tab, setTab] = useState<TabId>('routes');
   const [search, setSearch] = useState('');
+  // which route's list is shown: all of them, one route (its key), or the customers who are on no route yet
+  const [routeKey, setRouteKey] = useState<string>(ALL_ROUTES);
   const [data, setData] = useState<ReportData | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
@@ -218,7 +231,12 @@ export default function PackingReportPage() {
   }, [authLoading, isAuthenticated, router]);
 
   const searching = search.trim().length > 0;
-  const shown = useMemo(() => (data ? filterPackingReport(data, search) : null), [data, search]);
+  const routeLabel = (route: PackRoute) => (route.driverName ? `${route.title} · ${route.driverName}` : route.title);
+  // a route that is not in this day's report (another day, or routes read again) goes back to showing everything
+  const activeRouteKey = data && (routeKey === UNROUTED_ROUTE ? data.unrouted.length > 0 : data.routes.some((r) => r.key === routeKey)) ? routeKey : ALL_ROUTES;
+  const shown = useMemo(() => (data ? filterByRoute(filterPackingReport(data, search), activeRouteKey) : null), [data, search, activeRouteKey]);
+  const activeRoute = data?.routes.find((r) => r.key === activeRouteKey);
+  const routeNote = activeRouteKey === UNROUTED_ROUTE ? 'not on a route yet' : activeRoute ? routeLabel(activeRoute) : '';
 
   const refreshRoutes = async () => {
     if (!token || !date) return;
@@ -240,7 +258,7 @@ export default function PackingReportPage() {
   };
 
   // the sheets for the Excel file and the PDF: what is on the screen, with the columns this admin chose
-  const sheetsFrom = (src: ReportData) => applyColumnChoice(buildPackingSheets(filterPackingReport(src, search)), { packing: [...listCols.hiddenKeys], packTotals: [...totalCols.hiddenKeys] });
+  const sheetsFrom = (src: ReportData) => applyColumnChoice(buildPackingSheets(filterByRoute(filterPackingReport(src, search), activeRouteKey)), { packing: [...listCols.hiddenKeys], packTotals: [...totalCols.hiddenKeys] });
 
   const printPdf = async () => {
     if (!shown || !date) return;
@@ -251,7 +269,7 @@ export default function PackingReportPage() {
       // always from the latest orders, not from what was loaded when the page was opened
       const latest = await load({ silent: true });
       if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
-      const blob = await buildReportPdf(sheetsFrom(latest), `Delivery ${formatDayShort(date)}${searching ? ` · search: ${search.trim()}` : ''}`);
+      const blob = await buildReportPdf(sheetsFrom(latest), `Delivery ${formatDayShort(date)}${routeNote ? ` · ${routeNote}` : ''}${searching ? ` · search: ${search.trim()}` : ''}`);
       if (win) win.location.href = URL.createObjectURL(blob);
       else downloadBlob(blob, `packing-report-${date}.pdf`);
     } catch (e) {
@@ -410,6 +428,34 @@ export default function PackingReportPage() {
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />
+        </Box>
+      )}
+
+      {!loading && data && tab === 'routes' && data.routes.length + (data.unrouted.length > 0 ? 1 : 0) > 1 && (
+        <Box className="no-print" role="group" aria-label="Show one route" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2 }}>
+          <Chip
+            label={`All routes (${data.routes.reduce((n, r) => n + r.stops.length, 0) + data.unrouted.length})`}
+            onClick={() => setRouteKey(ALL_ROUTES)}
+            variant="outlined"
+            sx={routeChipSx(activeRouteKey === ALL_ROUTES)}
+          />
+          {data.routes.map((route) => (
+            <Chip
+              key={route.key}
+              label={`${routeLabel(route)} (${route.stops.length})`}
+              onClick={() => setRouteKey(route.key)}
+              variant="outlined"
+              sx={routeChipSx(activeRouteKey === route.key)}
+            />
+          ))}
+          {data.unrouted.length > 0 && (
+            <Chip
+              label={`Not on a route yet (${data.unrouted.length})`}
+              onClick={() => setRouteKey(UNROUTED_ROUTE)}
+              variant="outlined"
+              sx={routeChipSx(activeRouteKey === UNROUTED_ROUTE, true)}
+            />
+          )}
         </Box>
       )}
 

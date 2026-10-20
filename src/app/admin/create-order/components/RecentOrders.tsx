@@ -16,6 +16,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { IconChevronDown, IconChevronUp, IconSearch, IconX } from '@tabler/icons-react';
@@ -271,6 +272,11 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
                     color={cancelled ? 'default' : paid ? 'success' : 'warning'}
                     sx={{ mt: 0.5, fontWeight: 700 }}
                   />
+                  {row.awaitingPayment && row.countBeforePayment && (
+                    <Tooltip title="Already in the Kitchen, Packing and Delivery reports and on OptimoRoute, although it is not paid yet">
+                      <Chip size="small" variant="outlined" label="Counted" color="info" sx={{ mt: 0.5, ml: 0.5, fontWeight: 700 }} />
+                    </Tooltip>
+                  )}
                 </Box>
               </Box>
               {row.awaitingPayment && (
