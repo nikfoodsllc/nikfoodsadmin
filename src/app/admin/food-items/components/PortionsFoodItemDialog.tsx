@@ -51,7 +51,6 @@ interface PortionsFoodItem {
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
   spiceLevel?: string[];
-  isDraft?: boolean;
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
   splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
@@ -84,7 +83,6 @@ const getDefaultFormData = (): PortionsFoodItem => ({
   ecoContainerCharge: 0,
   hasSpiceLevel: false,
   spiceLevel: [],
-  isDraft: false,
   sticker: 'yes', // a new item is on the Stickers sheet unless someone turns it off
 });
 
@@ -214,10 +212,10 @@ export default function PortionsFoodItemDialog({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (saveAsDraft: boolean = false) => {
+  const handleSubmit = () => {
     const submitData = {
       ...formData,
-      isDraft: saveAsDraft,
+      isDraft: false,
       category: mergeCategoryIdsForSave(selectedSubCategoryIds, item?.category, subCategoryIds),
     };
     if (validate()) {
@@ -470,30 +468,6 @@ export default function PortionsFoodItemDialog({
             />
           </Box>
 
-          {/* Draft Toggle */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-              Status
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.isDraft || false}
-                  onChange={(e) => handleChange('isDraft', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#FF9F0D',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#FF9F0D',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2">{formData.isDraft ? 'Draft Mode' : 'Published'}</Typography>}
-            />
-          </Box>
 
           <Divider />
 
@@ -631,35 +605,7 @@ export default function PortionsFoodItemDialog({
           Cancel
         </Button>
         <Button
-          onClick={() => handleSubmit(true)}
-          disabled={loading}
-          variant="outlined"
-          sx={{
-            textTransform: 'none',
-            borderColor: '#FF9F0D',
-            color: '#FF9F0D',
-            paddingX: 3,
-            '&:hover': {
-              backgroundColor: '#FFF4E4',
-              borderColor: '#FF9F0D',
-            },
-            '&.Mui-disabled': {
-              borderColor: '#D1D5DB',
-              color: '#9CA3AF',
-            },
-          }}
-        >
-          {loading ? (
-            <>
-              <CircularProgress size={16} sx={{ color: '#FF9F0D', marginRight: 1 }} />
-              Saving Draft...
-            </>
-          ) : (
-            'Save as Draft'
-          )}
-        </Button>
-        <Button
-          onClick={() => handleSubmit(false)}
+          onClick={() => handleSubmit()}
           disabled={loading}
           variant="contained"
           sx={{
