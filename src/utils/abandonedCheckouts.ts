@@ -66,7 +66,8 @@ export interface OrderInfo {
 
 /** What happened to the automatic reminder email, in the order it happens: sent, delivered, opened, button clicked. */
 export interface ReminderView {
-  state: 'sending' | 'sent' | 'delivered' | 'bounced' | 'spam' | 'failed';
+  /** 'push': the reminder went out as an app notification instead of an email */
+  state: 'sending' | 'sent' | 'delivered' | 'bounced' | 'spam' | 'failed' | 'push';
   sentAt?: string;
   deliveredAt?: string;
   openedAt?: string;
@@ -82,6 +83,7 @@ export function reminderView(r: DraftDoc['reminderEmail']): ReminderView | undef
   if (!r || !r.status) return undefined;
   const state: ReminderView['state'] =
     r.status === 'claimed' ? 'sending'
+    : r.status === 'push' ? 'push'
     : r.status === 'failed' ? 'failed'
     : r.status === 'bounced' ? 'bounced'
     : r.status === 'complained' ? 'spam'
@@ -246,7 +248,7 @@ export function splitByReminder(rows: AbandonedRow[]): { waiting: AbandonedRow[]
   const emailed: AbandonedRow[] = [];
   for (const row of rows) {
     const state = row.reminder?.state;
-    (state === 'sent' || state === 'delivered' || state === 'bounced' || state === 'spam' ? emailed : waiting).push(row);
+    (state === 'sent' || state === 'delivered' || state === 'bounced' || state === 'spam' || state === 'push' ? emailed : waiting).push(row);
   }
   const newest = (a: AbandonedRow, b: AbandonedRow) => ms(b.lastActivityAt) - ms(a.lastActivityAt);
   const sentLast = (a: AbandonedRow, b: AbandonedRow) => ms(b.reminder?.sentAt) - ms(a.reminder?.sentAt);

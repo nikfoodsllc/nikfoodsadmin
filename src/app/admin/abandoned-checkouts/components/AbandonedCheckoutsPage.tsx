@@ -135,7 +135,7 @@ function CheckoutDetails({ row }: { row: AbandonedRow }) {
   );
 }
 
-const REMINDER_TEXT: Record<ReminderView['state'], string> = { sending: 'Reminder email sending', sent: 'Reminder email sent', delivered: 'Reminder email delivered', bounced: 'Reminder email bounced', spam: 'Marked as spam', failed: 'Reminder email failed' };
+const REMINDER_TEXT: Record<ReminderView['state'], string> = { sending: 'Reminder email sending', sent: 'Reminder email sent', delivered: 'Reminder email delivered', bounced: 'Reminder email bounced', spam: 'Marked as spam', failed: 'Reminder email failed', push: 'Reminder notification sent (app)' };
 
 /** What happened to the automatic reminder email: sent, delivered, opened, button clicked (each with its time). */
 // the chips can be longer than a phone is wide: let their text wrap instead of being cut off

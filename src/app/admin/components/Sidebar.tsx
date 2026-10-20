@@ -33,6 +33,7 @@ import {
   IconChefHat,
   IconShoppingCartPlus,
   IconShoppingCartOff,
+  IconBell,
   IconBook,
 } from '@tabler/icons-react';
 import Image from 'next/image';
@@ -98,6 +99,11 @@ const adminNavItems: NavItem[] = [
       { title: 'All Users', href: '/admin/all-users', icon: IconUsers },
       { title: 'Admin Users', href: '/admin/admin-users', icon: IconUserShield },
     ],
+  },
+  {
+    title: 'Notifications',
+    href: '/admin/notifications',
+    icon: IconBell,
   },
   {
     title: 'Understanding Admin',
