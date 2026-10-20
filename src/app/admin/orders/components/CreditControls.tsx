@@ -1,0 +1,323 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel, MenuItem, Radio, RadioGroup, Select, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Order } from '@/types/order';
+import { MoveItemsBar } from './RescheduleControls';
+import { centsToMoney, creditPicks, entireOrderPreview, feeCreditCents, whyNotCreditable } from '@/utils/storeCredit';
+import { whyNotReschedulable } from '@/utils/orderReschedule';
+
+const toCentsText = (v: string): number => Math.round((Number(v) || 0) * 100 + 1e-9);
+
+async function postCredit(token: string | null, orderId: string, body: unknown) {
+  const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/credit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` },
+    body: JSON.stringify(body),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || json.success === false) throw new Error(json.error || json.message || 'Something went wrong. Please try again.');
+  return json.data ?? {};
+}
+
+interface BarProps {
+  order: Order;
+  token: string | null;
+  /** Ticked items ('line:item') */
+  selected: Set<string>;
+  onClear: () => void;
+  /** Called after a change so the page can reload the order */
+  onChanged: () => Promise<void> | void;
+  plain?: boolean;
+}
+
+/** The bar for giving store credit for the ticked items: how many of each, a note, the amount, and a confirmation. */
+export function CreditItemsBar({ order, token, selected, onClear, onChanged, plain }: BarProps) {
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [note, setNote] = useState('');
+  const [internalNote, setInternalNote] = useState('');
+  const [includeTax, setIncludeTax] = useState(false);
+  const [includeFee, setIncludeFee] = useState(false);
+  /** Amounts the admin typed over the worked-out ones ('line:item' -> text) */
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+
+  const picks = useMemo(() => creditPicks(order, selected, quantities, includeTax, Object.fromEntries(Object.entries(typed).map(([k, v]) => [k, Number(v)]))), [order, selected, quantities, includeTax, typed]);
+  const feeCents = feeCreditCents(order);
+  const total = picks.reduce((n, p) => n + p.cents, 0) + (includeFee ? feeCents : 0);
+  if (whyNotCreditable(order) !== null) return null;
+  const key = (p: { line: number; item: number }) => `${p.line}:${p.item}`;
+
+  const give = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await postCredit(token, order.orderId, {
+        items: picks.map((p) => ({ line: p.line, item: p.item, quantity: p.quantity, ...(p.overridden ? { amount: p.cents / 100 } : {}) })),
+        note: note.trim() || undefined,
+        internalNote: internalNote.trim() || undefined,
+        includeTax,
+        includeFee: includeFee && feeCents > 0,
+      });
+      const balance = typeof data.balance === 'number' ? ` Their balance is now ${centsToMoney(Math.round(data.balance * 100))}.` : '';
+      const emailed = data.email?.sent ? ' The customer was emailed.' : ` The customer could not be emailed${data.email?.error ? ` (${data.email.error})` : ''}.`;
+      setConfirmOpen(false);
+      setNote('');
+      setInternalNote('');
+      setIncludeFee(false);
+      setQuantities({});
+      setTyped({});
+      onClear();
+      await onChanged();
+      setDone(`${centsToMoney(total)} credit given.${balance}${emailed}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not give the credit.');
+      setConfirmOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (picks.length === 0) {
+    return done ? (
+      <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+        <Typography sx={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>{done}</Typography>
+      </Box>
+    ) : null;
+  }
+
+  return (
+    <Box
+      sx={
+        plain
+          ? { p: 1.25, borderRadius: 2, border: '1px solid #86EFAC', bgcolor: '#F0FDF4' }
+          : { position: 'sticky', bottom: 0, zIndex: 2, mt: 1, p: 1.25, borderRadius: 2, border: '1px solid #86EFAC', bgcolor: '#F0FDF4', boxShadow: '0 -4px 12px rgba(0,0,0,0.08)' }
+      }
+    >
+      <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#166534', mb: 0.75 }}>Give store credit for:</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        {picks.map((p) => (
+          <Box key={key(p)} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography sx={{ fontSize: 13, flex: '1 1 140px', minWidth: 0, overflowWrap: 'anywhere' }}>{p.name}</Typography>
+            {p.left > 1 && (
+              <Select
+                size="small"
+                value={p.quantity}
+                onChange={(e) => {
+                  setQuantities((prev) => ({ ...prev, [key(p)]: Number(e.target.value) }));
+                  setTyped((prev) => { const next = { ...prev }; delete next[key(p)]; return next; });
+                }}
+                inputProps={{ 'aria-label': `How many ${p.name}` }}
+                sx={{ bgcolor: '#fff', minWidth: 70, '& .MuiSelect-select': { py: 0.5 } }}
+              >
+                {Array.from({ length: p.left }, (_, i) => i + 1).map((n) => (
+                  <MenuItem key={n} value={n}>
+                    {n} of {p.left}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            <TextField
+              size="small"
+              value={typed[key(p)] ?? (p.cents / 100).toFixed(2)}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9.]/g, '').slice(0, 8);
+                setTyped((prev) => ({ ...prev, [key(p)]: v }));
+              }}
+              onBlur={() => {
+                // typing the worked-out amount again (or clearing the box) goes back to the automatic amount
+                const v = typed[key(p)];
+                if (v !== undefined && (v === '' || toCentsText(v) === creditPicks(order, [`${p.line}:${p.item}`], { [key(p)]: p.quantity }, includeTax)[0]?.cents)) {
+                  setTyped((prev) => { const next = { ...prev }; delete next[key(p)]; return next; });
+                }
+              }}
+              inputProps={{ inputMode: 'decimal', 'aria-label': `Amount to credit for ${p.name}`, style: { textAlign: 'right', padding: '4px 8px', width: 64, fontWeight: 700, fontSize: 13 } }}
+              InputProps={{ startAdornment: <Typography sx={{ fontSize: 13, color: '#6B7280' }}>$</Typography> }}
+              sx={{ bgcolor: '#fff', '& .MuiOutlinedInput-root': { pl: 1 } }}
+              color={p.overridden ? 'warning' : undefined}
+              focused={p.overridden ? true : undefined}
+            />
+          </Box>
+        ))}
+      </Box>
+      <RadioGroup row value={includeTax ? 'with' : 'without'} onChange={(e) => setIncludeTax(e.target.value === 'with')} aria-label="Tax on the credited items" sx={{ mt: 0.5 }}>
+        <FormControlLabel value="without" control={<Radio size="small" />} label={<Typography sx={{ fontSize: 13 }}>Withhold tax</Typography>} />
+        <FormControlLabel value="with" control={<Radio size="small" />} label={<Typography sx={{ fontSize: 13 }}>Include tax (10.3%)</Typography>} />
+      </RadioGroup>
+      {feeCents > 0 && (
+        <FormControlLabel
+          sx={{ mt: 0.25, ml: 0 }}
+          control={<Checkbox size="small" checked={includeFee} onChange={(e) => setIncludeFee(e.target.checked)} />}
+          label={<Typography sx={{ fontSize: 13 }}>Also credit the Platform Fee and its tax ({centsToMoney(feeCents)})</Typography>}
+        />
+      )}
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="Note for the customer (optional): shown in their email and account"
+        value={note}
+        onChange={(e) => setNote(e.target.value.slice(0, 200))}
+        inputProps={{ 'aria-label': 'Note for the customer' }}
+        sx={{ bgcolor: '#fff', mt: 1 }}
+      />
+      <TextField
+        size="small"
+        fullWidth
+        placeholder="Internal note (optional): only admins see this"
+        value={internalNote}
+        onChange={(e) => setInternalNote(e.target.value.slice(0, 300))}
+        inputProps={{ 'aria-label': 'Internal note' }}
+        sx={{ bgcolor: '#fff', mt: 1 }}
+      />
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mt: 1 }}>
+        <Button variant="contained" size="small" color="success" onClick={() => setConfirmOpen(true)} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
+          Give {centsToMoney(total)} credit
+        </Button>
+        <Button size="small" onClick={onClear} disabled={busy} sx={{ textTransform: 'none' }}>
+          Clear
+        </Button>
+      </Box>
+      <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
+        {includeTax ? 'The item price and the 10.3% tax on it.' : 'The item price only; its tax is withheld.'}{picks.some((p) => p.overridden) ? ' An amount you typed replaces the worked-out one (at most the item price with tax).' : ''} {includeFee ? 'The Platform Fee and its tax are included.' : 'The Platform Fee and its tax are withheld.'} The tip is never credited.
+      </Typography>
+      {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
+
+      <Dialog open={confirmOpen} onClose={() => !busy && setConfirmOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700 }}>Give {centsToMoney(total)} store credit?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 14, mb: 1 }}>
+            {order.customerInfo?.name || 'The customer'} gets the credit on their account for {[...picks.map((p) => `${p.quantity} × ${p.name}`), ...(includeFee && feeCents > 0 ? ['the Platform Fee'] : [])].join(', ')}. It does not expire and cannot be turned into cash.
+          </Typography>
+          <Typography sx={{ fontSize: 14, color: '#6B7280' }}>They are emailed about it. This cannot be undone here.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)} disabled={busy} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button variant="contained" color="success" onClick={give} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {busy ? <CircularProgress size={18} color="inherit" /> : 'Give credit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
+/**
+ * Shown while items are ticked in an order's details: move their delivery date and/or give store credit for them.
+ * When the order allows both there is a switch; with one, just that bar.
+ */
+function ItemActionsBarInner({ order, token, selected, onClear, onChanged }: Omit<BarProps, 'plain'>) {
+  const canMove = whyNotReschedulable(order) === null;
+  const canCredit = whyNotCreditable(order) === null;
+  const [mode, setMode] = useState<'move' | 'credit'>(canMove ? 'move' : 'credit');
+
+  if (!canMove && !canCredit) return null;
+  if (!canCredit) return <MoveItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} />;
+  if (!canMove) return <CreditItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} />;
+
+  if (selected.size === 0) {
+    // keep the "done" notes of either bar visible
+    return (
+      <>
+        <MoveItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} />
+        <CreditItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} />
+      </>
+    );
+  }
+  return (
+    <Box sx={{ position: 'sticky', bottom: 0, zIndex: 2, mt: 1, p: 1, borderRadius: 2, bgcolor: '#fff', border: '1px solid #E5E7EB', boxShadow: '0 -4px 12px rgba(0,0,0,0.08)' }}>
+      <ToggleButtonGroup
+        exclusive
+        size="small"
+        value={mode}
+        onChange={(_, value) => value && setMode(value)}
+        sx={{ mb: 1, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600, py: 0.25 } }}
+      >
+        <ToggleButton value="move">Move delivery date</ToggleButton>
+        <ToggleButton value="credit">Store credit</ToggleButton>
+      </ToggleButtonGroup>
+      {/* both stay mounted, so what was typed or chosen in one is still there after a look at the other */}
+      <Box sx={{ display: mode === 'move' ? 'block' : 'none' }}>
+        <MoveItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} plain />
+      </Box>
+      <Box sx={{ display: mode === 'credit' ? 'block' : 'none' }}>
+        <CreditItemsBar order={order} token={token} selected={selected} onClear={onClear} onChanged={onChanged} plain />
+      </Box>
+    </Box>
+  );
+}
+
+/** One button to credit everything left on the order: all items with their tax, the Platform Fee with its tax, and the tip. */
+function EntireOrderCredit({ order, token, onChanged }: Pick<BarProps, 'order' | 'token' | 'onChanged'>) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [internalNote, setInternalNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+  const preview = useMemo(() => entireOrderPreview(order), [order]);
+  if (whyNotCreditable(order) !== null || preview.totalCents <= 0) return done ? <Alert severity="success" sx={{ mt: 1, py: 0 }}>{done}</Alert> : null;
+
+  const give = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await postCredit(token, order.orderId, { entireOrder: true, note: note.trim() || undefined, internalNote: internalNote.trim() || undefined });
+      const emailed = data.email?.sent ? ' The customer was emailed.' : ' The customer could not be emailed.';
+      setOpen(false);
+      setNote('');
+      setInternalNote('');
+      await onChanged();
+      setDone(`${centsToMoney(preview.totalCents)} credit given for the entire order.${emailed}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not give the credit.');
+      setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Box sx={{ mt: 1 }}>
+      <Button variant="outlined" color="success" size="small" onClick={() => setOpen(true)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+        Credit entire order · {centsToMoney(preview.totalCents)}
+      </Button>
+      {error && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{error}</Alert>}
+      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700 }}>Credit the entire order?</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1.5 }}>
+            <Typography sx={{ fontSize: 14 }}>Items and their 10.3% tax: {centsToMoney(preview.itemsCents)}</Typography>
+            {preview.feeCents > 0 && <Typography sx={{ fontSize: 14 }}>Platform Fee and its tax: {centsToMoney(preview.feeCents)}</Typography>}
+            {preview.tipCents > 0 && <Typography sx={{ fontSize: 14 }}>Tip: {centsToMoney(preview.tipCents)}</Typography>}
+            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Total: {centsToMoney(preview.totalCents)}</Typography>
+          </Box>
+          <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 1 }}>
+            {order.customerInfo?.name || 'The customer'} gets this as store credit. It does not expire, cannot be turned into cash, and they are emailed. This cannot be undone here.
+          </Typography>
+          <TextField size="small" fullWidth placeholder="Note for the customer (optional): shown in their email and account" value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} inputProps={{ 'aria-label': 'Note for the customer' }} />
+          <TextField size="small" fullWidth placeholder="Internal note (optional): only admins see this" value={internalNote} onChange={(e) => setInternalNote(e.target.value.slice(0, 300))} inputProps={{ 'aria-label': 'Internal note' }} sx={{ mt: 1 }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)} disabled={busy} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button variant="contained" color="success" onClick={give} disabled={busy} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {busy ? <CircularProgress size={18} color="inherit" /> : 'Give credit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
+/** Shown in an order's details: the whole-order credit button, and (while items are ticked) the item actions. */
+export function ItemActionsBar(props: Omit<BarProps, 'plain'>) {
+  return (
+    <>
+      <EntireOrderCredit order={props.order} token={props.token} onChanged={props.onChanged} />
+      <ItemActionsBarInner {...props} />
+    </>
+  );
+}

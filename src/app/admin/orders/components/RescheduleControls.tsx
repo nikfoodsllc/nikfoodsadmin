@@ -227,7 +227,7 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
  * kitchen day of each item stays. Any date from today works, also one that has already closed for ordering (an admin
  * decision, so the order cutoff does not apply).
  */
-export function MoveItemsBar({ order, token, selected, onClear, onChanged }: CommonProps & { selected: Set<string>; onClear: () => void }) {
+export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain }: CommonProps & { selected: Set<string>; onClear: () => void; plain?: boolean }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -271,17 +271,21 @@ export function MoveItemsBar({ order, token, selected, onClear, onChanged }: Com
 
   return (
     <Box
-      sx={{
-        position: 'sticky',
-        bottom: 0,
-        zIndex: 2,
-        mt: 1,
-        p: 1.25,
-        borderRadius: 2,
-        border: '1px solid #FCD34D',
-        bgcolor: '#FFFBEB',
-        boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
-      }}
+      sx={
+        plain
+          ? { p: 1.25, borderRadius: 2, border: '1px solid #FCD34D', bgcolor: '#FFFBEB' }
+          : {
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 2,
+              mt: 1,
+              p: 1.25,
+              borderRadius: 2,
+              border: '1px solid #FCD34D',
+              bgcolor: '#FFFBEB',
+              boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+            }
+      }
     >
       <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#92400E', mb: 0.5 }}>
         {count} item{count === 1 ? '' : 's'} selected. New delivery date:

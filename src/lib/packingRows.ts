@@ -1,3 +1,4 @@
+import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString } from '@/utils/kitchenDashboard';
 import type { PackingRow } from '@/utils/packingReport';
@@ -21,6 +22,7 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
         $and: [{ $or: [{ 'items.actualDeliveryDate': within }, { 'items.deliveryDate': within }] }],
       },
     },
+    CREDIT_ADJUST_STAGE,
     { $unwind: '$items' },
     { $match: { $expr: { $and: [{ $gte: [{ $toString: effective }, date] }, { $lt: [{ $toString: effective }, `${date}￿`] }] } } },
     { $unwind: '$items.items' },
@@ -96,6 +98,7 @@ export async function fetchHeldRows(date: string): Promise<HeldRow[]> {
         'items.deliveryDate': within,
       },
     },
+    CREDIT_ADJUST_STAGE,
     { $unwind: '$items' },
     {
       $match: {
