@@ -11,6 +11,7 @@ import {
   menuDayIndex,
   uniqueIds,
   filterNodes,
+  onlyAvailable,
   isValidDate,
   needsOptions,
   quantityFor,
@@ -56,7 +57,7 @@ export default function MenuPicker({
   const [open, setOpen] = useState<Set<string>>(() => new Set());
 
   const menuDays = useMemo(() => menuDayIndex(catalog), [catalog]);
-  const baseNodes = useMemo(() => (view === 'all' ? allMenuNodes(catalog) : dayMenuNodes(catalog, date)), [catalog, view, date]);
+  const baseNodes = useMemo(() => onlyAvailable(view === 'all' ? allMenuNodes(catalog) : dayMenuNodes(catalog, date), catalog.items), [catalog, view, date]);
   const nodes = useMemo(() => filterNodes(baseNodes, catalog.items, search), [baseNodes, catalog.items, search]);
   const searching = search.trim().length > 0;
   const totalItems = useMemo(() => uniqueIds(baseNodes).length, [baseNodes]);
@@ -93,7 +94,6 @@ export default function MenuPicker({
           <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
             {item.portions?.length ? `from ${money(Math.min(...(item.portionPrices?.length ? item.portionPrices : [item.price])))}` : money(item.price)}
             {item.hasCombo ? ' · combo' : ''}
-            {(item as MenuItem & { available?: boolean }).available === false ? ' · hidden on the website' : ''}
           </Typography>
           {view === 'all' && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5, alignItems: 'center' }}>
