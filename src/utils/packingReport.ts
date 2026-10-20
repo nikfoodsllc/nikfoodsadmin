@@ -231,3 +231,19 @@ export function filterPackingReport(report: PackingReport, query: string): Packi
     .filter((route) => route.stops.length > 0);
   return { ...report, routes, unrouted: report.unrouted.filter(stopHits), totals: report.totals.filter((t) => hit(t.name)), ...(report.held ? { held: filterHeld(report.held, q) } : {}) };
 }
+
+/** "all", a route's key, or this value for the customers who are on no route yet. */
+export const ALL_ROUTES = 'all';
+export const UNROUTED_ROUTE = 'unrouted';
+
+/**
+ * The route buttons: show the list of one route only (or only the customers not on a route yet). The item totals and the
+ * "not going out today" list are for the whole day and stay as they are. A key that is not in the report shows everything.
+ */
+export function filterByRoute(report: PackingReport, key: string): PackingReport {
+  if (!key || key === ALL_ROUTES) return report;
+  if (key === UNROUTED_ROUTE) return { ...report, routes: [] };
+  const routes = report.routes.filter((route) => route.key === key);
+  if (routes.length === 0) return report;
+  return { ...report, routes, unrouted: [] };
+}

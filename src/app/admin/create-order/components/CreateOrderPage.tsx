@@ -63,6 +63,8 @@ export default function CreateOrderPage() {
 
   const [tip, setTip] = useState(0);
   const [waiveFee, setWaiveFee] = useState(false);
+  // an order waiting for payment that already counts in the reports and goes to OptimoRoute
+  const [countNow, setCountNow] = useState(false);
   // the Platform Fee only covers Stripe's fee, so a Zelle order starts with it waived; once the admin touches the box, their choice stays
   const feeTouched = useRef(false);
   const changeWaiveFee = (value: boolean) => {
@@ -228,6 +230,7 @@ export default function CreateOrderPage() {
       tipPercentage: tip,
       waivePlatformFee: waiveFee,
       discount: discountValue,
+      ...(countNow && (payment === 'link' || payment === 'zelle') ? { countBeforePayment: true } : {}),
       payment: payment === 'link' ? { mode: 'link' } : payment === 'zelle' ? { mode: 'zelle' } : payment === 'quote' ? { mode: 'quote' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
       ...(editing ? { replacesOrderId: editing } : {}),
@@ -254,6 +257,7 @@ export default function CreateOrderPage() {
     setLines([]);
     setTip(0);
     setWaiveFee(false);
+    setCountNow(false);
     feeTouched.current = false;
     setDiscount('');
     setPayment('link');
@@ -290,6 +294,7 @@ export default function CreateOrderPage() {
     );
     setTip(o.tipPercentage);
     setWaiveFee(o.waivePlatformFee);
+    setCountNow(o.countBeforePayment === true);
     feeTouched.current = true; // an order being changed keeps the fee choice it was saved with
     setDiscount(o.discount > 0 ? String(o.discount) : '');
     setPayment(o.payKind === 'zelle' ? 'zelle' : 'link');
@@ -316,6 +321,8 @@ export default function CreateOrderPage() {
       onTip={setTip}
       waiveFee={waiveFee}
       onWaiveFee={changeWaiveFee}
+      countNow={countNow}
+      onCountNow={setCountNow}
       discount={discount}
       onDiscount={setDiscount}
       payment={payment}
