@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { fetchDashboardRows } from '@/lib/kitchenRows';
-import { buildKitchenDays, buildKitchenWeek, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
+import { db } from '@/lib/db';
+import { buildKitchenDays, buildKitchenWeek, enumerateDays, namesIn, validateRange, withPreparation } from '@/utils/kitchenDashboard';
+import { normalizePreparationType, type PreparationType } from '@/utils/preparationType';
 
 /**
  * Verify JWT token and check admin role
@@ -55,13 +57,32 @@ export async function GET(request: NextRequest) {
 
     const rows = await fetchDashboardRows(range);
 
+    const builtDays = buildKitchenDays(rows, days);
+    const builtWeek = buildKitchenWeek(rows);
+
+    // how each item is prepared (cooked or ready to eat), by name: only when every food item with that name agrees
+    const names = namesIn([...builtDays, builtWeek]);
+    const typesByName = new Map<string, Set<string>>();
+    if (names.length > 0) {
+      const found = await db.read<{ name?: string; preparationType?: unknown }>('fooditems', { name: { $in: names } } as never, { projection: { name: 1, preparationType: 1 } } as never);
+      for (const item of found.success ? found.data ?? [] : []) {
+        const key = (item.name ?? '').trim();
+        const set = typesByName.get(key) ?? new Set<string>();
+        set.add(normalizePreparationType(item.preparationType) ?? 'none');
+        typesByName.set(key, set);
+      }
+    }
+    const typeByName = new Map<string, PreparationType | null>(
+      [...typesByName].map(([name, set]) => [name, set.size === 1 && !set.has('none') ? ([...set][0] as PreparationType) : null])
+    );
+
     return NextResponse.json({
       data: {
         startDate: range.startDate,
         endDate: range.endDate,
-        days: buildKitchenDays(rows, days),
+        days: builtDays.map((d) => withPreparation(d, typeByName)),
         // the whole range as one block, whatever the menu day or delivery day of each line
-        week: buildKitchenWeek(rows),
+        week: withPreparation(builtWeek, typeByName),
       },
       message: 'Kitchen dashboard generated successfully',
     });
