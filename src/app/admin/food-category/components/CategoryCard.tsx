@@ -235,28 +235,6 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
             }}
           />
         )}
-
-        {/* Draft Badge - Below Type Badge */}
-        {category.isDraft && (
-          <Chip
-            label="Draft"
-            size="small"
-            className="category-badge"
-            sx={{
-              position: 'absolute',
-              top: 35,
-              left: 8,
-              backgroundColor: 'rgba(107, 114, 128, 0.95)',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '0.7rem',
-              height: 22,
-              minWidth: 48,
-              zIndex: 2,
-              transition: 'all 0.3s ease',
-            }}
-          />
-        )}
       </Box>
 
       {/* Bottom 40% - Content Section */}
