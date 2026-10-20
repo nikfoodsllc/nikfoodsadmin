@@ -38,8 +38,10 @@ import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
-import { MoveItemsBar, RescheduleBanner, shortDate } from './RescheduleControls';
+import { RescheduleBanner, shortDate } from './RescheduleControls';
+import { ItemActionsBar } from './CreditControls';
 import OrderTranscript from './OrderTranscript';
+import { creditLeft, whyNotCreditable } from '@/utils/storeCredit';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 import { comboQuantityText } from '@/utils/comboQuantity';
 
@@ -106,6 +108,8 @@ export default function OrderDetailsDialog({
   if (!order) return null;
 
   const movable = whyNotReschedulable(order) === null;
+  const creditable = whyNotCreditable(order) === null;
+  const selectable = movable || creditable;
   const toggleItems = (keys: string[], on: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -343,18 +347,20 @@ export default function OrderDetailsDialog({
 
         {/* Order Items by Day */}
         <Box sx={{ marginBottom: 3 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: movable ? 0.25 : 1.5, color: '#111827' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, marginBottom: selectable ? 0.25 : 1.5, color: '#111827' }}>
             Order Items
           </Typography>
-          {movable && (
-            <Typography sx={{ fontSize: 12, color: '#6B7280', marginBottom: 1.5 }}>Tick items to change their delivery date.</Typography>
+          {selectable && (
+            <Typography sx={{ fontSize: 12, color: '#6B7280', marginBottom: 1.5 }}>
+              {movable && creditable ? 'Tick items to change their delivery date or give store credit.' : movable ? 'Tick items to change their delivery date.' : 'Tick items to give store credit.'}
+            </Typography>
           )}
           {order.items.map((dayOrder, dayIndex) => {
             const heading = orderDayHeading(dayOrder);
             return (
             <Box key={dayIndex} sx={{ marginBottom: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
-                {movable && (() => {
+                {selectable && (() => {
                   const keys = dayOrder.items.map((_, i) => selectionKey(dayIndex, i));
                   const count = keys.filter((k) => selected.has(k)).length;
                   return (
@@ -401,7 +407,7 @@ export default function OrderDetailsDialog({
                           <TableCell>
                             {/* Item name with veg indicator */}
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
-                              {movable && (
+                              {selectable && (
                                 <Checkbox
                                   size="small"
                                   checked={selected.has(selectionKey(dayIndex, itemIndex))}
@@ -429,6 +435,11 @@ export default function OrderDetailsDialog({
                                 {item.originalDeliveryDate && item.originalDeliveryDate !== (dayOrder.actualDeliveryDate ? String(dayOrder.actualDeliveryDate).slice(0, 10) : String(dayOrder.deliveryDate).slice(0, 10)) && (
                                   <Typography variant="caption" sx={{ color: '#B45309', fontWeight: 600 }}>
                                     Moved from {shortDate(item.originalDeliveryDate)}
+                                  </Typography>
+                                )}
+                                {item.quantity - creditLeft(order, dayIndex, itemIndex) > 0 && (
+                                  <Typography variant="caption" sx={{ color: '#166534', fontWeight: 600, display: 'block' }}>
+                                    Credited {item.quantity - creditLeft(order, dayIndex, itemIndex)} of {item.quantity}
                                   </Typography>
                                 )}
                               </Box>
@@ -571,11 +582,45 @@ export default function OrderDetailsDialog({
             )}
             <Divider sx={{ marginY: 1 }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="body1" sx={{ fontWeight: 600 }}>Total Paid</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>{(order.storeCreditUsed ?? 0) > 0 ? 'Order total' : 'Total Paid'}</Typography>
               <Typography variant="body1" sx={{ fontWeight: 600, color: '#4F8CFF' }}>
                 {safeFormatCurrency(order.totalPaid)}
               </Typography>
             </Box>
+            {(order.storeCreditUsed ?? 0) > 0 && (
+              <>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" sx={{ color: '#10B981' }}>
+                    Store credit used{order.storeCreditState === 'released' ? ' (given back)' : ''}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#10B981' }}>
+                    -{safeFormatCurrency(order.storeCreditUsed!)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>Paid by card</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {safeFormatCurrency(Math.max(0, Math.round((order.totalPaid - order.storeCreditUsed!) * 100) / 100))}
+                  </Typography>
+                </Box>
+              </>
+            )}
+            {(order.creditShortfall ?? 0) > 0 && (
+              <Typography variant="caption" sx={{ color: '#B91C1C', fontWeight: 600 }}>
+                {safeFormatCurrency(order.creditShortfall!)} of store credit could not be taken when this order was paid later. Check the customer&apos;s balance.
+              </Typography>
+            )}
+            {(order.creditsIssued ?? []).length > 0 && (
+              <Box sx={{ mt: 1, p: 1, borderRadius: 1, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534' }}>Store credit given for this order</Typography>
+                {order.creditsIssued!.map((c, i) => (
+                  <Typography key={i} variant="caption" sx={{ display: 'block', color: '#166534' }}>
+                    {safeFormatCurrency(c.amount)} on {new Date(c.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}: {c.items.map((it) => `${it.quantity} × ${it.name}`).join(', ')}
+                    {c.note ? ` (${c.note})` : ''}
+                  </Typography>
+                ))}
+              </Box>
+            )}
             {getRefundedAmount(order) > 0 && (
               <>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -628,6 +673,16 @@ export default function OrderDetailsDialog({
                 </Typography>
               </Box>
             )}
+            {(order.stripeRefunds ?? []).map((r) => (
+              <Box key={r.id} sx={{ backgroundColor: '#FFFBEB', borderRadius: 1, padding: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#92400E' }}>
+                  Refund in Stripe: {safeFormatCurrency(r.amount)}
+                  {r.reason ? ` (${r.reason.replace(/_/g, ' ')})` : ''}
+                </Typography>
+                {r.note && <Typography variant="body2" sx={{ color: '#78350F', overflowWrap: 'anywhere' }}>Note: {r.note}</Typography>}
+                <Typography variant="caption" sx={{ color: '#6B7280' }}>{new Date(r.at).toLocaleString()}</Typography>
+              </Box>
+            ))}
             {typeof order.paymentAttempts === 'number' && order.paymentAttempts > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" sx={{ color: '#6B7280' }}>Failed attempts</Typography>
@@ -779,7 +834,7 @@ export default function OrderDetailsDialog({
           </FormControl>
         </Box>
         {/* appears while items are ticked: one new delivery date for all of them */}
-        <MoveItemsBar
+        <ItemActionsBar
           order={order}
           token={token}
           selected={selected}

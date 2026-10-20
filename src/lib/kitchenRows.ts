@@ -1,3 +1,4 @@
+import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 
@@ -22,6 +23,7 @@ export async function fetchKitchenRows(range: DayRange, options: { report?: bool
         'items.deliveryDate': within,
       },
     },
+    CREDIT_ADJUST_STAGE,
     { $unwind: '$items' },
     { $match: { 'items.deliveryDate': within } },
     { $unwind: '$items.items' },
@@ -106,6 +108,7 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
         'items.actualDeliveryDate': within,
       },
     },
+    CREDIT_ADJUST_STAGE,
     { $unwind: '$items' },
     { $match: { 'items.actualDeliveryDate': within } },
     { $unwind: '$items.items' },

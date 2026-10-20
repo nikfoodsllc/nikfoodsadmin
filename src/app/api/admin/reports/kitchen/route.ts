@@ -1,3 +1,4 @@
+import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       // Match orders based on date filter
       ...(Object.keys(filter).length > 0 ? [{ $match: filter }] : []),
       // Unwind the items array (OrderDay array)
+      CREDIT_ADJUST_STAGE,
       { $unwind: '$items' },
       // Unwind the items.items array (OrderDayItem array)
       { $unwind: '$items.items' },
@@ -114,6 +116,7 @@ export async function GET(request: NextRequest) {
       // Match orders based on date filter
       ...(Object.keys(filter).length > 0 ? [{ $match: filter }] : []),
       // Unwind the items array (OrderDay array)
+      CREDIT_ADJUST_STAGE,
       { $unwind: '$items' },
       // Unwind the items.items array (OrderDayItem array)
       { $unwind: '$items.items' },

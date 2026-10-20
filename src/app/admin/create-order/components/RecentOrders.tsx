@@ -302,6 +302,11 @@ export default function RecentOrders({ token, version, onChanged, onEdit, onRows
                 </>
               )}
               {!row.awaitingPayment && <ActivityLines row={row} />}
+              {(row.storeCreditUsed ?? 0) > 0 && row.awaitingPayment && (
+                <Typography sx={{ fontSize: 12, color: '#166534', fontWeight: 600, mt: 0.5 }}>
+                  The customer applied ${row.storeCreditUsed!.toFixed(2)} store credit. The card pays ${Math.max(0, Math.round((row.total - row.storeCreditUsed!) * 100) / 100).toFixed(2)}.
+                </Typography>
+              )}
               {row.offlinePaymentNote && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>Note: {row.offlinePaymentNote}</Typography>}
               {row.details && (
                 <>

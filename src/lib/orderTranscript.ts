@@ -46,6 +46,7 @@ export interface TranscriptOrder {
     at: When;
     by?: string;
     note?: string;
+    internalNote?: string;
     amount?: number;
     fee?: number;
     tip?: number;
@@ -164,7 +165,8 @@ export function buildOrderTranscript(order: TranscriptOrder, names: Record<strin
       ...(c.items ?? []).map((i) => `${i.quantity && i.quantity > 1 ? `${i.quantity} × ` : ''}${i.name ?? 'Item'} · ${money(i.amount ?? 0)}`),
       ...(c.fee ? [`Platform Fee (with tax) · ${money(c.fee)}`] : []),
       ...(c.tip ? [`Tip · ${money(c.tip)}`] : []),
-      ...(c.note ? [`Note: ${c.note}`] : []),
+      ...(c.note ? [`Note to customer: ${c.note}`] : []),
+      ...(c.internalNote ? [`Internal note: ${c.internalNote}`] : []),
     ];
     add(c.at, {
       kind: 'credit',

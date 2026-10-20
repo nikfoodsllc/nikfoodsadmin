@@ -1,0 +1,133 @@
+/**
+ * Store credit for items of an order (admin). The live site does the crediting
+ * (see livesite/src/lib/storeCredit.ts and lib/server/storeCreditIssue.ts): keep these rules in step.
+ *
+ * A credited item is worth its price (portion and eco container included, as stored on the order line) x quantity,
+ * plus, only when the admin chooses, the 10.3% tax charged on it (withheld by default). The Platform Fee, the tax on it and the tip are never credited.
+ */
+export const CREDIT_TAX_RATE = 0.103;
+
+export const toCents = (dollars: number): number => Math.round((Number(dollars) || 0) * 100 + 1e-9);
+
+export function creditForItemCents(unitPrice: number, quantity: number, includeTax = false): number {
+  const base = toCents(unitPrice) * Math.max(0, Math.floor(Number(quantity) || 0));
+  return includeTax ? base + Math.round(base * CREDIT_TAX_RATE) : base;
+}
+
+/** The Platform Fee plus the 10.3% tax on it (credited only when the admin chooses, and only once per order). */
+export function creditForFeeCents(platformFee: number): number {
+  const base = toCents(platformFee);
+  return base > 0 ? base + Math.round(base * CREDIT_TAX_RATE) : 0;
+}
+
+export interface CreditOrderLike {
+  platformFee?: number | null;
+  totalPaid?: number | null;
+  tip?: number | null;
+  platformFeeWaived?: boolean | null;
+  status?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  user?: string | null;
+  items?: Array<{ items?: Array<{ quantity?: number | null; price?: number | null; food?: { name?: string | null } | null }> | null }> | null;
+  creditsIssued?: Array<{ fee?: number | null; tip?: number | null; items?: Array<{ line: number; item: number; quantity: number }> | null }> | null;
+}
+
+/** Why credit cannot be given on this order, or null when it can (the same rule the live site applies). */
+export function whyNotCreditable(order: CreditOrderLike): string | null {
+  if (order.paymentStatus !== 'paid') return 'Credit can only be given for a paid order.';
+  if (order.status === 'cancelled') return 'This order is cancelled.';
+  if (String(order.paymentMethod ?? '').toLowerCase() === 'quote') return 'A quote was never charged, so there is nothing to credit.';
+  if (!order.user) return 'This order has no customer account to give credit to.';
+  if (!order.items || order.items.length === 0) return 'This order has no items.';
+  return null;
+}
+
+/** How many of each item (key 'line:item') were already credited. */
+export function creditedQuantities(order: CreditOrderLike): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const entry of order.creditsIssued ?? []) {
+    for (const it of entry.items ?? []) {
+      const key = `${it.line}:${it.item}`;
+      map.set(key, (map.get(key) ?? 0) + (Number(it.quantity) || 0));
+    }
+  }
+  return map;
+}
+
+/** How many of an item can still be credited. */
+export function creditLeft(order: CreditOrderLike, line: number, item: number): number {
+  const ordered = order.items?.[line]?.items?.[item]?.quantity ?? 0;
+  return Math.max(0, ordered - (creditedQuantities(order).get(`${line}:${item}`) ?? 0));
+}
+
+export interface CreditPick {
+  /** The amount was typed in by the admin instead of price x quantity (+ tax) */
+  overridden?: boolean;
+  line: number;
+  item: number;
+  name: string;
+  quantity: number;
+  left: number;
+  cents: number;
+}
+
+/** The picked items ('line:item' keys) with how much each is worth; items already credited in full are skipped. */
+export function creditPicks(order: CreditOrderLike, keys: Iterable<string>, quantities: Record<string, number> = {}, includeTax = false, overrides: Record<string, number> = {}): CreditPick[] {
+  const picks: CreditPick[] = [];
+  for (const key of keys) {
+    const [line, item] = key.split(':').map(Number);
+    const dayItem = order.items?.[line]?.items?.[item];
+    if (!dayItem) continue;
+    const left = creditLeft(order, line, item);
+    if (left === 0) continue;
+    const quantity = Math.min(left, Math.max(1, Math.floor(quantities[key] ?? left)));
+    const most = creditForItemCents(dayItem.price ?? 0, quantity, true);
+    const typed = overrides[key];
+    const overridden = typed !== undefined && Number.isFinite(typed) && toCents(typed) > 0;
+    picks.push({ line, item, name: dayItem.food?.name ?? 'Item', quantity, left, cents: overridden ? Math.min(toCents(typed), most) : creditForItemCents(dayItem.price ?? 0, quantity, includeTax), ...(overridden ? { overridden: true } : {}) });
+  }
+  return picks.sort((a, b) => a.line - b.line || a.item - b.item);
+}
+
+/** What the Platform Fee credit would be, or 0 when there is none or it was already credited. */
+export function feeCreditCents(order: CreditOrderLike): number {
+  if (order.platformFeeWaived) return 0;
+  if ((order.creditsIssued ?? []).some((c) => (Number(c.fee) || 0) > 0)) return 0;
+  return creditForFeeCents(order.platformFee ?? 0);
+}
+
+export interface EntireOrderPreview {
+  itemsCents: number;
+  feeCents: number;
+  tipCents: number;
+  totalCents: number;
+  /** Item lines still left to credit */
+  lines: number;
+}
+
+/** What crediting the whole order gives now: every item still left with its tax, the Platform Fee with its tax, and the tip (each fee/tip only if not credited before). */
+export function entireOrderPreview(order: CreditOrderLike): EntireOrderPreview {
+  let itemsCents = 0;
+  let lines = 0;
+  (order.items ?? []).forEach((day, line) =>
+    (day.items ?? []).forEach((it, item) => {
+      const left = creditLeft(order, line, item);
+      if (left > 0) {
+        itemsCents += creditForItemCents(it.price ?? 0, left, true);
+        lines += 1;
+      }
+    })
+  );
+  const feeCents = feeCreditCents(order);
+  const tipDone = (order.creditsIssued ?? []).some((c) => (Number(c.tip) || 0) > 0);
+  const tipCents = tipDone ? 0 : toCents(order.tip ?? 0);
+  // nothing credited before: the credit is exactly what the customer paid (the items absorb the rounding of the taxes)
+  if (lines > 0 && (order.creditsIssued ?? []).length === 0 && order.totalPaid != null) {
+    const target = toCents(order.totalPaid) - feeCents - tipCents;
+    if (target > 0 && Math.abs(target - itemsCents) <= 100) itemsCents = target;
+  }
+  return { itemsCents, feeCents, tipCents, totalCents: itemsCents + feeCents + tipCents, lines };
+}
+
+export const centsToMoney = (cents: number): string => `$${(Math.round(cents) / 100).toFixed(2)}`;
