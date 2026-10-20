@@ -25,6 +25,7 @@ export const ORDERS_COLUMNS: OrdersColumnDef[] = [
   { key: 'paymentStatus', label: 'Payment Status', defaultWidth: 150, skeleton: 'pill', skeletonWidth: 80 },
   { key: 'instruction', label: 'Instruction to Driver', defaultWidth: 150, skeleton: 'text', skeletonWidth: 100 },
   { key: 'paymentMethod', label: 'Payment Method', defaultWidth: 135, skeleton: 'text', skeletonWidth: 75 },
+  { key: 'channel', label: 'Order Source', defaultWidth: 130, skeleton: 'pill', skeletonWidth: 80 },
   { key: 'emailStatus', label: 'Confirmation Email', defaultWidth: 165, skeleton: 'pill', skeletonWidth: 70 },
   { key: 'optimo', label: 'OptimoRoute', defaultWidth: 150, skeleton: 'pill', skeletonWidth: 80 },
   { key: 'subtotal', label: 'Sub Total', defaultWidth: 90, align: 'right', skeleton: 'text', skeletonWidth: 55 },

@@ -53,6 +53,7 @@ export default function OrdersPage() {
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('all');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
   const [selectedOptimo, setSelectedOptimo] = useState('all');
+  const [selectedChannel, setSelectedChannel] = useState('all');
   const [selectedRescheduled, setSelectedRescheduled] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -145,6 +146,7 @@ export default function OrdersPage() {
       if (selectedPaymentStatus !== 'all') params.append('paymentStatus', selectedPaymentStatus);
       if (selectedPaymentMethod !== 'all') params.append('paymentMethod', selectedPaymentMethod);
       if (selectedOptimo !== 'all') params.append('optimo', selectedOptimo);
+      if (selectedChannel !== 'all') params.append('channel', selectedChannel);
       if (selectedRescheduled !== 'all') params.append('rescheduled', selectedRescheduled);
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
@@ -190,7 +192,7 @@ export default function OrdersPage() {
     } finally {
       if (seq === fetchSeq.current && !options.silent) setLoading(false);
     }
-  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedRescheduled, startDate, endDate, sortBy, currentPage, itemsPerPage, token]);
+  }, [searchQuery, selectedStatus, selectedPaymentStatus, selectedPaymentMethod, selectedOptimo, selectedChannel, selectedRescheduled, startDate, endDate, sortBy, currentPage, itemsPerPage, token]);
 
   // Fetch orders when filters change
   useEffect(() => {
@@ -297,6 +299,12 @@ export default function OrdersPage() {
     setSelectedOrderIds(new Set());
   };
 
+  const handleChannelChange = (value: string) => {
+    setSelectedChannel(value);
+    setCurrentPage(1);
+    setSelectedOrderIds(new Set());
+  };
+
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
     setCurrentPage(1);
@@ -328,6 +336,7 @@ export default function OrdersPage() {
     setSelectedPaymentStatus('all');
     setSelectedPaymentMethod('all');
     setSelectedOptimo('all');
+    setSelectedChannel('all');
     setSelectedRescheduled('all');
     setStartDate('');
     setEndDate('');
@@ -598,6 +607,7 @@ export default function OrdersPage() {
           selectedPaymentStatus={selectedPaymentStatus}
           selectedPaymentMethod={selectedPaymentMethod}
           selectedOptimo={selectedOptimo}
+          selectedChannel={selectedChannel}
           selectedRescheduled={selectedRescheduled}
           startDate={startDate}
           endDate={endDate}
@@ -607,6 +617,7 @@ export default function OrdersPage() {
           onPaymentStatusChange={handlePaymentStatusChange}
           onPaymentMethodChange={handlePaymentMethodChange}
           onOptimoChange={handleOptimoChange}
+          onChannelChange={handleChannelChange}
           onRescheduledChange={handleRescheduledChange}
           onStartDateChange={handleStartDateChange}
           onEndDateChange={handleEndDateChange}
@@ -684,6 +695,7 @@ export default function OrdersPage() {
         selectedPaymentStatus={selectedPaymentStatus}
         selectedPaymentMethod={selectedPaymentMethod}
         selectedOptimo={selectedOptimo}
+          selectedChannel={selectedChannel}
         selectedRescheduled={selectedRescheduled}
           startDate={startDate}
           endDate={endDate}
