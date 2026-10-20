@@ -244,11 +244,6 @@ function CategoryEntry({
             }}
           >
             {category.name}
-            {category.isDraft ? (
-              <Typography component="span" sx={{ fontSize: 12, color: '#B45309', ml: 0.75 }}>
-                (draft)
-              </Typography>
-            ) : null}
           </Typography>
           {chips}
         </Box>

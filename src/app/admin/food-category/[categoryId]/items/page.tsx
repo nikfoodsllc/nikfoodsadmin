@@ -759,17 +759,6 @@ export default function CategoryItemsPage() {
                 fontWeight: 500,
               }}
             />
-            {category.isDraft && (
-              <Chip
-                label="Draft"
-                size="small"
-                sx={{
-                  backgroundColor: '#FFA726',
-                  color: 'white',
-                  fontWeight: 500,
-                }}
-              />
-            )}
           </Box>
         </Box>
 
