@@ -34,7 +34,6 @@ interface FormData {
   price: string;
   veg: boolean;
   available: boolean;
-  isDraft: boolean;
   imagePreview: string;
 }
 
@@ -44,7 +43,6 @@ const getDefaultFormData = (): FormData => ({
   price: '',
   veg: true,
   available: true,
-  isDraft: false,
   imagePreview: '',
 });
 
@@ -134,7 +132,7 @@ export default function QuickCreateFoodItem({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (saveAsDraft: boolean = false) => {
+  const handleSubmit = async () => {
     if (!validate()) {
       return;
     }
@@ -178,7 +176,7 @@ export default function QuickCreateFoodItem({
           category: [categoryId], // Automatically assign to current category
           veg: formData.veg,
           available: formData.available,
-          isDraft: saveAsDraft,
+          isDraft: false,
           itemType: 'simple',
           url: imageUrl,
           public_id: publicId,
@@ -454,24 +452,7 @@ export default function QuickCreateFoodItem({
         </Button>
         <Box sx={{ display: 'flex', gap: 1, flex: { xs: 1, sm: 'none' } }}>
           <Button
-            onClick={() => handleSubmit(true)}
-            disabled={loading || uploadingImage}
-            variant="outlined"
-            sx={{
-              textTransform: 'none',
-              borderColor: '#FFA726',
-              color: '#FFA726',
-              flex: 1,
-              '&:hover': {
-                borderColor: '#FB8C00',
-                backgroundColor: 'rgba(255, 167, 38, 0.04)',
-              },
-            }}
-          >
-            {loading ? 'Saving...' : 'Save as Draft'}
-          </Button>
-          <Button
-            onClick={() => handleSubmit(false)}
+            onClick={() => handleSubmit()}
             disabled={loading || uploadingImage}
             variant="contained"
             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : null}
