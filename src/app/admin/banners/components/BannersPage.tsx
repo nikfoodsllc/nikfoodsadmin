@@ -41,6 +41,7 @@ interface Banner {
   active: boolean;
   startsAt: string | null;
   endsAt: string | null;
+  durationSeconds?: number;
   sequence: number;
   status: BannerStatus;
 }
@@ -76,7 +77,9 @@ function fromInput(v: string): string | null {
   return new Date(guess + 8 * 3600000).toISOString();
 }
 
-const EMPTY = { _id: '', title: '', subtitle: '', imageUrl: '', linkType: 'none' as BannerLinkType, categoryId: '', url: '', active: true, startsAt: '', endsAt: '' };
+// the choices for how long a banner stays before the next one slides in (a saved value outside this list is kept and shown too)
+const DURATION_CHOICES = [3, 4, 5, 6, 8, 10, 15, 20, 30];
+const EMPTY = { _id: '', title: '', subtitle: '', imageUrl: '', linkType: 'none' as BannerLinkType, categoryId: '', url: '', active: true, startsAt: '', endsAt: '', durationSeconds: 5 };
 
 export default function BannersPage() {
   const router = useRouter();
@@ -135,7 +138,7 @@ export default function BannersPage() {
 
   const open = (b?: Banner) => {
     setFormError('');
-    setForm(b ? { _id: b._id, title: b.title, subtitle: b.subtitle, imageUrl: b.imageUrl, linkType: b.linkType, categoryId: b.categoryId, url: b.url, active: b.active, startsAt: toInput(b.startsAt), endsAt: toInput(b.endsAt) } : { ...EMPTY });
+    setForm(b ? { _id: b._id, title: b.title, subtitle: b.subtitle, imageUrl: b.imageUrl, linkType: b.linkType, categoryId: b.categoryId, url: b.url, active: b.active, startsAt: toInput(b.startsAt), endsAt: toInput(b.endsAt), durationSeconds: b.durationSeconds ?? 5 } : { ...EMPTY });
   };
 
   const pick = (file: File | undefined) => {
@@ -168,7 +171,7 @@ export default function BannersPage() {
     if (!form) return;
     setSaving(true);
     setFormError('');
-    const body = { title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl, linkType: form.linkType, categoryId: form.categoryId, url: form.url, active: form.active, startsAt: fromInput(form.startsAt), endsAt: fromInput(form.endsAt) };
+    const body = { title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl, linkType: form.linkType, categoryId: form.categoryId, url: form.url, active: form.active, startsAt: fromInput(form.startsAt), endsAt: fromInput(form.endsAt), durationSeconds: form.durationSeconds };
     const r = form._id ? await call(`/api/admin/banners/${form._id}`, 'PUT', body) : await call('/api/admin/banners', 'POST', body);
     setSaving(false);
     if (r.ok) {
@@ -250,6 +253,7 @@ export default function BannersPage() {
               <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Typography sx={{ fontSize: 13, color: '#4B5563' }}>
                   {linkText(b)}
+                  {` · stays ${b.durationSeconds ?? 5} s`}
                   {(b.startsAt || b.endsAt) && ` · ${b.startsAt ? `from ${when(b.startsAt)}` : ''}${b.startsAt && b.endsAt ? ' ' : ''}${b.endsAt ? `until ${when(b.endsAt)}` : ''}`}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
@@ -341,6 +345,9 @@ export default function BannersPage() {
                 ))}
               </Box>
               {(form.startsAt || form.endsAt) && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: -1 }}>Times are Pacific time.</Typography>}
+              <TextField select label="Stays on show for" value={form.durationSeconds} onChange={(e) => setForm({ ...form, durationSeconds: Number(e.target.value) })} size="small" fullWidth helperText="How long this banner shows before the next one slides in (only matters when there is more than one live banner).">
+                {Array.from(new Set([...DURATION_CHOICES, form.durationSeconds])).sort((a, b) => a - b).map((n) => <MenuItem key={n} value={n}>{n} seconds</MenuItem>)}
+              </TextField>
               <FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} color="warning" />} label="Show to customers" />
               {formError && <Alert severity="error">{formError}</Alert>}
             </Box>
