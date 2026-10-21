@@ -15,11 +15,16 @@ export interface BannerInput {
   active: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
+  /** how long the banner stays on show before the carousel moves to the next one */
+  durationSeconds: number;
 }
 
 export const MAX_BANNERS = 20;
 export const TITLE_MAX = 60;
 export const SUBTITLE_MAX = 100;
+export const DEFAULT_DURATION_SECONDS = 5;
+export const MIN_DURATION_SECONDS = 2;
+export const MAX_DURATION_SECONDS = 60;
 
 const isHttps = (v: string) => /^https:\/\/[^\s]+$/i.test(v);
 const dateOrNull = (v: unknown): Date | null | 'bad' => {
@@ -48,6 +53,12 @@ export function validateBanner(body: unknown): { ok: true; value: BannerInput } 
   const endsAt = dateOrNull(b.endsAt);
   if (startsAt === 'bad' || endsAt === 'bad') return { ok: false, error: 'A date is not valid' };
   if (startsAt && endsAt && startsAt.getTime() >= endsAt.getTime()) return { ok: false, error: 'The end must be after the start' };
+  let durationSeconds = DEFAULT_DURATION_SECONDS;
+  if (b.durationSeconds !== undefined && b.durationSeconds !== null && b.durationSeconds !== '') {
+    const n = Number(b.durationSeconds);
+    if (!Number.isInteger(n) || n < MIN_DURATION_SECONDS || n > MAX_DURATION_SECONDS) return { ok: false, error: `How long a banner stays can be ${MIN_DURATION_SECONDS} to ${MAX_DURATION_SECONDS} seconds` };
+    durationSeconds = n;
+  }
 
   return {
     ok: true,
@@ -61,6 +72,7 @@ export function validateBanner(body: unknown): { ok: true; value: BannerInput } 
       active: b.active === false ? false : true,
       startsAt,
       endsAt,
+      durationSeconds,
     },
   };
 }
