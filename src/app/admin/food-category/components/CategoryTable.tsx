@@ -6,6 +6,8 @@ import { Box, Chip, IconButton, ListItemIcon, Menu, MenuItem, Typography } from 
 import {
   IconDotsVertical,
   IconEdit,
+  IconEye,
+  IconEyeOff,
   IconGripHorizontal,
   IconGripVertical,
   IconListDetails,
@@ -32,6 +34,8 @@ interface CategoryTableProps {
   groups: CategoryGroup<FoodCategory>[];
   onEdit: (category: FoodCategory) => void;
   onDelete: (category: FoodCategory) => void;
+  /** Switch a category (or sub-category) between available and unavailable to customers. */
+  onToggleAvailable: (category: FoodCategory) => void;
   onItemSequence: (category: FoodCategory) => void;
   /** New order of the top-level categories (ids, left to right). */
   onReorderCategories: (orderedIds: string[]) => void;
@@ -103,8 +107,9 @@ function CategoryEntry({
   handle,
   onEdit,
   onDelete,
+  onToggleAvailable,
   onItemSequence,
-}: { category: FoodCategory; isTop: boolean; handle: ReactNode } & Pick<CategoryTableProps, 'onEdit' | 'onDelete' | 'onItemSequence'>) {
+}: { category: FoodCategory; isTop: boolean; handle: ReactNode } & Pick<CategoryTableProps, 'onEdit' | 'onDelete' | 'onToggleAvailable' | 'onItemSequence'>) {
   const router = useRouter();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const count = itemCountOf(category);
@@ -169,6 +174,9 @@ function CategoryEntry({
         }}
       />
       {countChip}
+      {category.isDraft && (
+        <Chip size="small" label="Unavailable" sx={{ height: 20, fontSize: 11, bgcolor: '#FEE2E2', color: '#B91C1C', fontWeight: 700 }} />
+      )}
     </Box>
   );
 
@@ -311,6 +319,18 @@ function CategoryEntry({
         <MenuItem
           onClick={() => {
             close();
+            onToggleAvailable(category);
+          }}
+          sx={{ gap: 1.5 }}
+        >
+          <ListItemIcon>
+            {category.isDraft ? <IconEye size={18} /> : <IconEyeOff size={18} />}
+          </ListItemIcon>
+          {category.isDraft ? 'Make available' : 'Make unavailable'}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close();
             onDelete(category);
           }}
           sx={{ gap: 1.5, color: '#FF7675' }}
@@ -394,6 +414,7 @@ export default function CategoryTable({
   groups,
   onEdit,
   onDelete,
+  onToggleAvailable,
   onItemSequence,
   onReorderCategories,
   onReorderSubCategories,
@@ -496,6 +517,7 @@ export default function CategoryTable({
                             }
                             onEdit={onEdit}
                             onDelete={onDelete}
+                            onToggleAvailable={onToggleAvailable}
                             onItemSequence={onItemSequence}
                           />
                         ) : (
@@ -571,6 +593,7 @@ export default function CategoryTable({
                                 }
                                 onEdit={onEdit}
                                 onDelete={onDelete}
+                                onToggleAvailable={onToggleAvailable}
                                 onItemSequence={onItemSequence}
                               />
                             </Box>
