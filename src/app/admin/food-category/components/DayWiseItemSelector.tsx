@@ -129,7 +129,6 @@ export default function DayWiseItemSelector({
           const subs = categories
             .filter(
               (cat) =>
-                !cat.isDraft &&
                 categoryHasParent(cat) &&
                 toIdString(cat.parentCategoryId) === categoryId
             )

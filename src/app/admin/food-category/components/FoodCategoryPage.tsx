@@ -179,6 +179,28 @@ export default function FoodCategoryPage() {
     }
   };
 
+  /** Switches a category or sub-category between available and unavailable to customers (the saved flag is isDraft). */
+  const handleToggleAvailable = async (category: FoodCategory) => {
+    const makeUnavailable = !category.isDraft;
+    try {
+      if (!token || !isAuthenticated) throw new Error('No authentication token found');
+      const response = await fetch('/api/admin/food-category', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ _id: category._id?.toString(), isDraft: makeUnavailable }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Could not change availability');
+      }
+      showSnackbar(makeUnavailable ? `${category.name} is now unavailable to customers` : `${category.name} is now available to customers`);
+      await fetchCategories();
+    } catch (error) {
+      console.error('Error changing category availability:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Could not change availability', 'error');
+    }
+  };
+
   /** Saves a new order for one group of siblings (parentId null = the top-level categories). */
   const handleReorder = async (parentId: string | null, orderedIds: string[]) => {
     const before = categories;
@@ -402,6 +424,7 @@ export default function FoodCategoryPage() {
             groups={groupCategoriesByParent(filteredCategories, categories)}
             onEdit={handleEditClick}
             onDelete={handleDeleteClick}
+            onToggleAvailable={handleToggleAvailable}
             onItemSequence={handleItemSequenceClick}
             onReorderCategories={(orderedIds) => handleReorder(null, orderedIds)}
             onReorderSubCategories={(parentId, orderedIds) => handleReorder(parentId, orderedIds)}
