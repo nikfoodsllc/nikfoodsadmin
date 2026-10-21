@@ -304,10 +304,16 @@ export default function BannersPage() {
               {form.linkType === 'url' && <TextField label="Web address" placeholder="https://" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} size="small" fullWidth />}
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                <TextField label="Starts (optional)" type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} size="small" slotProps={{ inputLabel: { shrink: true } }} />
-                <TextField label="Ends (optional)" type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} size="small" slotProps={{ inputLabel: { shrink: true } }} />
+                <Box>
+                  <TextField label="Starts (optional)" type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} size="small" fullWidth slotProps={{ inputLabel: { shrink: true } }} />
+                  {form.startsAt && (<Button size="small" onClick={() => setForm({ ...form, startsAt: '' })} sx={{ textTransform: 'none', fontSize: 12, mt: 0.5, px: 0.5, minWidth: 0 }}>Clear Starts</Button>)}
+                </Box>
+                <Box>
+                  <TextField label="Ends (optional)" type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} size="small" fullWidth slotProps={{ inputLabel: { shrink: true } }} />
+                  {form.endsAt && (<Button size="small" onClick={() => setForm({ ...form, endsAt: '' })} sx={{ textTransform: 'none', fontSize: 12, mt: 0.5, px: 0.5, minWidth: 0 }}>Clear Ends</Button>)}
+                </Box>
               </Box>
-              <Typography sx={{ fontSize: 12, color: '#6B7280', mt: -1 }}>Times are Pacific time. Leave them empty to show it right away and until you switch it off.</Typography>
+              <Typography sx={{ fontSize: 12, color: '#6B7280', mt: -1 }}>Times are Pacific time. Leave them empty (or press Clear) to show it right away and until you switch it off.</Typography>
               <FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} color="warning" />} label="Show to customers" />
               {formError && <Alert severity="error">{formError}</Alert>}
             </Box>
