@@ -130,7 +130,8 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
       const data: Partial<Omit<FoodCategory, '_id'>> & { _id?: string; isImageUpdated?: boolean } = {
         name: name.trim(),
         description: description.trim(),
-        sequence: sequence,
+        // empty = the server puts a new category last (it refuses 0)
+        sequence: sequence >= 1 ? sequence : undefined,
         url: imageUrl,
         public_id: publicId,
         isDraft: !available,
@@ -290,13 +291,12 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
           <TextField
             label="Sequence"
             type="number"
-            value={sequence}
-            onChange={(e) => setSequence(Number(e.target.value))}
+            value={sequence >= 1 ? sequence : ''}
+            onChange={(e) => setSequence(Number(e.target.value) || 0)}
             disabled={loading}
             fullWidth
-            required
-            placeholder="Enter display order (0 for first)"
-            inputProps={{ min: 0, step: 1 }}
+            placeholder="Leave empty to add it last"
+            inputProps={{ min: 1, step: 1 }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 backgroundColor: '#F6FAFF',
