@@ -33,6 +33,7 @@ export const GLOSSARY_SECTIONS = [
   'Manage Days and cutoffs',
   'Abandoned Checkout',
   'Notifications',
+  'Banners',
   'Kitchen Dashboard',
   'Kitchen Report',
   'Packing Report',
@@ -201,6 +202,9 @@ export const GLOSSARY: GlossaryEntry[] = [
   // ---- abandoned checkout
   e('Abandoned Checkout', 'Waiting to send email', 'Abandoned Checkout tab', 'People who started a checkout and left without ordering, and whose reminder email has not gone out yet (it is sent about 30 minutes after they leave). You can also send it yourself right away. Anyone who ordered afterwards is not listed.', 'warn', 'to contact'),
   e('Notifications', 'Notifications (page)', 'Notifications', 'What customers with the NikFoods app get on their phone. At the top you see whether notifications are on for this site. "Menu update" is where you pick or write the text for a menu alert and send it; "Sent automatically" lists the notifications the site sends by itself, with how many went out in the last 7 days; below that is a history of the menu updates you sent.', undefined, 'push notification app phone alerts'),
+  e('Banners', 'Banners (page)', 'Food Catalog > Banners', 'The pictures at the top of the home page, on the website and in the app. Add a picture (a wide one, about 1400 x 700; it is cropped to fit), an optional title and line under it, and what happens when a customer taps it: nothing, open a menu category, or open a web page. The first banner in the list is shown first. With no live banners the website shows its usual welcome picture and the app shows none.', undefined, 'banner promotion hero carousel home page picture'),
+  e('Banners', 'Live / Starts later / Ended / Off', 'Banners list', 'Live: customers see it now. Starts later: it has a start time that has not come yet. Ended: its end time has passed. Off: the switch is off. Only Live banners reach customers. Changes show up on the website and in the app within about a minute.', undefined, 'status schedule switch'),
+  e('Banners', 'Order of banners', 'Banners list', 'The first banner in the list is shown first and the others follow as customers swipe. Use the up and down arrows to move a banner. At most 20 banners can be saved; use the Off switch to keep one for later instead of deleting it.', undefined, 'order arrows position'),
   e('Notifications', 'Who gets a menu update', 'Notifications > Menu update', 'Customers who subscribed to menu alerts (on the website or in the app), have the NikFoods app with notifications allowed, and have not switched menu alerts off in the app. The number on the Send button is how many can get it right now. Customers without the app are not reached: they only get menu alerts if you email them another way.', undefined, 'audience subscribers menu alert'),
   e('Notifications', 'Saved texts', 'Notifications > Menu update', 'The messages you can pick with one tap. Tap one to fill the title and message, change the words, then Send, Update (saves your changes to that text), or Save as new text. The title can be 40 characters and the message 150. Three texts are there to start with.', undefined, 'template text title message save'),
   e('Notifications', 'Send a test', 'Notifications > Menu update', 'Sends the text to one customer account\'s phones, whatever that customer chose in the app, so you can see it on a real phone first. Type your own customer account\'s email (an account that is logged in to the app on your phone).', undefined, 'test preview'),
