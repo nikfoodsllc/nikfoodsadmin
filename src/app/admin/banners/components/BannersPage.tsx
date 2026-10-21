@@ -316,16 +316,31 @@ export default function BannersPage() {
               {form.linkType === 'url' && <TextField label="Web address" placeholder="https://" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} size="small" fullWidth />}
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                <Box>
-                  <TextField label="Starts (optional)" type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} size="small" fullWidth slotProps={{ inputLabel: { shrink: true } }} />
-                  {form.startsAt && (<Button size="small" onClick={() => setForm({ ...form, startsAt: '' })} sx={{ textTransform: 'none', fontSize: 12, mt: 0.5, px: 0.5, minWidth: 0 }}>Clear Starts</Button>)}
-                </Box>
-                <Box>
-                  <TextField label="Ends (optional)" type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} size="small" fullWidth slotProps={{ inputLabel: { shrink: true } }} />
-                  {form.endsAt && (<Button size="small" onClick={() => setForm({ ...form, endsAt: '' })} sx={{ textTransform: 'none', fontSize: 12, mt: 0.5, px: 0.5, minWidth: 0 }}>Clear Ends</Button>)}
-                </Box>
+                {([
+                  { key: 'startsAt', label: 'Starts', none: 'Right away', set: 'Set a start time' },
+                  { key: 'endsAt', label: 'Ends', none: 'Never (stays until you switch it off)', set: 'Set an end time' },
+                ] as const).map((f) => (
+                  <Box key={f.key} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.4 }}>{f.label}</Typography>
+                    {form[f.key] ? (
+                      <>
+                        <TextField type="datetime-local" value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} size="small" fullWidth slotProps={{ htmlInput: { 'aria-label': `${f.label} (Pacific time)` } }} />
+                        <Button size="small" onClick={() => setForm({ ...form, [f.key]: '' })} sx={{ textTransform: 'none', alignSelf: 'flex-start', px: 0.5, minWidth: 0 }}>
+                          {f.key === 'startsAt' ? 'Start right away instead' : 'Never end instead'}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Typography sx={{ fontSize: 15, fontWeight: 600 }}>{f.none}</Typography>
+                        <Button size="small" onClick={() => setForm({ ...form, [f.key]: toInput(new Date().toISOString()) })} sx={{ textTransform: 'none', alignSelf: 'flex-start', px: 0.5, minWidth: 0 }}>
+                          {f.set}
+                        </Button>
+                      </>
+                    )}
+                  </Box>
+                ))}
               </Box>
-              <Typography sx={{ fontSize: 12, color: '#6B7280', mt: -1 }}>Times are Pacific time. Leave them empty (or press Clear) to show it right away and until you switch it off.</Typography>
+              {(form.startsAt || form.endsAt) && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: -1 }}>Times are Pacific time.</Typography>}
               <FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} color="warning" />} label="Show to customers" />
               {formError && <Alert severity="error">{formError}</Alert>}
             </Box>
