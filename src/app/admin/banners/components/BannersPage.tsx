@@ -224,9 +224,9 @@ export default function BannersPage() {
         <Box sx={{ display: 'grid', gap: 2 }}>
           {banners.map((b, i) => (
             <Paper key={b._id} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-              <Box sx={{ position: 'relative', aspectRatio: '2 / 1', backgroundColor: '#F3EEE6', opacity: b.status === 'live' ? 1 : 0.7 }}>
+              <Box sx={{ position: 'relative', backgroundColor: '#F3EEE6', opacity: b.status === 'live' ? 1 : 0.7 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={b.imageUrl} alt={b.title || 'Banner'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <img src={b.imageUrl} alt={b.title || 'Banner'} style={{ width: '100%', height: 'auto', display: 'block' }} />
                 {(b.title || b.subtitle) && (
                   <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, p: 1.5, pt: 4, background: 'linear-gradient(to top, rgba(26,20,16,0.7), rgba(26,20,16,0))', color: '#fff' }}>
                     {b.title && <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{b.title}</Typography>}
@@ -265,11 +265,11 @@ export default function BannersPage() {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileRef.current?.click()}
-                  sx={{ position: 'relative', aspectRatio: '2 / 1', borderRadius: 2, border: '2px dashed #D1D5DB', backgroundColor: '#FAFAF9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }}
+                  sx={{ position: 'relative', ...(form.imageUrl ? {} : { aspectRatio: '2 / 1' }), borderRadius: 2, border: '2px dashed #D1D5DB', backgroundColor: '#FAFAF9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }}
                 >
                   {form.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.imageUrl} alt="Banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={form.imageUrl} alt="Banner" style={{ width: '100%', height: 'auto', display: 'block' }} />
                   ) : (
                     <Box sx={{ textAlign: 'center', color: '#6B7280' }}>
                       <IconPhotoPlus size={32} />
@@ -283,7 +283,7 @@ export default function BannersPage() {
                   )}
                 </Box>
                 <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void upload(e.target.files?.[0])} />
-                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>A wide picture works best (about 1400 × 700). It is cropped to fit.{form.imageUrl ? ' Tap the picture to change it.' : ''}</Typography>
+                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>A wide picture works best (about 1400 × 700). The whole picture is shown, nothing is cut off.{form.imageUrl ? ' Tap the picture to change it.' : ''}</Typography>
               </Box>
 
               <TextField label="Title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} size="small" fullWidth helperText={`${form.title.length}/${TITLE_MAX}`} error={form.title.length > TITLE_MAX} />
