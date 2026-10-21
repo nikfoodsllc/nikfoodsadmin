@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bannerStatus, moveId, validateBanner } from './banners';
+import { bannerStatus, DEFAULT_DURATION_SECONDS, moveId, validateBanner } from './banners';
 
 const base = { imageUrl: 'https://res.cloudinary.com/x/image/upload/v1/a.jpg' };
 
@@ -34,6 +34,19 @@ describe('validateBanner', () => {
     expect(validateBanner({ ...base, startsAt: '2026-10-22T00:00:00Z', endsAt: '2026-10-21T00:00:00Z' }).ok).toBe(false);
     const r = validateBanner({ ...base, startsAt: '2026-10-21T00:00:00Z', endsAt: '2026-10-22T00:00:00Z' });
     expect(r.ok && r.value.startsAt instanceof Date && r.value.endsAt instanceof Date).toBe(true);
+  });
+  it('how long a banner stays: 5 seconds unless set, 2 to 60 whole seconds', () => {
+    const d = validateBanner(base);
+    expect(d.ok && d.value.durationSeconds).toBe(DEFAULT_DURATION_SECONDS);
+    const r = validateBanner({ ...base, durationSeconds: 8 });
+    expect(r.ok && r.value.durationSeconds).toBe(8);
+    const s = validateBanner({ ...base, durationSeconds: '12' });
+    expect(s.ok && s.value.durationSeconds).toBe(12);
+    expect(validateBanner({ ...base, durationSeconds: 1 }).ok).toBe(false);
+    expect(validateBanner({ ...base, durationSeconds: 61 }).ok).toBe(false);
+    expect(validateBanner({ ...base, durationSeconds: 2.5 }).ok).toBe(false);
+    expect(validateBanner({ ...base, durationSeconds: 'abc' }).ok).toBe(false);
+    expect(validateBanner({ ...base, durationSeconds: '' }).ok).toBe(true);
   });
   it('off stays off', () => {
     const r = validateBanner({ ...base, active: false });
