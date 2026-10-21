@@ -35,6 +35,7 @@ import {
   IconShoppingCartOff,
   IconBell,
   IconBook,
+  IconPhoto,
 } from '@tabler/icons-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
@@ -90,6 +91,7 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'Food Items', href: '/admin/food-items', icon: IconToolsKitchen2 },
       { title: 'Food Category', href: '/admin/food-category', icon: IconCategory },
+      { title: 'Banners', href: '/admin/banners', icon: IconPhoto },
     ],
   },
   {
