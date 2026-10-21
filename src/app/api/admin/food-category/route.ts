@@ -908,6 +908,14 @@ export async function PUT(request: NextRequest) {
     const existingCategory = existingResult.data;
     const oldPublicId = existingCategory.public_id;
 
+  // A category keeps the type it was created with: its saved items are stored differently for each type
+    if (listingType !== undefined && listingType !== (existingCategory.listingType ?? 'flat')) {
+      return NextResponse.json(
+        { error: 'The listing type (Flat or Day-wise) cannot be changed after the category is created' },
+        { status: 400 }
+      );
+    }
+
   // Determine final listing type (existing or new)
     const finalListingType = listingType ?? existingCategory.listingType ?? 'flat';
 

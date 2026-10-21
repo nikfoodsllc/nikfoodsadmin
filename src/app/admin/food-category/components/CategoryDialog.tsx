@@ -19,6 +19,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import ImageUpload from './ImageUpload';
 import { uploadToCloudinary } from '@/lib/cloudinary';
@@ -48,6 +50,8 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [listingType, setListingType] = useState<CategoryListingType>('flat');
+  // a new category starts hidden from customers until the admin switches it on
+  const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -61,6 +65,7 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
         setSequence(category.sequence || 0);
         setImagePreview(category.url || null);
         setListingType(category.listingType || 'flat');
+        setAvailable(!category.isDraft);
       } else {
         setName('');
         setDescription('');
@@ -68,6 +73,7 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
         setSequence(0);
         setImagePreview(null);
         setListingType('flat');
+        setAvailable(false);
       }
       setImageFile(null);
       setError('');
@@ -127,8 +133,8 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
         sequence: sequence,
         url: imageUrl,
         public_id: publicId,
-        isDraft: false,
-        listingType: listingType,
+        isDraft: !available,
+        listingType: effectiveListingType,
         dayWiseItems: [],
         parentCategoryId: parentCategoryId.trim() || '',
       };
@@ -147,6 +153,15 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
       setLoading(false);
     }
   };
+
+  // a sub-category follows its parent; an existing category keeps the type it was created with
+  const parentCategory = parentCategoryOptions.find((c) => c._id?.toString() === parentCategoryId);
+  const effectiveListingType: CategoryListingType = category
+    ? category.listingType || 'flat'
+    : parentCategory
+      ? parentCategory.listingType || 'flat'
+      : listingType;
+  const typeWord = effectiveListingType === 'day-wise' ? 'Day-wise' : 'Flat';
 
   const handleCancel = () => {
     if (!loading) {
@@ -231,6 +246,44 @@ export default function CategoryDialog({ open, category, parentCategoryOptions, 
             </Select>
             <Typography variant="caption" sx={{ color: '#666', marginTop: 0.5, display: 'block' }}>
               Sub-categories can sit under a top-level category (one level only).
+            </Typography>
+          </FormControl>
+
+          <FormControl disabled={loading}>
+            <FormLabel id="listing-type-label" sx={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>
+              How it is sold
+            </FormLabel>
+            {category || parentCategory ? (
+              <Typography sx={{ fontSize: 14, mt: 0.5 }}>
+                {typeWord}
+                <Typography component="span" sx={{ color: '#666', fontSize: 13 }}>
+                  {category
+                    ? ' (cannot be changed after the category is created)'
+                    : ` (follows its parent, ${parentCategory?.name})`}
+                </Typography>
+              </Typography>
+            ) : (
+              <>
+                <RadioGroup row aria-labelledby="listing-type-label" value={listingType} onChange={(e) => setListingType(e.target.value as CategoryListingType)}>
+                  <FormControlLabel value="flat" control={<Radio />} label="Flat" />
+                  <FormControlLabel value="day-wise" control={<Radio />} label="Day-wise" />
+                </RadioGroup>
+                <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                  {listingType === 'day-wise'
+                    ? 'Day-wise: you choose which items are sold on which dates (pre-orders, daily menus).'
+                    : 'Flat: the same items are sold on every open day.'}
+                </Typography>
+              </>
+            )}
+          </FormControl>
+
+          <FormControl disabled={loading}>
+            <FormControlLabel
+              control={<Switch checked={available} onChange={(e) => setAvailable(e.target.checked)} color="success" />}
+              label={available ? 'Available on the website' : 'Unavailable (hidden from customers)'}
+            />
+            <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+              Turn it on when the items are ready. While it is off, customers do not see it on the website or the app.
             </Typography>
           </FormControl>
 
