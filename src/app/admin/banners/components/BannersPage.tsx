@@ -27,6 +27,7 @@ import {
 import { IconArrowDown, IconArrowUp, IconPhotoPlus, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import BannerCropDialog from './BannerCropDialog';
 import { moveId, SUBTITLE_MAX, TITLE_MAX, type BannerLinkType, type BannerStatus } from '@/lib/banners';
 
 interface Banner {
@@ -93,6 +94,8 @@ export default function BannersPage() {
   const [toDelete, setToDelete] = useState<Banner | null>(null);
   const [notice, setNotice] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  // the picture just chosen, waiting for the admin to pick the part to show
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -133,6 +136,15 @@ export default function BannersPage() {
   const open = (b?: Banner) => {
     setFormError('');
     setForm(b ? { _id: b._id, title: b.title, subtitle: b.subtitle, imageUrl: b.imageUrl, linkType: b.linkType, categoryId: b.categoryId, url: b.url, active: b.active, startsAt: toInput(b.startsAt), endsAt: toInput(b.endsAt) } : { ...EMPTY });
+  };
+
+  const pick = (file: File | undefined) => {
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return setFormError('Choose a picture file');
+    if (file.size > 8 * 1024 * 1024) return setFormError('The picture is too large (8 MB at most)');
+    setFormError('');
+    setCropFile(file);
   };
 
   const upload = async (file: File | undefined) => {
@@ -282,8 +294,8 @@ export default function BannersPage() {
                     </Box>
                   )}
                 </Box>
-                <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => void upload(e.target.files?.[0])} />
-                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>A wide picture works best (about 1400 × 700). The whole picture is shown, nothing is cut off.{form.imageUrl ? ' Tap the picture to change it.' : ''}</Typography>
+                <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
+                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>A wide picture works best (about 1400 × 700). You choose which part to show after picking it.{form.imageUrl ? ' Tap the picture to change it.' : ''}</Typography>
               </Box>
 
               <TextField label="Title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} size="small" fullWidth helperText={`${form.title.length}/${TITLE_MAX}`} error={form.title.length > TITLE_MAX} />
@@ -326,6 +338,14 @@ export default function BannersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <BannerCropDialog
+        file={cropFile}
+        onCancel={() => setCropFile(null)}
+        onDone={(f) => {
+          setCropFile(null);
+          void upload(f);
+        }}
+      />
 
       <Dialog open={toDelete !== null} onClose={() => setToDelete(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Delete this banner?</DialogTitle>
