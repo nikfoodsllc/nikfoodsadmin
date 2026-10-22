@@ -28,6 +28,7 @@ import {
 import PreparationTypeField from './PreparationTypeField';
 import StickerField from './StickerField';
 import { StickerFlag } from '@/utils/stickerFlag';
+import ChefsPickField from './ChefsPickField';
 import { PreparationType, preparationTypeError } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ImageUpload from '../../food-category/components/ImageUpload';
@@ -55,6 +56,7 @@ interface SimpleFoodItem {
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
   splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
+  chefsPick?: boolean; // true = shown in the mobile app's Chef's Pick row
 }
 
 interface SimpleFoodItemDialogProps {
@@ -554,6 +556,7 @@ export default function SimpleFoodItemDialog({
           />
 
           {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
+          <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
           <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
           <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Not needed: this item has no sticker.' : 'Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount.'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
 
