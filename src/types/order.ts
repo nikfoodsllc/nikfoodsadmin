@@ -231,6 +231,9 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
+  countBeforePayment?: boolean; // Counted in the Kitchen, Packing and Delivery reports (and on the route plan) while unpaid
+  countedByAdmin?: string; // Set when counted from the Orders table
+  countedAt?: Date | string;
   stripePaymentIntentId?: string; // Only for card payments
   paymentError?: PaymentErrorInfo; // Latest failure/cancellation reported by Stripe
   paymentAttempts?: number; // Failed Stripe attempts (webhook count)

@@ -24,6 +24,7 @@ import { useColumnPreferences } from '@/hooks/useColumnPreferences';
 import OrderDetailsDialog from './OrderDetailsDialog';
 import ExportToCsvDialog from './ExportToCsvDialog';
 import DeleteOrdersDialog from './DeleteOrdersDialog';
+import { countSummary, type CountResultRow } from '@/utils/orderCounting';
 import { IconDownload, IconRefresh } from '@tabler/icons-react';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
@@ -460,6 +461,33 @@ export default function OrdersPage() {
     }
   };
 
+  // Count the selected unpaid orders in the Kitchen, Packing and Delivery reports (or stop counting them)
+  const handleBulkCount = async (count: boolean) => {
+    if (selectedOrderIds.size === 0) return;
+    setBulkUpdating(true);
+    try {
+      if (!token) throw new Error('No authentication token found');
+      const ids = orders.filter((o) => o._id && selectedOrderIds.has(o._id)).map((o) => o.orderId);
+      const response = await fetch('/api/admin/orders/count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderIds: ids, count }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || json.success === false) throw new Error(json.error || 'Failed to update the selected orders');
+      const results: CountResultRow[] = json.data?.results ?? [];
+      const summary = countSummary(results, count);
+      showSnackbar(summary.text, summary.severity === 'success' ? 'success' : 'error');
+      setSelectedOrderIds(new Set());
+      await fetchOrders();
+    } catch (error) {
+      console.error('Error counting selected orders:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update the selected orders', 'error');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   // Calculate maximum unique delivery days across all orders using new utility
 
   const totalPages = totalPagesFor(totalOrders, pageSize);
@@ -531,6 +559,25 @@ export default function OrdersPage() {
                 }}
               >
                 {bulkUpdating ? 'Updating...' : `Update Selected (${selectedOrderIds.size})`}
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={() => void handleBulkCount(true)}
+                disabled={bulkUpdating}
+                title="Count the selected unpaid orders in the Kitchen, Packing and Delivery reports"
+                sx={{ textTransform: 'none', borderRadius: 2, px: 2.5 }}
+              >
+                {`Count Selected (${selectedOrderIds.size})`}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => void handleBulkCount(false)}
+                disabled={bulkUpdating}
+                title="Stop counting the selected orders that were counted before payment"
+                sx={{ textTransform: 'none', borderRadius: 2, px: 2.5, borderColor: '#E5E7EB', color: '#374151' }}
+              >
+                Stop Counting
               </Button>
               <Button
                 variant="outlined"

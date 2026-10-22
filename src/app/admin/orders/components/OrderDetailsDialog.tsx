@@ -39,6 +39,7 @@ import { orderEmailStatusView } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
 import { orderDayHeading } from '@/utils/orderDays';
 import { RescheduleBanner, shortDate } from './RescheduleControls';
+import CountControls from './CountControls';
 import { ItemActionsBar } from './CreditControls';
 import AddressEditor from './AddressEditor';
 import OrderTranscript from './OrderTranscript';
@@ -737,6 +738,7 @@ export default function OrderDetailsDialog({
                 ))}
               </Box>
             )}
+            <CountControls order={order} token={token} onChanged={async () => { await onOrderChanged?.(); }} />
           </Box>
         </Box>
 
