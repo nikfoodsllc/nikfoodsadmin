@@ -3,6 +3,8 @@
  * (`checkoutDrafts`); this turns those into one row per person for the admin list.
  */
 
+import type { WaitingNote } from './abandonedWaiting';
+
 /** A checkout is only called abandoned once it has been quiet this long (the customer may still be paying). */
 export const QUIET_MINUTES = 10;
 
@@ -134,6 +136,8 @@ export interface AbandonedRow {
   previouslyContactedAt?: string;
   /** The automatic reminder email sent for this checkout */
   reminder?: ReminderView;
+  /** When there is no reminder: why none has gone out (set by the list route) */
+  waitingNote?: WaitingNote;
 }
 
 export type View = 'to_contact' | 'contacted';
