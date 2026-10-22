@@ -7,6 +7,7 @@ import Image from 'next/image';
 import TypeBadge from './TypeBadge';
 import PreparationBadge from './PreparationBadge';
 import StickerBadge from './StickerBadge';
+import ChefsPickBadge from './ChefsPickBadge';
 import { safeFormatCurrency } from '@/utils/currency';
 
 interface FoodItem {
@@ -24,6 +25,7 @@ interface FoodItem {
   preparationType?: 'cooked' | 'ready_to_eat';
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
+  chefsPick?: boolean;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -280,6 +282,12 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
     type: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
         <TypeBadge type={item.itemType} />
+      </TableCell>
+    ),
+    // Chef's Pick: Yes / No
+    chefsPick: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <ChefsPickBadge value={item.chefsPick} />
       </TableCell>
     ),
     // Preparation type: Cooked / Ready to eat / (not set yet)

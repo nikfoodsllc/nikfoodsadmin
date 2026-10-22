@@ -9,6 +9,7 @@
  *   preparationType=cooked|ready_to_eat|not_set
  *   sticker=yes|no|not_set
  *   splitSticker=yes|no|not_set
+ *   chefsPick=yes|no   (no = not marked yes)
  * Anything else is ignored (the filter stays off).
  */
 export function foodItemListFilters(params: URLSearchParams): Record<string, unknown> {
@@ -33,6 +34,9 @@ export function foodItemListFilters(params: URLSearchParams): Record<string, unk
   const sticker = params.get('sticker');
   if (sticker === 'yes' || sticker === 'no') filter.sticker = sticker;
   else if (sticker === 'not_set') filter.sticker = { $nin: ['yes', 'no'] };
+  const chefsPick = params.get('chefsPick');
+  if (chefsPick === 'yes') filter.chefsPick = true;
+  else if (chefsPick === 'no') filter.chefsPick = { $ne: true };
   const splitSticker = params.get('splitSticker');
   if (splitSticker === 'yes' || splitSticker === 'no') filter.splitSticker = splitSticker;
   else if (splitSticker === 'not_set') filter.splitSticker = { $nin: ['yes', 'no'] };

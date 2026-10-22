@@ -237,6 +237,8 @@ const foodItemSchema = z.object({
   preparationType: z.enum(['cooked', 'ready_to_eat']).nullish(),
   // Whether the item's orders get a packing sticker (Kitchen Report; No leaves it off). Optional: null on update means "back to not set yet".
   sticker: z.enum(['yes', 'no']).nullish(),
+  // Chef's Pick: true = shown in the mobile app's Chef's Pick row; left out on update = leave as it is
+  chefsPick: z.boolean().optional(),
   // Split Sticker: 'yes' = one sticker per box in the Stickers sheet; null on update = back to not set yet
   splitSticker: z.enum(['yes', 'no']).nullish(),
 
@@ -334,6 +336,7 @@ interface FoodItem {
   // 'yes' = its orders appear on the Stickers sheet, 'no' = they do not; missing = not set yet
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
+  chefsPick?: boolean;
 
   // Portions fields
   portions?: string[];
@@ -749,6 +752,7 @@ export async function POST(request: NextRequest) {
       ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
       // a new item is on the Stickers sheet unless it was created with Sticker = No
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
+      chefsPick: data.chefsPick === true,
       // an item with no sticker has no split sticker either
       ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       createdAt: new Date(),
@@ -977,6 +981,7 @@ const updateData: Partial<FoodItem> = {
   spiceLevel: data.spiceLevel || [],
   ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
+  ...(typeof data.chefsPick === 'boolean' ? { chefsPick: data.chefsPick } : {}),
   // an item with no sticker has no split sticker either; otherwise the Split Sticker choice is saved as sent
   ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
   updatedAt: new Date(),

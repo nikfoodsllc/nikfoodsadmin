@@ -1,5 +1,6 @@
 import { PreparationFilter, isPreparationFilter } from '@/utils/preparationType';
 import { StickerFilter, isStickerFilter } from '@/utils/stickerFlag';
+import { ChefsPickFilter, isChefsPickFilter } from '@/utils/chefsPick';
 
 /** The column filters above the Food Items table. 'all' means the filter is off. */
 export interface FoodItemFilters {
@@ -9,6 +10,7 @@ export interface FoodItemFilters {
   preparation: PreparationFilter;
   sticker: StickerFilter;
   splitSticker: StickerFilter;
+  chefsPick: ChefsPickFilter;
   /** A top-level category id ('all' = off): items in it or in any of its sub-categories */
   category: string;
   /** A sub-category id ('all' = off): items in that sub-category only */
@@ -46,6 +48,7 @@ export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
   preparation: 'all',
   sticker: 'all',
   splitSticker: 'all',
+  chefsPick: 'all',
   category: 'all',
   subCategory: 'all',
 };
@@ -63,6 +66,7 @@ export function foodItemFilterParams(filters: FoodItemFilters, tree?: CategoryTr
   }
   if (filters.sticker !== 'all' && isStickerFilter(filters.sticker)) params.push(['sticker', filters.sticker]);
   if (filters.splitSticker !== 'all' && isStickerFilter(filters.splitSticker)) params.push(['splitSticker', filters.splitSticker]);
+  if (filters.chefsPick !== 'all' && isChefsPickFilter(filters.chefsPick)) params.push(['chefsPick', filters.chefsPick]);
   return params;
 }
 

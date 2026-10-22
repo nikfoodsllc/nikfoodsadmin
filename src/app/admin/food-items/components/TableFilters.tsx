@@ -146,6 +146,21 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
         </Select>
       </FormControl>
 
+      {/* Chef's Pick */}
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>Chef&apos;s Pick</InputLabel>
+        <Select
+          value={filters.chefsPick}
+          label="Chef's Pick"
+          onChange={(e) => onFilterChange('chefsPick', e.target.value as FoodItemFilters['chefsPick'])}
+          sx={selectSx}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="yes">Yes</MenuItem>
+          <MenuItem value="no">No</MenuItem>
+        </Select>
+      </FormControl>
+
       {/* Sticker */}
       <FormControl size="small" sx={{ minWidth: 140 }}>
         <InputLabel>Sticker</InputLabel>
