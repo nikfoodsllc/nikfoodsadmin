@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, Snackbar, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, Snackbar, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { IconBell, IconSend, IconTrash } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
+import AppCustomersTab from './AppCustomersTab';
 
 const TITLE_MAX = 40;
 const BODY_MAX = 150;
@@ -83,6 +84,7 @@ export default function NotificationsPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [notice, setNotice] = useState('');
+  const [tab, setTab] = useState<'send' | 'customers'>('send');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -209,6 +211,15 @@ export default function NotificationsPage() {
       {data?.mode === 'dry' && <Alert severity="info" sx={{ mb: 2 }}>Test mode: the site works out who would get each message but sends nothing.</Alert>}
       {data?.mode === 'on' && <Alert severity="success" sx={{ mb: 2 }}>Notifications are on. {data.customersWithApp} customer{data.customersWithApp === 1 ? '' : 's'} have the app with notifications allowed.</Alert>}
 
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: '1px solid #E5E7EB' }} variant="scrollable" scrollButtons={false}>
+        <Tab value="send" label="Send and history" sx={{ textTransform: 'none', fontWeight: 700 }} />
+        <Tab value="customers" label="App customers" sx={{ textTransform: 'none', fontWeight: 700 }} />
+      </Tabs>
+
+      {tab === 'customers' && <AppCustomersTab call={call} />}
+
+      {tab === 'send' && (
+        <>
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, mb: 2.5, borderRadius: 2 }}>
         <Typography sx={{ fontWeight: 800, fontSize: 18 }}>Menu update</Typography>
         <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
@@ -285,6 +296,9 @@ export default function NotificationsPage() {
           </Box>
         ))}
       </Paper>
+
+        </>
+      )}
 
       <Dialog open={confirmSend !== false} onClose={() => setConfirmSend(false)} fullWidth maxWidth="xs">
         <DialogTitle>{confirmSend === 'again' ? 'Send another?' : `Send to ${reach} customer${reach === 1 ? '' : 's'}?`}</DialogTitle>
