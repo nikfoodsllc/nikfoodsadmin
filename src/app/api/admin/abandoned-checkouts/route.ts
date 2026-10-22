@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { computeMetrics, type PaidOrderForMetrics } from '@/utils/abandonedMetrics';
 import { buildPaidRows, type PaidOrderRef as PaidOrderWithId } from '@/utils/abandonedPaid';
+import { REMINDER_GAP_DAYS, recentReminders, waitingNote } from '@/utils/abandonedWaiting';
 import { buildAbandonedRows, resolveRange, summarize, type DraftDoc, type OrderInfo, type PaidOrderRef } from '@/utils/abandonedCheckouts';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,19 @@ export async function GET(request: NextRequest) {
     }
 
     const built = buildAbandonedRows(drafts, paidOrders, info);
+
+    // for people with no reminder yet: why none has gone out (a reminder to them within the last 2 days, no email, too old...)
+    const now = new Date();
+    const gapSince = new Date(now.getTime() - REMINDER_GAP_DAYS * 24 * 3_600_000);
+    const gapResult = await db.read<{ userId?: string; customer?: { email?: string }; reminderEmail?: { claimedAt?: Date; status?: string } }>(
+      'checkoutDrafts',
+      { 'reminderEmail.claimedAt': { $gte: gapSince } } as never,
+      { limit: 2000, projection: { userId: 1, 'customer.email': 1, 'reminderEmail.claimedAt': 1, 'reminderEmail.status': 1 } }
+    );
+    const recent = recentReminders(gapResult.success ? gapResult.data ?? [] : []);
+    for (const row of [...built.to_contact, ...built.contacted]) {
+      if (!row.reminder) row.waitingNote = waitingNote(row, recent, now);
+    }
 
     // the minimum order value of each person's zip: it decides which day an item is really delivered on
     const zips = [...new Set([...built.to_contact, ...built.contacted].map((r) => r.zip).filter((z): z is string => Boolean(z)))];
