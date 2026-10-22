@@ -430,7 +430,7 @@ export default function KitchenReportPage() {
             Amounts are in ounces (oz) and pounds (lb): 16 oz = 1 lb. Items without a size are counted in units.
           </Typography>
         </Box>
-        <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <Button variant="outlined" size="small" startIcon={<IconColumns3 size={16} />} onClick={() => setColumnsOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Columns
           </Button>
