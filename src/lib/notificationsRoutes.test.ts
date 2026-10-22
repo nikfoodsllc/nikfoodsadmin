@@ -4,6 +4,7 @@ import { notificationsTarget } from './notificationsRoutes';
 describe('notificationsTarget', () => {
   it('maps the page routes', () => {
     expect(notificationsTarget(['summary'], 'GET')).toBe('/api/admin/push/summary');
+    expect(notificationsTarget(['app-users'], 'GET')).toBe('/api/admin/push/app-users');
     expect(notificationsTarget(['templates'], 'GET')).toBe('/api/admin/push/templates');
     expect(notificationsTarget(['templates'], 'POST')).toBe('/api/admin/push/templates');
     expect(notificationsTarget(['send-menu'], 'POST')).toBe('/api/admin/push/send-menu');
@@ -15,6 +16,8 @@ describe('notificationsTarget', () => {
   });
   it('refuses wrong methods, odd ids and unknown paths', () => {
     expect(notificationsTarget(['summary'], 'POST')).toBeNull();
+    expect(notificationsTarget(['app-users'], 'POST')).toBeNull();
+    expect(notificationsTarget(['app-users'], 'DELETE')).toBeNull();
     expect(notificationsTarget(['send-menu'], 'GET')).toBeNull();
     expect(notificationsTarget(['templates', '../admin'], 'PUT')).toBeNull();
     expect(notificationsTarget(['templates', 'x'], 'DELETE')).toBeNull();
