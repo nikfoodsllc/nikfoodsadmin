@@ -16,7 +16,7 @@ import {
   IconButton,
   Divider,
 } from '@mui/material';
-import {
+import { IconMessage2,
   IconToolsKitchen2,
   IconPackage,
   IconCategory,
@@ -93,6 +93,7 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'Push Notification', href: '/admin/notifications', icon: IconBell },
       { title: 'App Customers', href: '/admin/app-customers', icon: IconUserCheck },
+      { title: 'Welcome Msg', href: '/admin/welcome-message', icon: IconMessage2 },
     ],
   },
   {
