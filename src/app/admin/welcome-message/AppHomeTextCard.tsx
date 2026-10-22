@@ -41,7 +41,7 @@ export default function AppHomeTextCard({ token }: { token: string | null }) {
     <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, mb: 2 }}>
       <Typography sx={{ fontWeight: 700 }}>Welcome message</Typography>
       <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
-        The greeting at the top of the app&apos;s home screen. Write {'{name}'} where the customer&apos;s first name should go. Leave it empty for the usual &quot;name, what shall we cook?&quot;. The text shrinks to fit its box.
+        The greeting at the top of the app&apos;s home screen. Write {'{name}'} where the customer&apos;s first name should go: the name shows in black, the rest in gold. Leave it empty for the usual &quot;name, what shall we cook?&quot;. The text shrinks to fit its box.
       </Typography>
       <TextField
         fullWidth
