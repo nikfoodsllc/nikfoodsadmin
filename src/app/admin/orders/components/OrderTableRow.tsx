@@ -12,6 +12,7 @@ import { orderEmailStatusView, type EmailTone } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
 import { CHANNEL_LABELS, channelOf } from '@/utils/orderChannel';
 import { rescheduleView } from '@/utils/orderReschedule';
+import { isCountedEarly } from '@/utils/orderCounting';
 
 const EMAIL_TONES: Record<EmailTone, { bg: string; color: string }> = {
   good: { bg: '#DCFCE7', color: '#166534' },
@@ -138,6 +139,14 @@ export default function OrderTableRow({
     paymentStatus: (
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <StatusBadge status={getDisplayPaymentStatus(order)} type="payment" />
+        {isCountedEarly(order) && (
+          <Chip
+            label="Counted"
+            size="small"
+            title="Counted in the Kitchen, Packing and Delivery reports before it is paid"
+            sx={{ mt: 0.5, height: 20, fontSize: '11px', fontWeight: 600, backgroundColor: '#FEF3C7', color: '#92400E' }}
+          />
+        )}
       </TableCell>
     ),
     // Instruction to Driver
