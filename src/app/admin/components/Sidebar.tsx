@@ -35,6 +35,8 @@ import {
   IconShoppingCartOff,
   IconBell,
   IconBook,
+  IconDeviceMobile,
+  IconUserCheck,
   IconPhoto,
 } from '@tabler/icons-react';
 import Image from 'next/image';
@@ -86,6 +88,14 @@ const adminNavItems: NavItem[] = [
     icon: IconMapPin,
   },
   {
+    title: 'Mobile App',
+    icon: IconDeviceMobile,
+    children: [
+      { title: 'Push Notification', href: '/admin/notifications', icon: IconBell },
+      { title: 'App Customers', href: '/admin/app-customers', icon: IconUserCheck },
+    ],
+  },
+  {
     title: 'Food Catalog',
     icon: IconToolsKitchen2,
     children: [
@@ -101,11 +111,6 @@ const adminNavItems: NavItem[] = [
       { title: 'All Users', href: '/admin/all-users', icon: IconUsers },
       { title: 'Admin Users', href: '/admin/admin-users', icon: IconUserShield },
     ],
-  },
-  {
-    title: 'Notifications',
-    href: '/admin/notifications',
-    icon: IconBell,
   },
   {
     title: 'Understanding Admin',
