@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildKitchenReport, type StickerLookup, type TypeLookup } from './kitchenReport';
-import { buildKitchenDays, type KitchenRow } from './kitchenDashboard';
+import { type KitchenRow } from './kitchenDashboard';
 import { stickerQtyText } from './kitchenReport';
 import { buildReportSheets, cellText, prepSheet, readyToEatSheet, sheetToPdfTables, stickersSheet } from './kitchenReportSheets';
 import { buildReportPdf } from './reportPdf';
@@ -75,16 +75,16 @@ describe('stickerQtyText', () => {
 
 describe('buildReportPdf', () => {
   const report = buildKitchenReport(rows, lookup, stickerLookup);
-  const sheets = buildReportSheets({ cooked: report.cooked, notSet: report.notSet, stickers: report.stickers, days: buildKitchenDays(rows, ['2026-10-13']) });
+  const sheets = buildReportSheets({ cooked: report.cooked, notSet: report.notSet, stickers: report.stickers });
   const text = async (blob: Blob) => Buffer.from(await blob.arrayBuffer()).toString('latin1');
 
-  it('makes a PDF with the four sheets, the item names, the units and page numbers', async () => {
+  it('makes a PDF with the three sheets, the item names, the units and page numbers', async () => {
     const blob = await buildReportPdf(sheets, 'Oct 13, 2026');
     const pdf = await text(blob);
     expect(blob.type).toBe('application/pdf');
     expect(pdf.startsWith('%PDF')).toBe(true);
-    for (const needle of ['Kitchen Prep', 'Ready to Eat', 'Stickers', 'Day totals', 'Rajma', 'Chapati', 'Amy', '12 oz', 'Page 1 of 4', 'Tue, Oct 13']) expect(pdf).toContain(needle);
-    expect((pdf.match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(4); // one page per sheet here
+    for (const needle of ['Kitchen Prep', 'Ready to Eat', 'Stickers', 'Rajma', 'Chapati', 'Amy', '12 oz', 'Page 1 of 3', 'Tue, Oct 13']) expect(pdf).toContain(needle);
+    expect((pdf.match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(3); // one page per sheet here
   });
   it('portrait with one item per page: every box has its own page, and nothing at all is refused', async () => {
     const pdf = await text(await buildReportPdf(sheets.slice(0, 1), 'x', { orientation: 'portrait', boxPerPage: true }));
@@ -98,7 +98,7 @@ describe('buildReportPdf', () => {
     for (let i = 0; i < 40; i++) for (let j = 0; j < 8; j++) many.push(row({ orderId: `${i}-${j}`, name: `Item ${i}`, customerName: `Customer ${j}`, portion: '12Oz' }));
     const lookupAll: TypeLookup = () => 'cooked';
     const big = buildKitchenReport(many, lookupAll);
-    const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: big.cooked, notSet: [], stickers: [], days: [] }), 'long'));
+    const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: big.cooked, notSet: [], stickers: [] }), 'long'));
     const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
     expect(pages).toBeGreaterThan(4);
     expect(pdf).toContain(`Page ${pages} of ${pages}`);
@@ -107,21 +107,21 @@ describe('buildReportPdf', () => {
     const singles: KitchenRow[] = [];
     for (let i = 0; i < 40; i++) singles.push(row({ orderId: `s${i}`, name: `Single ${i}`, customerName: `Customer ${i}`, portion: '12Oz' }));
     const small = buildKitchenReport(singles, () => 'cooked');
-    const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: small.cooked, notSet: [], stickers: [], days: [] }), 'singles'));
+    const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: small.cooked, notSet: [], stickers: [] }), 'singles'));
     const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
     // Kitchen Prep (40 boxes of one row), plus one page each for the two empty sheets: a handful of pages, not 40
-    expect(pages).toBeLessThanOrEqual(4 + 3);
+    expect(pages).toBeLessThanOrEqual(3 + 3);
   });
   it('a long box starts right after the previous one and runs over the page break instead of jumping to a new page', async () => {
     const mixed: KitchenRow[] = [row({ orderId: 'a', name: 'A short item', customerName: 'Amy', portion: '12Oz' })];
     for (let j = 0; j < 45; j++) mixed.push(row({ orderId: `b${j}`, name: 'B long item', customerName: `Customer ${j}`, portion: '12Oz' }));
     const rep = buildKitchenReport(mixed, () => 'cooked');
-    const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: rep.cooked, notSet: [], stickers: [], days: [] }), 'mixed'));
+    const pdf = await text(await buildReportPdf(buildReportSheets({ cooked: rep.cooked, notSet: [], stickers: [] }), 'mixed'));
     const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) || []).length;
-    expect(pages).toBeLessThanOrEqual(4 + 3); // the 46 lines fit on two pages of Kitchen Prep
+    expect(pages).toBeLessThanOrEqual(3 + 3); // the 46 lines fit on two pages of Kitchen Prep
   });
   it('handles an empty report', async () => {
-    const blob = await buildReportPdf(buildReportSheets({ cooked: [], notSet: [], stickers: [], days: [] }), 'empty');
+    const blob = await buildReportPdf(buildReportSheets({ cooked: [], notSet: [], stickers: [] }), 'empty');
     expect(blob.size).toBeGreaterThan(500);
   });
 });

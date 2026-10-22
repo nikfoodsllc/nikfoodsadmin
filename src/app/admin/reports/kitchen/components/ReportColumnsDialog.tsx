@@ -33,7 +33,7 @@ export default function ReportColumnsDialog({ open, onClose, groups }: { open: b
       <DialogTitle sx={{ fontWeight: 700, pb: 0.5 }}>Columns for Excel and PDF</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" sx={{ color: '#6B7280', mb: 2 }}>
-          Choose what goes into each sheet. Your choice is saved to your account and used every time you download.
+          Choose what goes into each Excel file and PDF. Your choice is saved to your account and used every time you download.
         </Typography>
         {groups.map((group) => {
           const shown = group.columns.filter((c) => !group.hidden.has(c.key)).length;
