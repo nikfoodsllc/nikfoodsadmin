@@ -6,6 +6,8 @@ import { ObjectId, UpdateFilter } from 'mongodb';
 import { FoodCategory, CategoryListingType, CategoryDayWiseItem, CategoryFoodMapping } from '@/types/order';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 import { applyLockedItemsToUpcomingDays } from '@/lib/server/lockedMenu';
+import { getCategoryDeleteImpact } from '@/lib/server/categoryDeleteImpact';
+import { deleteVerdict, nameMatches } from '@/utils/categoryDelete';
 
 /**
  * Validate listing type
@@ -1126,6 +1128,20 @@ export async function DELETE(request: NextRequest) {
 
     console.log('✅ [DELETE] Category found successfully:', existingResult.data?.name);
     const category = existingResult.data;
+
+    // Safeguards (enforced here, not only on the screen): a category with sub-categories is never deleted, and one
+    // that still has items or locked rows is deleted only when its exact name is sent as confirmName.
+    const impact = await getCategoryDeleteImpact(categoryId, category);
+    const verdict = deleteVerdict(impact);
+    if (!verdict.allowed) {
+      return NextResponse.json({ error: verdict.blockedReason, code: 'HAS_SUBCATEGORIES', impact }, { status: 409 });
+    }
+    if (verdict.needsName && !nameMatches(searchParams.get('confirmName'), category.name)) {
+      return NextResponse.json(
+        { error: `Type the category name to confirm. ${verdict.warnings.join(' ')}`, code: 'NEEDS_CONFIRMATION', impact },
+        { status: 409 }
+      );
+    }
 
     // Delete from database
     console.log('🗑️ [DELETE] Deleting category with ID:', categoryId.toHexString());
