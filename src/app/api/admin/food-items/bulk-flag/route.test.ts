@@ -66,6 +66,14 @@ describe('bulk-flag', () => {
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect((await res.json()).data).toMatchObject({ requested: 2, modified: 2, field: 'available', value: false, livesiteNotified: true });
   });
+  it("chefsPick works the same way and clears the menu cache (the app's menu shows it)", async () => {
+    const res = await PATCH(req({ body: { ids: [A, B], field: 'chefsPick', value: true } }));
+    expect(res.status).toBe(200);
+    expect(update.mock.calls[0][2].$set.chefsPick).toBe(true);
+    expect(Object.keys(update.mock.calls[0][2].$set).sort()).toEqual(['chefsPick', 'updatedAt']);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect((await PATCH(req({ body: { ids: [A], field: 'chefsPick', value: 'yes' } }))).status).toBe(400);
+  });
   it('veg works the same way', async () => {
     await PATCH(req({ body: { ids: [A], field: 'veg', value: true } }));
     expect(update.mock.calls[0][2].$set.veg).toBe(true);

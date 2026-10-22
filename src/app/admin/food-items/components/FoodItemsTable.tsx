@@ -34,6 +34,7 @@ interface FoodItem {
   preparationType?: 'cooked' | 'ready_to_eat';
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
+  chefsPick?: boolean;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
