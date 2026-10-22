@@ -218,7 +218,15 @@ function PersonCard({ row, onHide, onRemind, onCreateOrder }: { row: AbandonedRo
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
         {row.triedToPay ? <Chip size="small" color="warning" label="Pressed Pay, payment did not go through" sx={{ fontWeight: 600 }} /> : <Chip size="small" label="Never pressed Pay" sx={{ fontWeight: 600 }} />}
-        {!row.reminder && <Chip size="small" variant="outlined" color="info" label="Waiting for the reminder email" sx={{ fontWeight: 600 }} />}
+        {!row.reminder && (
+          <Chip
+            size="small"
+            variant="outlined"
+            color={row.waitingNote && ['gap', 'too_old', 'no_email', 'no_items'].includes(row.waitingNote.code) ? 'warning' : 'info'}
+            label={row.waitingNote?.text ?? 'Waiting for the reminder email'}
+            sx={{ fontWeight: 600, maxWidth: '100%', height: 'auto', '& .MuiChip-label': { whiteSpace: 'normal', py: 0.25 } }}
+          />
+        )}
         {row.earlierCheckouts > 0 && <Chip size="small" variant="outlined" label={`${row.earlierCheckouts} earlier checkout${row.earlierCheckouts === 1 ? '' : 's'}`} />}
       </Box>
       {row.problem && <Typography sx={{ fontSize: 13, color: '#B45309', mt: 0.75 }}>{row.problem}</Typography>}
