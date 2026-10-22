@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, MenuItem, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
-import { IconColumns3, IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconSortAscending, IconSortDescending, IconTruckDelivery, IconX } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, InputAdornment, Menu, MenuItem, Paper, Tab, Tabs, TextField, Tooltip, Typography } from '@mui/material';
+import { IconChevronDown, IconColumns3, IconFileSpreadsheet, IconPrinter, IconRefresh, IconSearch, IconSortAscending, IconSortDescending, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
@@ -39,13 +39,20 @@ import {
 } from '@/utils/kitchenReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
-import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, STICKER_COLUMNS, TONE_COLORS, TOTALS_COLUMNS } from '@/utils/kitchenReportSheets';
+import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, STICKER_COLUMNS, TONE_COLORS, type SheetKey } from '@/utils/kitchenReportSheets';
 import ReportColumnsDialog from './ReportColumnsDialog';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
 type TabId = 'prep' | 'ready' | 'stickers' | 'days';
+
+/** The three downloadable sheets: the name shown, the start of the file name, and the order in the menus. */
+const SHEET_ORDER: SheetKey[] = ['prep', 'ready', 'stickers'];
+const SHEET_TITLES: Record<string, string> = { prep: 'Kitchen Prep', ready: 'Ready to Eat', stickers: 'Stickers' };
+const SHEET_FILES: Record<string, string> = { prep: 'kitchen-prep', ready: 'ready-to-eat', stickers: 'stickers' };
+/** A sheet worth making: it has at least one row of data (a header alone is not). */
+const hasRows = (sheets: Array<{ rows: Array<{ kind: string }> }>) => sheets.some((sheet) => sheet.rows.some((r) => r.kind === 'data'));
 
 /** The range buttons. The first two show the day and the date ("Thu, Oct 8"), so there is no doubt which day they mean. */
 function presetsFor(today: string): Array<{ id: Preset; label: string }> {
@@ -262,7 +269,8 @@ export default function KitchenReportPage() {
   const prepCols = useColumnPreferences('admin_kitchen_report_prep_columns', PREP_COLUMNS, 'kitchen-report-prep');
   const readyCols = useColumnPreferences('admin_kitchen_report_ready_columns', PREP_COLUMNS, 'kitchen-report-ready');
   const stickerCols = useColumnPreferences('admin_kitchen_report_stickers_columns', STICKER_COLUMNS, 'kitchen-report-stickers');
-  const totalCols = useColumnPreferences('admin_kitchen_report_totals_columns', TOTALS_COLUMNS, 'kitchen-report-totals');
+  // the three Excel files and the three PDFs: one menu each (which sheet to make)
+  const [fileMenu, setFileMenu] = useState<{ anchor: HTMLElement; kind: 'excel' | 'pdf' } | null>(null);
   const [printing, setPrinting] = useState(false);
   const [data, setData] = useState<ReportData | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
@@ -335,21 +343,19 @@ export default function KitchenReportPage() {
   const notSetCount = notSet.length;
   const readyCount = readyToEat.length + notSetCount;
 
-  // the sheets for the Excel file and the PDF, with only the columns this admin chose, from the report they are made from
-  const sheetsFrom = (src: ReportData) =>
+  // the one sheet for an Excel file or a PDF, with only the columns this admin chose, from the report it is made from
+  const sheetsFrom = (src: ReportData, only: SheetKey) =>
     applyColumnChoice(
       buildReportSheets({
         cooked: sortBlocks(filterBlocksBySearch(src.cooked, search), sort),
         readyToEat: sortBlocks(filterBlocksBySearch(src.readyToEat, search), sort),
         notSet: sortBlocks(filterBlocksBySearch(src.notSet, search), sort),
         stickers: sortStickers(filterStickersBySearch(src.stickers, search), sort),
-        days: src.days.map((d) => sortDay(searching ? filterBlockBySearch(d, search) : d)),
-      }),
+      }).filter((sheet) => sheet.key === only),
       {
         prep: [...prepCols.hiddenKeys],
         ready: [...readyCols.hiddenKeys],
         stickers: [...stickerCols.hiddenKeys],
-        totals: [...totalCols.hiddenKeys],
       }
     );
 
@@ -364,7 +370,7 @@ export default function KitchenReportPage() {
   const customProblem = preset === 'custom' ? validateRange(custom) : null;
 
   // Print: the PDF version of the Excel file, opened in a new tab (print or save it from there)
-  const printPdf = async () => {
+  const printPdf = async (only: SheetKey) => {
     if (!data || !range) return;
     const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
     // the tab is opened right now, while the click still counts, and filled when the PDF is ready
@@ -375,11 +381,12 @@ export default function KitchenReportPage() {
       // always from the latest orders, not from what was loaded when the page was opened
       const latest = await load({ silent: true });
       if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
-      const sheets = sheetsFrom(latest);
-      const title = `${formatRangeLabel(range)}${searching ? ` · search: ${search.trim()}` : ''}`;
+      const sheets = sheetsFrom(latest, only);
+      if (!hasRows(sheets)) throw new Error(`there is nothing in ${SHEET_TITLES[only]} for these days`);
+      const title = `${SHEET_TITLES[only]} · ${formatRangeLabel(range)}${searching ? ` · search: ${search.trim()}` : ''}`;
       const blob = await buildReportPdf(sheets, title, { orientation: 'portrait', boxPerPage: true });
       if (tab) tab.location.href = URL.createObjectURL(blob);
-      else downloadBlob(blob, `kitchen-report-${label}.pdf`); // the browser blocked the new tab: save the file instead
+      else downloadBlob(blob, `${SHEET_FILES[only]}-${label}.pdf`); // the browser blocked the new tab: save the file instead
     } catch (e) {
       tab?.close();
       setError(e instanceof Error ? `Could not make the PDF: ${e.message}` : 'Could not make the PDF');
@@ -388,7 +395,7 @@ export default function KitchenReportPage() {
     }
   };
 
-  const download = async () => {
+  const download = async (only: SheetKey) => {
     if (!data || !range) return;
     const label = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
     setExporting(true);
@@ -396,10 +403,11 @@ export default function KitchenReportPage() {
       // always from the latest orders, not from what was loaded when the page was opened
       const latest = await load({ silent: true });
       if (!latest) throw new Error('could not get the latest orders, so nothing was made. Try again');
-      // the file has all three sheets and follows the search, like the screen
-      const sheets = sheetsFrom(latest);
-      const blob = await buildReportWorkbook(sheets, `Kitchen report ${label}`);
-      downloadBlob(blob, `kitchen-report-${label}.xlsx`);
+      // the file has just this sheet and follows the search, like the screen
+      const sheets = sheetsFrom(latest, only);
+      if (!hasRows(sheets)) throw new Error(`there is nothing in ${SHEET_TITLES[only]} for these days`);
+      const blob = await buildReportWorkbook(sheets, `${SHEET_TITLES[only]} ${label}`);
+      downloadBlob(blob, `${SHEET_FILES[only]}-${label}.xlsx`);
     } catch (e) {
       setError(e instanceof Error ? `Could not make the Excel file: ${e.message}` : 'Could not make the Excel file');
     } finally {
@@ -422,16 +430,31 @@ export default function KitchenReportPage() {
             Amounts are in ounces (oz) and pounds (lb): 16 oz = 1 lb. Items without a size are counted in units.
           </Typography>
         </Box>
-        <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Box className="no-print" sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <Button variant="outlined" size="small" startIcon={<IconColumns3 size={16} />} onClick={() => setColumnsOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Columns
           </Button>
-          <Button variant="outlined" size="small" startIcon={<IconFileSpreadsheet size={16} />} onClick={download} disabled={!data || loading || exporting} sx={{ textTransform: 'none', fontWeight: 600 }}>
+          <Button variant="outlined" size="small" startIcon={<IconFileSpreadsheet size={16} />} endIcon={<IconChevronDown size={14} />} onClick={(e) => setFileMenu({ anchor: e.currentTarget, kind: 'excel' })} disabled={!data || loading || exporting} sx={{ textTransform: 'none', fontWeight: 600 }}>
             {exporting ? 'Making the file...' : 'Download Excel'}
           </Button>
-          <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} onClick={printPdf} disabled={!data || loading || printing} sx={{ textTransform: 'none', fontWeight: 600 }}>
+          <Button variant="outlined" size="small" startIcon={<IconPrinter size={16} />} endIcon={<IconChevronDown size={14} />} onClick={(e) => setFileMenu({ anchor: e.currentTarget, kind: 'pdf' })} disabled={!data || loading || printing} sx={{ textTransform: 'none', fontWeight: 600 }}>
             {printing ? 'Making the PDF...' : 'Print (PDF)'}
           </Button>
+          <Menu anchorEl={fileMenu?.anchor} open={!!fileMenu} onClose={() => setFileMenu(null)}>
+            {SHEET_ORDER.map((key) => (
+              <MenuItem
+                key={key}
+                onClick={() => {
+                  const kind = fileMenu?.kind;
+                  setFileMenu(null);
+                  if (kind === 'excel') void download(key);
+                  else void printPdf(key);
+                }}
+              >
+                {SHEET_TITLES[key]}
+              </MenuItem>
+            ))}
+          </Menu>
           <Tooltip title="Reload">
             <span>
               <IconButton onClick={() => void load()} disabled={loading} aria-label="Reload the report">
@@ -585,7 +608,6 @@ export default function KitchenReportPage() {
           { key: 'prep', title: 'Kitchen Prep', columns: prepCols.allColumns, hidden: prepCols.hiddenKeys, syncStatus: prepCols.syncStatus, onToggle: prepCols.toggleColumn, onReset: prepCols.showAll, onHideAll: prepCols.hideAll },
           { key: 'ready', title: 'Ready to Eat', columns: readyCols.allColumns, hidden: readyCols.hiddenKeys, syncStatus: readyCols.syncStatus, onToggle: readyCols.toggleColumn, onReset: readyCols.showAll, onHideAll: readyCols.hideAll },
           { key: 'stickers', title: 'Stickers', columns: stickerCols.allColumns, hidden: stickerCols.hiddenKeys, syncStatus: stickerCols.syncStatus, onToggle: stickerCols.toggleColumn, onReset: stickerCols.showAll, onHideAll: stickerCols.hideAll },
-          { key: 'totals', title: 'Day totals', columns: totalCols.allColumns, hidden: totalCols.hiddenKeys, syncStatus: totalCols.syncStatus, onToggle: totalCols.toggleColumn, onReset: totalCols.showAll, onHideAll: totalCols.hideAll },
         ]}
       />
     </Box>

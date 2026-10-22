@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import ExcelJS from 'exceljs';
 import { buildKitchenReport, type StickerLookup, type TypeLookup } from './kitchenReport';
 import type { KitchenRow } from './kitchenDashboard';
-import { buildKitchenDays } from './kitchenDashboard';
-import { applyColumnChoice, buildReportSheets, dayTotalsSheet, prepSheet, readyToEatSheet, rowTone, stickersSheet, TONE_COLORS } from './kitchenReportSheets';
+import { applyColumnChoice, buildReportSheets, prepSheet, readyToEatSheet, rowTone, stickersSheet, TONE_COLORS } from './kitchenReportSheets';
 import { sheetAmounts } from './kitchenReport';
 import { buildReportWorkbook } from './downloadReportExcel';
 
@@ -92,26 +91,20 @@ describe('sheetAmounts', () => {
   });
 });
 
-describe('stickers and day totals', () => {
+describe('stickers', () => {
   const report = buildKitchenReport([row({ name: 'Pickle', orderId: '1', customerName: 'Amy', isEco: true }), row({ name: 'Pickle', orderId: '2', customerName: 'Bob' }), row({ name: 'Pickle', orderId: '3', customerName: 'Cat' })], byName, stickerYes);
   it('stickers alternate and ECO is green', () => {
     expect(stickersSheet(report.stickers).rows.filter((r) => r.kind === 'data').map((r) => r.tone)).toEqual(['eco', 'white', 'red']);
   });
-  it('day totals alternate per day, with combos after the items', () => {
-    const days = buildKitchenDays([row({ name: 'Rajma', quantity: 3 }), row({ orderId: '2', name: 'Chapati', quantity: 2 })], ['2026-10-13', '2026-10-14']);
-    const rows = dayTotalsSheet(days).rows.filter((r) => r.kind === 'data');
-    expect(rows.map((r) => [r.cells[1], r.cells[2], r.tone])).toEqual([['Rajma', 3, 'red'], ['Chapati', 2, 'white']]);
-  });
 });
 
 describe('the Excel file', () => {
-  it('has the four sheets with real fills, bold totals, frozen header and date cells', async () => {
+  it('has the three sheets with real fills, bold totals, frozen header and date cells', async () => {
     const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz', isEco: true }), row({ orderId: '2', customerName: 'Bob', portion: '8Oz' }), row({ orderId: '3', name: 'Pickle', customerName: 'Cat' })], byName, stickerYes);
-    const days = buildKitchenDays([row({ portion: '12Oz' })], ['2026-10-13']);
-    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers, days }), 'test');
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers }), 'test');
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
-    expect(wb.worksheets.map((w) => w.name)).toEqual(['Kitchen Prep', 'Ready to Eat', 'Stickers', 'Day totals']);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Kitchen Prep', 'Ready to Eat', 'Stickers']);
     const prep = wb.getWorksheet('Kitchen Prep')!;
     expect(prep.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
     // columns: A and B are the empty margin, C = Item Name, D = Customer, E = Spice, F = Total Ordered Qty, G = Total / ECO, H..J = dates
@@ -146,7 +139,7 @@ describe('the Excel file', () => {
   });
   it('text that looks like a formula stays text', async () => {
     const report = buildKitchenReport([row({ customerName: '=SUM(A1)' })], byName, stickerYes);
-    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [], days: [] }), 'test');
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [] }), 'test');
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
     const cell = wb.getWorksheet('Kitchen Prep')!.getRow(2).getCell(4);
@@ -158,7 +151,7 @@ describe('the Excel file', () => {
 describe('units without sizes read "1 unit" and "4 units"', () => {
   it('the cell format has a singular form', async () => {
     const report = buildKitchenReport([row({ name: 'Chapati', orderId: '1', customerName: 'Amy', quantity: 1 }), row({ name: 'Chapati', orderId: '2', customerName: 'Bob', quantity: 4 })], byName, stickerYes);
-    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [], days: [] }), 'test');
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [] }), 'test');
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
     const prep = wb.getWorksheet('Kitchen Prep')!;
@@ -170,7 +163,7 @@ describe('units without sizes read "1 unit" and "4 units"', () => {
 
 describe('applyColumnChoice (the columns an admin picked)', () => {
   const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz', isEco: true }), row({ orderId: '2', customerName: 'Bob', portion: '8Oz' })], byName, stickerYes);
-  const sheets = buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers, days: [] });
+  const sheets = buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers });
   const prep = sheets[0];
 
   it('nothing hidden: the same sheets come back', () => {
@@ -197,11 +190,11 @@ describe('applyColumnChoice (the columns an admin picked)', () => {
   it('a sheet with every column switched off is left out', () => {
     const cut = applyColumnChoice(sheets, { prep: prep.columnKeys });
     expect(cut.map((s) => s.key)).toEqual(sheets.slice(1).map((s) => s.key));
-    expect(applyColumnChoice(sheets, { prep: prep.columnKeys, ready: sheets[1].columnKeys, stickers: sheets[2].columnKeys, totals: sheets[3].columnKeys })).toEqual([]);
+    expect(applyColumnChoice(sheets, { prep: prep.columnKeys, ready: sheets[1].columnKeys, stickers: sheets[2].columnKeys })).toEqual([]);
   });
   it('the Ready to Eat sheet and the section band survive a column choice', () => {
     const report2 = buildKitchenReport([row({ orderId: '5', name: 'Mystery', customerName: 'Eve' })], byName, stickerYes);
-    const ready = buildReportSheets({ cooked: [], readyToEat: report2.readyToEat, notSet: report2.notSet, stickers: [], days: [] })[1];
+    const ready = buildReportSheets({ cooked: [], readyToEat: report2.readyToEat, notSet: report2.notSet, stickers: [] })[1];
     const [, cut] = applyColumnChoice([prep, ready], { ready: ['customer'] });
     expect(cut.rows.some((r) => r.kind === 'section')).toBe(true);
     expect(cut.columnKeys).not.toContain('customer');
@@ -211,12 +204,28 @@ describe('applyColumnChoice (the columns an admin picked)', () => {
 describe('Excel text size', () => {
   it('every cell of the table is 12 point', async () => {
     const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz' })], byName, stickerYes);
-    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [], days: buildKitchenDays([row({ portion: '12Oz' })], ['2026-10-13']) }), 'test');
+    const blob = await buildReportWorkbook(buildReportSheets({ cooked: report.cooked, notSet: [], stickers: [] }), 'test');
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await blob.arrayBuffer());
-    for (const name of ['Kitchen Prep', 'Day totals']) {
-      const ws = wb.getWorksheet(name)!;
-      for (let r = 1; r <= 2; r++) for (let c = 3; c <= 5; c++) expect(ws.getRow(r).getCell(name === 'Day totals' ? c - 2 : c).font?.size).toBe(12);
+    const ws = wb.getWorksheet('Kitchen Prep')!;
+    for (let r = 1; r <= 2; r++) for (let c = 3; c <= 5; c++) expect(ws.getRow(r).getCell(c).font?.size).toBe(12);
+  });
+});
+
+describe('one file per sheet', () => {
+  const report = buildKitchenReport([row({ orderId: '1', customerName: 'Amy', portion: '12Oz' }), row({ orderId: '3', name: 'Pickle', customerName: 'Cat' })], byName, stickerYes);
+  const sheets = buildReportSheets({ cooked: report.cooked, readyToEat: report.readyToEat, notSet: report.notSet, stickers: report.stickers });
+  it('each sheet alone makes a workbook with only that sheet, and no Day totals anywhere', async () => {
+    expect(sheets.map((x) => x.key)).toEqual(['prep', 'ready', 'stickers']);
+    for (const only of sheets) {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await (await buildReportWorkbook(applyColumnChoice([only], {}), 'test')).arrayBuffer());
+      expect(wb.worksheets.map((w) => w.name)).toEqual([only.name]);
     }
+  });
+  it('the column choice of one sheet does not touch the other sheets', () => {
+    const stickers = sheets.filter((x) => x.key === 'stickers');
+    expect(applyColumnChoice(stickers, { prep: sheets[0].columnKeys })).toEqual(stickers);
+    expect(applyColumnChoice(stickers, { stickers: ['order'] })[0].columnKeys).not.toContain('order');
   });
 });

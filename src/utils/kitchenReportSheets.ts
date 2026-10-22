@@ -1,11 +1,12 @@
 /**
- * What the Kitchen Report's Excel file contains: three sheets (Kitchen Prep, Stickers, Day totals), described as plain
- * rows with a colour for each so the file can be written (and tested) without a spreadsheet library.
+ * What the Kitchen Report's Excel files and PDFs contain: three sheets (Kitchen Prep, Ready to Eat, Stickers; each is its own
+ * download, the day totals are on screen only), described as plain rows with a colour for each so the file can be written
+ * (and tested) without a spreadsheet library.
  *
  * Colours follow Kunal's own sheet: rows alternate red and white so no row is missed (each item's block starts with a
  * red row), and an ECO row is green whatever its place in the pattern.
  */
-import { deliveryNote, formatDayShort, type KitchenDay } from './kitchenDashboard';
+import { formatDayShort } from './kitchenDashboard';
 import { sheetAmounts, stickerQtyText, type PrepBlock, type StickerLine } from './kitchenReport';
 import type { ColumnDef } from './columnPreferences';
 
@@ -35,7 +36,7 @@ export interface SheetRow {
   box?: { top: boolean; bottom: boolean };
 }
 
-export type SheetKey = 'prep' | 'ready' | 'stickers' | 'totals' | 'packing' | 'packTotals' | 'packHeld';
+export type SheetKey = 'prep' | 'ready' | 'stickers' | 'packing' | 'packTotals' | 'packHeld';
 
 export interface SheetModel {
   /** Which sheet this is (the admin's chosen columns are saved per key) */
@@ -77,20 +78,11 @@ export const STICKER_COLUMNS: ColumnDef[] = [
   col('order', 'Order', 24),
   col('kitchenDate', 'Kitchen date', 17),
 ];
-export const TOTALS_COLUMNS: ColumnDef[] = [
-  col('day', 'Day', 17),
-  col('item', 'Item', 40),
-  col('quantity', 'Quantity', 10),
-  col('amount', 'Total amount', 18),
-  col('later', 'Delivered later', 28),
-];
-
 /** The sheets whose columns the admin can choose, with the name shown in the dialog and the table the choice is saved under. */
 export const SHEET_CHOICES: Array<{ key: SheetKey; title: string; serverTable: string; columns: ColumnDef[] }> = [
   { key: 'prep', title: 'Kitchen Prep', serverTable: 'kitchen-report-prep', columns: PREP_COLUMNS },
   { key: 'ready', title: 'Ready to Eat', serverTable: 'kitchen-report-ready', columns: PREP_COLUMNS },
   { key: 'stickers', title: 'Stickers', serverTable: 'kitchen-report-stickers', columns: STICKER_COLUMNS },
-  { key: 'totals', title: 'Day totals', serverTable: 'kitchen-report-totals', columns: TOTALS_COLUMNS },
 ];
 
 /** Kunal's columns first (Item Name, Customer Name, Spice Level, Total Ordered Qty, and the item total / ECO column), then the kitchen and delivery dates (the day the order was placed is not needed here). */
@@ -164,18 +156,8 @@ export function stickersSheet(stickers: StickerLine[]): SheetModel {
   return { key: 'stickers', columnKeys: STICKER_COLUMNS.map((c) => c.key), name: 'Stickers', widths: STICKER_COLUMNS.map((c) => c.defaultWidth), rows };
 }
 
-export function dayTotalsSheet(days: KitchenDay[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: ['Day', 'Item', 'Quantity', 'Total amount', 'Delivered later'] }];
-  for (const day of days) {
-    let n = 0;
-    for (const item of day.items) rows.push({ kind: 'data', tone: rowTone(n++, false), cells: [date(day.day), item.name, item.quantity, item.totalText, deliveryNote(item.deliveries, item.quantity)] });
-    for (const combo of day.combos) rows.push({ kind: 'data', tone: rowTone(n++, false), cells: [date(day.day), `${combo.name} (combo)`, combo.quantity, '', deliveryNote(combo.deliveries, combo.quantity)] });
-  }
-  return { key: 'totals', columnKeys: TOTALS_COLUMNS.map((c) => c.key), name: 'Day totals', widths: TOTALS_COLUMNS.map((c) => c.defaultWidth), rows };
-}
-
-export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[]; days: KitchenDay[] }): SheetModel[] {
-  return [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers), dayTotalsSheet(input.days)];
+export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[] }): SheetModel[] {
+  return [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers)];
 }
 
 /**
