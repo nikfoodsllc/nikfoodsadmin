@@ -1,6 +1,10 @@
 /** The Notifications page's "App customers" list: the shape the customer site sends, and the search / filter / wording used on screen. */
 
+/** Allowed = a phone can get notifications; denied = said No (or switched them off in iPhone Settings); notAsked = never answered. */
+export type AppPermission = 'allowed' | 'denied' | 'notAsked';
+
 export interface AppPhone {
+  permission: AppPermission;
   platform: string;
   deviceName: string;
   appVersion: string;
@@ -15,6 +19,7 @@ export interface AppCustomer {
   phone: string;
   phones: AppPhone[];
   lastSeenAt: string | null;
+  permission: AppPermission;
   orders: boolean;
   menuSwitch: boolean;
   menuSubscribed: boolean;
@@ -23,6 +28,9 @@ export interface AppCustomer {
 
 export interface AppCounts {
   customers: number;
+  allowed: number;
+  denied: number;
+  notAsked: number;
   phones: number;
   orders: number;
   menu: number;
@@ -30,10 +38,13 @@ export interface AppCounts {
   allOff: number;
 }
 
-export type AppFilter = 'all' | 'ordersOff' | 'menuOff' | 'remindersOn' | 'allOff';
+export type AppFilter = 'all' | 'allowed' | 'denied' | 'notAsked' | 'ordersOff' | 'menuOff' | 'remindersOn' | 'allOff';
 
 export const APP_FILTERS: Array<{ key: AppFilter; label: string }> = [
   { key: 'all', label: 'All' },
+  { key: 'allowed', label: 'Allowed' },
+  { key: 'denied', label: 'Said No' },
+  { key: 'notAsked', label: 'Not asked yet' },
   { key: 'ordersOff', label: 'Order updates off' },
   { key: 'menuOff', label: 'Menu alerts off' },
   { key: 'remindersOn', label: 'Cart reminders on' },
@@ -57,10 +68,14 @@ export function filterAppCustomers(list: AppCustomer[], search: string, filter: 
   const q = search.trim().toLowerCase();
   const qDigits = digits(q);
   return list.filter((c) => {
-    if (filter === 'ordersOff' && c.orders) return false;
-    if (filter === 'menuOff' && getsMenuAlerts(c)) return false;
-    if (filter === 'remindersOn' && !c.reminders) return false;
-    if (filter === 'allOff' && (c.orders || getsMenuAlerts(c) || c.reminders)) return false;
+    // the switch filters only mean something for customers who allowed notifications on the phone
+    if (filter === 'allowed' && c.permission !== 'allowed') return false;
+    if (filter === 'denied' && c.permission !== 'denied') return false;
+    if (filter === 'notAsked' && c.permission !== 'notAsked') return false;
+    if (filter === 'ordersOff' && (c.permission !== 'allowed' || c.orders)) return false;
+    if (filter === 'menuOff' && (c.permission !== 'allowed' || getsMenuAlerts(c))) return false;
+    if (filter === 'remindersOn' && (c.permission !== 'allowed' || !c.reminders)) return false;
+    if (filter === 'allOff' && (c.permission !== 'allowed' || c.orders || getsMenuAlerts(c) || c.reminders)) return false;
     if (!q) return true;
     if (c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)) return true;
     if (qDigits.length >= 3 && digits(c.phone).includes(qDigits)) return true;
@@ -68,10 +83,13 @@ export function filterAppCustomers(list: AppCustomer[], search: string, filter: 
   });
 }
 
-/** "iPhone of Amy · app 1.0.1", or "iPhone" when the phone sent no name. */
+export const PERMISSION_LABEL: Record<AppPermission, string> = { allowed: 'Notifications allowed', denied: 'Said No', notAsked: 'Not asked yet' };
+
+/** "iPhone of Amy · app 1.0.1", or "iPhone" when the phone sent no name; a phone that is not allowed says so. */
 export function phoneText(p: AppPhone): string {
   const base = p.deviceName || (p.platform === 'ios' ? 'iPhone' : p.platform || 'Phone');
-  return p.appVersion ? `${base} · app ${p.appVersion}` : base;
+  const named = p.appVersion ? `${base} · app ${p.appVersion}` : base;
+  return p.permission === 'allowed' || !p.permission ? named : `${named} (${PERMISSION_LABEL[p.permission].toLowerCase()})`;
 }
 
 /** "Oct 21, 5:32 PM" in Pacific time, or a dash when we never heard from the phone. */

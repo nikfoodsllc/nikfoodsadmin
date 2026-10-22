@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, InputAdornment, Paper, TextField, Typography } from '@mui/material';
 import { IconRefresh, IconSearch } from '@tabler/icons-react';
-import { APP_FILTERS, filterAppCustomers, menuStatus, phoneText, seenText, type AppCounts, type AppCustomer, type AppFilter } from '@/utils/appCustomers';
+import { APP_FILTERS, filterAppCustomers, menuStatus, PERMISSION_LABEL, phoneText, seenText, type AppCounts, type AppCustomer, type AppFilter } from '@/utils/appCustomers';
 
 type Call = (path: string) => Promise<{ ok: boolean; status: number; json: { data?: unknown; error?: string } }>;
 
@@ -72,17 +72,19 @@ export default function AppCustomersTab({ call }: { call: Call }) {
     <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {counts && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1.25, mb: 2 }}>
-          <Tile value={counts.customers} label="Customers with the app" hint="notifications allowed on the phone" />
-          <Tile value={counts.phones} label="Phones" hint="some customers have more than one" />
-          <Tile value={counts.orders} label="Order updates on" />
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, minmax(0, 1fr))' }, gap: 1.25, mb: 2 }}>
+          <Tile value={counts.customers} label="Using the app" hint={`${counts.phones} phone${counts.phones === 1 ? '' : 's'}, signed in`} />
+          <Tile value={counts.allowed} label="Notifications allowed" />
+          <Tile value={counts.denied} label="Said No" hint="off in iPhone Settings" />
+          <Tile value={counts.notAsked} label="Not asked yet" />
+          <Tile value={counts.orders} label="Order updates on" hint="of those allowed" />
           <Tile value={counts.menu} label="Menu alerts on" hint="switch on and subscribed" />
           <Tile value={counts.reminders} label="Cart reminders on" />
           <Tile value={counts.allOff} label="Everything off" hint="all three switched off" />
         </Box>
       )}
       <Typography sx={{ color: '#6B7280', fontSize: 13, mb: 1.5 }}>
-        Everyone here allowed notifications on their iPhone. Customers who said No to Apple, or have not opened the app signed in, are not on this list.
+        Everyone here has signed in on the app. Older app versions do not report a No, so a customer on one of them only shows once they allow notifications; everyone appears after they update the app.
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
@@ -124,9 +126,14 @@ export default function AppCustomersTab({ call }: { call: Call }) {
                 <Typography sx={{ color: '#6B7280', fontSize: 12, whiteSpace: 'nowrap' }}>Last seen {seenText(c.lastSeenAt)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
-                <Switch label="Order updates" on={c.orders} />
-                <Switch label="Menu alerts" on={menu.on} text={menu.label} />
-                <Switch label="Cart reminders" on={c.reminders} />
+                <Chip size="small" label={PERMISSION_LABEL[c.permission]} sx={{ fontWeight: 700, bgcolor: c.permission === 'allowed' ? '#DCFCE7' : c.permission === 'denied' ? '#FEE2E2' : '#FEF3C7', color: c.permission === 'allowed' ? '#166534' : c.permission === 'denied' ? '#991B1B' : '#92400E' }} />
+                {c.permission === 'allowed' && (
+                  <>
+                    <Switch label="Order updates" on={c.orders} />
+                    <Switch label="Menu alerts" on={menu.on} text={menu.label} />
+                    <Switch label="Cart reminders" on={c.reminders} />
+                  </>
+                )}
               </Box>
               <Typography sx={{ color: '#6B7280', fontSize: 12, mt: 1, wordBreak: 'break-word' }}>
                 {c.phones.length === 1 ? 'Phone' : `${c.phones.length} phones`}: {c.phones.map(phoneText).join(' · ')}
