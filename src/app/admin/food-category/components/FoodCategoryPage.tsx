@@ -7,6 +7,7 @@ import { CategoryListingType } from '@/types/order';
 import CategoryTable from './CategoryTable';
 import CategoryDialog from './CategoryDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
+import type { CategoryDeleteVerdict } from '@/utils/categoryDelete';
 import CategorySkeleton from './CategorySkeleton';
 import ItemSequenceDialog from './ItemSequenceDialog';
 import { FoodCategory } from '@/types/order';
@@ -31,6 +32,9 @@ export default function FoodCategoryPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<FoodCategory | null>(null);
   const [selectedCategoryForSequence, setSelectedCategoryForSequence] = useState<FoodCategory | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteChecking, setDeleteChecking] = useState(false);
+  const [deleteVerdictState, setDeleteVerdictState] = useState<CategoryDeleteVerdict | null>(null);
+  const [deleteCheckError, setDeleteCheckError] = useState<string | null>(null);
   const [reorderSaving, setReorderSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -111,9 +115,24 @@ export default function FoodCategoryPage() {
     setDialogOpen(true);
   };
 
-  const handleDeleteClick = (category: FoodCategory) => {
+  const handleDeleteClick = async (category: FoodCategory) => {
     setCategoryToDelete(category);
+    setDeleteVerdictState(null);
+    setDeleteCheckError(null);
+    setDeleteChecking(true);
     setDeleteDialogOpen(true);
+    try {
+      const response = await fetch(`/api/admin/food-category/delete-impact?id=${category._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Could not check what is inside this category');
+      setDeleteVerdictState(body.data.verdict);
+    } catch (error) {
+      setDeleteCheckError(error instanceof Error ? error.message : 'Could not check what is inside this category');
+    } finally {
+      setDeleteChecking(false);
+    }
   };
 
   const handleItemSequenceClick = (category: FoodCategory) => {
@@ -129,6 +148,8 @@ export default function FoodCategoryPage() {
   const handleDeleteDialogClose = () => {
     setDeleteDialogOpen(false);
     setCategoryToDelete(null);
+    setDeleteVerdictState(null);
+    setDeleteCheckError(null);
   };
 
   const handleSequenceDialogClose = () => {
@@ -233,7 +254,7 @@ export default function FoodCategoryPage() {
     }
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = async (typedName: string) => {
     if (!categoryToDelete) return;
 
     setDeleteLoading(true);
@@ -242,7 +263,7 @@ export default function FoodCategoryPage() {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`/api/admin/food-category?id=${categoryToDelete._id}`, {
+      const response = await fetch(`/api/admin/food-category?id=${categoryToDelete._id}&confirmName=${encodeURIComponent(typedName)}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -447,6 +468,9 @@ export default function FoodCategoryPage() {
         open={deleteDialogOpen}
         categoryName={categoryToDelete?.name || ''}
         loading={deleteLoading}
+        checking={deleteChecking}
+        verdict={deleteVerdictState}
+        checkError={deleteCheckError}
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteDialogClose}
       />
