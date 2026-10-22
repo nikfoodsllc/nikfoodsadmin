@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, Snackbar, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { IconBell, IconSend, IconTrash } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, Snackbar, TextField, Typography } from '@mui/material';
+import { IconBell, IconSend, IconTrash, IconUserCheck } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppCustomersTab from './AppCustomersTab';
 
@@ -67,7 +67,8 @@ function Preview({ title, body }: { title: string; body: string }) {
   );
 }
 
-export default function NotificationsPage() {
+/** One page for each of the two Mobile App menu items: the push notifications (view send) and the customers who use the app (view customers). */
+export default function NotificationsPage({ view = 'send' }: { view?: 'send' | 'customers' }) {
   const router = useRouter();
   const { token, loading: authLoading, isAuthenticated } = useAuth();
   const [data, setData] = useState<Summary | null>(null);
@@ -84,7 +85,7 @@ export default function NotificationsPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [notice, setNotice] = useState('');
-  const [tab, setTab] = useState<'send' | 'customers'>('send');
+  const tab = view;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -202,19 +203,15 @@ export default function NotificationsPage() {
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto', p: { xs: 1.5, sm: 3 } }}>
       <Typography sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <IconBell size={26} /> Notifications
+        {view === 'customers' ? <IconUserCheck size={26} /> : <IconBell size={26} />} {view === 'customers' ? 'App Customers' : 'Push Notification'}
       </Typography>
-      <Typography sx={{ color: '#6B7280', mb: 2, fontSize: 14 }}>What customers with the NikFoods app get on their phone.</Typography>
+      <Typography sx={{ color: '#6B7280', mb: 2, fontSize: 14 }}>{view === 'customers' ? 'Who uses the NikFoods app and whether their phone allows notifications.' : 'What customers with the NikFoods app get on their phone.'}</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {data?.mode === 'off' && <Alert severity="warning" sx={{ mb: 2 }}>Notifications are switched off on this site, so nothing is sent. They are turned on with the PUSH setting.</Alert>}
       {data?.mode === 'dry' && <Alert severity="info" sx={{ mb: 2 }}>Test mode: the site works out who would get each message but sends nothing.</Alert>}
       {data?.mode === 'on' && <Alert severity="success" sx={{ mb: 2 }}>Notifications are on. {data.customersWithApp} customer{data.customersWithApp === 1 ? '' : 's'} have the app with notifications allowed.</Alert>}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: '1px solid #E5E7EB' }} variant="scrollable" scrollButtons={false}>
-        <Tab value="send" label="Send and history" sx={{ textTransform: 'none', fontWeight: 700 }} />
-        <Tab value="customers" label="App customers" sx={{ textTransform: 'none', fontWeight: 700 }} />
-      </Tabs>
 
       {tab === 'customers' && <AppCustomersTab call={call} />}
 
