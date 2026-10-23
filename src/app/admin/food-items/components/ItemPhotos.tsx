@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Dialog, IconButton, Tooltip, Typography } from '@mui/material';
-import { IconArrowLeft, IconArrowRight, IconMinus, IconPhotoPlus, IconPlus, IconX } from '@tabler/icons-react';
+import { IconArrowLeft, IconArrowRight, IconArrowsMaximize, IconPhotoPlus, IconX, IconZoomIn, IconZoomOut } from '@tabler/icons-react';
 import { DraftPhoto, MAX_ITEM_PHOTOS, PHOTO_ACCEPT, movePhoto, newPhotoKey, photoProblem } from '@/utils/itemImages';
 
 const tile = 104;
@@ -89,7 +89,7 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
               <Typography sx={{ position: 'absolute', left: 0, bottom: 0, px: 0.75, py: 0.1, bgcolor: '#4F8CFF', color: '#fff', fontSize: 11, fontWeight: 600, borderTopRightRadius: 6 }}>Main</Typography>
             )}
             <Box sx={{ position: 'absolute', top: 3, right: 3, display: 'flex', gap: 0.5 }}>
-              <Tooltip title="Zoom"><IconButton aria-label="Zoom photo" size="small" sx={iconBtn} onClick={() => open(i)}><IconPlus size={16} /></IconButton></Tooltip>
+              <Tooltip title="View large"><IconButton aria-label="Zoom photo" size="small" sx={iconBtn} onClick={() => open(i)}><IconArrowsMaximize size={15} /></IconButton></Tooltip>
               <Tooltip title="Remove"><span><IconButton aria-label="Remove photo" size="small" sx={iconBtn} onClick={() => remove(i)} disabled={disabled}><IconX size={16} /></IconButton></span></Tooltip>
             </Box>
             {photos.length > 1 && (
@@ -130,8 +130,8 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
               <IconButton aria-label="Close" onClick={() => setViewing(null)} sx={{ ...iconBtn, width: 36, height: 36 }}><IconX size={20} /></IconButton>
             </Box>
             <Box sx={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 1 }}>
-              <IconButton aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, z - 1))} disabled={zoom === 1} sx={{ ...iconBtn, width: 40, height: 40 }}><IconMinus size={20} /></IconButton>
-              <IconButton aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z + 1))} disabled={zoom === 4} sx={{ ...iconBtn, width: 40, height: 40 }}><IconPlus size={20} /></IconButton>
+              <IconButton aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, z - 1))} disabled={zoom === 1} sx={{ ...iconBtn, width: 40, height: 40 }}><IconZoomOut size={20} /></IconButton>
+              <IconButton aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z + 1))} disabled={zoom === 4} sx={{ ...iconBtn, width: 40, height: 40 }}><IconZoomIn size={20} /></IconButton>
             </Box>
           </Box>
         )}
