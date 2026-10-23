@@ -40,6 +40,7 @@ import TablePagination from './TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { DraftPhoto, SavedImage, imagesForSave, storedPhotoUrl } from '@/utils/itemImages';
 import {
   buildSubCategoryOptions,
   CategoryLookup,
@@ -644,31 +645,35 @@ export default function FoodItemsPage() {
     try {
       setDialogLoading(true);
 
-      let imageUrl = data.url || '';
-      let publicId = data.public_id || '';
-
-      let isImageUpdated = false;
-
-      if (imageFile) {
-        const uploadResult = await uploadToCloudinary(imageFile);
-
-        imageUrl = uploadResult.secure_url;
-        publicId = uploadResult.public_id;
-
-        isImageUpdated = true;
+      // the photos of the form, main photo first: new ones upload now (one after the other), saved ones stay as they are
+      const photos: DraftPhoto[] = Array.isArray(data.photos) ? data.photos : [];
+      const uploaded = new Map<string, SavedImage>();
+      for (const photo of photos) {
+        if (!photo.file) continue;
+        const result = await uploadToCloudinary(photo.file);
+        // a HEIC upload is stored with a .jpg address so every browser can show it
+        uploaded.set(photo.key, { url: storedPhotoUrl(result.secure_url, result.format), public_id: result.public_id });
       }
+      let images = imagesForSave(photos, uploaded);
+      // older callers (the category quick-create) still pass a single image file
+      if (images.length === 0 && imageFile) {
+        const result = await uploadToCloudinary(imageFile);
+        images = [{ url: storedPhotoUrl(result.secure_url, result.format), public_id: result.public_id }];
+      }
+      if (images.length === 0 && data.url) images = [{ url: data.url, ...(data.public_id ? { public_id: data.public_id } : {}) }];
+
+      const imageUrl = images[0]?.url ?? '';
+      const publicId = images[0]?.public_id ?? '';
 
       const requestData = buildFoodItemSavePayload(
         data,
         imageUrl,
         publicId
       );
+      delete requestData.photos;
+      requestData.images = images;
 
       const isEdit = !!data._id;
-
-      if (isEdit) {
-        requestData.isImageUpdated = isImageUpdated;
-      }
 
       const response = await fetch('/api/admin/food-items', {
         method: isEdit ? 'PUT' : 'POST',
