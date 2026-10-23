@@ -75,6 +75,7 @@ interface ComboFoodItem {
     minSelection?: number;
     maxSelection?: number;
     isRequired?: boolean;
+    takesSpice?: boolean;
   }>;
   hasSpiceLevel: boolean;
   spiceLevel?: string[];

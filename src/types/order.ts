@@ -132,6 +132,8 @@ export interface FoodItemSnapshot {
     _id: string;
     title: string;
     description?: string;
+    /** Whether the combo's spice level applies to this section's parts (missing = old rule, see comboSpice.ts) */
+    takesSpice?: boolean;
     selectedItems: Array<{
       _id: string;
       item: {
