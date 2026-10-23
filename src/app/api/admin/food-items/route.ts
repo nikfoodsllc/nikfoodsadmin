@@ -213,6 +213,10 @@ const sectionSchema = z.object({
   minSelection: z.number().optional().default(1),
   maxSelection: z.number().optional().default(1),
   isRequired: z.boolean().optional().default(true),
+  // whether the combo's spice level applies to this section's parts; left out = the old rule (everything but staples/breads)
+  takesSpice: z.boolean().optional(),
+  // the customer picks this section's spice level separately from the combo's (only used when takesSpice is on)
+  ownSpice: z.boolean().optional(),
 });
 
 // Zod schema for food item validation

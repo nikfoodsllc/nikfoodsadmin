@@ -8,6 +8,7 @@
  */
 
 import { comboItemQuantity, comboQuantityText } from './comboQuantity';
+import { getSectionSpice, sectionTakesSpice, spiceForSection } from './comboSpice';
 
 export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
 
@@ -120,6 +121,10 @@ export interface KitchenRow {
   sections?: Array<{
     _id?: string;
     title?: string;
+    /** Set by the admin per section; missing on older combos (see sectionTakesSpice) */
+    takesSpice?: boolean | null;
+    /** The customer picks this section's spice level on its own (see comboSpice.ts) */
+    ownSpice?: boolean | null;
     selectedItems?: Array<{ _id?: string; portion?: string | null; quantity?: number | null; item?: { _id?: string; name?: string } | null }>;
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
@@ -296,7 +301,7 @@ export function spicedPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelecti
   const sections = row.sections ?? [];
   if (!sections.length || !row.comboSelections) return names;
   for (const section of sections) {
-    if (/staple|bread/i.test(clean(section.title))) continue;
+    if (!sectionTakesSpice(section)) continue;
     const picked = (section._id && row.comboSelections[section._id]) || [];
     for (const id of picked) {
       const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);
@@ -304,6 +309,28 @@ export function spicedPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelecti
     }
   }
   return names;
+}
+
+/**
+ * The spice level of each picked option that has one, by option name. A section follows the combo's spice level, or the
+ * level the customer chose for that section alone (admin settings per section, see comboSpice.ts); a section that takes
+ * no spice gives nothing.
+ */
+export function partSpices(row: Pick<KitchenRow, 'sections' | 'comboSelections' | 'spiceLevel'>): Map<string, string> {
+  const out = new Map<string, string>();
+  const sections = row.sections ?? [];
+  if (!sections.length || !row.comboSelections) return out;
+  for (const section of sections) {
+    if (!sectionTakesSpice(section)) continue;
+    const level = spiceForSection(section, row.comboSelections, row.spiceLevel);
+    if (!level) continue;
+    const picked = (section._id && row.comboSelections[section._id]) || [];
+    for (const id of picked) {
+      const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);
+      if (name) out.set(name, level);
+    }
+  }
+  return out;
 }
 
 /** The picked options of a combo as separate items. `quantity` is how many of that item come with ONE combo (Chapati x 4); 1 when the combo does not say. */
@@ -433,7 +460,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
     const name = clean(row.name);
     const spice = clean(row.spiceLevel);
     const parts = comboParts(row);
-    const spiced = spicedPartNames(row);
+    const partSpice = partSpices(row);
     // delivered on a different day than it is cooked: counted by delivery date
     const later = laterDelivery(row);
 
@@ -460,7 +487,8 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
         acc.total += made;
         acc.inCombos += made;
         // the combo's spice level goes on every picked part except the staples (chapati, rice), as in the Kitchen Report
-        if (spice && spiced.has(part.name)) bump(acc.spice, spice, made);
+        const partLevel = partSpice.get(part.name);
+        if (partLevel) bump(acc.spice, partLevel, made);
         if (later) bump(acc.deliveries, later, made);
         bump(acc.portions, part.portion ?? 'No size', made);
         const partSize = parsePortionAmount(part.portion);
@@ -576,7 +604,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       orderStatus: row.orderStatus ?? null,
     };
     const parts = comboParts(row);
-    const spiced = spicedPartNames(row);
+    const partSpice = partSpices(row);
     if (parts.length > 0) {
       if (clean(row.name) === wanted) {
         lines.push({ ...base, quantity: row.quantity, portion: null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: '', choices: comboChoiceLines(row) });
@@ -584,7 +612,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       for (const part of parts) {
         if (part.name === wanted) {
           const made = row.quantity * part.quantity;
-          lines.push({ ...base, quantity: made, portion: part.portion, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, made), choices: [] });
+          lines.push({ ...base, quantity: made, portion: part.portion, spice: partSpice.get(part.name) || null, viaCombo: clean(row.name), amountText: amountTextOf(part.portion, made), choices: [] });
         }
       }
     } else if (clean(row.name) === wanted) {
@@ -649,7 +677,9 @@ export function comboChoiceLines(row: Pick<KitchenRow, 'sections' | 'comboSelect
       const portion = clean(option?.portion);
       names.push(`${portion ? `${name} (${portion})` : name}${comboQuantityText(option?.quantity)}`);
     }
-    if (names.length > 0) lines.push(`${clean(section.title) || 'Choice'}: ${names.join(', ')}`);
+    // a section the customer chose a spice level for gets it after the names
+    const own = getSectionSpice(row.comboSelections, section._id);
+    if (names.length > 0) lines.push(`${clean(section.title) || 'Choice'}: ${names.join(', ')}${own ? ` · ${own}` : ''}`);
   }
   return lines;
 }

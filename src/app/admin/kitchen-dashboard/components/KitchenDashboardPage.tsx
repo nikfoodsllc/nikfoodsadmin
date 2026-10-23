@@ -20,7 +20,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronUp, IconRefresh, IconSearch, IconTruckDelivery, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import ItemOrdersDialog from './ItemOrdersDialog';
 import { useColumnPreferences } from '@/hooks/useColumnPreferences';
@@ -242,7 +242,7 @@ function BlockBody({
   );
 }
 
-function DayCard({ day, isToday, onSelectItem, view }: { day: KitchenDay; isToday: boolean; onSelectItem: (name: string) => void; view: PrepView }) {
+function DayCard({ day, isToday, isPast, expanded, onToggle, onSelectItem, view }: { day: KitchenDay; isToday: boolean; isPast: boolean; expanded: boolean; onToggle: () => void; onSelectItem: (name: string) => void; view: PrepView }) {
   const empty = day.items.length === 0 && day.combos.length === 0;
   return (
     <Paper
@@ -257,7 +257,11 @@ function DayCard({ day, isToday, onSelectItem, view }: { day: KitchenDay; isToda
         bgcolor: empty ? '#FAFAFA' : '#fff',
       }}
     >
-      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #E5E7EB', bgcolor: isToday ? 'rgba(93,135,255,0.08)' : '#F9FAFB' }}>
+      <Box
+        // a day that has passed folds away so the current days sit near the top; the header is the button that opens it again
+        {...(isPast ? { role: 'button', tabIndex: 0, 'aria-expanded': expanded, onClick: onToggle, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } } : {})}
+        sx={{ px: 2, py: 1.5, borderBottom: expanded ? '1px solid #E5E7EB' : 'none', bgcolor: isToday ? 'rgba(93,135,255,0.08)' : '#F9FAFB', cursor: isPast ? 'pointer' : 'default' }}
+      >
         <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
           {/* a div, not a paragraph: the Today chip inside it is a div */}
           <Typography component="div" sx={{ fontWeight: 700, fontSize: 17, color: '#111827' }}>
@@ -266,7 +270,10 @@ function DayCard({ day, isToday, onSelectItem, view }: { day: KitchenDay; isToda
               <Chip size="small" color="primary" label="Today" sx={{ ml: 1, height: 20, fontSize: 11 }} />
             )}
           </Typography>
-          <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{formatDayShort(day.day)}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#6B7280' }}>
+            <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{formatDayShort(day.day)}</Typography>
+            {isPast && (expanded ? <IconChevronUp size={18} aria-label="Collapse" /> : <IconChevronDown size={18} aria-label="Expand" />)}
+          </Box>
         </Box>
         {!empty && (
           <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.5 }}>
@@ -277,7 +284,7 @@ function DayCard({ day, isToday, onSelectItem, view }: { day: KitchenDay; isToda
         )}
       </Box>
 
-      <BlockBody items={day.items} combos={day.combos} emptyText="Nothing ordered for this day." onSelectItem={onSelectItem} view={view} />
+      {expanded && <BlockBody items={day.items} combos={day.combos} emptyText="Nothing ordered for this day." onSelectItem={onSelectItem} view={view} />}
     </Paper>
   );
 }
@@ -324,6 +331,8 @@ export default function KitchenDashboardPage() {
   const [prepView, setPrepView] = useState<PrepView>('all');
   // the item whose orders are shown (day null = every day of the range)
   const [trace, setTrace] = useState<{ item: string; day: string | null } | null>(null);
+  // past days start folded; the ones opened by hand are kept here (a search opens every past day that has a match)
+  const [openPast, setOpenPast] = useState<Set<string>>(new Set());
   // which weekdays to show and in what order; saved per admin (same mechanism as the table columns)
   const dayLayout = useColumnPreferences('admin_kitchen_days', KITCHEN_DAY_DEFS, 'kitchen-days');
   const [loading, setLoading] = useState(true);
@@ -410,6 +419,8 @@ export default function KitchenDashboardPage() {
   const hiddenDays = allDays.length - days.length;
   const totalUnits = days.reduce((sum, d) => sum + d.totals.units, 0);
   const busyDays = days.filter((d) => d.items.length > 0 || d.combos.length > 0).length;
+  const pastDays = days.filter((d) => d.day < today);
+  const allPastOpen = pastDays.length > 0 && pastDays.every((d) => openPast.has(d.day));
 
   return (
     <Box>
@@ -496,6 +507,15 @@ export default function KitchenDashboardPage() {
             {!loading && !error && loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
           </Typography>
         )}
+        {!loading && !error && tab === 'days' && pastDays.length > 0 && !searching && (
+          <Button
+            size="small"
+            onClick={() => setOpenPast(allPastOpen ? new Set() : new Set(pastDays.map((d) => d.day)))}
+            sx={{ mt: 0.5, ml: -1, textTransform: 'none', fontWeight: 600 }}
+          >
+            {allPastOpen ? 'Collapse past days' : `Expand past days (${pastDays.length})`}
+          </Button>
+        )}
       </Paper>
 
       {range && (
@@ -579,9 +599,21 @@ export default function KitchenDashboardPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }, gap: 2, alignItems: 'start' }}>
           {loading
             ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} variant="rounded" height={220} />)
-            : days.map((day) => (
-                <DayCard key={day.day} day={day} isToday={day.day === today} onSelectItem={(name) => setTrace({ item: name, day: day.day })} view={prepView} />
-              ))}
+            : days.map((day) => {
+                const isPast = day.day < today;
+                return (
+                  <DayCard
+                    key={day.day}
+                    day={day}
+                    isToday={day.day === today}
+                    isPast={isPast}
+                    expanded={!isPast || searching || openPast.has(day.day)}
+                    onToggle={() => setOpenPast((prev) => { const next = new Set(prev); if (next.has(day.day)) next.delete(day.day); else next.add(day.day); return next; })}
+                    onSelectItem={(name) => setTrace({ item: name, day: day.day })}
+                    view={prepView}
+                  />
+                );
+              })}
           {!loading && searching && days.length === 0 && (
             <Typography sx={{ color: '#6B7280', gridColumn: '1 / -1' }}>No item matches “{search.trim()}” on these days.</Typography>
           )}

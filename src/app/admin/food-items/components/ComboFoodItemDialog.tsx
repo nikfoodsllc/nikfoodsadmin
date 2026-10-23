@@ -75,6 +75,8 @@ interface ComboFoodItem {
     minSelection?: number;
     maxSelection?: number;
     isRequired?: boolean;
+    takesSpice?: boolean;
+    ownSpice?: boolean;
   }>;
   hasSpiceLevel: boolean;
   spiceLevel?: string[];
@@ -474,6 +476,7 @@ export default function ComboFoodItemDialog({
           {/* Combo Section Manager */}
           <ComboSectionManager
             sections={formData.sections}
+            hasSpiceLevel={formData.hasSpiceLevel}
             allFoodItems={allFoodItems}
             onChange={(sections) => handleChange('sections', sections)}
             disabled={loading}
