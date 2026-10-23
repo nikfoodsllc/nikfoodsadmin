@@ -29,7 +29,8 @@ import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
 import { PreparationType, preparationTypeError } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
-import ImageUpload from '../../food-category/components/ImageUpload';
+import ItemPhotos from './ItemPhotos';
+import { DraftPhoto, photosFromItem } from '@/utils/itemImages';
 import ComboSectionManager from './ComboSectionManager';
 import PriceConfirmationDialog from './PriceConfirmationDialog';
 import SubCategorySelect from './SubCategorySelect';
@@ -140,7 +141,8 @@ export default function ComboFoodItemDialog({
 
   const [formData, setFormData] = useState<ComboFoodItem>(getInitialFormData);
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // the item's photos, main photo first; new ones upload when the item is saved
+  const [photos, setPhotos] = useState<DraftPhoto[]>(() => photosFromItem(item));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Price confirmation dialog state
@@ -161,7 +163,7 @@ export default function ComboFoodItemDialog({
       }
       setFormData(newFormData);
       setSelectedSubCategoryIds(resolveSubCategoryIds(item?.category, subCategoryIds));
-      setImageFile(null);
+      setPhotos(photosFromItem(item));
       setErrors({});
       // Reset price confirmation state
       setPriceConfirmDialogOpen(false);
@@ -185,15 +187,9 @@ export default function ComboFoodItemDialog({
     }
   };
 
-  const handleImageChange = (file: File | null, previewUrl: string | null) => {
-    setImageFile(file);
-    if (previewUrl) {
-      setFormData((prev) => ({
-        ...prev,
-        url: previewUrl,
-      }));
-    }
-    // Clear error when image is selected
+  const handlePhotos = (next: DraftPhoto[]) => {
+    setPhotos(next);
+    // Clear error when a photo is added
     if (errors.image) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -231,8 +227,8 @@ export default function ComboFoodItemDialog({
       newErrors.sections = 'All sections must have at least one item';
     }
 
-    if (!formData.url && !imageFile) {
-      newErrors.image = 'Image is required';
+    if (photos.length === 0) {
+      newErrors.image = 'At least one photo is required';
     }
 
     if (selectedSubCategoryIds.length === 0) {
@@ -267,7 +263,7 @@ export default function ComboFoodItemDialog({
         setPriceConfirmDialogOpen(true);
       } else {
         // No zero-priced items, proceed with normal save
-        onSave(dataWithSequence, imageFile);
+        onSave({ ...dataWithSequence, photos } as ComboFoodItem, null);
       }
     }
   };
@@ -286,7 +282,7 @@ export default function ComboFoodItemDialog({
 
     // Close dialog and save with updated prices
     setPriceConfirmDialogOpen(false);
-    onSave(updatedFormData, imageFile, { priceUpdated: true, updatedCount: zeroPricedItems.length });
+    onSave({ ...updatedFormData, photos } as ComboFoodItem, null, { priceUpdated: true, updatedCount: zeroPricedItems.length });
   };
 
   // Handle user choosing to keep prices at zero
@@ -295,7 +291,7 @@ export default function ComboFoodItemDialog({
 
     // Close dialog and save with original (zero) prices
     setPriceConfirmDialogOpen(false);
-    onSave(pendingFormData, imageFile, { priceUpdated: false, updatedCount: 0 });
+    onSave({ ...pendingFormData, photos } as ComboFoodItem, null, { priceUpdated: false, updatedCount: 0 });
   };
 
   // Handle closing the price confirmation dialog without action
@@ -360,9 +356,9 @@ export default function ComboFoodItemDialog({
           {/* Image Upload */}
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: '#374151' }}>
-              Food Item Image *
+              Food Item Photos *
             </Typography>
-            <ImageUpload value={formData.url || null} onChange={handleImageChange} disabled={loading} />
+            <ItemPhotos photos={photos} onChange={handlePhotos} disabled={loading} />
             {errors.image && (
               <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
                 {errors.image}
