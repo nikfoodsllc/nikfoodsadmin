@@ -8,6 +8,7 @@
  */
 
 import { comboItemQuantity, comboQuantityText } from './comboQuantity';
+import { sectionTakesSpice } from './comboSpice';
 
 export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
 
@@ -120,6 +121,8 @@ export interface KitchenRow {
   sections?: Array<{
     _id?: string;
     title?: string;
+    /** Set by the admin per section; missing on older combos (see sectionTakesSpice) */
+    takesSpice?: boolean | null;
     selectedItems?: Array<{ _id?: string; portion?: string | null; quantity?: number | null; item?: { _id?: string; name?: string } | null }>;
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
@@ -296,7 +299,7 @@ export function spicedPartNames(row: Pick<KitchenRow, 'sections' | 'comboSelecti
   const sections = row.sections ?? [];
   if (!sections.length || !row.comboSelections) return names;
   for (const section of sections) {
-    if (/staple|bread/i.test(clean(section.title))) continue;
+    if (!sectionTakesSpice(section)) continue;
     const picked = (section._id && row.comboSelections[section._id]) || [];
     for (const id of picked) {
       const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);

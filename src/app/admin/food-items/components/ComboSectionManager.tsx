@@ -15,6 +15,7 @@ import {
   Switch,
   Chip,
 } from '@mui/material';
+import { sectionTakesSpice } from '@/utils/comboSpice';
 import { IconPlus, IconTrash, IconSearch, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 
 interface FoodItem {
@@ -44,6 +45,8 @@ interface Section {
   minSelection?: number;
   maxSelection?: number;
   isRequired?: boolean;
+  /** Whether the combo's spice level applies to this section's items. Missing = the old rule (see sectionTakesSpice). */
+  takesSpice?: boolean;
 }
 
 interface ComboSectionManagerProps {
@@ -244,6 +247,12 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
       minSelection: isRequired ? 1 : 0,
       maxSelection: isRequired ? 1 : Math.max(1, newSections[sectionIndex].selectedItems.length),
     };
+    onChange(newSections);
+  };
+
+  const handleTakesSpiceToggle = (sectionIndex: number, takesSpice: boolean) => {
+    const newSections = [...sections];
+    newSections[sectionIndex] = { ...newSections[sectionIndex], takesSpice };
     onChange(newSections);
   };
 
@@ -725,6 +734,32 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
                         </Typography>
                       }
                     />
+                  </Box>
+
+                  {/* Spice: does the combo's spice level apply to what is picked in this section? */}
+                  <Box sx={{ mb: 2 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={sectionTakesSpice(section)}
+                          onChange={(e) => handleTakesSpiceToggle(sectionIndex, e.target.checked)}
+                          disabled={disabled}
+                          size="small"
+                          sx={{
+                            '& .MuiSwitch-switchBase.Mui-checked': { color: '#4F8CFF' },
+                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4F8CFF' },
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          Takes spice
+                        </Typography>
+                      }
+                    />
+                    <Typography variant="caption" sx={{ display: 'block', color: '#6B7280', ml: 4.5, mt: -0.5 }}>
+                      On: the combo&apos;s spice level is printed on the kitchen report and stickers for what is picked here. Off: no spice (for example idli, chapati, rice).
+                    </Typography>
                   </Box>
 
                   {/* Min/Max Selection Inputs */}
