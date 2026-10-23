@@ -32,6 +32,7 @@ import { getDisplayPaymentStatus } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
 import type { PaymentStatus } from '@/types/order';
 import { comboQuantityText } from '@/utils/comboQuantity';
+import { getSectionSpice } from '@/utils/comboSpice';
 
 interface DeliveryOrder {
   orderId: string;
@@ -312,7 +313,8 @@ export default function DeliveryReportPage() {
                   selectedItemIds.includes(si._id)
                 );
                 if (selectedItems.length === 0) return '';
-                return `${section.title}: ${selectedItems.map(si => `${si.item.name}${comboQuantityText(si.quantity)}`).join(', ')}`;
+                const own = getSectionSpice(item.comboSelections, section._id);
+                return `${section.title}: ${selectedItems.map(si => `${si.item.name}${comboQuantityText(si.quantity)}`).join(', ')}${own ? ` · ${own}` : ''}`;
               })
               .filter(Boolean)
               .join(' | ');
@@ -530,7 +532,7 @@ export default function DeliveryReportPage() {
                       return (
                         <Box key={section._id} sx={{ ml: 1 }}>
                           <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
-                            {section.title}:
+                            {section.title}:{getSectionSpice(item.comboSelections, section._id) ? ` · ${getSectionSpice(item.comboSelections, section._id)}` : ''}
                           </Typography>
                           {selectedItems.map(si => (
                             <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151', fontSize: '12px' }}>

@@ -15,7 +15,7 @@ import {
   Switch,
   Chip,
 } from '@mui/material';
-import { sectionTakesSpice } from '@/utils/comboSpice';
+import { sectionOwnsSpice, sectionTakesSpice } from '@/utils/comboSpice';
 import { IconPlus, IconTrash, IconSearch, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 
 interface FoodItem {
@@ -47,12 +47,16 @@ interface Section {
   isRequired?: boolean;
   /** Whether the combo's spice level applies to this section's items. Missing = the old rule (see sectionTakesSpice). */
   takesSpice?: boolean;
+  /** The customer picks this section's spice level on its own (needs the combo to have spice levels). */
+  ownSpice?: boolean;
 }
 
 interface ComboSectionManagerProps {
   sections: Section[];
   allFoodItems: FoodItem[];
   onChange: (sections: Section[]) => void;
+  /** The combo has spice levels (required for a section to have its own spice choice) */
+  hasSpiceLevel?: boolean;
   disabled?: boolean;
   error?: string;
 }
@@ -61,6 +65,7 @@ export default function ComboSectionManager({
   sections,
   allFoodItems,
   onChange,
+  hasSpiceLevel = false,
   disabled,
   error,
 }: ComboSectionManagerProps) {
@@ -253,6 +258,12 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
   const handleTakesSpiceToggle = (sectionIndex: number, takesSpice: boolean) => {
     const newSections = [...sections];
     newSections[sectionIndex] = { ...newSections[sectionIndex], takesSpice };
+    onChange(newSections);
+  };
+
+  const handleOwnSpiceToggle = (sectionIndex: number, ownSpice: boolean) => {
+    const newSections = [...sections];
+    newSections[sectionIndex] = { ...newSections[sectionIndex], ownSpice };
     onChange(newSections);
   };
 
@@ -760,6 +771,35 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
                     <Typography variant="caption" sx={{ display: 'block', color: '#6B7280', ml: 4.5, mt: -0.5 }}>
                       On: the combo&apos;s spice level is printed on the kitchen report and stickers for what is picked here. Off: no spice (for example idli, chapati, rice).
                     </Typography>
+                    {sectionTakesSpice(section) && (
+                      <>
+                        <FormControlLabel
+                          sx={{ display: 'flex', mt: 0.5 }}
+                          control={
+                            <Switch
+                              checked={sectionOwnsSpice(section)}
+                              onChange={(e) => handleOwnSpiceToggle(sectionIndex, e.target.checked)}
+                              disabled={disabled || !hasSpiceLevel}
+                              size="small"
+                              sx={{
+                                '& .MuiSwitch-switchBase.Mui-checked': { color: '#4F8CFF' },
+                                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#4F8CFF' },
+                              }}
+                            />
+                          }
+                          label={
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              Customer picks spice here
+                            </Typography>
+                          }
+                        />
+                        <Typography variant="caption" sx={{ display: 'block', color: '#6B7280', ml: 4.5, mt: -0.5 }}>
+                          {hasSpiceLevel
+                            ? 'On: the customer chooses a spice level for this section on its own. Off: this section follows the combo\'s spice level.'
+                            : 'Switch on "Spice Level" for this combo first, then the customer can choose spice per section.'}
+                        </Typography>
+                      </>
+                    )}
                   </Box>
 
                   {/* Min/Max Selection Inputs */}

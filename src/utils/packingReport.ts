@@ -5,7 +5,7 @@
  * Pure functions, no database and no network. The inputs are the order lines delivered that day, the roster (drivers and
  * their stops, copied from OptimoRoute once it has planned the routes) and our record of which orders sit in which stop.
  */
-import { comboChoiceLines, comboParts, spicedPartNames, type KitchenRow } from './kitchenDashboard';
+import { comboChoiceLines, comboParts, partSpices, type KitchenRow } from './kitchenDashboard';
 import { isEcoEligiblePart } from './kitchenReport';
 import type { HeldReport } from './packingHeld';
 import { filterHeld } from './packingHeld';
@@ -116,8 +116,8 @@ const streetKey = (v: unknown) => norm(clean(v).split(',')[0]);
 export function toLine(row: PackingRow, date: string): PackLine {
   const choices = comboChoiceLines(row);
   const picked = comboParts(row);
-  const spiced = spicedPartNames(row);
-  const parts: PackPart[] = picked.map((part) => ({ name: clean(part.name), portion: clean(part.portion) || null, quantity: part.quantity, spice: spiced.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name) }));
+  const partSpice = partSpices(row);
+  const parts: PackPart[] = picked.map((part) => ({ name: clean(part.name), portion: clean(part.portion) || null, quantity: part.quantity, spice: partSpice.get(part.name) || null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name) }));
   return {
     orderId: row.orderId,
     name: clean(row.name),
