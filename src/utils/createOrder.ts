@@ -5,6 +5,7 @@
  */
 
 import { comboQuantityText } from '@/utils/comboQuantity';
+import { comboNeedsOverallSpice, getSectionSpice, sectionsMissingSpice } from '@/utils/comboSpice';
 
 export interface MenuSelectedItem {
   _id: string;
@@ -23,6 +24,9 @@ export interface MenuComboSection {
   minSelection: number;
   maxSelection: number;
   selectedItems: MenuSelectedItem[];
+  /** Spice settings of the section (see utils/comboSpice.ts) */
+  takesSpice?: boolean;
+  ownSpice?: boolean;
 }
 
 export interface MenuItem {
@@ -194,7 +198,9 @@ export function pickProblem(
   pick: { selectedPortion?: string; selectedSpiceLevel?: string; comboSelections?: Record<string, string[]> }
 ): string | null {
   if ((item.portions?.length ?? 0) > 0 && !pick.selectedPortion) return 'Choose a size';
-  if (item.hasSpiceLevel && (item.spiceLevel?.length ?? 0) > 0 && !pick.selectedSpiceLevel) return 'Choose a spice level';
+  if (item.hasSpiceLevel && (item.spiceLevel?.length ?? 0) > 0 && !pick.selectedSpiceLevel && comboNeedsOverallSpice(item)) return 'Choose a spice level';
+  const noSpice = sectionsMissingSpice(item, pick.comboSelections)[0];
+  if (noSpice) return `Choose a spice level for ${noSpice.title}`;
   if (item.hasCombo) {
     for (const section of item.sections ?? []) {
       const chosen = pick.comboSelections?.[section._id]?.length ?? 0;
@@ -230,7 +236,8 @@ export function lineTags(
       .map((id) => section.selectedItems.find((o) => o._id === id))
       .filter(Boolean)
       .map((o) => `${o!.item?.name ?? 'Item'}${o!.portion ? ` (${o!.portion})` : ''}${comboQuantityText(o!.quantity)}`);
-    if (names.length > 0) tags.push(`${section.title}: ${names.join(', ')}`);
+    const own = getSectionSpice(pick.comboSelections, section._id);
+    if (names.length > 0) tags.push(`${section.title}: ${names.join(', ')}${own ? ` · ${own}` : ''}`);
   }
   return tags;
 }

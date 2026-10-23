@@ -22,6 +22,7 @@ import {
   spiceRank,
   type KitchenRow,
   spicedPartNames,
+  partSpices,
 } from './kitchenDashboard';
 import type { PreparationType } from './preparationType';
 import type { StickerFlag } from './stickerFlag';
@@ -132,12 +133,12 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
     };
     const parts = comboParts(row);
     if (parts.length > 0) {
-      const spicedNames = spicedPartNames(row);
+      const partSpice = partSpices(row);
       for (const part of parts) {
         atoms.push({
           name: part.name,
           id: part.id ?? null,
-          line: { ...base, quantity: row.quantity * part.quantity, portion: part.portion, spice: spicedNames.has(part.name) ? clean(row.spiceLevel) || null : null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity * part.quantity) },
+          line: { ...base, quantity: row.quantity * part.quantity, portion: part.portion, spice: partSpice.get(part.name) || null, isEco: Boolean(row.isEco) && isEcoEligiblePart(part.name), viaCombo: name, viaSpice: clean(row.spiceLevel) || null, amountText: amountTextOf(part.portion, row.quantity * part.quantity) },
         });
       }
     } else {
