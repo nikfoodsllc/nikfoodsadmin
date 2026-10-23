@@ -29,7 +29,8 @@ import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
 import { PreparationType, preparationTypeError } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
-import ImageUpload from '../../food-category/components/ImageUpload';
+import ItemPhotos from './ItemPhotos';
+import { DraftPhoto, photosFromItem } from '@/utils/itemImages';
 import PortionManager from './PortionManager';
 import SubCategorySelect from './SubCategorySelect';
 import { mergeCategoryIdsForSave, resolveSubCategoryIds, SubCategoryOption } from '../utils/subCategoryUtils';
@@ -110,7 +111,8 @@ export default function PortionsFoodItemDialog({
 
   const [formData, setFormData] = useState<PortionsFoodItem>(getInitialFormData);
   const [selectedSubCategoryIds, setSelectedSubCategoryIds] = useState<string[]>([]);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // the item's photos, main photo first; new ones upload when the item is saved
+  const [photos, setPhotos] = useState<DraftPhoto[]>(() => photosFromItem(item));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Reset form when dialog opens or item changes
@@ -119,7 +121,7 @@ export default function PortionsFoodItemDialog({
       const newFormData = item ? itemToPortionsFormData(item) : getDefaultFormData();
       setFormData(newFormData);
       setSelectedSubCategoryIds(resolveSubCategoryIds(item?.category, subCategoryIds));
-      setImageFile(null);
+      setPhotos(photosFromItem(item));
       setErrors({});
     }
   }, [open, item, subCategories]);
@@ -139,15 +141,9 @@ export default function PortionsFoodItemDialog({
     }
   };
 
-  const handleImageChange = (file: File | null, previewUrl: string | null) => {
-    setImageFile(file);
-    if (previewUrl) {
-      setFormData((prev) => ({
-        ...prev,
-        url: previewUrl,
-      }));
-    }
-    // Clear error when image is selected
+  const handlePhotos = (next: DraftPhoto[]) => {
+    setPhotos(next);
+    // Clear error when a photo is added
     if (errors.image) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -202,8 +198,8 @@ export default function PortionsFoodItemDialog({
       newErrors.portions = 'All portions must have a name';
     }
 
-    if (!formData.url && !imageFile) {
-      newErrors.image = 'Image is required';
+    if (photos.length === 0) {
+      newErrors.image = 'At least one photo is required';
     }
 
     if (selectedSubCategoryIds.length === 0) {
@@ -221,7 +217,7 @@ export default function PortionsFoodItemDialog({
       category: mergeCategoryIdsForSave(selectedSubCategoryIds, item?.category, subCategoryIds),
     };
     if (validate()) {
-      onSave(submitData, imageFile);
+      onSave({ ...submitData, photos } as PortionsFoodItem, null);
     }
   };
 
@@ -292,9 +288,9 @@ export default function PortionsFoodItemDialog({
           {/* Image Upload */}
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: '#374151' }}>
-              Food Item Image *
+              Food Item Photos *
             </Typography>
-            <ImageUpload value={formData.url || null} onChange={handleImageChange} disabled={loading} />
+            <ItemPhotos photos={photos} onChange={handlePhotos} disabled={loading} />
             {errors.image && (
               <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
                 {errors.image}

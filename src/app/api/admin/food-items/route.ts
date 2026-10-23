@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
-import { deleteFromCloudinary } from '@/lib/cloudinary';
+import { deleteUnusedPhotos, deleteRemovedPhotos, imageFields, incomingImages } from '@/lib/itemImageStore';
+import { storedImages } from '@/utils/itemImages';
 import { ObjectId, type Filter } from 'mongodb';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
 import { isPreparationType } from '@/utils/preparationType';
@@ -235,6 +236,8 @@ const foodItemSchema = z.object({
   isDraft: z.boolean().default(false), // Draft status for food items
   url: z.string().optional(),
   public_id: z.string().optional(),
+  // all photos of the item, main photo first (url / public_id above are the first one); at most 8
+  images: z.array(z.object({ url: z.string().min(1), public_id: z.string().optional() })).max(8).optional(),
   itemType: z.enum(['simple', 'portions', 'combo']).default('simple'),
   // How the item is prepared for the kitchen. Required when CREATING an item (POST checks it); on update, null means
   // "back to not set yet" and leaving it out leaves the stored value alone.
@@ -334,6 +337,7 @@ interface FoodItem {
   isDraft?: boolean; // Draft status for food items
   url?: string;
   public_id?: string;
+  images?: Array<{ url: string; public_id?: string }>;
   itemType: 'simple' | 'portions' | 'combo';
   // 'cooked' = made fresh for the day's menu, 'ready_to_eat' = already made, only packed; missing = not set yet
   preparationType?: 'cooked' | 'ready_to_eat';
@@ -746,8 +750,7 @@ export async function POST(request: NextRequest) {
       veg: data.veg,
       available: data.available,
       isDraft: data.isDraft ?? false,
-      url: data.url || '',
-      public_id: data.public_id || '',
+      ...imageFields(incomingImages(data)),
       itemType: data.itemType,
       isEcoFriendlyContainer: data.isEcoFriendlyContainer,
       ecoContainerCharge: data.ecoContainerCharge,
@@ -810,10 +813,8 @@ export async function POST(request: NextRequest) {
     const result = await db.create<FoodItem>('fooditems', foodItemData);
 
     if (!result.success) {
-      // Rollback: Delete uploaded image from Cloudinary if DB creation fails
-      if (data.public_id) {
-        await deleteFromCloudinary(data.public_id);
-      }
+      // Rollback: Delete uploaded images from Cloudinary if DB creation fails
+      await deleteUnusedPhotos(incomingImages(data).map((i) => i.public_id ?? ''));
       throw new Error(result.error || 'Failed to create food item');
     }
 
@@ -906,7 +907,7 @@ export async function PUT(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { _id, isImageUpdated, ...rest } = body;
+    const { _id, isImageUpdated: _legacyImageFlag, ...rest } = body;
     /** Only sync FLAT mappings when client explicitly sends `category` (omit = leave mappings unchanged). */
     const categoryProvided = Object.prototype.hasOwnProperty.call(body, 'category');
 
@@ -938,7 +939,6 @@ export async function PUT(request: NextRequest) {
     }
 
     const existingItem = existingResult.data;
-    const oldPublicId = existingItem.public_id;
 
    const data = validationResult.data;
 
@@ -976,8 +976,7 @@ const updateData: Partial<FoodItem> = {
   veg: data.veg,
   available: data.available,
   isDraft: data.isDraft ?? false,
-  url: data.url || '',
-  public_id: data.public_id || '',
+  ...imageFields(incomingImages(data)),
   itemType: data.itemType,
   isEcoFriendlyContainer: data.isEcoFriendlyContainer,
   ecoContainerCharge: data.ecoContainerCharge,
@@ -1134,10 +1133,8 @@ const updateData: Partial<FoodItem> = {
       }
     }
 
-    // If image was updated and there was an old image, delete it from Cloudinary
-    if (isImageUpdated && oldPublicId) {
-      await deleteFromCloudinary(oldPublicId);
-    }
+    // photos the item no longer has are removed from Cloudinary (unless another item still uses them)
+    await deleteRemovedPhotos(existingItem, incomingImages(data), existingItem._id);
 
     // Fetch updated item
     const updatedItem = await db.readOne<FoodItem>('fooditems', {
@@ -1229,14 +1226,8 @@ export async function DELETE(request: NextRequest) {
       throw new Error(deleteResult.error || 'Failed to delete food item');
     }
 
-    // Delete image from Cloudinary if exists
-    if (item.public_id) {
-      const cloudinaryResult = await deleteFromCloudinary(item.public_id);
-      if (!cloudinaryResult.success) {
-        console.error('Failed to delete image from Cloudinary:', cloudinaryResult.error);
-        // Continue anyway as DB deletion was successful
-      }
-    }
+    // Delete the item's photos from Cloudinary (a photo another item still uses is kept)
+    await deleteUnusedPhotos(storedImages(item).map((i) => i.public_id ?? ''), item._id);
 
     invalidateLivesiteHomeMenuCache();
     return NextResponse.json({ success: true, message: 'Food item deleted successfully' });
