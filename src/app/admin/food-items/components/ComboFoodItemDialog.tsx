@@ -23,11 +23,9 @@ import {
   SelectChangeEvent,
   Divider,
 } from '@mui/material';
-import PreparationTypeField from './PreparationTypeField';
-import StickerField from './StickerField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
-import { PreparationType, preparationTypeError } from '@/utils/preparationType';
+import { PreparationType } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ItemPhotos from './ItemPhotos';
 import { DraftPhoto, photosFromItem } from '@/utils/itemImages';
@@ -210,10 +208,6 @@ export default function ComboFoodItemDialog({
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     }
-
-    // a NEW item must say how it is prepared (existing items may stay not set)
-    const preparationError = preparationTypeError(!item?._id, formData.preparationType);
-    if (preparationError) newErrors.preparationType = preparationError;
 
     if (formData.price == null || formData.price < 0) {
       newErrors.price = 'Price must be non-negative';
@@ -510,28 +504,10 @@ export default function ComboFoodItemDialog({
             />
           </Box>
 
-          {/* Preparation Type: Cooked / Ready to eat (required for a new item; existing items may stay not set) */}
-          <PreparationTypeField
-            value={formData.preparationType}
-            onChange={(value) => {
-              setFormData((prev) => ({ ...prev, preparationType: value }));
-              if (errors.preparationType) {
-                setErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.preparationType;
-                  return next;
-                });
-              }
-            }}
-            disabled={loading}
-            required={!item?._id}
-            error={errors.preparationType}
-          />
-
-          {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
-          <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
-          <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Not needed: this item has no sticker.' : 'Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount.'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
+          <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
+            Prep Type and Sticker are set on each item inside the combo, not here.
+          </Typography>
 
           <Divider />
 

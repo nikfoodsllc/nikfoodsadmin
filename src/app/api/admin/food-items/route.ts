@@ -708,8 +708,9 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
-    // A new food item must say how it is prepared (updates may leave it as it is)
-    if (!isPreparationType(data.preparationType)) {
+    // A new food item must say how it is prepared (updates may leave it as it is).
+    // A combo is not asked: the reports use the Prep Type and Sticker of each item inside it.
+    if (data.itemType !== 'combo' && !isPreparationType(data.preparationType)) {
       return NextResponse.json(
         { error: 'Preparation type is required (Cooked or Ready to eat)' },
         { status: 400 }
