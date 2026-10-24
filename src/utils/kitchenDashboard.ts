@@ -8,7 +8,7 @@
  */
 
 import { comboItemQuantity, comboQuantityText } from './comboQuantity';
-import { getSectionSpice, sectionTakesSpice, spiceForSection } from './comboSpice';
+import { getOptionSpice, getSectionSpice, sectionTakesSpice, spiceForSection } from './comboSpice';
 
 export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
 
@@ -321,10 +321,20 @@ export function partSpices(row: Pick<KitchenRow, 'sections' | 'comboSelections' 
   const sections = row.sections ?? [];
   if (!sections.length || !row.comboSelections) return out;
   for (const section of sections) {
+    const picked = (section._id && row.comboSelections[section._id]) || [];
+    // a combo that asks for spice per item: each picked item has its own level (items without spice have none)
+    let perItem = false;
+    for (const id of picked) {
+      const own = getOptionSpice(row.comboSelections, section._id, id);
+      if (!own) continue;
+      perItem = true;
+      const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);
+      if (name) out.set(name, own);
+    }
+    if (perItem) continue;
     if (!sectionTakesSpice(section)) continue;
     const level = spiceForSection(section, row.comboSelections, row.spiceLevel);
     if (!level) continue;
-    const picked = (section._id && row.comboSelections[section._id]) || [];
     for (const id of picked) {
       const name = clean(section.selectedItems?.find((si) => si._id === id)?.item?.name);
       if (name) out.set(name, level);
@@ -675,7 +685,8 @@ export function comboChoiceLines(row: Pick<KitchenRow, 'sections' | 'comboSelect
       const name = clean(option?.item?.name);
       if (!name) continue;
       const portion = clean(option?.portion);
-      names.push(`${portion ? `${name} (${portion})` : name}${comboQuantityText(option?.quantity)}`);
+      const level = getOptionSpice(row.comboSelections, section._id, id);
+      names.push(`${portion ? `${name} (${portion})` : name}${comboQuantityText(option?.quantity)}${level ? ` · ${level}` : ''}`);
     }
     // a section the customer chose a spice level for gets it after the names
     const own = getSectionSpice(row.comboSelections, section._id);

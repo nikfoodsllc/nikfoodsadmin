@@ -22,6 +22,8 @@ import {
   MenuItem,
   SelectChangeEvent,
   Divider,
+  RadioGroup,
+  Radio,
 } from '@mui/material';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
@@ -79,6 +81,8 @@ interface ComboFoodItem {
   }>;
   hasSpiceLevel: boolean;
   spiceLevel?: string[];
+  /** How spice is asked: 'inherit' = for each item that has spice levels, using its own levels; 'combo' = for each such item, using the levels picked here. Missing on older combos. */
+  spiceMode?: 'inherit' | 'combo' | null;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
@@ -209,6 +213,10 @@ export default function ComboFoodItemDialog({
       newErrors.name = 'Name is required';
     }
 
+    if (formData.hasSpiceLevel && (formData.spiceMode ?? 'inherit') === 'combo' && (formData.spiceLevel?.length ?? 0) === 0) {
+      newErrors.spiceLevel = 'Pick at least one spice level';
+    }
+
     if (formData.price == null || formData.price < 0) {
       newErrors.price = 'Price must be non-negative';
     }
@@ -236,8 +244,12 @@ export default function ComboFoodItemDialog({
   const handleSubmit = () => {
     if (validate()) {
       // Assign sequence numbers to sections based on their current array index
+      const spiceMode = formData.hasSpiceLevel ? (formData.spiceMode ?? 'inherit') : null;
       const dataWithSequence = {
         ...formData,
+        spiceMode,
+        // the levels list only matters when the combo asks for its own levels
+        spiceLevel: spiceMode === 'combo' ? formData.spiceLevel ?? [] : [],
         sections: formData.sections.map((section, index) => ({
           ...section,
           sequence: index,
@@ -466,7 +478,6 @@ export default function ComboFoodItemDialog({
           {/* Combo Section Manager */}
           <ComboSectionManager
             sections={formData.sections}
-            hasSpiceLevel={formData.hasSpiceLevel}
             allFoodItems={allFoodItems}
             onChange={(sections) => handleChange('sections', sections)}
             disabled={loading}
@@ -557,13 +568,45 @@ export default function ComboFoodItemDialog({
                   }}
                 />
               }
-              label={<Typography variant="body2">Has Spice Level Options</Typography>}
+              label={<Typography variant="body2">Has Spice Level</Typography>}
             />
           </Box>
 
-          {/* Spice Levels Multi-Select */}
+          {/* How spice is asked */}
           {formData.hasSpiceLevel && (
-            <FormControl fullWidth>
+            <Box>
+              <RadioGroup
+                value={formData.spiceMode ?? 'inherit'}
+                onChange={(e) => handleChange('spiceMode', e.target.value as 'inherit' | 'combo')}
+              >
+                <FormControlLabel
+                  value="inherit"
+                  control={<Radio size="small" disabled={loading} />}
+                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Inherit Item Spice Data (default)</Typography>}
+                />
+                <Typography variant="caption" sx={{ display: 'block', color: '#6B7280', ml: 4, mt: -0.5, mb: 1 }}>
+                  The customer picks a spice level for each item in the combo that has spice levels, using that item&apos;s own levels. Items without spice (rice, bread) never ask.
+                </Typography>
+                <FormControlLabel
+                  value="combo"
+                  control={<Radio size="small" disabled={loading} />}
+                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>Collect Spice at Combo Level</Typography>}
+                />
+                <Typography variant="caption" sx={{ display: 'block', color: '#6B7280', ml: 4, mt: -0.5 }}>
+                  Pick the levels below. The customer picks one of them for each item in the combo that has spice levels.
+                </Typography>
+              </RadioGroup>
+              {item?._id && item.spiceMode == null && formData.hasSpiceLevel && (
+                <Typography variant="caption" sx={{ display: 'block', color: '#B45309', mt: 1 }}>
+                  This combo still uses the older one-level setup. Saving switches it to the option chosen here.
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {/* Spice Levels Multi-Select (only when the combo asks for its own levels) */}
+          {formData.hasSpiceLevel && (formData.spiceMode ?? 'inherit') === 'combo' && (
+            <FormControl fullWidth error={Boolean(errors.spiceLevel)}>
               <InputLabel id="spice-level-label">Spice Levels</InputLabel>
               <Select
                 labelId="spice-level-label"
@@ -600,6 +643,11 @@ export default function ComboFoodItemDialog({
                   </MenuItem>
                 ))}
               </Select>
+              {errors.spiceLevel && (
+                <Typography variant="caption" sx={{ color: '#d32f2f', mt: 0.5 }}>
+                  {errors.spiceLevel}
+                </Typography>
+              )}
             </FormControl>
           )}
 
