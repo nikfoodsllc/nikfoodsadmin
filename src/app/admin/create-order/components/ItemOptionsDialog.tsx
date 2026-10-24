@@ -29,7 +29,7 @@ import {
   type MenuItem,
 } from '@/utils/createOrder';
 import { comboQuantityText } from '@/utils/comboQuantity';
-import { comboNeedsOverallSpice, getSectionSpice, pruneSectionSpice, sectionOwnsSpice, withSectionSpice } from '@/utils/comboSpice';
+import { comboNeedsOverallSpice, getSectionSpice, optionSpiceKey, pickedSpiceOptions, pruneComboSpice, sectionOwnsSpice, withOptionSpice, withSectionSpice, type PickedSpiceOption } from '@/utils/comboSpice';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -47,6 +47,8 @@ function defaultsFor(item: MenuItem) {
   const spice = item.hasSpiceLevel && item.spiceLevel?.length ? (item.spiceLevel.includes('Normal') ? 'Normal' : item.spiceLevel[0]) : undefined;
   // a section with its own spice choice starts on the same default level
   if (spice) for (const section of item.sections ?? []) if (sectionOwnsSpice(section) && combo[section._id]?.length) combo[`spice:${section._id}`] = [spice];
+  // a combo that asks for spice per item: each item picked by default that has spice starts on its first level that reads Normal, else the first
+  for (const p of pickedSpiceOptions(item, combo)) combo[optionSpiceKey(p.section._id, p.option._id ?? '')] = [p.levels.includes('Normal') ? 'Normal' : p.levels[0]];
   return {
     portion: item.portions?.[0],
     spice,
@@ -54,7 +56,7 @@ function defaultsFor(item: MenuItem) {
   };
 }
 
-function ComboSection({ section, chosen, onChange, spiceLevels, spice, onSpice }: { section: MenuComboSection; chosen: string[]; onChange: (ids: string[]) => void; spiceLevels?: string[]; spice?: string | null; onSpice?: (level: string) => void }) {
+function ComboSection({ section, chosen, onChange, spiceLevels, spice, onSpice, itemSpice = [], onItemSpice }: { section: MenuComboSection; chosen: string[]; onChange: (ids: string[]) => void; spiceLevels?: string[]; spice?: string | null; onSpice?: (level: string) => void; itemSpice?: PickedSpiceOption<MenuComboSection>[]; onItemSpice?: (optionId: string, level: string) => void }) {
   const single = section.maxSelection <= 1;
   const toggle = (id: string) => {
     if (single) return onChange([id]);
@@ -83,6 +85,16 @@ function ComboSection({ section, chosen, onChange, spiceLevels, spice, onSpice }
           />
         );
       })}
+      {itemSpice.map((p) => (
+        <Box key={p.option._id} sx={{ mt: 0.75 }}>
+          <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 0.5 }}>Spice level for {p.option.item?.name ?? 'item'}</Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            {p.levels.map((s) => (
+              <Chip key={s} size="small" label={s} color={p.level === s ? 'warning' : 'default'} variant={p.level === s ? 'filled' : 'outlined'} onClick={() => onItemSpice?.(p.option._id ?? '', s)} />
+            ))}
+          </Box>
+        </Box>
+      ))}
       {onSpice && spiceLevels && spiceLevels.length > 0 && sectionOwnsSpice(section) && chosen.length > 0 && (
         <Box sx={{ mt: 0.75 }}>
           <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 0.5 }}>Spice level for {section.title}</Typography>
@@ -171,7 +183,7 @@ export default function ItemOptionsDialog({
   const deliverBad = deliverOn !== '' && deliverOn < date;
   const add = () => {
     if (problem || priceBad || deliverBad) return;
-    const comboSelections = pruneSectionSpice(item.sections, Object.fromEntries(Object.entries(combo).filter(([, ids]) => ids.length > 0)));
+    const comboSelections = pruneComboSpice(item, Object.fromEntries(Object.entries(combo).filter(([, ids]) => ids.length > 0)));
     onAdd({
       date,
       ...(deliverOn && deliverOn > date ? { deliverOn } : {}),
@@ -231,6 +243,8 @@ export default function ItemOptionsDialog({
             spiceLevels={item.hasSpiceLevel ? item.spiceLevel : undefined}
             spice={getSectionSpice(combo, section._id)}
             onSpice={(level) => setCombo((c) => withSectionSpice(c, section._id, level))}
+            itemSpice={pickedSpiceOptions(item, combo).filter((p) => p.section._id === section._id)}
+            onItemSpice={(optionId, level) => setCombo((c) => withOptionSpice(c, section._id, optionId, level))}
           />
         ))}
         {item.isEcoFriendlyContainer && (

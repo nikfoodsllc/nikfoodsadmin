@@ -220,6 +220,13 @@ const sectionSchema = z.object({
   ownSpice: z.boolean().optional(),
 });
 
+/** A combo with a spice mode no longer uses the per-section spice switches: drop them so old values cannot linger. */
+function withoutSectionSpiceFlags<T extends Record<string, unknown>>(section: T, spiceMode: 'inherit' | 'combo' | null | undefined): T {
+  if (spiceMode !== 'inherit' && spiceMode !== 'combo') return section;
+  const { takesSpice: _takesSpice, ownSpice: _ownSpice, ...rest } = section;
+  return rest as T;
+}
+
 // Zod schema for food item validation
 const foodItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -264,6 +271,8 @@ const foodItemSchema = z.object({
   ecoContainerCharge: z.number().default(0),
   hasSpiceLevel: z.boolean().default(false),
   spiceLevel: z.array(z.string()).optional(),
+  // Combos with Has Spice Level: 'inherit' = ask for each item that has spice levels, using its own levels; 'combo' = ask for each such item, using the combo's levels. Missing = the older one-level-for-the-combo behaviour.
+  spiceMode: z.enum(['inherit', 'combo']).nullish(),
 
   isImageUpdated: z.boolean().optional(),
 }).refine(
@@ -361,6 +370,7 @@ interface FoodItem {
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
   spiceLevel?: string[];
+  spiceMode?: 'inherit' | 'combo';
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -757,6 +767,7 @@ export async function POST(request: NextRequest) {
       ecoContainerCharge: data.ecoContainerCharge,
       hasSpiceLevel: data.hasSpiceLevel,
       spiceLevel: data.spiceLevel || [],
+      ...(data.itemType === 'combo' && data.hasSpiceLevel && data.spiceMode ? { spiceMode: data.spiceMode } : {}),
       ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
       // a new item is on the Stickers sheet unless it was created with Sticker = No
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
@@ -786,7 +797,7 @@ export async function POST(request: NextRequest) {
       foodItemData.hasCombo = true;
       // Assign sequence numbers to sections based on their array index
       foodItemData.sections = data.sections?.map((section: any, index: number) => ({
-        ...section,
+        ...withoutSectionSpiceFlags(section, data.hasSpiceLevel ? data.spiceMode : null),
         sequence: section.sequence ?? index,
       }));
 
@@ -983,6 +994,7 @@ const updateData: Partial<FoodItem> = {
   ecoContainerCharge: data.ecoContainerCharge,
   hasSpiceLevel: data.hasSpiceLevel,
   spiceLevel: data.spiceLevel || [],
+  ...(data.itemType === 'combo' && data.hasSpiceLevel && data.spiceMode ? { spiceMode: data.spiceMode } : {}),
   ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
   ...(typeof data.chefsPick === 'boolean' ? { chefsPick: data.chefsPick } : {}),
@@ -1020,7 +1032,7 @@ const updateData: Partial<FoodItem> = {
       updateData.hasCombo = true;
       // Assign sequence numbers to sections based on their array index
       updateData.sections = data.sections?.map((section: any, index: number) => ({
-        ...section,
+        ...withoutSectionSpiceFlags(section, data.hasSpiceLevel ? data.spiceMode : null),
         sequence: section.sequence ?? index,
       }));
 
@@ -1077,6 +1089,8 @@ const updateData: Partial<FoodItem> = {
     const unset: Record<string, ''> = {};
     if (data.preparationType === null) unset.preparationType = '';
     if (data.sticker === null) unset.sticker = '';
+    // a combo without spice (or sent without a spice mode) goes back to no spice mode
+    if (data.itemType === 'combo' && (data.hasSpiceLevel === false || data.spiceMode === null)) unset.spiceMode = '';
     if (data.splitSticker === null && data.sticker !== 'no') unset.splitSticker = '';
     const updateResult = await db.updateOne<FoodItem>(
       'fooditems',

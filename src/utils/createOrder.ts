@@ -5,11 +5,11 @@
  */
 
 import { comboQuantityText } from '@/utils/comboQuantity';
-import { comboNeedsOverallSpice, getSectionSpice, sectionsMissingSpice } from '@/utils/comboSpice';
+import { comboNeedsOverallSpice, getOptionSpice, getSectionSpice, optionsMissingSpice, sectionsMissingSpice } from '@/utils/comboSpice';
 
 export interface MenuSelectedItem {
   _id: string;
-  item?: { name?: string };
+  item?: { name?: string; hasSpiceLevel?: boolean; spiceLevel?: string[] };
   portion?: string;
   /** How many of this item come with one combo (missing = 1) */
   quantity?: number;
@@ -40,6 +40,8 @@ export interface MenuItem {
   portionPrices?: number[];
   hasSpiceLevel?: boolean;
   spiceLevel?: string[];
+  /** Combos: 'inherit' / 'combo' = spice is asked for each item that has spice levels (see utils/comboSpice.ts) */
+  spiceMode?: 'inherit' | 'combo';
   isEcoFriendlyContainer?: boolean;
   ecoContainerCharge?: number;
   hasCombo?: boolean;
@@ -201,6 +203,8 @@ export function pickProblem(
   if (item.hasSpiceLevel && (item.spiceLevel?.length ?? 0) > 0 && !pick.selectedSpiceLevel && comboNeedsOverallSpice(item)) return 'Choose a spice level';
   const noSpice = sectionsMissingSpice(item, pick.comboSelections)[0];
   if (noSpice) return `Choose a spice level for ${noSpice.title}`;
+  const noItemSpice = optionsMissingSpice(item, pick.comboSelections)[0];
+  if (noItemSpice) return `Choose a spice level for ${noItemSpice.option.item?.name ?? 'an item'}`;
   if (item.hasCombo) {
     for (const section of item.sections ?? []) {
       const chosen = pick.comboSelections?.[section._id]?.length ?? 0;
@@ -235,7 +239,7 @@ export function lineTags(
     const names = (pick.comboSelections?.[section._id] ?? [])
       .map((id) => section.selectedItems.find((o) => o._id === id))
       .filter(Boolean)
-      .map((o) => `${o!.item?.name ?? 'Item'}${o!.portion ? ` (${o!.portion})` : ''}${comboQuantityText(o!.quantity)}`);
+      .map((o) => `${o!.item?.name ?? 'Item'}${o!.portion ? ` (${o!.portion})` : ''}${comboQuantityText(o!.quantity)}${getOptionSpice(pick.comboSelections, section._id, o!._id) ? ` · ${getOptionSpice(pick.comboSelections, section._id, o!._id)}` : ''}`);
     const own = getSectionSpice(pick.comboSelections, section._id);
     if (names.length > 0) tags.push(`${section.title}: ${names.join(', ')}${own ? ` · ${own}` : ''}`);
   }
