@@ -32,7 +32,7 @@ import { getDisplayPaymentStatus } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
 import type { PaymentStatus } from '@/types/order';
 import { comboQuantityText } from '@/utils/comboQuantity';
-import { getSectionSpice } from '@/utils/comboSpice';
+import { getOptionSpice, getSectionSpice } from '@/utils/comboSpice';
 
 interface DeliveryOrder {
   orderId: string;
@@ -314,7 +314,7 @@ export default function DeliveryReportPage() {
                 );
                 if (selectedItems.length === 0) return '';
                 const own = getSectionSpice(item.comboSelections, section._id);
-                return `${section.title}: ${selectedItems.map(si => `${si.item.name}${comboQuantityText(si.quantity)}`).join(', ')}${own ? ` · ${own}` : ''}`;
+                return `${section.title}: ${selectedItems.map(si => `${si.item.name}${comboQuantityText(si.quantity)}${getOptionSpice(item.comboSelections, section._id, si._id) ? ` · ${getOptionSpice(item.comboSelections, section._id, si._id)}` : ''}`).join(', ')}${own ? ` · ${own}` : ''}`;
               })
               .filter(Boolean)
               .join(' | ');
@@ -536,7 +536,7 @@ export default function DeliveryReportPage() {
                           </Typography>
                           {selectedItems.map(si => (
                             <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151', fontSize: '12px' }}>
-                              • {si.item.name} {si.portion && `(${si.portion})`}{comboQuantityText(si.quantity)}
+                              • {si.item.name} {si.portion && `(${si.portion})`}{comboQuantityText(si.quantity)}{getOptionSpice(item.comboSelections, section._id, si._id) ? ` · ${getOptionSpice(item.comboSelections, section._id, si._id)}` : ''}
                             </Typography>
                           ))}
                         </Box>

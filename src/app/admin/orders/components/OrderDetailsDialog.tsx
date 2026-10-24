@@ -46,7 +46,7 @@ import OrderTranscript from './OrderTranscript';
 import { creditLeft, whyNotCreditable } from '@/utils/storeCredit';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 import { comboQuantityText } from '@/utils/comboQuantity';
-import { getSectionSpice } from '@/utils/comboSpice';
+import { getOptionSpice, getSectionSpice } from '@/utils/comboSpice';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -508,7 +508,7 @@ export default function OrderDetailsDialog({
                                           </Typography>
                                           {selectedItems.map(si => (
                                             <Typography key={si._id} variant="caption" sx={{ display: 'block', ml: 1, color: '#374151' }}>
-                                              • {si.item.name} {si.portion && `(${si.portion})`}{comboQuantityText(si.quantity)}
+                                              • {si.item.name} {si.portion && `(${si.portion})`}{comboQuantityText(si.quantity)}{getOptionSpice(item.comboSelections, section._id, si._id) ? ` · ${getOptionSpice(item.comboSelections, section._id, si._id)}` : ''}
                                             </Typography>
                                           ))}
                                         </Box>
