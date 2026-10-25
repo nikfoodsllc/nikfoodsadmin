@@ -6,6 +6,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, Dial
 import { IconBell, IconSend, IconTrash, IconUserCheck } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppCustomersTab from './AppCustomersTab';
+import AppUpdateCard from './AppUpdateCard';
 
 const TITLE_MAX = 40;
 const BODY_MAX = 150;
@@ -258,6 +259,8 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
         </Box>
         {reach === 0 && <Typography sx={{ color: '#92400E', fontSize: 13, mt: 1 }}>Nobody can get this yet: it needs a customer who subscribed to menu alerts, has the app, and has notifications allowed.</Typography>}
       </Paper>
+
+      <AppUpdateCard call={call} mode={data?.mode} onSent={() => void load()} />
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, mb: 2.5, borderRadius: 2 }}>
         <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 0.5 }}>Sent automatically</Typography>
