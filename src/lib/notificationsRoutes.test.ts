@@ -9,6 +9,9 @@ describe('notificationsTarget', () => {
     expect(notificationsTarget(['templates'], 'POST')).toBe('/api/admin/push/templates');
     expect(notificationsTarget(['send-menu'], 'POST')).toBe('/api/admin/push/send-menu');
     expect(notificationsTarget(['test'], 'POST')).toBe('/api/admin/push/test');
+    expect(notificationsTarget(['app-update'], 'GET')).toBe('/api/admin/push/app-update');
+    expect(notificationsTarget(['app-update'], 'PUT')).toBe('/api/admin/push/app-update');
+    expect(notificationsTarget(['app-update'], 'POST')).toBe('/api/admin/push/app-update');
   });
   it('maps one saved text by its id', () => {
     expect(notificationsTarget(['templates', '65f1a2b3c4d5e6f7a8b9c0d1'], 'PUT')).toBe('/api/admin/push/templates/65f1a2b3c4d5e6f7a8b9c0d1');
@@ -19,6 +22,8 @@ describe('notificationsTarget', () => {
     expect(notificationsTarget(['app-users'], 'POST')).toBeNull();
     expect(notificationsTarget(['app-users'], 'DELETE')).toBeNull();
     expect(notificationsTarget(['send-menu'], 'GET')).toBeNull();
+    expect(notificationsTarget(['app-update'], 'DELETE')).toBeNull();
+    expect(notificationsTarget(['app-update', 'x'], 'GET')).toBeNull();
     expect(notificationsTarget(['templates', '../admin'], 'PUT')).toBeNull();
     expect(notificationsTarget(['templates', 'x'], 'DELETE')).toBeNull();
     expect(notificationsTarget(['anything'], 'GET')).toBeNull();

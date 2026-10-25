@@ -37,7 +37,7 @@ async function forward(request: NextRequest, { params }: { params: Promise<{ slu
       return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
     }
     // the history shows who pressed Send
-    init.body = JSON.stringify(slug[0] === 'send-menu' ? { ...body, adminName: admin.name } : body);
+    init.body = JSON.stringify(slug[0] === 'send-menu' || slug[0] === 'app-update' ? { ...body, adminName: admin.name } : body);
   }
   try {
     const response = await fetch(`${livesiteBase()}${target}`, init);
