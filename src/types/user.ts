@@ -39,4 +39,6 @@ export interface Address {
 // User with populated addresses (for admin display)
 export interface UserWithAddresses extends Omit<UserDocument, 'password' | 'addresses'> {
   addresses?: Address[];
+  /** Text-message choice (list only): agreed, stopped or never */
+  textStatus?: 'agreed' | 'stopped' | 'never';
 }

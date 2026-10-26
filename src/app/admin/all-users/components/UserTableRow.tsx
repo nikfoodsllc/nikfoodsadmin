@@ -82,6 +82,17 @@ export default function UserTableRow({
         </Typography>
       </TableCell>
 
+      {/* Texts: did the customer agree to text messages */}
+      <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
+        {user.textStatus === 'agreed' ? (
+          <Chip label="Agreed" size="small" sx={{ height: 20, fontSize: '11px', fontWeight: 600, backgroundColor: '#D1FAE5', color: '#047857' }} />
+        ) : user.textStatus === 'stopped' ? (
+          <Chip label="Stopped" size="small" sx={{ height: 20, fontSize: '11px', fontWeight: 600, backgroundColor: '#FEE2E2', color: '#B91C1C' }} />
+        ) : (
+          <Typography sx={{ fontSize: '13px', color: '#9CA3AF' }}>No</Typography>
+        )}
+      </TableCell>
+
       {/* Registered On */}
       <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
         <Typography
