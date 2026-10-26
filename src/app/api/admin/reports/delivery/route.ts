@@ -1,4 +1,5 @@
 import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
+import { NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
@@ -89,6 +90,8 @@ export async function GET(request: NextRequest) {
       {
         $match: {
           'items.deliveryDate': dateFilter,
+          // an order an admin marked Delivered by hand is finished
+          ...NOT_MANUALLY_DELIVERED,
         },
       },
       // items an admin gave store credit for are not made or delivered: they are left out

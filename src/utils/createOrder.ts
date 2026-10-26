@@ -281,6 +281,17 @@ export function missingForCreate(customer: CustomerForm, address: AddressForm, l
   return missing;
 }
 
+/** An order the same customer already has on the same dates (the "red flag" the site returns before creating an order). */
+export interface PossibleDuplicate {
+  orderId: string;
+  createdAt: string;
+  status: string;
+  paymentStatus: string;
+  total: number;
+  sharedDates: string[];
+  byAdmin: boolean;
+}
+
 /** The tip choice that means "type an amount in dollars" (the other choices are percentages of the subtotal). */
 export const TIP_OTHER = -1;
 /** The most a typed tip can be, in dollars (the site refuses more). */
