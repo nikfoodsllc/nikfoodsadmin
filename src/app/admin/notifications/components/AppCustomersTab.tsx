@@ -78,7 +78,7 @@ export default function AppCustomersTab({ call }: { call: Call }) {
           <Tile value={counts.denied} label="Said No" hint="off in iPhone Settings" />
           <Tile value={counts.notAsked} label="Not asked yet" />
           <Tile value={counts.orders} label="Order updates on" hint="of those allowed" />
-          <Tile value={counts.menu} label="Menu alerts on" hint="switch on and subscribed" />
+          <Tile value={counts.menu} label="Menu alerts on" hint="menu switch on" />
           <Tile value={counts.reminders} label="Cart reminders on" />
           <Tile value={counts.allOff} label="Everything off" hint="all three switched off" />
         </Box>
