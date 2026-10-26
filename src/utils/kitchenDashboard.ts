@@ -136,6 +136,8 @@ export interface KitchenRow {
   orderStatus?: string | null;
   /** The day the order was placed (Pacific time), 'YYYY-MM-DD'. */
   orderedOn?: string | null;
+  /** The exact moment the order was placed (ISO). */
+  orderedAt?: string | null;
   /** Set when an admin moved this item's delivery date and the row sits on its new date: the kitchen day it was picked for. */
   movedFrom?: string | null;
 }
@@ -591,6 +593,8 @@ export interface ItemOrderLine {
   /** For a combo ordered on its own: what this customer picked in it, one line per section ('Veg Curry of the Day: Kale Chane (12Oz)'). */
   choices: string[];
   orderStatus: string | null;
+  /** When the order was placed (ISO), for the time shown and the sort. */
+  orderedAt: string | null;
 }
 
 /**
@@ -612,6 +616,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       deliveredOn: row.deliveredOn ?? null,
       isEco: Boolean(row.isEco),
       orderStatus: row.orderStatus ?? null,
+      orderedAt: row.orderedAt ?? null,
     };
     const parts = comboParts(row);
     const partSpice = partSpices(row);
@@ -630,13 +635,13 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
     }
   }
   // spice level first (mild to hot, no spice last), then the size on the order (16Oz before 12Oz before 8Oz, no size
-  // last), then the customer's name, so all the orders of one person for the same spice and size sit together; every
-  // order line is listed (nothing is merged)
+  // last), then the newest order first, then the customer's name; every order line is listed (nothing is merged)
   return lines.sort(
     (a, b) =>
       spiceRank(a.spice) - spiceRank(b.spice) ||
       clean(a.spice).localeCompare(clean(b.spice)) ||
       sizeRank(b.portion) - sizeRank(a.portion) ||
+      (Date.parse(b.orderedAt ?? '') || 0) - (Date.parse(a.orderedAt ?? '') || 0) ||
       a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
       b.quantity - a.quantity ||
       a.day.localeCompare(b.day) ||
@@ -741,6 +746,13 @@ export function filterBlockBySearch<T extends { items: KitchenItem[]; combos: Ki
  * The calendar day ('YYYY-MM-DD') of a moment in Pacific time, whatever time zone the server runs in (an order placed at
  * 11:30 PM Pacific is still that day, even though it is already the next day in UTC). Null for anything that is not a date.
  */
+/** 'Oct 24, 3:42 PM' in Pacific time for an order's placed moment; '' when unknown. */
+export function formatOrderedAt(value: string | null | undefined): string {
+  const date = value ? new Date(value) : null;
+  if (!date || !Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
 export function pacificDayOf(value: unknown): string | null {
   const date = value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? new Date(value) : null;
   if (!date || !Number.isFinite(date.getTime())) return null;
