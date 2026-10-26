@@ -13,6 +13,8 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  MenuItem,
+  TextField,
 } from '@mui/material';
 import { IconDownload } from '@tabler/icons-react';
 import UsersTable from './UsersTable';
@@ -26,6 +28,7 @@ import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 import { UserWithAddresses } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
+import { type TextFilter, type UserSort, parseTextFilter, parseUserSort } from '@/utils/userFilters';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -48,6 +51,8 @@ export default function UsersPage() {
   const searchBox = useSearchBox(() => setCurrentPage(1));
   const searchQuery = searchBox.query;
   const beginRequest = useLatestRequest();
+  const [textFilter, setTextFilter] = useState<TextFilter>('all');
+  const [sort, setSort] = useState<UserSort>('newest');
   const [totalUsers, setTotalUsers] = useState(0);
   // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
   const [pageSize, setPageSize] = usePageSize('all-users');
@@ -86,6 +91,8 @@ export default function UsersPage() {
       // Build query parameters
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
+      if (textFilter !== 'all') params.append('texts', textFilter);
+      if (sort !== 'newest') params.append('sort', sort);
       params.append('page', currentPage.toString());
       params.append('limit', itemsPerPage.toString());
 
@@ -111,7 +118,7 @@ export default function UsersPage() {
     } finally {
       if (request.isCurrent()) setLoading(false);
     }
-  }, [token, isAuthenticated, router, searchQuery, currentPage, itemsPerPage, beginRequest]);
+  }, [token, isAuthenticated, router, searchQuery, textFilter, sort, currentPage, itemsPerPage, beginRequest]);
 
   // Fetch users when filters change
   useEffect(() => {
@@ -264,9 +271,35 @@ export default function UsersPage() {
         </Box>
       </Box>
 
-      {/* Search Bar */}
-      <Box sx={{ marginBottom: 3 }}>
+      {/* Search, filter and sort */}
+      <Box sx={{ marginBottom: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
         <SearchBar value={searchBox.input} onChange={handleSearchChange} />
+        <TextField
+          select
+          size="small"
+          label="Text messages"
+          value={textFilter}
+          onChange={(e) => { setTextFilter(parseTextFilter(e.target.value)); setCurrentPage(1); }}
+          sx={{ minWidth: 190, backgroundColor: '#fff' }}
+        >
+          <MenuItem value="all">All customers</MenuItem>
+          <MenuItem value="agreed">Agreed to texts</MenuItem>
+          <MenuItem value="stopped">Stopped texts</MenuItem>
+          <MenuItem value="never">Never agreed</MenuItem>
+        </TextField>
+        <TextField
+          select
+          size="small"
+          label="Sort by"
+          value={sort}
+          onChange={(e) => { setSort(parseUserSort(e.target.value)); setCurrentPage(1); }}
+          sx={{ minWidth: 170, backgroundColor: '#fff' }}
+        >
+          <MenuItem value="newest">Newest first</MenuItem>
+          <MenuItem value="oldest">Oldest first</MenuItem>
+          <MenuItem value="name_asc">Name A to Z</MenuItem>
+          <MenuItem value="name_desc">Name Z to A</MenuItem>
+        </TextField>
       </Box>
 
       {/* Table */}

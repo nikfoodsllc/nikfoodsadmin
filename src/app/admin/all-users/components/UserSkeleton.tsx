@@ -19,6 +19,10 @@ export default function UserSkeleton() {
           <TableCell>
             <Skeleton variant="text" width={120} />
           </TableCell>
+          {/* Texts */}
+          <TableCell>
+            <Skeleton variant="text" width={60} />
+          </TableCell>
           {/* Registered On */}
           <TableCell>
             <Skeleton variant="text" width={100} />
