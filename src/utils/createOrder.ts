@@ -281,6 +281,26 @@ export function missingForCreate(customer: CustomerForm, address: AddressForm, l
   return missing;
 }
 
+/** The tip choice that means "type an amount in dollars" (the other choices are percentages of the subtotal). */
+export const TIP_OTHER = -1;
+/** The most a typed tip can be, in dollars (the site refuses more). */
+export const MAX_TIP_AMOUNT = 500;
+
+/** What to send for the tip: the percentage, or a dollar amount when "Other amount" is chosen. */
+export function tipFields(tip: number, other: string): { tipPercentage: number; tipAmount?: number } {
+  if (tip !== TIP_OTHER) return { tipPercentage: tip };
+  const amount = Math.round((Number(other) || 0) * 100) / 100;
+  return { tipPercentage: 0, tipAmount: Math.min(MAX_TIP_AMOUNT, Math.max(0, amount)) };
+}
+
+/** What is wrong with the typed tip, or '' when it is fine (or when a percentage is chosen). */
+export function tipProblem(tip: number, other: string): string {
+  if (tip !== TIP_OTHER) return '';
+  if (other.trim() === '' || other === '.') return 'A tip amount';
+  if (Number(other) > MAX_TIP_AMOUNT) return `A tip of $${MAX_TIP_AMOUNT} or less`;
+  return '';
+}
+
 /** One order in the "Recent orders entered here" list. */
 export interface OrderListRow {
   orderId: string;

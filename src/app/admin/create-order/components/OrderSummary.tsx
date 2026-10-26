@@ -9,6 +9,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  InputAdornment,
   MenuItem,
   Paper,
   Radio,
@@ -17,7 +18,7 @@ import {
   Typography,
 } from '@mui/material';
 import { IconMinus, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
-import { paidMethodValue, type CartLine, type PaidChoice } from '@/utils/createOrder';
+import { MAX_TIP_AMOUNT, paidMethodValue, TIP_OTHER, tipProblem, type CartLine, type PaidChoice } from '@/utils/createOrder';
 import { dayChipLabel } from './MenuPicker';
 import PaidMethodPicker from './PaidMethodPicker';
 
@@ -54,6 +55,9 @@ export default function OrderSummary(props: {
   previewError: string;
   tip: number;
   onTip: (t: number) => void;
+  /** The typed tip in dollars, used when the tip choice is "Other amount" */
+  tipOther: string;
+  onTipOther: (v: string) => void;
   waiveFee: boolean;
   onWaiveFee: (v: boolean) => void;
   /** Count the order in the reports and send it to OptimoRoute now, before it is paid (payment link and Zelle orders) */
@@ -127,7 +131,26 @@ export default function OrderSummary(props: {
       <Divider sx={{ my: 1.5 }} />
       <TextField select label="Tip" value={props.tip} onChange={(e) => props.onTip(Number(e.target.value))} size="small" fullWidth sx={{ mb: 1 }}>
         {[0, 5, 10, 15].map((t) => <MenuItem key={t} value={t}>{t === 0 ? 'No tip' : `${t}% of the subtotal`}</MenuItem>)}
+        <MenuItem value={TIP_OTHER}>Other amount ($)</MenuItem>
       </TextField>
+      {props.tip === TIP_OTHER && (
+        <TextField
+          label="Tip amount"
+          value={props.tipOther}
+          onChange={(e) => {
+            const kept = e.target.value.replace(/[^0-9.]/g, '');
+            const [whole, ...rest] = kept.split('.');
+            props.onTipOther((rest.length > 0 ? `${whole}.${rest.join('').slice(0, 2)}` : whole).slice(0, 7));
+          }}
+          error={tipProblem(props.tip, props.tipOther) !== '' && props.tipOther !== ''}
+          helperText={`Dollars, up to $${MAX_TIP_AMOUNT}. Replaces the percentage.`}
+          size="small"
+          fullWidth
+          inputProps={{ inputMode: 'decimal', 'aria-label': 'Tip amount in dollars' }}
+          InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+          sx={{ mb: 1 }}
+        />
+      )}
       <TextField
         label="Discount (optional)"
         value={props.discount}
