@@ -7,6 +7,7 @@ import { optimoFilterFor } from '@/utils/orderOptimoView';
 import { channelFilterFor } from '@/utils/orderChannel';
 import { rescheduledFilterFor } from '@/utils/orderReschedule';
 import { announceStatusChange, isAnnouncedStatus } from '@/lib/pushStatus';
+import { releaseFromRoute } from '@/lib/optimoRelease';
 
 const VALID_ORDER_STATUSES: OrderStatus[] = [
   'pending',
@@ -283,6 +284,11 @@ export async function PUT(request: NextRequest) {
         await announceStatusChange(request, [String(updatedOrder.data.orderId)], status);
       }
 
+      // marked Delivered by hand: the order is finished, so it leaves the OptimoRoute route (best effort; the site's 30-minute check does it too)
+      if (status === 'delivered' && before.data?.status !== 'delivered' && updatedOrder.data?.orderId) {
+        await releaseFromRoute(request, [String(updatedOrder.data.orderId)]);
+      }
+
       return NextResponse.json({
         data: updatedOrder.data,
         message: 'Order status updated successfully',
@@ -334,6 +340,10 @@ export async function PUT(request: NextRequest) {
     if (isAnnouncedStatus(status)) {
       const changed = await db.read<Order>('orders', { _id: { $in: objectIds } } as Record<string, unknown>, { projection: { orderId: 1 } });
       await announceStatusChange(request, (changed.data ?? []).map((o) => String(o.orderId)), status);
+    }
+    if (status === 'delivered') {
+      const delivered = await db.read<Order>('orders', { _id: { $in: objectIds } } as Record<string, unknown>, { projection: { orderId: 1 } });
+      await releaseFromRoute(request, (delivered.data ?? []).map((o) => String(o.orderId)));
     }
 
     return NextResponse.json({
