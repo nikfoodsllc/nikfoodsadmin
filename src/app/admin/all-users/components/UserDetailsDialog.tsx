@@ -21,7 +21,7 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { IconX, IconMapPin, IconPhone, IconMail, IconEye, IconEdit, IconPlus } from '@tabler/icons-react';
+import { IconX, IconMapPin, IconPhone, IconMail, IconEye, IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
 import { UserWithAddresses } from '@/types/user';
 import { Order } from '@/types/order';
 import StatusBadge from '../../orders/components/StatusBadge';
@@ -56,6 +56,10 @@ export default function UserDetailsDialog({ open, user, onClose, startEditing, o
   // editing: the customer's own details, one address (by id), or a new address
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingAddress, setEditingAddress] = useState<string | 'new' | null>(null);
+  // delete: which address is asking "are you sure", and the result of the call
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const userKey = user?._id ? String(user._id) : '';
 
   // every time the dialog opens for a customer it starts in view mode (or edit mode when asked)
@@ -63,7 +67,29 @@ export default function UserDetailsDialog({ open, user, onClose, startEditing, o
     if (!open) return;
     setEditingProfile(Boolean(startEditing));
     setEditingAddress(null);
+    setConfirmDeleteId(null);
+    setDeleteError(null);
   }, [open, userKey, startEditing]);
+
+  const deleteAddress = async (addressId: string) => {
+    if (!token || !userKey) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${userKey}/addresses/${addressId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data?.error || 'Could not delete the address. Try again.');
+      } else {
+        setConfirmDeleteId(null);
+        onChanged?.();
+      }
+    } catch {
+      setDeleteError('Could not reach the server. Try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const saved = () => {
     setEditingProfile(false);
@@ -353,11 +379,28 @@ export default function UserDetailsDialog({ open, user, onClose, startEditing, o
                             )}
                           </Box>
                           {editingAddress === null && (
-                            <Button size="small" startIcon={<IconEdit size={13} />} onClick={() => setEditingAddress(String(address._id))} sx={{ textTransform: 'none', fontSize: '12px', color: '#4F8CFF', minWidth: 0 }}>
-                              Edit
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              <Button size="small" startIcon={<IconEdit size={13} />} onClick={() => setEditingAddress(String(address._id))} sx={{ textTransform: 'none', fontSize: '12px', color: '#4F8CFF', minWidth: 0 }}>
+                                Edit
+                              </Button>
+                              <Button size="small" startIcon={<IconTrash size={13} />} onClick={() => { setDeleteError(null); setConfirmDeleteId(String(address._id)); }} sx={{ textTransform: 'none', fontSize: '12px', color: '#DC2626', minWidth: 0 }}>
+                                Delete
+                              </Button>
+                            </Box>
                           )}
                         </Box>
+                        {confirmDeleteId === String(address._id) && (
+                          <Box sx={{ mb: 1, p: 1.5, borderRadius: 1.5, backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#991B1B', mb: 1 }}>Delete this address? Past orders keep it.</Typography>
+                            {deleteError && <Typography sx={{ fontSize: 12, color: '#B91C1C', mb: 1 }}>{deleteError}</Typography>}
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button size="small" variant="contained" disabled={deleting} onClick={() => deleteAddress(String(address._id))} sx={{ textTransform: 'none', backgroundColor: '#DC2626', '&:hover': { backgroundColor: '#B91C1C' } }}>
+                                {deleting ? 'Deleting…' : 'Delete address'}
+                              </Button>
+                              <Button size="small" disabled={deleting} onClick={() => setConfirmDeleteId(null)} sx={{ textTransform: 'none', color: '#6B7280' }}>Keep</Button>
+                            </Box>
+                          </Box>
+                        )}
                         <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px', lineHeight: 1.6 }}>
                           {address.street_address}
                           {address.apartment && `, Apt ${address.apartment}`}
