@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addDays,
   buildItemOrders,
+  formatOrderedAt,
   buildKitchenDays,
   buildKitchenWeek,
   comboChoiceLines,
@@ -483,6 +484,19 @@ describe('who ordered: sorted by spice level, then size, then name', () => {
     ];
     // 1Lb and 16Oz are the same size: Gita, Hiral, Meher; then 12Oz: Anand, Kavita; then 8Oz; no size last
     expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['g', 'b', 'd', 'e', 'a', 'c', 'f']);
+  });
+  it('inside a spice level and size: the newest order first, and the time is carried on each line', () => {
+    const rows = [
+      r({ orderId: 'old', portion: '12Oz', customerName: 'Zed', orderedAt: '2026-10-24T17:00:00.000Z' }),
+      r({ orderId: 'new', portion: '12Oz', customerName: 'Asha', orderedAt: '2026-10-25T20:30:00.000Z' }),
+      r({ orderId: 'mid', portion: '12Oz', customerName: 'Mira', orderedAt: '2026-10-25T01:00:00.000Z' }),
+      r({ orderId: 'big', portion: '16Oz', customerName: 'Zed', orderedAt: '2026-10-20T01:00:00.000Z' }),
+    ];
+    const lines = buildItemOrders(rows, 'Matar Paneer Bhurji');
+    expect(lines.map((l) => l.orderId)).toEqual(['big', 'new', 'mid', 'old']);
+    expect(lines[1].orderedAt).toBe('2026-10-25T20:30:00.000Z');
+    expect(formatOrderedAt('2026-10-25T20:30:00.000Z')).toBe('Oct 25, 1:30 PM');
+    expect(formatOrderedAt(null)).toBe('');
   });
   it('a person with several orders of it: every order is listed and they sit together', () => {
     const rows = [
