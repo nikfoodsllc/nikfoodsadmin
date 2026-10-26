@@ -4,16 +4,17 @@ import { filterAppCustomers, getsMenuAlerts, menuStatus, phoneText, seenText, ty
 const c = (over: Partial<AppCustomer>): AppCustomer => ({ permission: 'allowed', userId: 'x', name: 'Amy Rao', email: 'amy@example.com', phone: '2065550101', phones: [{ permission: 'allowed', platform: 'ios', deviceName: "Amy's iPhone", appVersion: '1.0.1', lastSeenAt: null, firstSeenAt: null }], lastSeenAt: null, orders: true, menuSwitch: true, menuSubscribed: true, reminders: false, ...over });
 
 describe('menu alerts wording', () => {
-  it('needs the switch and the email list', () => {
+  it('only needs the app switch (not the email list)', () => {
     expect(menuStatus(c({}))).toEqual({ label: 'On', on: true });
     expect(menuStatus(c({ menuSwitch: false }))).toEqual({ label: 'Off', on: false });
-    expect(menuStatus(c({ menuSubscribed: false }))).toEqual({ label: 'Not subscribed', on: false });
+    expect(menuStatus(c({ menuSubscribed: false }))).toEqual({ label: 'On', on: true });
+    expect(getsMenuAlerts(c({ menuSubscribed: false }))).toBe(true);
     expect(getsMenuAlerts(c({ menuSwitch: false, menuSubscribed: true }))).toBe(false);
   });
 });
 
 describe('filterAppCustomers', () => {
-  const list = [c({ userId: 'a' }), c({ userId: 'b', name: 'Bob', email: 'bob@example.com', phone: '4255550202', orders: false, phones: [{ permission: 'allowed', platform: 'ios', deviceName: 'Work phone', appVersion: '', lastSeenAt: null, firstSeenAt: null }] }), c({ userId: 'd', name: 'Dev', email: 'd@example.com', orders: false, menuSubscribed: false, reminders: false }), c({ userId: 'e', name: 'Eve', email: 'e@example.com', reminders: true })];
+  const list = [c({ userId: 'a' }), c({ userId: 'b', name: 'Bob', email: 'bob@example.com', phone: '4255550202', orders: false, phones: [{ permission: 'allowed', platform: 'ios', deviceName: 'Work phone', appVersion: '', lastSeenAt: null, firstSeenAt: null }] }), c({ userId: 'd', name: 'Dev', email: 'd@example.com', orders: false, menuSwitch: false, reminders: false }), c({ userId: 'e', name: 'Eve', email: 'e@example.com', reminders: true })];
   const ids = (l: AppCustomer[]) => l.map((x) => x.userId);
   it('filters by switch', () => {
     expect(ids(filterAppCustomers(list, '', 'all'))).toEqual(['a', 'b', 'd', 'e']);

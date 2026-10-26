@@ -221,7 +221,7 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, mb: 2.5, borderRadius: 2 }}>
         <Typography sx={{ fontWeight: 800, fontSize: 18 }}>Menu update</Typography>
         <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
-          Sent to customers who subscribed to menu alerts and have the app: <b>{reach}</b> can get it now ({data?.menu.subscribers ?? 0} subscribed, {data?.menu.subscribersWithApp ?? 0} of them have the app).
+          Sent to customers who have the app with notifications allowed and menu alerts on: <b>{reach}</b> can get it now ({data?.menu.subscribersWithApp ?? 0} have the app).
         </Typography>
 
         <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Your saved texts</Typography>
@@ -257,7 +257,7 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
             </>
           )}
         </Box>
-        {reach === 0 && <Typography sx={{ color: '#92400E', fontSize: 13, mt: 1 }}>Nobody can get this yet: it needs a customer who subscribed to menu alerts, has the app, and has notifications allowed.</Typography>}
+        {reach === 0 && <Typography sx={{ color: '#92400E', fontSize: 13, mt: 1 }}>Nobody can get this yet: it needs a customer who has the app, has notifications allowed, and has menu alerts on.</Typography>}
       </Paper>
 
       <AppUpdateCard call={call} mode={data?.mode} onSent={() => void load()} />

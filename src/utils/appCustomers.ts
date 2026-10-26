@@ -51,14 +51,12 @@ export const APP_FILTERS: Array<{ key: AppFilter; label: string }> = [
   { key: 'allOff', label: 'Everything off' },
 ];
 
-/** Will a menu alert reach this customer? Both the app switch and the menu alerts email list (with consent) must say yes. */
-export const getsMenuAlerts = (c: AppCustomer): boolean => c.menuSwitch && c.menuSubscribed;
+/** Will a menu alert reach this customer? Only the app's own menu switch decides (the menu alerts email list is not needed). */
+export const getsMenuAlerts = (c: AppCustomer): boolean => c.menuSwitch;
 
-/** What to show for the menu alerts: On, Off (switched off in the app) or Not subscribed (switch on, but not on the email list). */
-export function menuStatus(c: AppCustomer): { label: 'On' | 'Off' | 'Not subscribed'; on: boolean } {
-  if (!c.menuSwitch) return { label: 'Off', on: false };
-  if (!c.menuSubscribed) return { label: 'Not subscribed', on: false };
-  return { label: 'On', on: true };
+/** What to show for the menu alerts: On, or Off (switched off in the app). */
+export function menuStatus(c: AppCustomer): { label: 'On' | 'Off'; on: boolean } {
+  return c.menuSwitch ? { label: 'On', on: true } : { label: 'Off', on: false };
 }
 
 const digits = (text: string) => text.replace(/\D/g, '');
