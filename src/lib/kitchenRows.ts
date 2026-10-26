@@ -81,6 +81,7 @@ function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): Kit
       deliveredOn: toDayString(raw.deliveredOn),
       orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
       orderedOn: pacificDayOf(raw.orderedAt),
+      orderedAt: raw.orderedAt instanceof Date || typeof raw.orderedAt === 'string' ? new Date(raw.orderedAt).toISOString() : null,
       movedFrom: movedFrom ? kitchenDay : null,
     });
   }

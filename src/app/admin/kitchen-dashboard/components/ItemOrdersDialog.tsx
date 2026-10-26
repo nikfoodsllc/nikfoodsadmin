@@ -14,7 +14,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { IconX } from '@tabler/icons-react';
-import { formatDayShort, type DayRange, type ItemOrderLine } from '@/utils/kitchenDashboard';
+import { formatDayShort, formatOrderedAt, type DayRange, type ItemOrderLine } from '@/utils/kitchenDashboard';
 
 /** The heading of a spice group in the list ('No spice level' for lines without one). */
 const spiceHeading = (spice: string | null) => spice || 'No spice level';
@@ -143,6 +143,9 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
                 </Typography>
                 <Typography sx={{ fontSize: 12.5, color: '#6B7280', userSelect: 'all', wordBreak: 'break-all' }}>{line.orderId}</Typography>
                 {when && <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.25 }}>{when}</Typography>}
+                {formatOrderedAt(line.orderedAt) && (
+                  <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.25 }}>Ordered {formatOrderedAt(line.orderedAt)}</Typography>
+                )}
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                   {line.portion && <Chip size="small" label={line.portion} sx={{ height: 22, fontSize: 12, bgcolor: '#F3F4F6' }} />}
                   {line.spice && (
