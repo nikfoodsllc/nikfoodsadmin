@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, Tab, Tabs, Typography, useMediaQuery, type Theme } from '@mui/material';
-import { IconShoppingCart, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconShoppingCart, IconX } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   addLine,
@@ -23,6 +23,7 @@ import {
   type MenuItem,
   type OrderListRow,
   type PaidChoice,
+  type PossibleDuplicate,
   TIP_OTHER,
   tipFields,
   tipProblem,
@@ -69,6 +70,8 @@ export default function CreateOrderPage() {
   const [tip, setTip] = useState(0);
   // dollars typed when the tip choice is "Other amount"
   const [tipOther, setTipOther] = useState('');
+  // orders the same customer already has on the same dates (red flag before creating)
+  const [duplicates, setDuplicates] = useState<PossibleDuplicate[] | null>(null);
   const [waiveFee, setWaiveFee] = useState(false);
   // an order waiting for payment that already counts in the reports and goes to OptimoRoute
   const [countNow, setCountNow] = useState(false);
@@ -225,7 +228,7 @@ export default function CreateOrderPage() {
   };
   const takeOne = (item: MenuItem, forDate: string = date) => setLines((cur) => removeOne(cur, forDate, item._id));
 
-  const submit = async () => {
+  const submit = async (confirmDuplicate = false) => {
     if (!token || submittingRef.current) return;
     submittingRef.current = true;
     setConfirmOpen(false);
@@ -241,6 +244,7 @@ export default function CreateOrderPage() {
       ...(countNow && (payment === 'link' || payment === 'zelle') ? { countBeforePayment: true } : {}),
       payment: payment === 'link' ? { mode: 'link' } : payment === 'zelle' ? { mode: 'zelle' } : payment === 'quote' ? { mode: 'quote' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
+      ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
       ...(editing ? { replacesOrderId: editing } : {}),
     };
     const r = await callApi(token, 'create', { method: 'POST', body: JSON.stringify(body) });
@@ -249,6 +253,10 @@ export default function CreateOrderPage() {
     if (r.ok) {
       setResult(r.body.data);
       setListVersion((v) => v + 1);
+    }
+    else if (r.status === 409 && r.body?.code === 'POSSIBLE_DUPLICATE' && Array.isArray(r.body.duplicates)) {
+      // red flag: nothing was saved; the admin decides
+      setDuplicates(r.body.duplicates as PossibleDuplicate[]);
     }
     else {
       setSubmitError(r.body?.error || 'The order could not be created');
@@ -483,6 +491,29 @@ export default function CreateOrderPage() {
         </DialogActions>
       </Dialog>
 
+      <Dialog open={duplicates !== null} onClose={() => setDuplicates(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 800, color: '#B91C1C', display: 'flex', alignItems: 'center', gap: 1 }}><IconAlertTriangle size={24} />Red flag: possible duplicate</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: '#111827', mb: 1.5 }}>
+            {customer.name || 'This customer'} already has {duplicates && duplicates.length === 1 ? 'an order' : 'orders'} for the same date. Nothing was saved yet.
+          </DialogContentText>
+          {(duplicates ?? []).map((d) => (
+            <Box key={d.orderId} sx={{ border: '1px solid #FCA5A5', bgcolor: '#FEF2F2', borderRadius: 1.5, p: 1.25, mb: 1 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: 14, wordBreak: 'break-all' }}>{d.orderId}</Typography>
+              <Typography sx={{ fontSize: 13, color: '#374151' }}>
+                {d.sharedDates.map((x) => dayChipLabel(x)).join(', ')} · ${Number(d.total ?? 0).toFixed(2)} · {d.paymentStatus === 'paid' ? 'paid' : 'waiting for payment'} · {d.status}
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{d.byAdmin ? 'Entered by an admin' : 'Placed on the website'}</Typography>
+            </Box>
+          ))}
+          <DialogContentText sx={{ fontSize: 13, mt: 1 }}>Check the Orders list. Create the order only if this is really a second order.</DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+          <Button onClick={() => setDuplicates(null)} sx={{ textTransform: 'none', fontWeight: 700 }}>Go back</Button>
+          <Button variant="contained" color="error" onClick={() => { setDuplicates(null); void submit(true); }} sx={{ textTransform: 'none', fontWeight: 700 }}>Create anyway</Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Create this order?</DialogTitle>
         <DialogContent>
@@ -500,7 +531,7 @@ export default function CreateOrderPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)} sx={{ textTransform: 'none' }}>Back</Button>
-          <Button variant="contained" onClick={submit} sx={{ textTransform: 'none', fontWeight: 700 }}>Create order</Button>
+          <Button variant="contained" onClick={() => void submit()} sx={{ textTransform: 'none', fontWeight: 700 }}>Create order</Button>
         </DialogActions>
       </Dialog>
     </Box>
