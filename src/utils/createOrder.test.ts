@@ -8,6 +8,9 @@ import {
   lineSignature,
   lineTags,
   missingForCreate,
+  TIP_OTHER,
+  tipFields,
+  tipProblem,
   needsOptions,
   pickProblem,
   replaceLine,
@@ -590,5 +593,24 @@ describe('onlyAvailable', () => {
     expect(out[0].itemIds).toEqual(['a']);
     expect(out[0].children.map((n) => n.id)).toEqual(['m']);
     expect(onlyAvailable([node('x', ['b', 'd'])], items)).toEqual([]);
+  });
+});
+
+describe('typed tip', () => {
+  it('sends the percentage unless Other amount is chosen', () => {
+    expect(tipFields(10, '')).toEqual({ tipPercentage: 10 });
+    expect(tipFields(0, '7')).toEqual({ tipPercentage: 0 });
+    expect(tipFields(TIP_OTHER, '7.5')).toEqual({ tipPercentage: 0, tipAmount: 7.5 });
+    expect(tipFields(TIP_OTHER, '0')).toEqual({ tipPercentage: 0, tipAmount: 0 });
+    expect(tipFields(TIP_OTHER, '7.456')).toEqual({ tipPercentage: 0, tipAmount: 7.46 });
+    expect(tipFields(TIP_OTHER, '9999')).toEqual({ tipPercentage: 0, tipAmount: 500 });
+  });
+  it('reports what is wrong with a typed tip', () => {
+    expect(tipProblem(5, '')).toBe('');
+    expect(tipProblem(TIP_OTHER, '')).toBe('A tip amount');
+    expect(tipProblem(TIP_OTHER, '.')).toBe('A tip amount');
+    expect(tipProblem(TIP_OTHER, '501')).toBe('A tip of $500 or less');
+    expect(tipProblem(TIP_OTHER, '0')).toBe('');
+    expect(tipProblem(TIP_OTHER, '500')).toBe('');
   });
 });

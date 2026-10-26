@@ -23,6 +23,9 @@ import {
   type MenuItem,
   type OrderListRow,
   type PaidChoice,
+  TIP_OTHER,
+  tipFields,
+  tipProblem,
 } from '@/utils/createOrder';
 import CustomerSection, { EMPTY_ADDRESS, type FoundCustomer } from './CustomerSection';
 import MenuPicker, { dayChipLabel } from './MenuPicker';
@@ -64,6 +67,8 @@ export default function CreateOrderPage() {
   const editItem = editLine && menu ? menu.items[editLine.foodItemId] ?? null : null;
 
   const [tip, setTip] = useState(0);
+  // dollars typed when the tip choice is "Other amount"
+  const [tipOther, setTipOther] = useState('');
   const [waiveFee, setWaiveFee] = useState(false);
   // an order waiting for payment that already counts in the reports and goes to OptimoRoute
   const [countNow, setCountNow] = useState(false);
@@ -187,7 +192,7 @@ export default function CreateOrderPage() {
     const timer = setTimeout(async () => {
       const r = await callApi(token, 'preview', {
         method: 'POST',
-        body: JSON.stringify({ lines: orderLines(), address: { ...address, street_address: address.street_address || 'x' }, tipPercentage: tip, waivePlatformFee: waiveFee, discount: discountValue }),
+        body: JSON.stringify({ lines: orderLines(), address: { ...address, street_address: address.street_address || 'x' }, ...tipFields(tip, tipOther), waivePlatformFee: waiveFee, discount: discountValue }),
       });
       if (seq !== previewSeq.current) return;
       setPreviewLoading(false);
@@ -200,10 +205,11 @@ export default function CreateOrderPage() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [token, lines, zipOk, address, tip, waiveFee, discountValue, orderLines]);
+  }, [token, lines, zipOk, address, tip, tipOther, waiveFee, discountValue, orderLines]);
 
   const counts = useMemo(() => lines.reduce<Record<string, number>>((acc, l) => ({ ...acc, [l.date]: (acc[l.date] ?? 0) + l.quantity }), {}), [lines]);
-  const missing = missingForCreate(customer, address, lines.length);
+  const tipMissing = tipProblem(tip, tipOther);
+  const missing = [...missingForCreate(customer, address, lines.length), ...(tipMissing ? [tipMissing] : [])];
 
   // the day the item being chosen goes on (an item picked from the whole menu goes on its own menu day)
   const [optionsDate, setOptionsDate] = useState('');
@@ -229,7 +235,7 @@ export default function CreateOrderPage() {
       customer,
       address,
       lines: orderLines(),
-      tipPercentage: tip,
+      ...tipFields(tip, tipOther),
       waivePlatformFee: waiveFee,
       discount: discountValue,
       ...(countNow && (payment === 'link' || payment === 'zelle') ? { countBeforePayment: true } : {}),
@@ -258,6 +264,7 @@ export default function CreateOrderPage() {
     setExisting(null);
     setLines([]);
     setTip(0);
+    setTipOther('');
     setWaiveFee(false);
     setCountNow(false);
     feeTouched.current = false;
@@ -295,7 +302,13 @@ export default function CreateOrderPage() {
         return { ...pick, name, unitPrice, tags, key: lineSignature(pick) };
       })
     );
-    setTip(o.tipPercentage);
+    if (typeof o.tipAmount === 'number') {
+      setTip(TIP_OTHER);
+      setTipOther(String(o.tipAmount));
+    } else {
+      setTip(o.tipPercentage);
+      setTipOther('');
+    }
     setWaiveFee(o.waivePlatformFee);
     setCountNow(o.countBeforePayment === true);
     feeTouched.current = true; // an order being changed keeps the fee choice it was saved with
@@ -322,6 +335,8 @@ export default function CreateOrderPage() {
       previewError={previewError}
       tip={tip}
       onTip={setTip}
+      tipOther={tipOther}
+      onTipOther={setTipOther}
       waiveFee={waiveFee}
       onWaiveFee={changeWaiveFee}
       countNow={countNow}
