@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bannerStatus, DEFAULT_DURATION_SECONDS, moveId, validateBanner } from './banners';
+import { bannerStatus, DEFAULT_DURATION_SECONDS, DEFAULT_HIDE_DAYS, moveId, validateBanner } from './banners';
 
 const base = { imageUrl: 'https://res.cloudinary.com/x/image/upload/v1/a.jpg' };
 
@@ -72,5 +72,25 @@ describe('moveId', () => {
     expect(moveId(['a', 'b', 'c', 'd'], 'a', 3)).toEqual(['b', 'c', 'd', 'a']);
     expect(moveId(['a', 'b'], 'b', 99)).toEqual(['a', 'b']);
     expect(moveId(['a', 'b'], 'zzz', 0)).toEqual(['a', 'b']);
+  });
+});
+
+describe('validateBanner popups', () => {
+  it('defaults to a header banner without hideDays', () => {
+    const r = validateBanner(base);
+    expect(r.ok && r.value.placement).toBe('header');
+    expect(r.ok && 'hideDays' in r.value).toBe(false);
+  });
+  it('a popup keeps its placement and defaults the hidden days to 30', () => {
+    const r = validateBanner({ ...base, placement: 'popup' });
+    expect(r.ok && r.value).toMatchObject({ placement: 'popup', hideDays: DEFAULT_HIDE_DAYS });
+  });
+  it('a popup can open a web page or nothing, not a category', () => {
+    expect(validateBanner({ ...base, placement: 'popup', linkType: 'url', url: 'https://apps.apple.com/x' }).ok).toBe(true);
+    expect(validateBanner({ ...base, placement: 'popup', linkType: 'category', categoryId: '65f1a2b3c4d5e6f7a8b9c0d1' }).ok).toBe(false);
+  });
+  it('the hidden days are a whole number from 1 to 365', () => {
+    expect(validateBanner({ ...base, placement: 'popup', hideDays: 7 }).ok).toBe(true);
+    for (const n of [0, 366, 1.5, 'x']) expect(validateBanner({ ...base, placement: 'popup', hideDays: n }).ok).toBe(false);
   });
 });
