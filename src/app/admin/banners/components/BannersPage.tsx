@@ -19,6 +19,8 @@ import {
   Paper,
   Snackbar,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   Typography,
   useMediaQuery,
@@ -28,7 +30,7 @@ import { IconArrowDown, IconArrowUp, IconPhotoPlus, IconPencil, IconPlus, IconTr
 import { useAuth } from '@/contexts/AuthContext';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import BannerCropDialog from './BannerCropDialog';
-import { moveId, SUBTITLE_MAX, TITLE_MAX, type BannerLinkType, type BannerStatus } from '@/lib/banners';
+import { APP_STORE_URL, DEFAULT_HIDE_DAYS, moveId, SUBTITLE_MAX, TITLE_MAX, type BannerLinkType, type BannerPlacement, type BannerStatus } from '@/lib/banners';
 
 interface Banner {
   _id: string;
@@ -42,6 +44,7 @@ interface Banner {
   startsAt: string | null;
   endsAt: string | null;
   durationSeconds?: number;
+  hideDays?: number;
   sequence: number;
   status: BannerStatus;
 }
@@ -79,13 +82,17 @@ function fromInput(v: string): string | null {
 
 // the choices for how long a banner stays before the next one slides in (a saved value outside this list is kept and shown too)
 const DURATION_CHOICES = [3, 4, 5, 6, 8, 10, 15, 20, 30];
-const EMPTY = { _id: '', title: '', subtitle: '', imageUrl: '', linkType: 'none' as BannerLinkType, categoryId: '', url: '', active: true, startsAt: '', endsAt: '', durationSeconds: 5 };
+// the choices for how many days a popup stays hidden after a customer closes it
+const HIDE_CHOICES = [1, 3, 7, 14, 30, 60, 90];
+const EMPTY = { _id: '', title: '', subtitle: '', imageUrl: '', linkType: 'none' as BannerLinkType, categoryId: '', url: '', active: true, startsAt: '', endsAt: '', durationSeconds: 5, hideDays: DEFAULT_HIDE_DAYS };
 
 export default function BannersPage() {
   const router = useRouter();
   const theme = useTheme();
   const phone = useMediaQuery(theme.breakpoints.down('sm'));
   const { token, loading: authLoading, isAuthenticated } = useAuth();
+  const [placement, setPlacement] = useState<BannerPlacement>('header');
+  const popup = placement === 'popup';
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,13 +122,13 @@ export default function BannersPage() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    const r = await call('/api/admin/banners');
+    const r = await call(`/api/admin/banners?placement=${placement}`);
     if (r.ok) {
       setBanners(r.json.data as Banner[]);
       setError('');
     } else setError(r.json.error || 'Could not load the banners');
     setLoading(false);
-  }, [call, token]);
+  }, [call, token, placement]);
 
   useEffect(() => {
     void load();
@@ -138,7 +145,7 @@ export default function BannersPage() {
 
   const open = (b?: Banner) => {
     setFormError('');
-    setForm(b ? { _id: b._id, title: b.title, subtitle: b.subtitle, imageUrl: b.imageUrl, linkType: b.linkType, categoryId: b.categoryId, url: b.url, active: b.active, startsAt: toInput(b.startsAt), endsAt: toInput(b.endsAt), durationSeconds: b.durationSeconds ?? 5 } : { ...EMPTY });
+    setForm(b ? { _id: b._id, title: b.title, subtitle: b.subtitle, imageUrl: b.imageUrl, linkType: b.linkType, categoryId: b.categoryId, url: b.url, active: b.active, startsAt: toInput(b.startsAt), endsAt: toInput(b.endsAt), durationSeconds: b.durationSeconds ?? 5, hideDays: b.hideDays ?? DEFAULT_HIDE_DAYS } : popup ? { ...EMPTY, linkType: 'url' as BannerLinkType, url: APP_STORE_URL } : { ...EMPTY });
   };
 
   const pick = (file: File | undefined) => {
@@ -171,12 +178,12 @@ export default function BannersPage() {
     if (!form) return;
     setSaving(true);
     setFormError('');
-    const body = { title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl, linkType: form.linkType, categoryId: form.categoryId, url: form.url, active: form.active, startsAt: fromInput(form.startsAt), endsAt: fromInput(form.endsAt), durationSeconds: form.durationSeconds };
+    const body = { title: form.title, subtitle: form.subtitle, imageUrl: form.imageUrl, linkType: form.linkType, categoryId: form.categoryId, url: form.url, active: form.active, startsAt: fromInput(form.startsAt), endsAt: fromInput(form.endsAt), durationSeconds: form.durationSeconds, placement, hideDays: form.hideDays };
     const r = form._id ? await call(`/api/admin/banners/${form._id}`, 'PUT', body) : await call('/api/admin/banners', 'POST', body);
     setSaving(false);
     if (r.ok) {
       setForm(null);
-      setNotice(form._id ? 'Saved' : 'Banner added');
+      setNotice(form._id ? 'Saved' : popup ? 'Popup added' : 'Banner added');
       void load();
     } else setFormError(r.json.error || 'Could not save');
   };
@@ -221,19 +228,29 @@ export default function BannersPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <Box>
           <Typography sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 800 }}>Banners</Typography>
-          <Typography sx={{ color: '#6B7280', fontSize: 14 }}>The pictures at the top of the home page, on the website and in the app. The first one is shown first.</Typography>
+          <Typography sx={{ color: '#6B7280', fontSize: 14 }}>
+            {popup ? 'The picture that opens on top of the website when a customer arrives. Only the first live one is shown.' : 'The pictures at the top of the home page, on the website and in the app. The first one is shown first.'}
+          </Typography>
         </Box>
         <Button variant="contained" color="warning" startIcon={<IconPlus size={18} />} onClick={() => open()} sx={{ textTransform: 'none', fontWeight: 700 }}>
-          Add banner
+          {popup ? 'Add popup' : 'Add banner'}
         </Button>
       </Box>
+      <Tabs value={placement} onChange={(_, v: BannerPlacement) => { setBanners([]); setError(''); setPlacement(v); }} sx={{ mb: 2, borderBottom: '1px solid #E5E7EB' }} textColor="inherit" TabIndicatorProps={{ style: { backgroundColor: '#ED6C02' } }}>
+        <Tab value="header" label="Header Banners" sx={{ textTransform: 'none', fontWeight: 700 }} />
+        <Tab value="popup" label="Popup Banners" sx={{ textTransform: 'none', fontWeight: 700 }} />
+      </Tabs>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {banners.length === 0 && !error ? (
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, textAlign: 'center' }}>
-          <Typography sx={{ fontWeight: 700 }}>No banners yet</Typography>
-          <Typography sx={{ color: '#6B7280', fontSize: 14, mt: 0.5 }}>Until you add one, the website shows its usual welcome picture and the app shows none.</Typography>
+          <Typography sx={{ fontWeight: 700 }}>{popup ? 'No popup added yet' : 'No banners yet'}</Typography>
+          <Typography sx={{ color: '#6B7280', fontSize: 14, mt: 0.5 }}>
+            {popup
+              ? 'Until you add one, the website shows its built-in "Our app is on the Apple Store" popup. Once you add one, only what you add here is shown; switch it off to show no popup at all.'
+              : 'Until you add one, the website shows its usual welcome picture and the app shows none.'}
+          </Typography>
         </Paper>
       ) : (
         <Box sx={{ display: 'grid', gap: 2 }}>
@@ -253,7 +270,7 @@ export default function BannersPage() {
               <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Typography sx={{ fontSize: 13, color: '#4B5563' }}>
                   {linkText(b)}
-                  {` · stays ${b.durationSeconds ?? 5} s`}
+                  {popup ? ` · hidden ${b.hideDays ?? DEFAULT_HIDE_DAYS} days after closing` : ` · stays ${b.durationSeconds ?? 5} s`}
                   {(b.startsAt || b.endsAt) && ` · ${b.startsAt ? `from ${when(b.startsAt)}` : ''}${b.startsAt && b.endsAt ? ' ' : ''}${b.endsAt ? `until ${when(b.endsAt)}` : ''}`}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
@@ -271,7 +288,7 @@ export default function BannersPage() {
       )}
 
       <Dialog open={form !== null} onClose={() => !saving && setForm(null)} fullWidth maxWidth="sm" fullScreen={phone}>
-        <DialogTitle>{form?._id ? 'Edit banner' : 'Add banner'}</DialogTitle>
+        <DialogTitle>{popup ? (form?._id ? 'Edit popup' : 'Add popup') : form?._id ? 'Edit banner' : 'Add banner'}</DialogTitle>
         <DialogContent>
           {form && (
             <Box sx={{ display: 'grid', gap: 2, pt: 1 }}>
@@ -299,15 +316,15 @@ export default function BannersPage() {
                   )}
                 </Box>
                 <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
-                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>A wide picture works best (about 1400 × 700). You choose which part to show after picking it.{form.imageUrl ? ' Tap the picture to change it.' : ''}</Typography>
+                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>A wide picture works best (about 1600 × 800).{popup ? ' It opens as a popup, so make the words in it easy to read on a phone.' : ' You choose which part to show after picking it.'}{form.imageUrl ? ' Tap the picture to change it.' : ''}</Typography>
               </Box>
 
-              <TextField label="Title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} size="small" fullWidth helperText={`${form.title.length}/${TITLE_MAX}`} error={form.title.length > TITLE_MAX} />
-              <TextField label="Line under the title (optional)" value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} size="small" fullWidth helperText={`${form.subtitle.length}/${SUBTITLE_MAX}`} error={form.subtitle.length > SUBTITLE_MAX} />
+              {!popup && <TextField label="Title (optional)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} size="small" fullWidth helperText={`${form.title.length}/${TITLE_MAX}`} error={form.title.length > TITLE_MAX} />}
+              {!popup && <TextField label="Line under the title (optional)" value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} size="small" fullWidth helperText={`${form.subtitle.length}/${SUBTITLE_MAX}`} error={form.subtitle.length > SUBTITLE_MAX} />}
 
               <TextField select label="When tapped" value={form.linkType} onChange={(e) => setForm({ ...form, linkType: e.target.value as BannerLinkType })} size="small" fullWidth>
                 <MenuItem value="none">Nothing</MenuItem>
-                <MenuItem value="category">Open a menu category</MenuItem>
+                {!popup && <MenuItem value="category">Open a menu category</MenuItem>}
                 <MenuItem value="url">Open a web page</MenuItem>
               </TextField>
               {form.linkType === 'category' && (
@@ -345,9 +362,15 @@ export default function BannersPage() {
                 ))}
               </Box>
               {(form.startsAt || form.endsAt) && <Typography sx={{ fontSize: 12, color: '#6B7280', mt: -1 }}>Times are Pacific time.</Typography>}
+              {popup ? (
+                <TextField select label="After a customer closes it, show again after" value={form.hideDays} onChange={(e) => setForm({ ...form, hideDays: Number(e.target.value) })} size="small" fullWidth helperText="A new or changed picture is shown again right away, even to customers who closed the old one.">
+                  {Array.from(new Set([...HIDE_CHOICES, form.hideDays])).sort((a, b) => a - b).map((n) => <MenuItem key={n} value={n}>{n === 1 ? '1 day' : `${n} days`}</MenuItem>)}
+                </TextField>
+              ) : (
               <TextField select label="Stays on show for" value={form.durationSeconds} onChange={(e) => setForm({ ...form, durationSeconds: Number(e.target.value) })} size="small" fullWidth helperText="How long this banner shows before the next one slides in (only matters when there is more than one live banner).">
                 {Array.from(new Set([...DURATION_CHOICES, form.durationSeconds])).sort((a, b) => a - b).map((n) => <MenuItem key={n} value={n}>{n} seconds</MenuItem>)}
               </TextField>
+              )}
               <FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} color="warning" />} label="Show to customers" />
               {formError && <Alert severity="error">{formError}</Alert>}
             </Box>
@@ -370,9 +393,9 @@ export default function BannersPage() {
       />
 
       <Dialog open={toDelete !== null} onClose={() => setToDelete(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete this banner?</DialogTitle>
+        <DialogTitle>{popup ? 'Delete this popup?' : 'Delete this banner?'}</DialogTitle>
         <DialogContent>
-          <DialogContentText>It disappears from the website and the app. To hide it for a while, switch it off instead.</DialogContentText>
+          <DialogContentText>It disappears from the website{popup ? '' : ' and the app'}. To hide it for a while, switch it off instead.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setToDelete(null)} sx={{ textTransform: 'none' }}>Cancel</Button>

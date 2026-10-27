@@ -1,8 +1,10 @@
 /**
- * Home-page banners (shown on the website and in the app). What an admin may save, and how a banner stands right now.
- * The customer site reads the same `banners` collection (GET /api/banners there).
+ * Home-page banners (shown on the website and in the app) and the pop-up that opens with the website. What an admin may save, and how a
+ * banner stands right now. The customer site reads the same `banners` collection (GET /api/banners and /api/popup-banner there);
+ * a pop-up is a banner with placement 'popup' (older banners have no placement and are header banners).
  */
 export type BannerLinkType = 'none' | 'category' | 'url';
+export type BannerPlacement = 'header' | 'popup';
 export type BannerStatus = 'live' | 'scheduled' | 'ended' | 'off';
 
 export interface BannerInput {
@@ -17,8 +19,15 @@ export interface BannerInput {
   endsAt: Date | null;
   /** how long the banner stays on show before the carousel moves to the next one */
   durationSeconds: number;
+  placement: BannerPlacement;
+  /** pop-up only: days it stays hidden after a customer closes it */
+  hideDays?: number;
 }
 
+export const APP_STORE_URL = 'https://apps.apple.com/us/app/id6767141830';
+export const DEFAULT_HIDE_DAYS = 30;
+export const MIN_HIDE_DAYS = 1;
+export const MAX_HIDE_DAYS = 365;
 export const MAX_BANNERS = 20;
 export const TITLE_MAX = 60;
 export const SUBTITLE_MAX = 100;
@@ -42,7 +51,9 @@ export function validateBanner(body: unknown): { ok: true; value: BannerInput } 
   const linkType = (b.linkType === 'category' || b.linkType === 'url' ? b.linkType : 'none') as BannerLinkType;
   const categoryId = String(b.categoryId ?? '').trim();
   const url = String(b.url ?? '').trim();
+  const placement: BannerPlacement = b.placement === 'popup' ? 'popup' : 'header';
 
+  if (placement === 'popup' && linkType === 'category') return { ok: false, error: 'A popup can open a web page or nothing' };
   if (!imageUrl) return { ok: false, error: 'Add a picture' };
   if (!isHttps(imageUrl) || imageUrl.length > 600) return { ok: false, error: 'The picture address is not valid' };
   if (title.length > TITLE_MAX) return { ok: false, error: `The title can be ${TITLE_MAX} characters` };
@@ -59,10 +70,21 @@ export function validateBanner(body: unknown): { ok: true; value: BannerInput } 
     if (!Number.isInteger(n) || n < MIN_DURATION_SECONDS || n > MAX_DURATION_SECONDS) return { ok: false, error: `How long a banner stays can be ${MIN_DURATION_SECONDS} to ${MAX_DURATION_SECONDS} seconds` };
     durationSeconds = n;
   }
+  let hideDays: number | undefined;
+  if (placement === 'popup') {
+    hideDays = DEFAULT_HIDE_DAYS;
+    if (b.hideDays !== undefined && b.hideDays !== null && b.hideDays !== '') {
+      const n = Number(b.hideDays);
+      if (!Number.isInteger(n) || n < MIN_HIDE_DAYS || n > MAX_HIDE_DAYS) return { ok: false, error: `Days hidden after closing can be ${MIN_HIDE_DAYS} to ${MAX_HIDE_DAYS}` };
+      hideDays = n;
+    }
+  }
 
   return {
     ok: true,
     value: {
+      placement,
+      ...(hideDays !== undefined ? { hideDays } : {}),
       title,
       subtitle,
       imageUrl,

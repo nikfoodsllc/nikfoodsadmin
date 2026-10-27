@@ -21,7 +21,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });
   const col = await collection();
   const now = new Date();
-  const updated = await col.findOneAndUpdate({ _id: new ObjectId(id) }, { $set: { ...checked.value, updatedAt: now } }, { returnDocument: 'after' });
+  // where a banner is shown (header or popup) is fixed when it is added
+  const { placement: _placement, ...fields } = checked.value;
+  void _placement;
+  const updated = await col.findOneAndUpdate({ _id: new ObjectId(id) }, { $set: { ...fields, updatedAt: now } }, { returnDocument: 'after' });
   const doc = (updated as { value?: Record<string, unknown> | null } | Record<string, unknown> | null);
   const saved = doc && 'value' in (doc as object) ? (doc as { value?: Record<string, unknown> | null }).value : (doc as Record<string, unknown> | null);
   if (!saved) return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
