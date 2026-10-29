@@ -229,7 +229,7 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
       {tab === 'send' && (
         <>
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, mb: 2.5, borderRadius: 2 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>Menu update</Typography>
+        <Typography sx={{ fontWeight: 800, fontSize: 18 }}>App Notification</Typography>
         <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
           {audience === 'specific'
             ? 'Sent only to the customers you choose below. They need the app with notifications allowed.'
@@ -322,7 +322,7 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
       </Paper>
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: 2 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 1 }}>Menu updates sent</Typography>
+        <Typography sx={{ fontWeight: 800, fontSize: 18, mb: 1 }}>App notifications sent</Typography>
         {data?.campaigns.length === 0 && <Typography sx={{ color: '#9CA3AF', fontSize: 14 }}>Nothing sent yet.</Typography>}
         {data?.campaigns.map((c, i) => (
           <Box key={c._id} sx={{ py: 1.1, borderTop: i === 0 ? 'none' : '1px solid #F3F4F6' }}>
