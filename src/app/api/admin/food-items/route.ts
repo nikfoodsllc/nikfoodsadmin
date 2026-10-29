@@ -11,7 +11,7 @@ import { stockOf, type StockDoc } from '@/lib/stockCounts';
 import { writeStockLog } from '@/lib/stockLog';
 import { isPreparationType } from '@/utils/preparationType';
 import { isStickerFlag } from '@/utils/stickerFlag';
-import { foodItemListFilters } from './listFilters';
+import { foodItemListFilters, stockLevelParam } from './listFilters';
 
 // Interface for available days
 interface AvailableDay {
@@ -584,6 +584,16 @@ export async function GET(request: NextRequest) {
     // (applied after vegOnly, so a `veg` filter wins when both are sent)
     Object.assign(filter, foodItemListFilters(searchParams));
 
+    // Stock filter by level (ok / low / sold out): the level follows the live count, so the items with a limit are counted first
+    const wantedLevel = stockLevelParam(searchParams);
+    let stockLevelIds: ObjectId[] | null = null;
+    if (wantedLevel) {
+      const limited = await db.read<FoodItem>('fooditems', { stockThreshold: { $gt: 0 } });
+      const docs = (limited.success && limited.data ? limited.data : []) as unknown as StockDoc[];
+      const levels = await stockOf(docs);
+      stockLevelIds = docs.filter((d) => levels.get(String(d._id))?.level === wantedLevel).map((d) => new ObjectId(String(d._id)));
+    }
+
     // Filter by draft status
     if (draftOnly) {
       filter.isDraft = true;
@@ -594,6 +604,11 @@ export async function GET(request: NextRequest) {
     // Add category filter if applicable
     if (categoryFoodItemIds && categoryFoodItemIds.length > 0) {
       filter._id = { $in: categoryFoodItemIds };
+    }
+    if (stockLevelIds) {
+      // only the items at that stock level (and in the chosen category, when one is chosen)
+      const inCategory = filter._id ? new Set((filter._id as { $in: ObjectId[] }).$in.map((x) => String(x))) : null;
+      filter._id = { $in: stockLevelIds.filter((x) => !inCategory || inCategory.has(String(x))) };
     }
 
     // Get all food items first (we'll filter by day after fetching)
