@@ -8,7 +8,7 @@ import { invalidateLivesiteHomeMenuCacheAndWait } from '@/lib/invalidateHomeMenu
 const MAX_BULK_ITEMS = 1000; // not exported: a Next.js route file may only export HTTP handlers
 
 /** The yes/no fields of a food item the bulk update may change. All are shown to customers (Chef's Pick in the mobile app). */
-const BULK_FLAGS = ['available', 'veg', 'chefsPick'] as const;
+const BULK_FLAGS = ['available', 'veg', 'chefsPick', 'allowInstructions'] as const;
 
 function verifyAuth(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -27,7 +27,7 @@ function verifyAuth(request: NextRequest) {
 
 /**
  * PATCH /api/admin/food-items/bulk-flag
- * Body: { ids: string[], field: 'available' | 'veg' | 'chefsPick', value: boolean }
+ * Body: { ids: string[], field: 'available' | 'veg' | 'chefsPick' | 'allowInstructions', value: boolean }
  *
  * Sets Available (on/off), Veg / Non-Veg or Chef's Pick for a whole batch of food items. Only that field (and updatedAt) is
  * touched. Customers see both fields on the menu, so the site's menu cache is cleared afterwards.
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest) {
 
     const { ids, field, value } = body;
     if (typeof field !== 'string' || !(BULK_FLAGS as readonly string[]).includes(field)) {
-      return NextResponse.json({ error: 'field must be "available", "veg" or "chefsPick"' }, { status: 400 });
+      return NextResponse.json({ error: 'field must be "available", "veg", "chefsPick" or "allowInstructions"' }, { status: 400 });
     }
     if (typeof value !== 'boolean') {
       return NextResponse.json({ error: 'value must be true or false' }, { status: 400 });

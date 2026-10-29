@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
+import InstructionsField from './InstructionsField';
 import { PreparationType } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ItemPhotos from './ItemPhotos';
@@ -89,6 +90,7 @@ interface ComboFoodItem {
   splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
   chefsPick?: boolean; // true = shown in the mobile app's Chef's Pick row
+  allowInstructions?: boolean; // true = customers get a Special instructions box for this item
 }
 
 interface ComboFoodItemDialogProps {
@@ -516,6 +518,8 @@ export default function ComboFoodItemDialog({
           </Box>
 
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
+
+          <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
           <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
             Prep Type and Sticker are set on each item inside the combo, not here.
           </Typography>
