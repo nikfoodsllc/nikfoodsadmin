@@ -20,6 +20,8 @@ export function stockLogText(row: StockLogLine): string {
       return `Limit removed (it was ${row.from})`;
     case 'unit_changed':
       return `Limit changed from ${row.from} to ${row.to}; the count started again`;
+    case 'alert_changed':
+      return `Low-stock alert changed from ${row.from} to ${row.to}`;
     case 'reset_mode_changed':
       return `Reset changed from ${row.from} to ${row.to}`;
     case 'reset':

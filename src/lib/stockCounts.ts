@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
-import { STOCK_HOLD_MINUTES, amountIn, cleanStockUnit, cleanThreshold, lineAmounts, stockSince, stockState, type StockClock, type StockLineInput, type StockState, type StockUnit } from '@/utils/stockRules';
+import { STOCK_HOLD_MINUTES, amountIn, cleanAlertPercent, cleanStockUnit, cleanThreshold, lineAmounts, stockLevel, stockSince, stockState, type StockClock, type StockLineInput, type StockState, type StockUnit } from '@/utils/stockRules';
 
 /** Which orders use up stock: the ones the kitchen counts, plus orders waiting for payment for a short while. (Same rule as the customer site.) */
 function usedStockClauses(now: Date) {
@@ -49,11 +49,16 @@ export interface StockDoc extends StockClock {
   _id: unknown;
   stockThreshold?: unknown;
   stockUnit?: unknown;
+  stockAlertPercent?: unknown;
 }
 
 export interface ItemStock extends StockState {
   /** the count started at this moment (the limit was set, a manual reset, or the last daily reset) */
   since: string;
+  /** the share of the limit at which the team is warned (default 10) */
+  alertPercent: number;
+  /** 'low' once what is left is at or under the alert share, 'out' at the limit */
+  level: 'none' | 'ok' | 'low' | 'out';
 }
 
 /** The limit, the units ordered since the count started, and what is left, for the items that have a limit. */
@@ -66,7 +71,8 @@ export async function stockOf(docs: StockDoc[], now: Date = new Date()): Promise
   for (const d of limited) {
     const id = String(d._id);
     const unit = cleanStockUnit(d.stockUnit);
-    out.set(id, { ...stockState(d.stockThreshold, counts.get(id) ?? 0, unit), since: stockSince(d, now).toISOString() });
+    const state = stockState(d.stockThreshold, counts.get(id) ?? 0, unit);
+    out.set(id, { ...state, since: stockSince(d, now).toISOString(), alertPercent: cleanAlertPercent(d.stockAlertPercent), level: stockLevel(state, d.stockAlertPercent) });
   }
   return out;
 }

@@ -264,6 +264,7 @@ const foodItemSchema = z.object({
   stockUnit: z.enum(['units', 'lb', 'oz']).optional(),
   stockResetMode: z.enum(['manual', 'daily']).optional(),
   stockResetTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+  stockAlertPercent: z.number().int().min(1).max(99).nullable().optional(),
   // Split Sticker: 'yes' = one sticker per box in the Stickers sheet; null on update = back to not set yet
   splitSticker: z.enum(['yes', 'no']).nullish(),
 
@@ -371,6 +372,7 @@ interface FoodItem {
   stockResetAt?: Date;
   stockResetMode?: 'manual' | 'daily';
   stockResetTime?: string | null;
+  stockAlertPercent?: number | null;
 
   // Portions fields
   portions?: string[];
