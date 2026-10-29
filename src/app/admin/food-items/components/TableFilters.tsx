@@ -161,6 +161,24 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
         </Select>
       </FormControl>
 
+      {/* Stock (order limit) */}
+      <FormControl size="small" sx={{ minWidth: 150 }}>
+        <InputLabel>Stock</InputLabel>
+        <Select
+          value={filters.stock}
+          label="Stock"
+          onChange={(e) => onFilterChange('stock', e.target.value as FoodItemFilters['stock'])}
+          sx={selectSx}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="none">No limit</MenuItem>
+          <MenuItem value="has">Has a limit</MenuItem>
+          <MenuItem value="ok">In stock</MenuItem>
+          <MenuItem value="low">Low stock</MenuItem>
+          <MenuItem value="out">Sold out</MenuItem>
+        </Select>
+      </FormControl>
+
       {/* Special Instructions */}
       <FormControl size="small" sx={{ minWidth: 170 }}>
         <InputLabel>Special Instructions</InputLabel>
