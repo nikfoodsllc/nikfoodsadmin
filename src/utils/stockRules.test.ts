@@ -124,3 +124,31 @@ describe('units a line uses up', () => {
     expect(lineUnits({ food: { _id: 'x' }, quantity: 'two' }).size).toBe(0);
   });
 });
+
+describe('low-stock alert level', async () => {
+  const { cleanAlertPercent, stockLevel, DEFAULT_ALERT_PERCENT } = await import('./stockRules');
+  const level = (limit: number, ordered: number, pct?: unknown, unit: 'units' | 'lb' | 'oz' = 'units') => stockLevel(stockState(limit, ordered, unit), pct);
+  it('the alert share is a whole number from 1 to 99, otherwise 10', () => {
+    expect(DEFAULT_ALERT_PERCENT).toBe(10);
+    expect(cleanAlertPercent(25)).toBe(25);
+    expect(cleanAlertPercent('30')).toBe(30);
+    for (const v of [0, 100, -5, 12.5, '', 'abc', null, undefined]) expect(cleanAlertPercent(v)).toBe(10);
+  });
+  it('ok above the share, low at or under it, out at the limit, none without a limit', () => {
+    expect(level(20, 17)).toBe('ok'); // 3 left = 15%
+    expect(level(20, 18)).toBe('low'); // 2 left = exactly 10%
+    expect(level(20, 19)).toBe('low');
+    expect(level(20, 20)).toBe('out');
+    expect(level(20, 0)).toBe('ok');
+    expect(level(10, 5, 50)).toBe('low');
+    expect(level(10, 4, 50)).toBe('ok');
+    expect(level(2, 1)).toBe('ok'); // 1 of 2 left = 50%
+    expect(stockLevel(stockState(null, 0), 10)).toBe('none');
+  });
+  it('works for weight limits (counted in ounces)', () => {
+    // 5 lb = 80 oz; 10% = 8 oz
+    expect(level(5, 72, undefined, 'lb')).toBe('low');
+    expect(level(5, 71, undefined, 'lb')).toBe('ok');
+    expect(level(5, 80, undefined, 'lb')).toBe('out');
+  });
+});

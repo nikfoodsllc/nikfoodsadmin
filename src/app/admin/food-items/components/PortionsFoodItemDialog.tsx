@@ -64,6 +64,7 @@ interface PortionsFoodItem {
   stockUnit?: 'units' | 'lb' | 'oz';
   stockResetMode?: 'manual' | 'daily';
   stockResetTime?: string | null;
+  stockAlertPercent?: number | null;
 }
 
 interface PortionsFoodItemDialogProps {

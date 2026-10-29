@@ -12,6 +12,8 @@ export interface StockValue {
   stockUnit?: StockUnit;
   stockResetMode?: 'manual' | 'daily';
   stockResetTime?: string | null;
+  /** the team gets a low-stock email when this share (1 to 99) of the limit is left; blank = 10 */
+  stockAlertPercent?: number | null;
 }
 
 interface Live {
@@ -20,6 +22,8 @@ interface Live {
   ordered?: number;
   remaining?: number | null;
   soldOut?: boolean;
+  level?: 'none' | 'ok' | 'low' | 'out';
+  alertPercent?: number;
   since?: string;
   mode?: 'manual' | 'daily';
   time?: string | null;
@@ -80,6 +84,9 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
   const hasLive = Boolean(live && live.limit !== null && live.ordered !== undefined);
   const pct = hasLive && live!.limit ? Math.min(100, Math.round(((live!.ordered ?? 0) / live!.limit) * 100)) : 0;
   const suf = suffix(live?.unit);
+  const alertPct = value.stockAlertPercent && value.stockAlertPercent >= 1 && value.stockAlertPercent <= 99 ? value.stockAlertPercent : 10;
+  const alertLeft = limit !== null ? Math.round(limit * alertPct) / 100 : 0;
+  const alertLeftText = `${alertLeft}${unit === 'lb' ? ' lb' : unit === 'oz' ? ' oz' : ''} or less`;
 
   return (
     <Box sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.5, bgcolor: '#FAFAFA' }}>
@@ -127,6 +134,26 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
       />
 
       {limit !== null && (
+        <TextField
+          fullWidth
+          size="small"
+          type="number"
+          label="Alert me when this % is left"
+          value={value.stockAlertPercent ?? ''}
+          placeholder="10"
+          disabled={disabled}
+          onChange={(e) => {
+            const raw = e.target.value.trim();
+            const n = Number(raw);
+            onChange({ stockAlertPercent: raw !== '' && Number.isInteger(n) && n >= 1 && n <= 99 ? n : null });
+          }}
+          slotProps={{ htmlInput: { min: 1, max: 99, step: 1, inputMode: 'numeric', 'aria-label': 'Low-stock alert percentage' }, inputLabel: { shrink: true } }}
+          helperText={`Blank = 10%. At ${alertPct}% left (${alertLeftText}) support@nikfoods.com gets a Low stock email, and another when the item sells out.`}
+          sx={{ mt: 1.5 }}
+        />
+      )}
+
+      {limit !== null && (
         <Box sx={{ mt: 1.5 }}>
           <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>Reset the count</Typography>
           <RadioGroup
@@ -159,9 +186,9 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
               Ordered since reset: {live!.ordered}{suf} of {live!.limit}{suf}
               {!live!.soldOut && live!.remaining !== null && live!.remaining !== undefined ? ` · ${live!.remaining}${suf} left` : ''}
             </Typography>
-            {live!.soldOut ? <Chip size="small" label="SOLD OUT" sx={{ bgcolor: '#FEE2E2', color: '#B91C1C', fontWeight: 700 }} /> : <Chip size="small" label="Live" sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 600 }} />}
+            {live!.soldOut ? <Chip size="small" label="SOLD OUT" sx={{ bgcolor: '#FEE2E2', color: '#B91C1C', fontWeight: 700 }} /> : live!.level === 'low' ? <Chip size="small" label="LOW" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} /> : <Chip size="small" label="Live" sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 600 }} />}
           </Box>
-          <LinearProgress variant="determinate" value={pct} sx={{ mt: 1, height: 8, borderRadius: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: live!.soldOut ? '#DC2626' : pct >= 80 ? '#D97706' : '#16A34A' } }} />
+          <LinearProgress variant="determinate" value={pct} sx={{ mt: 1, height: 8, borderRadius: 4, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: live!.soldOut ? '#DC2626' : live!.level === 'low' ? '#D97706' : '#16A34A' } }} />
           <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>
             Counting since {when(live!.since)}
             {live!.mode === 'daily' && live!.nextReset ? ` · next automatic reset ${when(live!.nextReset)}` : ' · manual reset only'}

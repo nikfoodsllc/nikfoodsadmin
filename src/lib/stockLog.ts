@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 
 export interface StockLogRow {
   foodItemId: string;
-  kind: 'limit_set' | 'limit_changed' | 'limit_removed' | 'reset_mode_changed' | 'unit_changed' | 'reset';
+  kind: 'limit_set' | 'limit_changed' | 'limit_removed' | 'reset_mode_changed' | 'unit_changed' | 'alert_changed' | 'reset';
   from?: string;
   to?: string;
   /** For a manual reset: units that had been ordered, and the limit, at that moment */

@@ -1,4 +1,4 @@
-import { cleanResetMode, cleanResetTime, cleanStockUnit, cleanThreshold, type ResetMode, type StockUnit } from '@/utils/stockRules';
+import { DEFAULT_ALERT_PERCENT, cleanAlertPercent, cleanResetMode, cleanResetTime, cleanStockUnit, cleanThreshold, type ResetMode, type StockUnit } from '@/utils/stockRules';
 
 /** What the admin sent for an item's order limit (all optional: left out = leave as it is). */
 export interface StockInput {
@@ -6,6 +6,8 @@ export interface StockInput {
   stockUnit?: StockUnit;
   stockResetMode?: ResetMode;
   stockResetTime?: string | null;
+  /** the team gets a low-stock email when this share (1 to 99) of the limit is left; blank = the default (10) */
+  stockAlertPercent?: number | null;
 }
 
 /** What an item has saved. */
@@ -14,10 +16,11 @@ export interface StockSaved {
   stockUnit?: unknown;
   stockResetMode?: unknown;
   stockResetTime?: unknown;
+  stockAlertPercent?: unknown;
 }
 
 export interface StockLogEntry {
-  kind: 'limit_set' | 'limit_changed' | 'limit_removed' | 'reset_mode_changed' | 'unit_changed';
+  kind: 'limit_set' | 'limit_changed' | 'limit_removed' | 'reset_mode_changed' | 'unit_changed' | 'alert_changed';
   from?: string;
   to?: string;
 }
@@ -31,7 +34,14 @@ export function stockFieldsForCreate(input: StockInput, now: Date): Record<strin
   if (limit === null) return {};
   const mode = cleanResetMode(input.stockResetMode);
   const time = cleanResetTime(input.stockResetTime);
-  return { stockThreshold: limit, stockUnit: unit, stockResetAt: now, stockResetMode: mode === 'daily' && time ? 'daily' : 'manual', ...(mode === 'daily' && time ? { stockResetTime: time } : {}) };
+  return {
+    stockThreshold: limit,
+    stockUnit: unit,
+    stockResetAt: now,
+    stockResetMode: mode === 'daily' && time ? 'daily' : 'manual',
+    ...(mode === 'daily' && time ? { stockResetTime: time } : {}),
+    ...(cleanAlertPercent(input.stockAlertPercent) !== DEFAULT_ALERT_PERCENT ? { stockAlertPercent: cleanAlertPercent(input.stockAlertPercent) } : {}),
+  };
 }
 
 /**
@@ -74,6 +84,12 @@ export function stockFieldsForUpdate(saved: StockSaved, input: StockInput, now: 
     const was = modeText(saved.stockResetMode, saved.stockResetTime);
     const now2 = modeText(effectiveMode, effectiveMode === 'daily' ? time : null);
     if (was !== now2 && after !== null) log.push({ kind: 'reset_mode_changed', from: was, to: now2 });
+  }
+  if (input.stockAlertPercent !== undefined) {
+    const was = cleanAlertPercent(saved.stockAlertPercent);
+    const next = cleanAlertPercent(input.stockAlertPercent);
+    set.stockAlertPercent = next;
+    if (was !== next && after !== null) log.push({ kind: 'alert_changed', from: `${was}%`, to: `${next}%` });
   }
   return { set, log };
 }
