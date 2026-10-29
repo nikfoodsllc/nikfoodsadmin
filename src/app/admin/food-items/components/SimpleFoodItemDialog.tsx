@@ -30,6 +30,7 @@ import StickerField from './StickerField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
 import InstructionsField from './InstructionsField';
+import StockField from './StockField';
 import { PreparationType, preparationTypeError } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ItemPhotos from './ItemPhotos';
@@ -60,6 +61,10 @@ interface SimpleFoodItem {
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
   chefsPick?: boolean; // true = shown in the mobile app's Chef's Pick row
   allowInstructions?: boolean; // true = customers get a Special instructions box for this item
+  stockThreshold?: number | null; // order limit (inventory); null / missing = no limit
+  stockUnit?: 'units' | 'lb' | 'oz';
+  stockResetMode?: 'manual' | 'daily';
+  stockResetTime?: string | null;
 }
 
 interface SimpleFoodItemDialogProps {
@@ -556,6 +561,7 @@ export default function SimpleFoodItemDialog({
           {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
           <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
+          <StockField itemId={formData._id} hasSizes={false} value={formData} onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))} disabled={loading} />
           <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
           <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Not needed: this item has no sticker.' : 'Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount.'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
 
