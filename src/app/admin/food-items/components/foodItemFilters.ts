@@ -3,6 +3,9 @@ import { StickerFilter, isStickerFilter } from '@/utils/stickerFlag';
 import { ChefsPickFilter, isChefsPickFilter } from '@/utils/chefsPick';
 import { InstructionsFilter, isInstructionsFilter } from '@/utils/itemInstructions';
 
+export type StockFilter = 'all' | 'none' | 'has' | 'ok' | 'low' | 'out';
+export const isStockFilter = (value: unknown): value is StockFilter => value === 'all' || value === 'none' || value === 'has' || value === 'ok' || value === 'low' || value === 'out';
+
 /** The column filters above the Food Items table. 'all' means the filter is off. */
 export interface FoodItemFilters {
   veg: 'all' | 'true' | 'false';
@@ -13,6 +16,8 @@ export interface FoodItemFilters {
   splitSticker: StickerFilter;
   chefsPick: ChefsPickFilter;
   allowInstructions: InstructionsFilter;
+  /** Order limit: none = no limit, has = any limit, ok / low / out = where the live count stands ('all' = off) */
+  stock: StockFilter;
   /** A top-level category id ('all' = off): items in it or in any of its sub-categories */
   category: string;
   /** A sub-category id ('all' = off): items in that sub-category only */
@@ -52,6 +57,7 @@ export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
   splitSticker: 'all',
   chefsPick: 'all',
   allowInstructions: 'all',
+  stock: 'all',
   category: 'all',
   subCategory: 'all',
 };
@@ -71,6 +77,7 @@ export function foodItemFilterParams(filters: FoodItemFilters, tree?: CategoryTr
   if (filters.splitSticker !== 'all' && isStickerFilter(filters.splitSticker)) params.push(['splitSticker', filters.splitSticker]);
   if (filters.chefsPick !== 'all' && isChefsPickFilter(filters.chefsPick)) params.push(['chefsPick', filters.chefsPick]);
   if (filters.allowInstructions !== 'all' && isInstructionsFilter(filters.allowInstructions)) params.push(['allowInstructions', filters.allowInstructions]);
+  if (filters.stock !== 'all' && isStockFilter(filters.stock)) params.push(['stock', filters.stock]);
   return params;
 }
 

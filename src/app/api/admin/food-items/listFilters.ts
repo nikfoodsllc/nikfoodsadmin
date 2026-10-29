@@ -11,6 +11,7 @@
  *   splitSticker=yes|no|not_set
  *   chefsPick=yes|no   (no = not marked yes)
  *   allowInstructions=yes|no   (no = not marked yes)
+ *   stock=none|has|ok|low|out   (none = no order limit, has = any limit; ok / low / out follow the live count and are handled by the route)
  * Anything else is ignored (the filter stays off).
  */
 export function foodItemListFilters(params: URLSearchParams): Record<string, unknown> {
@@ -41,9 +42,19 @@ export function foodItemListFilters(params: URLSearchParams): Record<string, unk
   const allowInstructions = params.get('allowInstructions');
   if (allowInstructions === 'yes') filter.allowInstructions = true;
   else if (allowInstructions === 'no') filter.allowInstructions = { $ne: true };
+  // stock=none|has are plain filters; ok|low|out depend on the live count, so the list route works them out (stockLevelParam)
+  const stock = params.get('stock');
+  if (stock === 'has') filter.stockThreshold = { $gt: 0 };
+  else if (stock === 'none') filter.$nor = [{ stockThreshold: { $gt: 0 } }];
   const splitSticker = params.get('splitSticker');
   if (splitSticker === 'yes' || splitSticker === 'no') filter.splitSticker = splitSticker;
   else if (splitSticker === 'not_set') filter.splitSticker = { $nin: ['yes', 'no'] };
 
   return filter;
+}
+
+/** The stock filter values that need the live count (the route works them out): ok, low or out; otherwise null. */
+export function stockLevelParam(params: URLSearchParams): 'ok' | 'low' | 'out' | null {
+  const v = params.get('stock');
+  return v === 'ok' || v === 'low' || v === 'out' ? v : null;
 }
