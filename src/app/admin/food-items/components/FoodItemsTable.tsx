@@ -36,7 +36,7 @@ interface FoodItem {
   splitSticker?: 'yes' | 'no';
   chefsPick?: boolean;
   allowInstructions?: boolean;
-  stock?: { limit: number | null; ordered: number; soldOut: boolean; unit?: string };
+  stock?: { limit: number | null; ordered: number; soldOut: boolean; unit?: string; level?: string };
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;

@@ -73,3 +73,27 @@ describe('limits in pounds and ounces', () => {
     expect(stockUnitProblem({ stockUnit: 'oz' }, false)).toBeNull();
   });
 });
+
+describe('low-stock alert setting', () => {
+  it('a new item stores the share only when it is not the default', () => {
+    expect(stockFieldsForCreate({ stockThreshold: 20 }, now)).not.toHaveProperty('stockAlertPercent');
+    expect(stockFieldsForCreate({ stockThreshold: 20, stockAlertPercent: 25 }, now)).toMatchObject({ stockAlertPercent: 25 });
+    expect(stockFieldsForCreate({ stockThreshold: 20, stockAlertPercent: 10 }, now)).not.toHaveProperty('stockAlertPercent');
+  });
+  it('changing the share is saved and written in the log', () => {
+    const saved = { stockThreshold: 20, stockUnit: 'units' };
+    const r = stockFieldsForUpdate(saved, { stockAlertPercent: 25 }, now);
+    expect(r.set.stockAlertPercent).toBe(25);
+    expect(r.log).toEqual([{ kind: 'alert_changed', from: '10%', to: '25%' }]);
+  });
+  it('the same share, or a blank one (back to 10), logs only when it differs', () => {
+    const saved = { stockThreshold: 20, stockUnit: 'units', stockAlertPercent: 25 };
+    expect(stockFieldsForUpdate(saved, { stockAlertPercent: 25 }, now).log).toEqual([]);
+    const blank = stockFieldsForUpdate(saved, { stockAlertPercent: null }, now);
+    expect(blank.set.stockAlertPercent).toBe(10);
+    expect(blank.log).toEqual([{ kind: 'alert_changed', from: '25%', to: '10%' }]);
+  });
+  it('leaving the share out leaves it alone', () => {
+    expect(stockFieldsForUpdate({ stockThreshold: 20, stockAlertPercent: 25 }, { stockThreshold: 30 }, now).set).not.toHaveProperty('stockAlertPercent');
+  });
+});

@@ -253,3 +253,25 @@ export const perUnitAmount = (portion: unknown, unit: StockUnit): number => (bas
 
 /** The most units that fit in `room` of the base when one unit uses `per` (no cap when `per` is 0: a size without a weight cannot be weighed). */
 export const unitsThatFit = (room: number, per: number): number => (per > 0 ? Math.max(0, Math.floor(room / per + 1e-9)) : Number.POSITIVE_INFINITY);
+
+/** The low-stock alert starts when this share of the limit is left, unless the admin chose another one. */
+export const DEFAULT_ALERT_PERCENT = 10;
+
+/** A usable alert share: a whole number from 1 to 99. Anything else (blank, text, 0, 100) means the default (10). */
+export function cleanAlertPercent(value: unknown): number {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 99 ? n : DEFAULT_ALERT_PERCENT;
+}
+
+export type StockLevel = 'none' | 'ok' | 'low' | 'out';
+
+/**
+ * Where an item with an order limit stands: 'out' at the limit, 'low' once what is left is the alert share of the limit or less,
+ * 'ok' above that, 'none' when there is no limit.
+ */
+export function stockLevel(state: Pick<StockState, 'limit' | 'unit' | 'remainingBase' | 'soldOut'>, alertPercent: unknown): StockLevel {
+  if (state.limit === null || state.remainingBase === null) return 'none';
+  if (state.soldOut) return 'out';
+  const cap = limitInBase(state.limit, state.unit);
+  return state.remainingBase <= (cap * cleanAlertPercent(alertPercent)) / 100 + 1e-9 ? 'low' : 'ok';
+}
