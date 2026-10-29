@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, Snackbar, TextField, Typography } from '@mui/material';
-import { IconBell, IconSend, IconTrash, IconUserCheck } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, Snackbar, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { IconBell, IconSend, IconTrash, IconUserCheck, IconUsers } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AppCustomersTab from './AppCustomersTab';
 import AppUpdateCard from './AppUpdateCard';
+import SelectCustomersDialog from './SelectCustomersDialog';
+import { selectedSendNotice } from '@/utils/pickCustomers';
 
 const TITLE_MAX = 40;
 const BODY_MAX = 150;
@@ -27,6 +29,7 @@ interface Campaign {
   sent: number;
   failed: number;
   mode: string;
+  selected?: boolean;
 }
 interface Summary {
   mode: 'off' | 'dry' | 'on';
@@ -86,6 +89,9 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [notice, setNotice] = useState('');
+  const [audience, setAudience] = useState<'all' | 'specific'>('all');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const tab = view;
 
   useEffect(() => {
@@ -131,10 +137,13 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
 
   const send = async (again: boolean) => {
     setBusy(true);
-    const r = await call('send-menu', 'POST', { title, body, ...(again ? { confirmAgain: true } : {}) });
+    const r = await call('send-menu', 'POST', { title, body, ...(audience === 'specific' ? { userIds: chosen } : again ? { confirmAgain: true } : {}) });
     setBusy(false);
     setConfirmSend(false);
-    if (r.ok) {
+    if (r.ok && audience === 'specific') {
+      setNotice(selectedSendNotice(r.json.data as { mode: string; audience: number; skipped: number; unavailable: number; phones: number; sent: number; failed: number }));
+      void load();
+    } else if (r.ok) {
       const d = r.json.data as { mode: string; audience: number; phones: number; sent: number; failed: number };
       setNotice(d.mode === 'dry' ? `Test run: it would go to ${d.phones} phone${d.phones === 1 ? '' : 's'}. Nothing was sent.` : `Sent to ${d.sent} phone${d.sent === 1 ? '' : 's'}${d.failed ? ` (${d.failed} could not be reached)` : ''}.`);
       void load();
@@ -198,7 +207,8 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
     );
   }
 
-  const reach = data?.menu.reachable ?? 0;
+  const reachAll = data?.menu.reachable ?? 0;
+  const reach = audience === 'specific' ? chosen.length : reachAll;
   const counts = new Map((data?.last7 ?? []).map((r) => [r.event, r]));
 
   return (
@@ -221,8 +231,39 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2.5 }, mb: 2.5, borderRadius: 2 }}>
         <Typography sx={{ fontWeight: 800, fontSize: 18 }}>Menu update</Typography>
         <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
-          Sent to customers who have the app with notifications allowed and menu alerts on: <b>{reach}</b> can get it now ({data?.menu.subscribersWithApp ?? 0} have the app).
+          {audience === 'specific'
+            ? 'Sent only to the customers you choose below. They need the app with notifications allowed.'
+            : <>Sent to customers who have the app with notifications allowed and menu alerts on: <b>{reachAll}</b> can get it now ({data?.menu.subscribersWithApp ?? 0} have the app).</>}
         </Typography>
+
+        <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Send to</Typography>
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          color="warning"
+          value={audience}
+          onChange={(_, v: 'all' | 'specific' | null) => {
+            if (!v) return;
+            setAudience(v);
+            if (v === 'specific') setPickerOpen(true);
+          }}
+          sx={{ mb: 1, maxWidth: 520 }}
+          aria-label="Who gets this notification"
+        >
+          <ToggleButton value="all" sx={{ textTransform: 'none', fontWeight: 700 }}>All customers</ToggleButton>
+          <ToggleButton value="specific" sx={{ textTransform: 'none', fontWeight: 700, gap: 0.75 }}>
+            <IconUsers size={17} /> Specific customers
+          </ToggleButton>
+        </ToggleButtonGroup>
+        {audience === 'specific' && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>{chosen.length === 0 ? 'No one chosen yet' : `${chosen.length} customer${chosen.length === 1 ? '' : 's'} chosen`}</Typography>
+            <Button size="small" onClick={() => setPickerOpen(true)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+              {chosen.length === 0 ? 'Choose customers' : 'Change'}
+            </Button>
+          </Box>
+        )}
 
         <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Your saved texts</Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
@@ -257,7 +298,8 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
             </>
           )}
         </Box>
-        {reach === 0 && <Typography sx={{ color: '#92400E', fontSize: 13, mt: 1 }}>Nobody can get this yet: it needs a customer who has the app, has notifications allowed, and has menu alerts on.</Typography>}
+        {audience === 'all' && reach === 0 && <Typography sx={{ color: '#92400E', fontSize: 13, mt: 1 }}>Nobody can get this yet: it needs a customer who has the app, has notifications allowed, and has menu alerts on.</Typography>}
+        {audience === 'specific' && chosen.length === 0 && <Typography sx={{ color: '#92400E', fontSize: 13, mt: 1 }}>Choose at least one customer to send to.</Typography>}
       </Paper>
 
       <AppUpdateCard call={call} mode={data?.mode} onSent={() => void load()} />
@@ -291,6 +333,7 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
             <Typography sx={{ fontSize: 13, color: '#374151' }}>{c.body}</Typography>
             <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
               {c.mode === 'dry' ? 'Test run, nothing sent' : `${c.sent} sent${c.failed ? `, ${c.failed} could not be reached` : ''}`}
+              {c.selected ? ` · to ${c.audience} chosen customer${c.audience === 1 ? '' : 's'}` : ''}
               {c.by ? ` · ${c.by}` : ''}
             </Typography>
           </Box>
@@ -313,6 +356,8 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
           </Button>
         </DialogActions>
       </Dialog>
+
+      <SelectCustomersDialog open={pickerOpen} call={call} chosen={chosen} onChange={setChosen} onClose={() => setPickerOpen(false)} />
 
       <Dialog open={testOpen} onClose={() => setTestOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Send a test</DialogTitle>
