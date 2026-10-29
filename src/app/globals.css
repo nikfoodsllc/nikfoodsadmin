@@ -84,7 +84,12 @@ a {
   animation: shimmer 1.5s infinite linear;
 }
 
-/* Dialogs lock the body, but this page scrolls on <html>: lock it too so the background cannot move behind an open dialog */
-html:has(body[style*="overflow: hidden"]) {
+/*
+ * Dialogs lock the body, but this page scrolls on <html>: lock it too so the background cannot move behind an open dialog.
+ * It is keyed on an open dialog (MUI marks every open pop-up with .MuiModal-root and removes it when it closes), NOT on the
+ * inline style MUI puts on <body>: Safari does not re-check an attribute selector on the style attribute, so after a dialog
+ * closed the page stayed locked ("frozen") until a reload.
+ */
+html:has(.MuiModal-root:not(.MuiModal-hidden)) {
   overflow-y: hidden;
 }

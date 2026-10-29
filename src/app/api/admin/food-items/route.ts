@@ -6,6 +6,9 @@ import { deleteUnusedPhotos, deleteRemovedPhotos, imageFields, incomingImages } 
 import { storedImages } from '@/utils/itemImages';
 import { ObjectId, type Filter } from 'mongodb';
 import { invalidateLivesiteHomeMenuCache } from '@/lib/invalidateHomeMenuCache';
+import { stockFieldsForCreate, stockFieldsForUpdate, stockUnitProblem } from '@/lib/stockSettings';
+import { stockOf, type StockDoc } from '@/lib/stockCounts';
+import { writeStockLog } from '@/lib/stockLog';
 import { isPreparationType } from '@/utils/preparationType';
 import { isStickerFlag } from '@/utils/stickerFlag';
 import { foodItemListFilters } from './listFilters';
@@ -255,6 +258,12 @@ const foodItemSchema = z.object({
   chefsPick: z.boolean().optional(),
   // Special instructions box for customers: true = on; left out on update = leave as it is (a new item starts with it off)
   allowInstructions: z.boolean().optional(),
+  // Order limit (inventory): a whole number of units, null = no limit; left out on update = leave as it is
+  stockThreshold: z.number().min(0.25).max(100000).nullable().optional(),
+  // what the limit is counted in: units, pounds or ounces (pounds and ounces need an item with sizes)
+  stockUnit: z.enum(['units', 'lb', 'oz']).optional(),
+  stockResetMode: z.enum(['manual', 'daily']).optional(),
+  stockResetTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
   // Split Sticker: 'yes' = one sticker per box in the Stickers sheet; null on update = back to not set yet
   splitSticker: z.enum(['yes', 'no']).nullish(),
 
@@ -357,6 +366,11 @@ interface FoodItem {
   splitSticker?: 'yes' | 'no';
   chefsPick?: boolean;
   allowInstructions?: boolean;
+  stockThreshold?: number | null;
+  stockUnit?: 'units' | 'lb' | 'oz';
+  stockResetAt?: Date;
+  stockResetMode?: 'manual' | 'daily';
+  stockResetTime?: string | null;
 
   // Portions fields
   portions?: string[];
@@ -430,7 +444,7 @@ function verifyAuth(request: NextRequest) {
     return { success: false, error: 'Unauthorized: Admin access required' };
   }
 
-  return { success: true, userId: verificationResult.payload.userId };
+  return { success: true, userId: verificationResult.payload.userId, adminName: String((verificationResult.payload as unknown as { name?: string; email?: string }).name || (verificationResult.payload as unknown as { email?: string }).email || '').slice(0, 60) };
 }
 
 /**
@@ -674,6 +688,17 @@ export async function GET(request: NextRequest) {
     // Apply pagination
     const paginatedItems = filteredItems.slice(skip, skip + limit);
 
+    // items with an order limit: how many were ordered and how many are left (live)
+    try {
+      const stock = await stockOf(paginatedItems as unknown as StockDoc[]);
+      for (const item of paginatedItems as unknown as Array<Record<string, unknown>>) {
+        const s = stock.get(String(item._id));
+        if (s) item.stock = s;
+      }
+    } catch (stockError) {
+      console.error('Could not count the stock for the list:', stockError);
+    }
+
     return NextResponse.json({
       data: {
         items: paginatedItems,
@@ -720,6 +745,8 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validationResult.data;
+    const stockProblem = stockUnitProblem(data, Array.isArray(data.portions) && data.portions.length > 0);
+    if (stockProblem) return NextResponse.json({ error: stockProblem }, { status: 400 });
 
     // A new food item must say how it is prepared (updates may leave it as it is).
     // A combo is not asked: the reports use the Prep Type and Sticker of each item inside it.
@@ -776,6 +803,7 @@ export async function POST(request: NextRequest) {
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
       chefsPick: data.chefsPick === true,
       allowInstructions: data.allowInstructions === true,
+      ...stockFieldsForCreate(data, new Date()),
       // an item with no sticker has no split sticker either
       ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       createdAt: new Date(),
@@ -955,8 +983,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const existingItem = existingResult.data;
-
    const data = validationResult.data;
+    const stockProblem = stockUnitProblem(data, Array.isArray(data.portions) && data.portions.length > 0);
+    if (stockProblem) return NextResponse.json({ error: stockProblem }, { status: 400 });
+    // order limit (inventory): what to save, and what to write in the item's stock log
+    const stockUpdate = stockFieldsForUpdate(existingItem as unknown as Record<string, unknown>, data, new Date());
 
 // Check duplicate food item except current item
 const escapedName = data.name
@@ -1003,6 +1034,7 @@ const updateData: Partial<FoodItem> = {
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
   ...(typeof data.chefsPick === 'boolean' ? { chefsPick: data.chefsPick } : {}),
   ...(typeof data.allowInstructions === 'boolean' ? { allowInstructions: data.allowInstructions } : {}),
+  ...stockUpdate.set,
   // an item with no sticker has no split sticker either; otherwise the Split Sticker choice is saved as sent
   ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
   updatedAt: new Date(),
@@ -1155,6 +1187,8 @@ const updateData: Partial<FoodItem> = {
 
     // photos the item no longer has are removed from Cloudinary (unless another item still uses them)
     await deleteRemovedPhotos(existingItem, incomingImages(data), existingItem._id);
+
+    for (const entry of stockUpdate.log) await writeStockLog({ foodItemId: String(_id), ...entry, byId: String(authResult.userId ?? ''), byName: authResult.adminName ?? '' });
 
     // Fetch updated item
     const updatedItem = await db.readOne<FoodItem>('fooditems', {
