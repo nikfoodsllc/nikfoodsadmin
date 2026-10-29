@@ -26,6 +26,7 @@ import {
   type PackableRoute,
   type PackingRun,
 } from '@/utils/packingProgress';
+import InstructionsNote from '@/components/common/InstructionsNote';
 
 type Preset = 'today' | 'tomorrow' | 'other';
 
@@ -578,6 +579,7 @@ export default function PackLivePage() {
                                     {c}
                                   </Typography>
                                 ))}
+                                <InstructionsNote text={line.note} large />
                                 <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                   {line.portion && <Chip size="small" label={line.portion} sx={{ height: 26, fontSize: 14 }} />}
                                   {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}

@@ -45,6 +45,10 @@ describe('foodItemListFilters', () => {
     expect(f('chefsPick=no')).toEqual({ chefsPick: { $ne: true } });
     expect(f('chefsPick=all')).toEqual({});
     expect(f('chefsPick=maybe')).toEqual({});
+    expect(f('allowInstructions=yes')).toEqual({ allowInstructions: true });
+    expect(f('allowInstructions=no')).toEqual({ allowInstructions: { $ne: true } });
+    expect(f('allowInstructions=all')).toEqual({});
+    expect(f('allowInstructions=maybe')).toEqual({});
   });
   it('sticker, including "not set yet"', () => {
     expect(f('sticker=yes')).toEqual({ sticker: 'yes' });

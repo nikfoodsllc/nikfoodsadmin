@@ -43,6 +43,7 @@ import { applyColumnChoice, buildReportSheets, PREP_COLUMNS, STICKER_COLUMNS, TO
 import ReportColumnsDialog from './ReportColumnsDialog';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
+import InstructionsNote from '@/components/common/InstructionsNote';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
 type TabId = 'prep' | 'ready' | 'stickers' | 'days';
@@ -113,6 +114,7 @@ function LineRow({ line, showKitchenDay }: { line: PrepLine; showKitchenDay: boo
             {line.isEco && <Chip size="small" label="ECO" sx={{ height: 22, fontSize: 12, fontWeight: 700, bgcolor: '#E2F4E7', color: '#126B2C' }} />}
           </Box>
         )}
+        <InstructionsNote text={line.note} />
         {line.viaCombo && (
           <Typography sx={{ fontSize: 12.5, color: '#4B5563', mt: 0.4 }}>
             From {line.viaCombo}
@@ -192,6 +194,7 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
                     </Box>
                   )}
                   {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
+                  <InstructionsNote text={s.note} />
                   {s.movedFrom && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Moved from {formatDayShort(s.movedFrom)}</Typography>}
                   {s.day !== s.deliveryDate && (
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 0.4, fontSize: 12.5, fontWeight: 700, color: '#B45309' }}>

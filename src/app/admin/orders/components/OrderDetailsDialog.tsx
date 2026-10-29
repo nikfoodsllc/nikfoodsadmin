@@ -523,7 +523,7 @@ export default function OrderDetailsDialog({
                             {item.notes && (
                               <Box sx={{ ml: 1.75, mt: 0.5 }}>
                                 <Typography variant="caption" sx={{ color: '#6B7280', fontStyle: 'italic' }}>
-                                  Note: {item.notes}
+                                  Instructions: {item.notes}
                                 </Typography>
                               </Box>
                             )}

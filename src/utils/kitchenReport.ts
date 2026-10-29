@@ -47,6 +47,8 @@ export interface PrepLine {
   portion: string | null;
   spice: string | null;
   isEco: boolean;
+  /** The customer's special instructions for this item, when they wrote any */
+  note?: string | null;
   /** Set when the item is a chosen part of a combo: the combo's name and the spice level of that combo */
   viaCombo: string | null;
   viaSpice: string | null;
@@ -81,6 +83,8 @@ export interface StickerLine {
   quantity: number;
   spice: string | null;
   isEco: boolean;
+  /** The customer's special instructions for this item, when they wrote any */
+  note?: string | null;
   viaCombo: string | null;
 }
 
@@ -130,6 +134,7 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
       deliveredOn: row.deliveredOn && row.deliveredOn !== row.day ? row.deliveredOn : null,
       deliveryDate: row.deliveredOn || row.day,
       movedFrom: row.movedFrom && row.movedFrom !== row.day ? row.movedFrom : null,
+      note: clean(row.notes) || null,
     };
     const parts = comboParts(row);
     if (parts.length > 0) {
@@ -226,6 +231,7 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
         quantity: split ? 1 : atom.line.quantity,
         spice: atom.line.spice,
         isEco: atom.line.isEco,
+        note: atom.line.note ?? null,
         viaCombo: atom.line.viaCombo,
       });
     }

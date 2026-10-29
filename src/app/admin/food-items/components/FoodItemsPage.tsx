@@ -69,6 +69,7 @@ interface FoodItem {
   sticker?: StickerFlag;
   splitSticker?: StickerFlag;
   chefsPick?: boolean;
+  allowInstructions?: boolean;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -168,7 +169,7 @@ interface ComboFoodItem {
   isDraft?: boolean;
 }
 
-type BulkField = 'available' | 'veg' | 'chefsPick' | 'preparation' | 'sticker' | 'splitSticker';
+type BulkField = 'available' | 'veg' | 'chefsPick' | 'allowInstructions' | 'preparation' | 'sticker' | 'splitSticker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
@@ -513,7 +514,7 @@ export default function FoodItemsPage() {
   };
 
   // Available (on / off) and Veg / Non-Veg: both are shown to customers, so the server also refreshes the menu
-  const applyFlag = async (field: 'available' | 'veg' | 'chefsPick', value: boolean) => {
+  const applyFlag = async (field: 'available' | 'veg' | 'chefsPick' | 'allowInstructions', value: boolean) => {
     if (selectedIds.size === 0) return;
     try {
       setBulkLoading(true);
@@ -524,7 +525,7 @@ export default function FoodItemsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to update items');
-      const label = field === 'available' ? (value ? 'Available' : 'Unavailable') : field === 'chefsPick' ? (value ? "Chef's Pick: Yes" : "Chef's Pick: No") : value ? 'Veg' : 'Non-Veg';
+      const label = field === 'available' ? (value ? 'Available' : 'Unavailable') : field === 'chefsPick' ? (value ? "Chef's Pick: Yes" : "Chef's Pick: No") : field === 'allowInstructions' ? (value ? 'Special Instructions: Yes' : 'Special Instructions: No') : value ? 'Veg' : 'Non-Veg';
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
       setBulkField(null);
@@ -884,6 +885,7 @@ export default function FoodItemsPage() {
               <ToggleButton value="available">Available</ToggleButton>
               <ToggleButton value="veg">Veg/Non-Veg</ToggleButton>
               <ToggleButton value="chefsPick">Chef&apos;s Pick</ToggleButton>
+              <ToggleButton value="allowInstructions">Special Instructions</ToggleButton>
               <ToggleButton value="preparation">Preparation Type</ToggleButton>
               <ToggleButton value="sticker">Sticker</ToggleButton>
               <ToggleButton value="splitSticker">Split Sticker</ToggleButton>
@@ -920,6 +922,17 @@ export default function FoodItemsPage() {
                 Yes
               </Button>
               <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyFlag('chefsPick', false)} sx={{ textTransform: 'none' }}>
+                No
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'allowInstructions' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Special Instructions to:</Typography>
+              <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyFlag('allowInstructions', true)} sx={{ textTransform: 'none', backgroundColor: '#16A34A', '&:hover': { backgroundColor: '#15803D' } }}>
+                Yes
+              </Button>
+              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyFlag('allowInstructions', false)} sx={{ textTransform: 'none' }}>
                 No
               </Button>
             </Box>

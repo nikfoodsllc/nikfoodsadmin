@@ -65,6 +65,7 @@ export const PREP_COLUMNS: ColumnDef[] = [
   col('kitchenDate', 'Kitchen date', 17),
   col('deliveryDate', 'Delivery date', 17),
   col('combo', 'With combo', 24),
+  col('instructions', 'Instructions', 30),
 ];
 export const STICKER_COLUMNS: ColumnDef[] = [
   col('deliveryDate', 'Delivery date', 17),
@@ -75,6 +76,7 @@ export const STICKER_COLUMNS: ColumnDef[] = [
   col('spice', 'Spice', 14),
   col('eco', 'Eco', 8),
   col('combo', 'With combo', 24),
+  col('instructions', 'Instructions', 30),
   col('order', 'Order', 24),
   col('kitchenDate', 'Kitchen date', 17),
 ];
@@ -116,6 +118,7 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
           date(line.day),
           date(line.deliveryDate),
           [line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '', line.movedFrom ? `Moved from ${dateCellText(line.movedFrom)}` : ''].filter(Boolean).join(' · '),
+          line.note ?? '',
         ],
       });
     });
@@ -124,7 +127,7 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
 
 /** A sheet of boxes (one per item): the Kitchen Prep sheet (cooked items) and the Ready to Eat sheet (the rest, with the items that have no type yet at the end). */
 function boxSheet(key: SheetKey, name: string, main: PrepBlock[], notSet: PrepBlock[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: [0, 1, 2, 3, 4, 5, 6, 7], rightCells: [3, 4] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: [0, 1, 2, 3, 4, 5, 6, 7, 8], rightCells: [3, 4] }];
   prepRows(main, rows, true);
   if (notSet.length > 0) {
     if (main.length > 0) rows.push({ kind: 'blank', cells: [] });
@@ -145,19 +148,26 @@ export function readyToEatSheet(readyToEat: PrepBlock[], notSet: PrepBlock[]): S
 }
 
 export function stickersSheet(stickers: StickerLine[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Order', 'Kitchen date'] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'With combo', 'Instructions', 'Order', 'Kitchen date'] }];
   stickers.forEach((s, i) => {
     rows.push({
       kind: 'data',
       tone: rowTone(i, s.isEco),
-      cells: [date(s.deliveryDate), s.item, s.customerName, s.portion ?? '', stickerQtyText(s.portion, s.quantity), s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.orderId, date(s.day)],
+      cells: [date(s.deliveryDate), s.item, s.customerName, s.portion ?? '', stickerQtyText(s.portion, s.quantity), s.spice ?? '', s.isEco ? 'ECO' : '', [s.viaCombo ?? '', s.movedFrom ? `Moved from ${dateCellText(s.movedFrom)}` : ''].filter(Boolean).join(' · '), s.note ?? '', s.orderId, date(s.day)],
     });
   });
   return { key: 'stickers', columnKeys: STICKER_COLUMNS.map((c) => c.key), name: 'Stickers', widths: STICKER_COLUMNS.map((c) => c.defaultWidth), rows };
 }
 
 export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[] }): SheetModel[] {
-  return [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers)];
+  const sheets = [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers)];
+  // the Instructions column is only there when somebody wrote instructions on that sheet (otherwise the sheets look exactly as before)
+  const hasNotes = (blocks: PrepBlock[]) => blocks.some((b) => b.lines.some((l) => Boolean(l.note)));
+  const hidden: Partial<Record<SheetKey, string[]>> = {};
+  if (!hasNotes(input.cooked)) hidden.prep = ['instructions'];
+  if (!hasNotes([...(input.readyToEat ?? []), ...input.notSet])) hidden.ready = ['instructions'];
+  if (!input.stickers.some((s) => Boolean(s.note))) hidden.stickers = ['instructions'];
+  return applyColumnChoice(sheets, hidden);
 }
 
 /**

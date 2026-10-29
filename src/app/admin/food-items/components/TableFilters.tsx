@@ -161,6 +161,21 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
         </Select>
       </FormControl>
 
+      {/* Special Instructions */}
+      <FormControl size="small" sx={{ minWidth: 170 }}>
+        <InputLabel>Special Instructions</InputLabel>
+        <Select
+          value={filters.allowInstructions}
+          label="Special Instructions"
+          onChange={(e) => onFilterChange('allowInstructions', e.target.value as FoodItemFilters['allowInstructions'])}
+          sx={selectSx}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="yes">Yes</MenuItem>
+          <MenuItem value="no">No</MenuItem>
+        </Select>
+      </FormControl>
+
       {/* Sticker */}
       <FormControl size="small" sx={{ minWidth: 140 }}>
         <InputLabel>Sticker</InputLabel>
