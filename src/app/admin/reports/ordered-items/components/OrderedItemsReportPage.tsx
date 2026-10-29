@@ -46,6 +46,8 @@ interface OrderedItem {
   portionQuantity: string;
   quantity: number;
   spiceLevel: string;
+  /** what the customer wrote in the item's Special instructions box */
+  notes?: string;
   itemPrice: number;
   ecoContainer: boolean;
   ecoContainerAvailable: boolean;
@@ -353,6 +355,7 @@ export default function OrderedItemsReportPage() {
       'Eco Container Price',
       'Sub Total',
       'Total Ordered Qty',
+      'Instructions',
     ];
 
     // Convert items to CSV rows
@@ -372,6 +375,7 @@ export default function OrderedItemsReportPage() {
         formatCurrency(item.ecoContainerPrice),
         formatCurrency(calculateItemTotalPrice(item)),
         calculateTotalOrderedQty(item.portionQuantity, item.quantity, item.partQuantity).toString(),
+        item.notes ?? '',
       ];
 
       return row.map(cell => {
@@ -827,6 +831,7 @@ export default function OrderedItemsReportPage() {
                     >
                       Spice Level{renderSortIcon('spiceLevel')}
                     </TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>Instructions</TableCell>
                     <TableCell 
                       onClick={() => handleSort('itemPrice')}
                       sx={{ 
@@ -948,6 +953,9 @@ export default function OrderedItemsReportPage() {
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#6B7280' }}>
                         {item.spiceLevel || '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '13px', color: item.notes ? '#92400E' : '#9CA3AF', fontWeight: item.notes ? 600 : 400, minWidth: 160, wordBreak: 'break-word' }}>
+                        {item.notes || '-'}
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {formatCurrency(item.itemPrice)}

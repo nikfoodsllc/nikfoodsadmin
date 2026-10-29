@@ -10,7 +10,7 @@ const DATE = '2026-10-13';
 const row = (o: Partial<PackingRow>): PackingRow => ({ orderId: 'ORD-1', day: DATE, name: 'Rajma', quantity: 1, customerName: 'Asha Rao', street: '1 A St', ...o });
 const rows = [
   row({ orderId: 'ORD-1', portion: '12Oz', isEco: true, spiceLevel: 'Hot' }),
-  row({ orderId: 'ORD-1', name: 'Chapati', quantity: 4 }),
+  row({ orderId: 'ORD-1', name: 'Chapati', quantity: 4, notes: 'Extra crispy please' }),
   row({ orderId: 'ORD-2', customerName: 'Bob Smith', name: 'Pickle', day: '2026-10-07' }),
   row({ orderId: 'ORD-3', customerName: 'Late One', name: 'Samosa', street: '3 C St' }),
 ];
@@ -52,9 +52,16 @@ describe('packingRouteSheets (one sheet per route)', () => {
     expect(rajma.cells[8]).toBe('Hot');
     expect(rajma.cells[9]).toBe('ECO');
   });
+  it('the customer\'s special instructions are in their own column', () => {
+    const chapati = all.find((r) => r.kind === 'data' && r.cells[5] === 'Chapati')!;
+    expect(PACKING_COLUMNS[11].key).toBe('instructions');
+    expect(chapati.cells[11]).toBe('Extra crispy please');
+    const rajma = all.find((r) => r.kind === 'data' && r.cells[5] === 'Rajma')!;
+    expect(rajma.cells[11]).toBe('');
+  });
   it('an item picked for another menu day says which', () => {
     const pickle = all.find((r) => r.kind === 'data' && r.cells[5] === 'Pickle')!;
-    expect(String(pickle.cells[11])).toContain('Oct 7');
+    expect(String(pickle.cells[12])).toContain('Oct 7');
   });
   it('a stop with nothing to pack still has a row, so it is not forgotten', () => {
     const empty = all.find((r) => r.kind === 'data' && r.cells[3] === 'Empty Stop')!;

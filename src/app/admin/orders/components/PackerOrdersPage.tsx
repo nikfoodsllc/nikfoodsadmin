@@ -182,7 +182,7 @@ function ItemLine({ item }: { item: PackerItem }) {
         {item.choices.map((line) => (
           <Box key={line} sx={{ color: '#6b7280', fontSize: 13 }}>{line}</Box>
         ))}
-        {item.notes && <Box sx={{ color: '#92400E', fontSize: 13 }}>Note: {item.notes}</Box>}
+        {item.notes && <Box sx={{ color: '#92400E', fontSize: 13 }}>Instructions: {item.notes}</Box>}
       </Box>
     </Box>
   );

@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
           portionQuantity: { $ifNull: ['$items.items.selectedPortion', ''] },
           quantity: '$items.items.quantity',
           spiceLevel: { $ifNull: ['$items.items.spiceLevel', ''] },
+          notes: { $ifNull: ['$items.items.notes', ''] },
           itemPrice: '$items.items.price',
           ecoContainer: { $ifNull: ['$items.items.isEcoFriendlyContainer', false] },
           ecoContainerAvailable: { $ifNull: ['$items.items.food.isEcoFriendlyContainer', false] },
@@ -254,6 +255,7 @@ export async function GET(request: NextRequest) {
                 portionQuantity: selectedItem.portion || item.portionQuantity,
                 quantity: item.quantity,
                 spiceLevel: item.spiceLevel,
+                notes: item.notes,
                 itemPrice: item.itemPrice, // Use the combo item price
                 ecoContainer: item.ecoContainer,
                 ecoContainerAvailable: item.ecoContainerAvailable,

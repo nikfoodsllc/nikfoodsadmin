@@ -55,6 +55,8 @@ export interface PackLine {
   portion: string | null;
   spice: string | null;
   isEco: boolean;
+  /** The customer's special instructions for this item, when they wrote any */
+  note?: string | null;
   /** A combo's picks, one line per section ("Veg Curry of the Day: Kale Chane (12Oz)"); empty for a plain item */
   choices: string[];
   /** The menu day it was picked for, when that is not the delivery date (cart clubbing or a moved date) */
@@ -125,6 +127,7 @@ export function toLine(row: PackingRow, date: string): PackLine {
     portion: clean(row.portion) || null,
     spice: clean(row.spiceLevel) || null,
     isEco: Boolean(row.isEco),
+    note: clean(row.notes) || null,
     choices,
     pickedFor: row.day && row.day !== date ? row.day : null,
     ...(row.day && row.day < date ? { madeEarlier: true } : {}),

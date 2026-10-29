@@ -19,6 +19,7 @@ import ReportColumnsDialog from '../../kitchen/components/ReportColumnsDialog';
 import HeldList from './HeldList';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
+import InstructionsNote from '@/components/common/InstructionsNote';
 
 type TabId = 'routes' | 'totals' | 'held';
 type Preset = 'today' | 'tomorrow' | 'other';
@@ -66,6 +67,7 @@ function LineRow({ line }: { line: PackLine }) {
         {line.choices.map((c) => (
           <Typography key={c} sx={{ fontSize: 12, color: '#4B5563', wordBreak: 'break-word' }}>{c}</Typography>
         ))}
+        <InstructionsNote text={line.note} />
         {line.pickedFor && (
           <Typography sx={{ fontSize: 12, color: '#B45309' }}>{line.madeEarlier ? `Made ${formatDayShort(line.pickedFor)} · from the fridge` : `Picked for ${formatDayShort(line.pickedFor)}`}</Typography>
         )}
