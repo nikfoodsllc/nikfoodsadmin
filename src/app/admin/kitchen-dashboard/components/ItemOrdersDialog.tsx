@@ -14,6 +14,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { IconX } from '@tabler/icons-react';
+import InstructionsNote from '@/components/common/InstructionsNote';
 import { formatDayShort, formatOrderedAt, type DayRange, type ItemOrderLine } from '@/utils/kitchenDashboard';
 
 /** The heading of a spice group in the list ('No spice level' for lines without one). */
@@ -170,6 +171,7 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
                     />
                   )}
                 </Box>
+                <InstructionsNote text={line.note} />
                 {(line.choices ?? []).length > 0 && (
                   <Box sx={{ mt: 0.75, pl: 1, borderLeft: '3px solid #FDE68A' }}>
                     {line.choices.map((choice) => {

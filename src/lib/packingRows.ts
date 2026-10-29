@@ -43,6 +43,7 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
         isEco: '$items.items.isEcoFriendlyContainer',
         sections: '$items.items.food.sections',
         comboSelections: '$items.items.comboSelections',
+        notes: '$items.items.notes',
       },
     },
   ];
@@ -64,6 +65,7 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
       sections: Array.isArray(raw.sections) ? raw.sections : null,
       comboSelections: raw.comboSelections && typeof raw.comboSelections === 'object' ? raw.comboSelections : null,
       customerName: typeof raw.customerName === 'string' ? raw.customerName : null,
+      notes: typeof raw.notes === 'string' && raw.notes.trim() ? raw.notes.trim() : null,
       deliveredOn: toDayString(raw.deliveredOn),
       orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
       orderedOn: pacificDayOf(raw.orderedAt),

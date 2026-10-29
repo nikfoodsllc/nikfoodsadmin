@@ -8,6 +8,7 @@ import TypeBadge from './TypeBadge';
 import PreparationBadge from './PreparationBadge';
 import StickerBadge from './StickerBadge';
 import ChefsPickBadge from './ChefsPickBadge';
+import InstructionsBadge from './InstructionsBadge';
 import { safeFormatCurrency } from '@/utils/currency';
 
 interface FoodItem {
@@ -26,6 +27,7 @@ interface FoodItem {
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
   chefsPick?: boolean;
+  allowInstructions?: boolean;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -288,6 +290,12 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
     chefsPick: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
         <ChefsPickBadge value={item.chefsPick} />
+      </TableCell>
+    ),
+    // Special instructions box for customers: Yes / No
+    allowInstructions: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <InstructionsBadge value={item.allowInstructions} />
       </TableCell>
     ),
     // Preparation type: Cooked / Ready to eat / (not set yet)

@@ -129,6 +129,8 @@ export interface KitchenRow {
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
+  /** What the customer wrote in the item's Special instructions box (when the item has one). */
+  notes?: string | null;
   /** Only filled when tracing an item back to the people who ordered it. */
   customerName?: string | null;
   /** The day the items are finally delivered (it can differ from `day` when a day was combined into another). */
@@ -586,6 +588,8 @@ export interface ItemOrderLine {
   portion: string | null;
   spice: string | null;
   isEco: boolean;
+  /** The customer's special instructions for this item, when they wrote any. */
+  note: string | null;
   /** Set when the item is a chosen part of this combo rather than ordered on its own. */
   viaCombo: string | null;
   /** How much food this order line is, size times quantity ('32 oz (2 lb)'); '' when the item has no readable size (a combo, 'Serves 4'). */
@@ -615,6 +619,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       day: row.day,
       deliveredOn: row.deliveredOn ?? null,
       isEco: Boolean(row.isEco),
+      note: clean(row.notes) || null,
       orderStatus: row.orderStatus ?? null,
       orderedAt: row.orderedAt ?? null,
     };

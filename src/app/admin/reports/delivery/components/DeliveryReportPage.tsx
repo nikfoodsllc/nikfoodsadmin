@@ -549,7 +549,7 @@ export default function DeliveryReportPage() {
                 {item.notes && (
                   <Box sx={{ ml: 3.25, mt: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', fontStyle: 'italic' }}>
-                      Note: {item.notes}
+                      Instructions: {item.notes}
                     </Typography>
                   </Box>
                 )}

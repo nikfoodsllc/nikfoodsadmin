@@ -74,6 +74,14 @@ describe('bulk-flag', () => {
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect((await PATCH(req({ body: { ids: [A], field: 'chefsPick', value: 'yes' } }))).status).toBe(400);
   });
+  it('allowInstructions works the same way and clears the menu cache (customers see the box)', async () => {
+    const res = await PATCH(req({ body: { ids: [A, B], field: 'allowInstructions', value: true } }));
+    expect(res.status).toBe(200);
+    expect(Object.keys(update.mock.calls[0][2].$set).sort()).toEqual(['allowInstructions', 'updatedAt']);
+    expect(update.mock.calls[0][2].$set.allowInstructions).toBe(true);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect((await PATCH(req({ body: { ids: [A], field: 'allowInstructions', value: 'yes' } }))).status).toBe(400);
+  });
   it('veg works the same way', async () => {
     await PATCH(req({ body: { ids: [A], field: 'veg', value: true } }));
     expect(update.mock.calls[0][2].$set.veg).toBe(true);

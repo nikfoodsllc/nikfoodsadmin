@@ -35,6 +35,7 @@ interface FoodItem {
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
   chefsPick?: boolean;
+  allowInstructions?: boolean;
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
