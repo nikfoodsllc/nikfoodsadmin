@@ -274,7 +274,15 @@ export default function OrderTableRow({
             color: '#111827',
           }}
         >
-          {safeFormatCurrency(order.platformFee)}
+          {order.feeRegion === 'intl' ? (
+            // an order from an App Store outside the US (6% + $0.30): marked so it is easy to spot
+            <Box component="span" title={`International App Store${order.storeCountry ? ` (${order.storeCountry})` : ''}: Platform Fee 6% + $0.30`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.25, borderRadius: 1, bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              <Box component="span" sx={{ fontSize: 11, letterSpacing: '0.04em' }}>INT</Box>
+              {safeFormatCurrency(order.platformFee)}
+            </Box>
+          ) : (
+            safeFormatCurrency(order.platformFee)
+          )}
         </Typography>
       </TableCell>
     ),
