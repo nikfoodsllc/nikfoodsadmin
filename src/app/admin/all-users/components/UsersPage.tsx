@@ -22,7 +22,7 @@ import SearchBar from './SearchBar';
 import { useSearchBox } from '@/hooks/useSearchBox';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import UserDetailsDialog from './UserDetailsDialog';
-import ExportCustomersDialog from './ExportCustomersDialog';
+import ExportCustomersDialog, { UNSUBSCRIBED_TEXT } from './ExportCustomersDialog';
 import TablePagination from '../../food-items/components/TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
@@ -43,7 +43,7 @@ export default function UsersPage() {
   // the details dialog can open straight in edit mode (the pencil in the table)
   const [startEditing, setStartEditing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [unsubBusy, setUnsubBusy] = useState(false);
+  const [unsubOpen, setUnsubOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithAddresses | null>(null);
 
   // Filters and pagination
@@ -239,27 +239,6 @@ export default function UsersPage() {
   };
 
   const totalPages = totalPagesFor(totalUsers, pageSize);
-
-  // everyone who unsubscribed from the Wix menu emails (customer site /unsubscribe page), to remove them from Wix
-  const downloadUnsubscribed = async () => {
-    setUnsubBusy(true);
-    try {
-      const res = await fetch('/api/admin/users/unsubscribed', { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error('failed');
-      const url = URL.createObjectURL(await res.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'unsubscribed.csv';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      showSnackbar('Could not download the unsubscribed list. Try again.', 'error');
-    } finally {
-      setUnsubBusy(false);
-    }
-  };
   return (
     <Box>
       {/* Header */}
@@ -293,8 +272,7 @@ export default function UsersPage() {
             variant="outlined"
             size="small"
             startIcon={<IconDownload size={16} />}
-            onClick={downloadUnsubscribed}
-            disabled={unsubBusy}
+            onClick={() => setUnsubOpen(true)}
             sx={{ textTransform: 'none', fontWeight: 600 }}
           >
             Unsubscribed CSV
@@ -368,6 +346,7 @@ export default function UsersPage() {
       />
 
       <ExportCustomersDialog open={exportOpen} token={token} onClose={() => setExportOpen(false)} />
+      <ExportCustomersDialog open={unsubOpen} token={token} onClose={() => setUnsubOpen(false)} text={UNSUBSCRIBED_TEXT} />
 
       {/* Delete User Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteDialogClose} maxWidth="xs" fullWidth>
