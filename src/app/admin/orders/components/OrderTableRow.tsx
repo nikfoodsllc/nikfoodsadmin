@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, ReactNode } from 'react';
-import { TableRow as MuiTableRow, TableCell, Typography, Button, Checkbox, Chip, Tooltip } from '@mui/material';
+import { TableRow as MuiTableRow, TableCell, Typography, Box, Button, Checkbox, Chip, Tooltip } from '@mui/material';
 import { IconEye } from '@tabler/icons-react';
 import StatusBadge from './StatusBadge';
 import { Order } from '@/types/order';
