@@ -43,6 +43,7 @@ export default function UsersPage() {
   // the details dialog can open straight in edit mode (the pencil in the table)
   const [startEditing, setStartEditing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [unsubBusy, setUnsubBusy] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithAddresses | null>(null);
 
   // Filters and pagination
@@ -239,6 +240,26 @@ export default function UsersPage() {
 
   const totalPages = totalPagesFor(totalUsers, pageSize);
 
+  // everyone who unsubscribed from the Wix menu emails (customer site /unsubscribe page), to remove them from Wix
+  const downloadUnsubscribed = async () => {
+    setUnsubBusy(true);
+    try {
+      const res = await fetch('/api/admin/users/unsubscribed', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('failed');
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'unsubscribed.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      showSnackbar('Could not download the unsubscribed list. Try again.', 'error');
+    } finally {
+      setUnsubBusy(false);
+    }
+  };
   return (
     <Box>
       {/* Header */}
@@ -267,6 +288,16 @@ export default function UsersPage() {
             sx={{ textTransform: 'none', fontWeight: 600 }}
           >
             Export CSV
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<IconDownload size={16} />}
+            onClick={downloadUnsubscribed}
+            disabled={unsubBusy}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Unsubscribed CSV
           </Button>
         </Box>
       </Box>
