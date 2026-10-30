@@ -22,7 +22,7 @@ import SearchBar from './SearchBar';
 import { useSearchBox } from '@/hooks/useSearchBox';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import UserDetailsDialog from './UserDetailsDialog';
-import ExportCustomersDialog from './ExportCustomersDialog';
+import ExportCustomersDialog, { UNSUBSCRIBED_TEXT } from './ExportCustomersDialog';
 import TablePagination from '../../food-items/components/TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
@@ -43,6 +43,7 @@ export default function UsersPage() {
   // the details dialog can open straight in edit mode (the pencil in the table)
   const [startEditing, setStartEditing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [unsubOpen, setUnsubOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithAddresses | null>(null);
 
   // Filters and pagination
@@ -238,7 +239,6 @@ export default function UsersPage() {
   };
 
   const totalPages = totalPagesFor(totalUsers, pageSize);
-
   return (
     <Box>
       {/* Header */}
@@ -267,6 +267,15 @@ export default function UsersPage() {
             sx={{ textTransform: 'none', fontWeight: 600 }}
           >
             Export CSV
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<IconDownload size={16} />}
+            onClick={() => setUnsubOpen(true)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Unsubscribed CSV
           </Button>
         </Box>
       </Box>
@@ -337,6 +346,7 @@ export default function UsersPage() {
       />
 
       <ExportCustomersDialog open={exportOpen} token={token} onClose={() => setExportOpen(false)} />
+      <ExportCustomersDialog open={unsubOpen} token={token} onClose={() => setUnsubOpen(false)} text={UNSUBSCRIBED_TEXT} />
 
       {/* Delete User Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteDialogClose} maxWidth="xs" fullWidth>
