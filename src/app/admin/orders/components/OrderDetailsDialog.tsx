@@ -565,7 +565,7 @@ export default function OrderDetailsDialog({
               <Typography variant="body2" sx={{ fontWeight: 500 }}>{safeFormatCurrency(order.subtotal)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="body2" sx={{ color: '#6B7280' }}>Platform Fee</Typography>
+              <Typography variant="body2" sx={{ color: '#6B7280' }}>Platform Fee{order.feeRegion === 'intl' ? ` (international App Store${order.storeCountry ? `: ${order.storeCountry}` : ''}, 6% + $0.30)` : ''}</Typography>
               <Typography variant="body2" sx={{ fontWeight: 500 }}>{safeFormatCurrency(order.platformFee)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
