@@ -225,6 +225,10 @@ export interface Order {
   customerInfo: CustomerInfo;
   subtotal: number;
   platformFee: number; // $1.00
+  /** 'intl' = the customer ordered in the mobile app from an App Store outside the US (Platform Fee 6% + $0.30 instead of 4% + $0.31) */
+  feeRegion?: 'us' | 'intl';
+  /** That App Store's country (3-letter code), for the same orders */
+  storeCountry?: string;
   deliveryFee: number; // $10.00 or $0
   taxes: number; // 10% of subtotal
   tip: number; // User selected tip
