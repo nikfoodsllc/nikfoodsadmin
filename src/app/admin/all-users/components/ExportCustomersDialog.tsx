@@ -5,8 +5,33 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { IconDownload } from '@tabler/icons-react';
 import { pacificToday } from '@/utils/abandonedCheckouts';
 
-/** Downloads the customers who registered in a date range as a CSV: First Name, Last Name, Email, Phone. */
-export default function ExportCustomersDialog({ open, token, onClose }: { open: boolean; token: string; onClose: () => void }) {
+export interface ExportDialogText {
+  endpoint: string;
+  title: string;
+  description: string;
+  /** singular noun for the success line, e.g. 'customer' */
+  noun: string;
+  fallbackName: string;
+}
+
+const CUSTOMERS_TEXT: ExportDialogText = {
+  endpoint: '/api/admin/users/export',
+  title: 'Export customers (CSV)',
+  description: 'Customers who registered between these dates (both days included). Leave a date empty for no limit. The file has First Name, Last Name, Email and Phone. Admin accounts and deleted accounts are not included.',
+  noun: 'customer',
+  fallbackName: 'customers.csv',
+};
+
+export const UNSUBSCRIBED_TEXT: ExportDialogText = {
+  endpoint: '/api/admin/users/unsubscribed',
+  title: 'Unsubscribed (CSV)',
+  description: 'People who unsubscribed from the Wix menu emails between these dates (both days included). Leave a date empty for no limit. The file has Email and the date. Remove them from the Wix mailing list.',
+  noun: 'unsubscribed address',
+  fallbackName: 'unsubscribed.csv',
+};
+
+/** Downloads a CSV for a date range (default: the customers who registered: First Name, Last Name, Email, Phone). */
+export default function ExportCustomersDialog({ open, token, onClose, text = CUSTOMERS_TEXT }: { open: boolean; token: string; onClose: () => void; text?: ExportDialogText }) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
   const [from, setFrom] = useState('');
@@ -25,7 +50,7 @@ export default function ExportCustomersDialog({ open, token, onClose }: { open: 
       const params = new URLSearchParams();
       if (from) params.set('from', from);
       if (to) params.set('to', to);
-      const res = await fetch(`/api/admin/users/export?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${text.endpoint}?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data?.error || 'Could not build the export');
@@ -33,7 +58,7 @@ export default function ExportCustomersDialog({ open, token, onClose }: { open: 
       }
       const count = res.headers.get('X-Row-Count') ?? '';
       const blob = await res.blob();
-      const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'customers.csv';
+      const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? text.fallbackName;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -42,7 +67,7 @@ export default function ExportCustomersDialog({ open, token, onClose }: { open: 
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setDone(`${count} customer${count === '1' ? '' : 's'} exported (${name}).`);
+      setDone(`${count} ${text.noun}${count === '1' ? '' : 's'} exported (${name}).`);
     } catch {
       setError('Could not reach the server. Try again.');
     } finally {
@@ -52,10 +77,10 @@ export default function ExportCustomersDialog({ open, token, onClose }: { open: 
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" fullScreen={fullScreen}>
-      <DialogTitle sx={{ borderBottom: '1px solid #E5E7EB' }}>Export customers (CSV)</DialogTitle>
+      <DialogTitle sx={{ borderBottom: '1px solid #E5E7EB' }}>{text.title}</DialogTitle>
       <DialogContent sx={{ pt: 2 }}>
         <Typography sx={{ fontSize: 13, color: '#4B5563', mt: 1.5, mb: 2 }}>
-          Customers who registered between these dates (both days included). Leave a date empty for no limit. The file has First Name, Last Name, Email and Phone. Admin accounts and deleted accounts are not included.
+          {text.description}
         </Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
           <TextField type="date" label="From" value={from} onChange={(e) => setFrom(e.target.value)} size="small" InputLabelProps={{ shrink: true }} inputProps={{ max: to || today }} />
