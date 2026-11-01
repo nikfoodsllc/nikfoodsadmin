@@ -1,5 +1,5 @@
 import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
-import { COUNTED_ORDER_CLAUSES } from '@/lib/countedOrders';
+import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 
@@ -16,6 +16,7 @@ export async function fetchKitchenRows(range: DayRange, options: { report?: bool
     {
       $match: {
         status: { $ne: 'cancelled' },
+        ...NOT_MANUALLY_DELIVERED,
         $or: COUNTED_ORDER_CLAUSES,
         'items.deliveryDate': within,
       },
@@ -101,6 +102,7 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
     {
       $match: {
         status: { $ne: 'cancelled' },
+        ...NOT_MANUALLY_DELIVERED,
         $or: COUNTED_ORDER_CLAUSES,
         'items.actualDeliveryDate': within,
       },
