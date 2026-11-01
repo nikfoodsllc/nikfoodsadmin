@@ -8,9 +8,10 @@
  * A failed or refunded payment never counts.
  */
 /**
- * An order an admin marked Delivered by hand (for example a pickup) is finished: the Packing and Delivery reports leave it out.
+ * An order an admin marked Delivered by hand (for example a pickup) is finished: the Kitchen Dashboard, Kitchen Report, Packing
+ * and Delivery reports and the OptimoRoute route all leave it out.
  * Orders OptimoRoute marked Delivered after the route was driven (deliveredBy 'optimoroute') stay in those reports as the day's record.
- * The Kitchen reports are not affected (the food was still made). Use inside `$match`.
+ * Use inside `$match`.
  */
 export const NOT_MANUALLY_DELIVERED = { $nor: [{ status: 'delivered', deliveredBy: { $ne: 'optimoroute' } }] };
 
