@@ -44,7 +44,7 @@ export const APP_FILTERS: Array<{ key: AppFilter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'allowed', label: 'Allowed' },
   { key: 'denied', label: 'Said No' },
-  { key: 'notAsked', label: 'Not asked yet' },
+  { key: 'notAsked', label: 'Not turned on' },
   { key: 'ordersOff', label: 'Order updates off' },
   { key: 'menuOff', label: 'Menu alerts off' },
   { key: 'remindersOn', label: 'Cart reminders on' },
@@ -81,7 +81,7 @@ export function filterAppCustomers(list: AppCustomer[], search: string, filter: 
   });
 }
 
-export const PERMISSION_LABEL: Record<AppPermission, string> = { allowed: 'Notifications allowed', denied: 'Said No', notAsked: 'Not asked yet' };
+export const PERMISSION_LABEL: Record<AppPermission, string> = { allowed: 'Notifications allowed', denied: 'Said No', notAsked: 'Not turned on' };
 
 /** "iPhone of Amy · app 1.0.1", or "iPhone" when the phone sent no name; a phone that is not allowed says so. */
 export function phoneText(p: AppPhone): string {

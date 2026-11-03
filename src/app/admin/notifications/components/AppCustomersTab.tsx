@@ -76,7 +76,7 @@ export default function AppCustomersTab({ call }: { call: Call }) {
           <Tile value={counts.customers} label="Using the app" hint={`${counts.phones} phone${counts.phones === 1 ? '' : 's'}, signed in`} />
           <Tile value={counts.allowed} label="Notifications allowed" />
           <Tile value={counts.denied} label="Said No" hint="off in iPhone Settings" />
-          <Tile value={counts.notAsked} label="Not asked yet" />
+          <Tile value={counts.notAsked} label="Not turned on" />
           <Tile value={counts.orders} label="Order updates on" hint="of those allowed" />
           <Tile value={counts.menu} label="Menu alerts on" hint="menu switch on" />
           <Tile value={counts.reminders} label="Cart reminders on" />
