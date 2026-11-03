@@ -16,7 +16,6 @@ interface FoodItem {
   _id: string;
   name: string;
   description?: string;
-  short_description?: string;
   price?: number;
   category: string[];
   veg: boolean;

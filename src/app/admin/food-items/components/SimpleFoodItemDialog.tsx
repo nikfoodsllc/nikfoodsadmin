@@ -29,6 +29,7 @@ import PreparationTypeField from './PreparationTypeField';
 import StickerField from './StickerField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
+import ToggleRow from './ToggleRow';
 import InstructionsField from './InstructionsField';
 import StockField from './StockField';
 import { PreparationType, preparationTypeError } from '@/utils/preparationType';
@@ -39,12 +40,12 @@ import { FoodModifier } from '@/types/modifier';
 import { useAuth } from '@/contexts/AuthContext';
 import SubCategorySelect from './SubCategorySelect';
 import { mergeCategoryIdsForSave, resolveSubCategoryIds, SubCategoryOption } from '../utils/subCategoryUtils';
+import PriceField from './PriceField';
 
 interface SimpleFoodItem {
   _id?: string;
   name: string;
   description?: string;
-  short_description?: string;
   price: number;
   category?: string[];
   veg: boolean;
@@ -82,7 +83,6 @@ const spiceLevels = ['Mild (Kid Friendly)', 'Normal', 'Medium Spice', 'Spicy'];
 const getDefaultFormData = (): SimpleFoodItem => ({
   name: '',
   description: '',
-  short_description: 'A perfect balance of taste, aroma, and warmth.',
   price: 0,
   veg: true,
   available: true,
@@ -401,38 +401,16 @@ export default function SimpleFoodItemDialog({
             }}
           />
 
-          {/* Short Description */}
-          <TextField
-            label="Short Description"
-            value={formData.short_description}
-            onChange={(e) => handleChange('short_description', e.target.value)}
-            disabled={loading}
-            multiline
-            rows={2}
-            fullWidth
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                '&.Mui-focused fieldset': {
-                  borderColor: '#4F8CFF',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#4F8CFF',
-              },
-            }}
-          />
 
           {/* Price */}
-          <TextField
+          <PriceField
             label="Price *"
-            type="number"
             value={formData.price}
-            onChange={(e) => handleChange('price', parseFloat(e.target.value) || 0)}
+            onValueChange={(v) => handleChange('price', v)}
             error={!!errors.price}
             helperText={errors.price}
             disabled={loading}
             fullWidth
-            inputProps={{ min: 0, step: 0.01 }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 '&.Mui-focused fieldset': {
@@ -512,34 +490,7 @@ export default function SimpleFoodItemDialog({
 
           <Divider />
 
-          {/* Veg/Non-Veg Toggle */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-              Food Type *
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.veg}
-                  onChange={(e) => handleChange('veg', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#10B981',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#10B981',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2">{formData.veg ? 'Vegetarian' : 'Non-Vegetarian'}</Typography>
-                </Box>
-              }
-            />
-          </Box>
+          <ToggleRow label="Vegetarian" caption="Off means non-vegetarian." checked={formData.veg} onChange={(on) => handleChange('veg', on)} disabled={loading} />
 
           {/* Preparation Type: Cooked / Ready to eat (required for a new item; existing items may stay not set) */}
           <PreparationTypeField
@@ -564,59 +515,17 @@ export default function SimpleFoodItemDialog({
           <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
           <StockField itemId={formData._id} hasSizes={false} value={formData} onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))} disabled={loading} />
           <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
-          <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Not needed: this item has no sticker.' : 'Yes: one sticker for every box. No or not set yet: one sticker line per order, showing the total amount.'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
+          <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Needs a sticker first.' : 'One sticker for every box (off: one line per order).'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
 
           <Divider />
 
-          {/* Available Toggle */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-              Availability
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.available}
-                  onChange={(e) => handleChange('available', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#4F8CFF',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2">{formData.available ? 'Available' : 'Unavailable'}</Typography>}
-            />
-          </Box>
+          <ToggleRow label="Available" caption="Off hides it from customers." checked={formData.available} onChange={(on) => handleChange('available', on)} disabled={loading} />
 
 
           <Divider />
 
           {/* Spice Level Toggle */}
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.hasSpiceLevel}
-                  onChange={(e) => handleChange('hasSpiceLevel', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#4F8CFF',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2">Has Spice Level Options</Typography>}
-            />
-          </Box>
+          <ToggleRow label="Spice levels" caption="Customers pick a spice level." checked={Boolean(formData.hasSpiceLevel)} onChange={(on) => handleChange('hasSpiceLevel', on)} disabled={loading} />
 
           {/* Spice Levels Multi-Select */}
           {formData.hasSpiceLevel && (
@@ -661,37 +570,16 @@ export default function SimpleFoodItemDialog({
           )}
 
           {/* Eco-Friendly Container Toggle */}
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.isEcoFriendlyContainer}
-                  onChange={(e) => handleChange('isEcoFriendlyContainer', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#10B981',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#10B981',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2">Eco-Friendly Container Available</Typography>}
-            />
-          </Box>
+          <ToggleRow label="Eco container" caption="Customers can add one for a fee." checked={Boolean(formData.isEcoFriendlyContainer)} onChange={(on) => handleChange('isEcoFriendlyContainer', on)} disabled={loading} />
 
           {/* Eco Container Charge */}
           {formData.isEcoFriendlyContainer && (
-            <TextField
+            <PriceField
               label="Eco Container Charge"
-              type="number"
               value={formData.ecoContainerCharge}
-              onChange={(e) => handleChange('ecoContainerCharge', parseFloat(e.target.value) || 0)}
+              onValueChange={(v) => handleChange('ecoContainerCharge', v)}
               disabled={loading}
               fullWidth
-              inputProps={{ min: 0, step: 0.01 }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   '&.Mui-focused fieldset': {

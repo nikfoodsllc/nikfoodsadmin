@@ -234,7 +234,6 @@ function withoutSectionSpiceFlags<T extends Record<string, unknown>>(section: T,
 const foodItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
-  short_description: z.string().optional(),
   // Clients/DB may send null; optional() only allows undefined, not null
   price: z.preprocess(
     (v) => (v === null ? undefined : v),
@@ -350,7 +349,6 @@ interface FoodItem {
   _id?: ObjectId | string;
   name: string;
   description?: string;
-  short_description?: string;
   price?: number;
   category: string[];
   veg: boolean;
@@ -797,13 +795,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set default short description if not provided
     const foodItemData: FoodItem = {
       name: data.name.trim(),
       description: data.description?.trim() || '',
-      short_description:
-        data.short_description?.trim() ||
-        'A perfect balance of taste, aroma, and warmth.',
       category: [],
       veg: data.veg,
       available: data.available,
@@ -1034,9 +1028,6 @@ if (duplicateFoodItem.success && duplicateFoodItem.data) {
 const updateData: Partial<FoodItem> = {
   name: data.name.trim(),
   description: data.description?.trim() || '',
-  short_description:
-    data.short_description?.trim() ||
-    'A perfect balance of taste, aroma, and warmth.',
   veg: data.veg,
   available: data.available,
   isDraft: data.isDraft ?? false,

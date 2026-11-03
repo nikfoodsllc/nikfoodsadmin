@@ -171,7 +171,6 @@ export default function QuickCreateFoodItem({
         body: JSON.stringify({
           name: formData.name.trim(),
           description: formData.description.trim(),
-          short_description: 'A perfect balance of taste, aroma, and warmth.',
           price: parseFloat(formData.price),
           category: [categoryId], // Automatically assign to current category
           veg: formData.veg,

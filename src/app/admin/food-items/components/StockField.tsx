@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, LinearProgress, Radio, RadioGroup, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
-import { IconRefresh } from '@tabler/icons-react';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, LinearProgress, Radio, RadioGroup, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { IconChevronDown, IconRefresh } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { stockLogText, type StockLogLine } from '@/utils/stockLogText';
 import type { StockUnit } from '@/utils/stockRules';
@@ -89,10 +89,16 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
   const alertLeftText = `${alertLeft}${unit === 'lb' ? ' lb' : unit === 'oz' ? ' oz' : ''} or less`;
 
   return (
-    <Box sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.5, bgcolor: '#FAFAFA' }}>
-      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-        Order limit (inventory)
-      </Typography>
+    <Accordion disableGutters elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: '8px !important', bgcolor: '#FAFAFA', '&:before': { display: 'none' } }}>
+      <AccordionSummary expandIcon={<IconChevronDown size={18} />} sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { alignItems: 'center', justifyContent: 'space-between', gap: 1, my: 0.5 } }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151' }}>
+          Order limit
+        </Typography>
+        <Typography variant="caption" sx={{ color: '#6B7280', mr: 1 }}>
+          {limit === null ? 'No limit' : `${limit}${unit === 'lb' ? ' lb' : unit === 'oz' ? ' oz' : ' units'}`}
+        </Typography>
+      </AccordionSummary>
+      <AccordionDetails sx={{ p: 1.5, pt: 0.5 }}>
 
       <ToggleButtonGroup
         exclusive
@@ -126,11 +132,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
           onChange({ stockThreshold: ok ? Math.min(n, 100000) : null });
         }}
         slotProps={{ htmlInput: { min: unit === 'lb' ? 0.25 : 1, step: unit === 'lb' ? 0.25 : 1, inputMode: 'decimal', 'aria-label': 'Order limit' } }}
-        helperText={
-          hasSizes
-            ? 'Leave empty for no limit. When this much is ordered the item shows Out of stock on the website and in the app and cannot be ordered. Pounds and ounces use the size of each serving (for example 1/2 Lb = 8 oz). Amounts inside combos count too.'
-            : 'Leave empty for no limit. When this many units are ordered the item shows Out of stock on the website and in the app and cannot be ordered. Units inside combos count too. (Pounds and ounces are only for items with sizes.)'
-        }
+        helperText={hasSizes ? 'Empty = no limit. At the limit the item shows Out of stock. Pounds and ounces use each serving size.' : 'Empty = no limit. At the limit the item shows Out of stock.'}
       />
 
       {limit !== null && (
@@ -148,7 +150,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
             onChange({ stockAlertPercent: raw !== '' && Number.isInteger(n) && n >= 1 && n <= 99 ? n : null });
           }}
           slotProps={{ htmlInput: { min: 1, max: 99, step: 1, inputMode: 'numeric', 'aria-label': 'Low-stock alert percentage' }, inputLabel: { shrink: true } }}
-          helperText={`Blank = 10%. At ${alertPct}% left (${alertLeftText}) support@nikfoods.com gets a Low stock email, and another when the item sells out.`}
+          helperText={`Blank = 10%. Support gets an email at ${alertPct}% left (${alertLeftText}) and when it sells out.`}
           sx={{ mt: 1.5 }}
         />
       )}
@@ -160,8 +162,8 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
             value={mode}
             onChange={(e) => onChange(e.target.value === 'daily' ? { stockResetMode: 'daily', stockResetTime: value.stockResetTime || '03:00' } : { stockResetMode: 'manual', stockResetTime: null })}
           >
-            <FormControlLabel value="manual" control={<Radio size="small" disabled={disabled} />} label="Manual only (press Reset count)" />
-            <FormControlLabel value="daily" control={<Radio size="small" disabled={disabled} />} label="Reset (Custom Time): every day at a time I choose" />
+            <FormControlLabel value="manual" control={<Radio size="small" disabled={disabled} />} label="Manual (Reset count button)" />
+            <FormControlLabel value="daily" control={<Radio size="small" disabled={disabled} />} label="Every day at a set time" />
           </RadioGroup>
           {mode === 'daily' && (
             <TextField
@@ -172,7 +174,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
               disabled={disabled}
               onChange={(e) => onChange({ stockResetMode: 'daily', stockResetTime: e.target.value || '03:00' })}
               slotProps={{ inputLabel: { shrink: true } }}
-              helperText="The count goes back to 0 at this time every day (Pacific time). You can still reset by hand."
+              helperText="Count goes back to 0 at this time daily. You can still reset by hand."
               sx={{ mt: 0.5 }}
             />
           )}
@@ -226,6 +228,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+      </AccordionDetails>
+    </Accordion>
   );
 }

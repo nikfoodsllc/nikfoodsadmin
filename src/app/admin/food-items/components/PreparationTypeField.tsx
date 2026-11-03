@@ -59,10 +59,7 @@ export default function PreparationTypeField({ value, onChange, disabled, requir
         {error ? (
           error
         ) : (
-          <>
-            Cooked: made fresh for that day&apos;s menu (chapati, rajma). Ready to eat: already made, only packed for
-            delivery (pickles, sweets).
-          </>
+          <>Cooked = made fresh. Ready to eat = just packed.</>
         )}
       </Typography>
     </Box>

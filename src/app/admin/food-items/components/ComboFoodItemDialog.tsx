@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
+import ToggleRow from './ToggleRow';
 import InstructionsField from './InstructionsField';
 import StockField from './StockField';
 import { PreparationType } from '@/utils/preparationType';
@@ -42,6 +43,7 @@ import {
   updateComboItemPrices,
   ZeroPricedItemInfo,
 } from '../utils/priceUtils';
+import PriceField from './PriceField';
 
 interface AllFoodItem {
   _id: string;
@@ -56,7 +58,6 @@ interface ComboFoodItem {
   _id?: string;
   name: string;
   description?: string;
-  short_description?: string;
   price: number;
   category?: string[];
   veg: boolean;
@@ -117,7 +118,6 @@ function safeNonNegativePrice(value: unknown): number {
 const getDefaultFormData = (): ComboFoodItem => ({
   name: '',
   description: '',
-  short_description: 'A perfect balance of taste, aroma, and warmth.',
   price: 0,
   veg: true,
   available: true,
@@ -439,38 +439,16 @@ export default function ComboFoodItemDialog({
             }}
           />
 
-          {/* Short Description */}
-          <TextField
-            label="Short Description"
-            value={formData.short_description}
-            onChange={(e) => handleChange('short_description', e.target.value)}
-            disabled={loading}
-            multiline
-            rows={2}
-            fullWidth
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                '&.Mui-focused fieldset': {
-                  borderColor: '#4F8CFF',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#4F8CFF',
-              },
-            }}
-          />
 
           {/* Base Price */}
-          <TextField
+          <PriceField
             label="Base Price *"
-            type="number"
             value={formData.price}
-            onChange={(e) => handleChange('price', parseFloat(e.target.value) || 0)}
+            onValueChange={(v) => handleChange('price', v)}
             error={!!errors.price}
             helperText={errors.price || 'Base price for the combo meal'}
             disabled={loading}
             fullWidth
-            inputProps={{ min: 0, step: 0.01 }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 '&.Mui-focused fieldset': {
@@ -494,34 +472,7 @@ export default function ComboFoodItemDialog({
 
           <Divider />
 
-          {/* Veg/Non-Veg Toggle */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-              Food Type *
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.veg}
-                  onChange={(e) => handleChange('veg', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#10B981',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#10B981',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2">{formData.veg ? 'Vegetarian' : 'Non-Vegetarian'}</Typography>
-                </Box>
-              }
-            />
-          </Box>
+          <ToggleRow label="Vegetarian" caption="Off means non-vegetarian." checked={formData.veg} onChange={(on) => handleChange('veg', on)} disabled={loading} />
 
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
 
@@ -534,30 +485,7 @@ export default function ComboFoodItemDialog({
 
           <Divider />
 
-          {/* Available Toggle */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#374151' }}>
-              Availability
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.available}
-                  onChange={(e) => handleChange('available', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#4F8CFF',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#4F8CFF',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2">{formData.available ? 'Available' : 'Unavailable'}</Typography>}
-            />
-          </Box>
+          <ToggleRow label="Available" caption="Off hides it from customers." checked={formData.available} onChange={(on) => handleChange('available', on)} disabled={loading} />
 
 
           <Divider />
@@ -666,37 +594,16 @@ export default function ComboFoodItemDialog({
           <Divider />
 
           {/* Eco-Friendly Container Toggle */}
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.isEcoFriendlyContainer}
-                  onChange={(e) => handleChange('isEcoFriendlyContainer', e.target.checked)}
-                  disabled={loading}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#10B981',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#10B981',
-                    },
-                  }}
-                />
-              }
-              label={<Typography variant="body2">Eco-Friendly Container Available</Typography>}
-            />
-          </Box>
+          <ToggleRow label="Eco container" caption="Customers can add one for a fee." checked={Boolean(formData.isEcoFriendlyContainer)} onChange={(on) => handleChange('isEcoFriendlyContainer', on)} disabled={loading} />
 
           {/* Eco Container Charge */}
           {formData.isEcoFriendlyContainer && (
-            <TextField
+            <PriceField
               label="Eco Container Charge"
-              type="number"
               value={formData.ecoContainerCharge}
-              onChange={(e) => handleChange('ecoContainerCharge', parseFloat(e.target.value) || 0)}
+              onValueChange={(v) => handleChange('ecoContainerCharge', v)}
               disabled={loading}
               fullWidth
-              inputProps={{ min: 0, step: 0.01 }}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   '&.Mui-focused fieldset': {
