@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { jwtHandler } from '@/lib/jwt';
-import { fetchKitchenRows, fetchMovedKitchenRows } from '@/lib/kitchenRows';
+import { fetchKitchenRows, fetchMovedKitchenRows, fetchStickerRows } from '@/lib/kitchenRows';
 import { buildKitchenDays, comboParts, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
 import { buildKitchenReport, type StickerLookup, type TypeLookup } from '@/utils/kitchenReport';
 import { normalizePreparationType, type PreparationType } from '@/utils/preparationType';
@@ -44,11 +44,13 @@ export async function GET(request: NextRequest) {
 
     // items an admin moved to another date are cooked for their new date
     const rows = [...(await fetchKitchenRows(range, { report: true })), ...(await fetchMovedKitchenRows(range))];
+    // the stickers follow the DELIVERY date, so they come from their own rows
+    const stickerRows = await fetchStickerRows(range);
 
     // how each item is prepared: by food id (a combo's parts have their own), and by name for anything without an id
     const ids = new Set<string>();
     const names = new Set<string>();
-    for (const row of rows) {
+    for (const row of [...rows, ...stickerRows]) {
       if (row.foodId) ids.add(row.foodId);
       names.add(row.name.trim());
       for (const part of comboParts(row)) {
@@ -118,11 +120,13 @@ export async function GET(request: NextRequest) {
     };
 
     const report = buildKitchenReport(rows, typeOf, stickerOf, splitOf);
+    const stickers = buildKitchenReport(stickerRows, typeOf, stickerOf, splitOf).stickers;
     return NextResponse.json({
       data: {
         startDate: range.startDate,
         endDate: range.endDate,
         ...report,
+        stickers,
         days: buildKitchenDays(rows, enumerateDays(range)),
       },
       message: 'Kitchen report generated successfully',
