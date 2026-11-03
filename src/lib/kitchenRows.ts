@@ -147,6 +147,52 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
 }
 
 /**
+ * The order lines to put stickers on: the stickers are printed for the day the food is DELIVERED, so these are chosen by
+ * delivery date (the item's actual delivery date, else its menu day), whatever day it was cooked or picked for.
+ */
+export async function fetchStickerRows(range: DayRange): Promise<KitchenRow[]> {
+  const within = { $gte: range.startDate, $lte: `${range.endDate}\uffff` };
+  const deliveredOf = { $ifNull: ['$items.actualDeliveryDate', '$items.deliveryDate'] };
+  const pipeline = [
+    {
+      $match: {
+        status: { $ne: 'cancelled' },
+        ...NOT_MANUALLY_DELIVERED,
+        $or: COUNTED_ORDER_CLAUSES,
+        $and: [{ $or: [{ 'items.actualDeliveryDate': within }, { 'items.deliveryDate': within }] }],
+      },
+    },
+    CREDIT_ADJUST_STAGE,
+    { $unwind: '$items' },
+    { $match: { $expr: { $and: [{ $gte: [deliveredOf, range.startDate] }, { $lte: [deliveredOf, `${range.endDate}\uffff`] }] } } },
+    { $unwind: '$items.items' },
+    {
+      $project: {
+        _id: 0,
+        orderId: 1,
+        orderStatus: '$status',
+        orderedAt: '$createdAt',
+        customerName: '$customerInfo.name',
+        day: '$items.deliveryDate',
+        deliveredOn: deliveredOf,
+        name: '$items.items.food.name',
+        foodId: '$items.items.food._id',
+        quantity: '$items.items.quantity',
+        portion: '$items.items.selectedPortion',
+        spiceLevel: '$items.items.spiceLevel',
+        isEco: '$items.items.isEcoFriendlyContainer',
+        sections: '$items.items.food.sections',
+        comboSelections: '$items.items.comboSelections',
+        notes: '$items.items.notes',
+      },
+    },
+  ];
+  const result = await db.aggregate('orders', pipeline);
+  if (!result.success) throw new Error(result.error || 'Failed to read orders');
+  return mapRows(result.data ?? []);
+}
+
+/**
  * The rows the Kitchen Dashboard counts: like fetchKitchenRows, but an item an admin moved to a delivery date
  * EARLIER than its kitchen day is cooked on that earlier date, so it leaves its old day and is counted on the
  * new one. Items moved later and cart-clubbed items stay on their kitchen day (the day card notes the delivery).
