@@ -16,6 +16,7 @@ import {
   Chip,
 } from '@mui/material';
 import { IconPlus, IconTrash, IconSearch, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
+import PriceField from './PriceField';
 
 interface FoodItem {
   _id: string;
@@ -558,16 +559,12 @@ const handleAvailabilityToggle = (sectionIndex: number, itemIndex: number) => {
 
                             {/* Additional Price */}
                             <Box sx={{ flex: '0 0 120px' }}>
-                              <TextField
+                              <PriceField
                                 label="Price ($)"
-                                type="number"
                                 value={comboItem.price}
-                                onChange={(e) =>
-                                  handlePriceChange(sectionIndex, itemIndex, parseFloat(e.target.value) || 0)
-                                }
+                                onValueChange={(v) => handlePriceChange(sectionIndex, itemIndex, v)}
                                 disabled={disabled}
                                 size="small"
-                                inputProps={{ min: 0, step: 0.01 }}
                                 fullWidth
                                 sx={{
                                   '& .MuiOutlinedInput-root': {

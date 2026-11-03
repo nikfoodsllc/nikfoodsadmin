@@ -35,7 +35,6 @@ export interface MenuItem {
   price: number;
   veg?: boolean;
   description?: string;
-  short_description?: string;
   portions?: string[];
   portionPrices?: number[];
   hasSpiceLevel?: boolean;

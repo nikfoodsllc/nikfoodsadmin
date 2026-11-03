@@ -2,6 +2,7 @@
 
 import { Box, TextField, Button, IconButton, Typography, Paper, Switch, FormControlLabel, Chip } from '@mui/material';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
+import PriceField from './PriceField';
 
 interface Portion {
   name: string;
@@ -97,13 +98,11 @@ export default function PortionManager({
                   }}
                 />
 
-                <TextField
+                <PriceField
                   label="Price ($)"
-                  type="number"
                   value={portion.price}
-                  onChange={(e) => handlePortionChange(index, 'price', parseFloat(e.target.value) || 0)}
+                  onValueChange={(v) => handlePortionChange(index, 'price', v)}
                   disabled={disabled}
-                  inputProps={{ min: 0, step: 0.01 }}
                   fullWidth
                   sx={{
                     flex: 1,
