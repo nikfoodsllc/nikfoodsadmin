@@ -33,6 +33,9 @@ describe('foodItemListFilters', () => {
     expect(f('preparationType=ready_to_eat')).toEqual({ preparationType: 'ready_to_eat' });
     expect(f('preparationType=not_set')).toEqual({ preparationType: { $nin: ['cooked', 'ready_to_eat'] } });
     expect(f('preparationType=all')).toEqual({});
+    expect(f('allergen=milk')).toEqual({ allergens: 'milk' });
+    expect(f('allergen=none')).toEqual({ allergens: { $in: [null, []] } });
+    expect(f('allergen=bogus')).toEqual({});
   });
 
   it('splitSticker, including "not set yet"', () => {

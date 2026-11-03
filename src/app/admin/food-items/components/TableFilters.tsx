@@ -3,6 +3,7 @@
 import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
 import { IconSearch } from '@tabler/icons-react';
 import { FoodItemFilters } from './foodItemFilters';
+import { ALLERGENS } from '@/utils/allergens';
 
 interface TableFiltersProps {
   searchValue: string;
@@ -143,6 +144,25 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="cooked">Cooked</MenuItem>
           <MenuItem value="ready_to_eat">Ready to eat</MenuItem>
           <MenuItem value="not_set">(not set yet)</MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* Allergens: items containing one allergen, or items with none */}
+      <FormControl size="small" sx={{ minWidth: 160 }}>
+        <InputLabel>Allergens</InputLabel>
+        <Select
+          value={filters.allergen}
+          label="Allergens"
+          onChange={(e) => onFilterChange('allergen', e.target.value as FoodItemFilters['allergen'])}
+          sx={selectSx}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="none">No allergens</MenuItem>
+          {ALLERGENS.map((a) => (
+            <MenuItem key={a.key} value={a.key}>
+              Contains {a.label.toLowerCase()}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
 

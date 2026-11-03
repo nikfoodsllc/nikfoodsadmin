@@ -29,6 +29,7 @@ import PreparationTypeField from './PreparationTypeField';
 import StickerField from './StickerField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
+import AllergensField from './AllergensField';
 import ToggleRow from './ToggleRow';
 import InstructionsField from './InstructionsField';
 import StockField from './StockField';
@@ -61,6 +62,7 @@ interface SimpleFoodItem {
   splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
   chefsPick?: boolean; // true = shown in the mobile app's Chef's Pick row
+  allergens?: string[]; // keys from utils/allergens.ts; none ticked = no allergens
   allowInstructions?: boolean; // true = customers get a Special instructions box for this item
   stockThreshold?: number | null; // order limit (inventory); null / missing = no limit
   stockUnit?: 'units' | 'lb' | 'oz';
@@ -511,6 +513,7 @@ export default function SimpleFoodItemDialog({
           />
 
           {/* Sticker: Yes / No / not set yet (only Yes items appear on the Stickers sheet) */}
+          <AllergensField value={formData.allergens} onChange={(value) => setFormData((prev) => ({ ...prev, allergens: value }))} disabled={loading} />
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
           <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
           <StockField itemId={formData._id} hasSizes={false} value={formData} onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))} disabled={loading} />
