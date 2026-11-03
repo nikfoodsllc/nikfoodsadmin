@@ -57,7 +57,6 @@ interface FoodItem {
   _id: string;
   name: string;
   description?: string;
-  short_description?: string;
   price?: number;
   category: string[];
   veg: boolean;
@@ -106,7 +105,6 @@ interface SimpleFoodItem {
   _id?: string;
   name: string;
   description?: string;
-  short_description?: string;
   price: number;
   veg: boolean;
   available: boolean;
@@ -123,7 +121,6 @@ interface PortionsFoodItem {
   _id?: string;
   name: string;
   description?: string;
-  short_description?: string;
   veg: boolean;
   available: boolean;
   url?: string;
@@ -141,7 +138,6 @@ interface ComboFoodItem {
   _id?: string;
   name: string;
   description?: string;
-  short_description?: string;
   price: number;
   veg: boolean;
   available: boolean;
