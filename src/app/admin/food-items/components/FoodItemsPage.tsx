@@ -34,6 +34,8 @@ import ComboFoodItemDialog from './ComboFoodItemDialog';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import TableFilters from './TableFilters';
 import { PreparationType } from '@/utils/preparationType';
+import { AllergenBulkMode, AllergenKey } from '@/utils/allergens';
+import AllergensField from './AllergensField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, buildCategoryTree, foodItemFilterParams, type CategoryTree } from './foodItemFilters';
 import TablePagination from './TablePagination';
@@ -69,6 +71,7 @@ interface FoodItem {
   splitSticker?: StickerFlag;
   chefsPick?: boolean;
   allowInstructions?: boolean;
+  allergens?: string[];
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
   hasSpiceLevel: boolean;
@@ -165,7 +168,7 @@ interface ComboFoodItem {
   isDraft?: boolean;
 }
 
-type BulkField = 'available' | 'veg' | 'chefsPick' | 'allowInstructions' | 'preparation' | 'sticker' | 'splitSticker';
+type BulkField = 'available' | 'veg' | 'chefsPick' | 'allowInstructions' | 'preparation' | 'allergens' | 'sticker' | 'splitSticker';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
@@ -237,6 +240,7 @@ export default function FoodItemsPage() {
   const [filters, setFilters] = useState<FoodItemFilters>(DEFAULT_FOOD_ITEM_FILTERS);
   // which field the bulk bar is about to change: chosen first, then its options are shown
   const [bulkField, setBulkField] = useState<BulkField | null>(null);
+  const [bulkAllergens, setBulkAllergens] = useState<AllergenKey[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
 
@@ -500,6 +504,31 @@ export default function FoodItemsPage() {
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
       setBulkField(null);
+      await fetchItems();
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const applyAllergens = async (mode: AllergenBulkMode) => {
+    if (selectedIds.size === 0) return;
+    try {
+      setBulkLoading(true);
+      const response = await fetch('/api/admin/food-items/allergens', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: [...selectedIds], mode, allergens: bulkAllergens }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update items');
+      const what = mode === 'replace' && bulkAllergens.length === 0 ? 'no allergens' : mode === 'add' ? 'allergens added' : mode === 'remove' ? 'allergens removed' : 'allergens set';
+      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'}: ${what}`);
+      setSelectedIds(new Set());
+      setBulkField(null);
+      setBulkAllergens([]);
       await fetchItems();
     } catch (error) {
       console.error(error);
@@ -883,6 +912,7 @@ export default function FoodItemsPage() {
               <ToggleButton value="chefsPick">Chef&apos;s Pick</ToggleButton>
               <ToggleButton value="allowInstructions">Special Instructions</ToggleButton>
               <ToggleButton value="preparation">Preparation Type</ToggleButton>
+              <ToggleButton value="allergens">Allergens</ToggleButton>
               <ToggleButton value="sticker">Sticker</ToggleButton>
               <ToggleButton value="splitSticker">Split Sticker</ToggleButton>
             </ToggleButtonGroup>
@@ -945,6 +975,23 @@ export default function FoodItemsPage() {
               <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
                 Clear (not set yet)
               </Button>
+            </Box>
+          )}
+          {bulkField === 'allergens' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Tick the allergens, then choose what to do with them:</Typography>
+              <AllergensField value={bulkAllergens} onChange={setBulkAllergens} disabled={bulkLoading} />
+              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                <Button size="small" variant="contained" disabled={bulkLoading || bulkAllergens.length === 0} onClick={() => applyAllergens('add')} sx={{ textTransform: 'none' }}>
+                  Add to selected
+                </Button>
+                <Button size="small" variant="outlined" disabled={bulkLoading || bulkAllergens.length === 0} onClick={() => applyAllergens('remove')} sx={{ textTransform: 'none' }}>
+                  Remove from selected
+                </Button>
+                <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyAllergens('replace')} sx={{ textTransform: 'none' }}>
+                  {bulkAllergens.length === 0 ? 'Set to no allergens' : 'Replace with these only'}
+                </Button>
+              </Box>
             </Box>
           )}
           {bulkField === 'sticker' && (

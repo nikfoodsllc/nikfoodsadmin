@@ -1,4 +1,5 @@
 import { PreparationFilter, isPreparationFilter } from '@/utils/preparationType';
+import { AllergenFilter, isAllergenFilter } from '@/utils/allergens';
 import { StickerFilter, isStickerFilter } from '@/utils/stickerFlag';
 import { ChefsPickFilter, isChefsPickFilter } from '@/utils/chefsPick';
 import { InstructionsFilter, isInstructionsFilter } from '@/utils/itemInstructions';
@@ -12,6 +13,8 @@ export interface FoodItemFilters {
   available: 'all' | 'true' | 'false';
   itemType: 'all' | 'simple' | 'portions' | 'combo';
   preparation: PreparationFilter;
+  /** Allergens: all = off, none = no allergens, or one allergen the item contains */
+  allergen: AllergenFilter;
   sticker: StickerFilter;
   splitSticker: StickerFilter;
   chefsPick: ChefsPickFilter;
@@ -53,6 +56,7 @@ export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
   available: 'all',
   itemType: 'all',
   preparation: 'all',
+  allergen: 'all',
   sticker: 'all',
   splitSticker: 'all',
   chefsPick: 'all',
@@ -73,6 +77,7 @@ export function foodItemFilterParams(filters: FoodItemFilters, tree?: CategoryTr
   if (filters.preparation !== 'all' && isPreparationFilter(filters.preparation)) {
     params.push(['preparationType', filters.preparation]);
   }
+  if (filters.allergen !== 'all' && isAllergenFilter(filters.allergen)) params.push(['allergen', filters.allergen]);
   if (filters.sticker !== 'all' && isStickerFilter(filters.sticker)) params.push(['sticker', filters.sticker]);
   if (filters.splitSticker !== 'all' && isStickerFilter(filters.splitSticker)) params.push(['splitSticker', filters.splitSticker]);
   if (filters.chefsPick !== 'all' && isChefsPickFilter(filters.chefsPick)) params.push(['chefsPick', filters.chefsPick]);
