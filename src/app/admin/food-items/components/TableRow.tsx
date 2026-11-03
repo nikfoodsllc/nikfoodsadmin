@@ -6,6 +6,7 @@ import { IconEdit, IconTrash, IconCopy  } from '@tabler/icons-react';
 import Image from 'next/image';
 import TypeBadge from './TypeBadge';
 import PreparationBadge from './PreparationBadge';
+import AllergenBadges from './AllergenBadges';
 import StickerBadge from './StickerBadge';
 import ChefsPickBadge from './ChefsPickBadge';
 import InstructionsBadge from './InstructionsBadge';
@@ -28,6 +29,7 @@ interface FoodItem {
   splitSticker?: 'yes' | 'no';
   chefsPick?: boolean;
   allowInstructions?: boolean;
+  allergens?: string[];
   stock?: { limit: number | null; ordered: number; soldOut: boolean; unit?: string };
   isEcoFriendlyContainer: boolean;
   ecoContainerCharge: number;
@@ -309,6 +311,12 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
     preparation: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
         <PreparationBadge value={item.preparationType} />
+      </TableCell>
+    ),
+    // Allergens: chips, or None
+    allergens: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <AllergenBadges value={item.allergens} />
       </TableCell>
     ),
     // Sticker: Yes / No / (not set yet)

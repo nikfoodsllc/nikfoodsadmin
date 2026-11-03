@@ -10,6 +10,7 @@ import { stockFieldsForCreate, stockFieldsForUpdate, stockUnitProblem } from '@/
 import { stockOf, type StockDoc } from '@/lib/stockCounts';
 import { writeStockLog } from '@/lib/stockLog';
 import { isPreparationType } from '@/utils/preparationType';
+import { cleanAllergens } from '@/utils/allergens';
 import { isStickerFlag } from '@/utils/stickerFlag';
 import { foodItemListFilters, stockLevelParam } from './listFilters';
 
@@ -255,6 +256,7 @@ const foodItemSchema = z.object({
   sticker: z.enum(['yes', 'no']).nullish(),
   // Chef's Pick: true = shown in the mobile app's Chef's Pick row; left out on update = leave as it is
   chefsPick: z.boolean().optional(),
+  allergens: z.array(z.string()).optional(),
   // Special instructions box for customers: true = on; left out on update = leave as it is (a new item starts with it off)
   allowInstructions: z.boolean().optional(),
   // Order limit (inventory): a whole number of units, null = no limit; left out on update = leave as it is
@@ -364,6 +366,7 @@ interface FoodItem {
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
   chefsPick?: boolean;
+  allergens?: string[];
   allowInstructions?: boolean;
   stockThreshold?: number | null;
   stockUnit?: 'units' | 'lb' | 'oz';
@@ -813,6 +816,7 @@ export async function POST(request: NextRequest) {
       // a new item is on the Stickers sheet unless it was created with Sticker = No
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
       chefsPick: data.chefsPick === true,
+      allergens: cleanAllergens(data.allergens),
       allowInstructions: data.allowInstructions === true,
       ...stockFieldsForCreate(data, new Date()),
       // an item with no sticker has no split sticker either
@@ -1041,6 +1045,8 @@ const updateData: Partial<FoodItem> = {
   ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
   ...(typeof data.chefsPick === 'boolean' ? { chefsPick: data.chefsPick } : {}),
+  // sent = the new list (empty = none); left out = leave as it is
+  ...(Array.isArray(data.allergens) ? { allergens: cleanAllergens(data.allergens) } : {}),
   ...(typeof data.allowInstructions === 'boolean' ? { allowInstructions: data.allowInstructions } : {}),
   ...stockUpdate.set,
   // an item with no sticker has no split sticker either; otherwise the Split Sticker choice is saved as sent

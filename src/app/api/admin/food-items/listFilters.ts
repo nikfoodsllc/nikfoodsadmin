@@ -1,3 +1,4 @@
+import { isAllergenKey } from '@/utils/allergens';
 /**
  * The column filters of the Food Items table, as a MongoDB filter. Missing values count the way the
  * table shows them: no `veg` means Non-Veg, no `available` means Unavailable, no `itemType` means Simple,
@@ -46,6 +47,10 @@ export function foodItemListFilters(params: URLSearchParams): Record<string, unk
   const stock = params.get('stock');
   if (stock === 'has') filter.stockThreshold = { $gt: 0 };
   else if (stock === 'none') filter.$nor = [{ stockThreshold: { $gt: 0 } }];
+  // allergen=milk (contains it) | none (contains no allergen: the field is missing or empty)
+  const allergen = params.get('allergen');
+  if (isAllergenKey(allergen)) filter.allergens = allergen;
+  else if (allergen === 'none') filter.allergens = { $in: [null, []] };
   const splitSticker = params.get('splitSticker');
   if (splitSticker === 'yes' || splitSticker === 'no') filter.splitSticker = splitSticker;
   else if (splitSticker === 'not_set') filter.splitSticker = { $nin: ['yes', 'no'] };

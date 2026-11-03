@@ -52,7 +52,7 @@ describe('permission', () => {
   });
   it('a phone that is not allowed says so', () => {
     expect(phoneText({ permission: 'denied', platform: 'ios', deviceName: 'Pat', appVersion: '1.0.2', lastSeenAt: null, firstSeenAt: null })).toBe('Pat · app 1.0.2 (said no)');
-    expect(phoneText({ permission: 'notAsked', platform: 'ios', deviceName: '', appVersion: '', lastSeenAt: null, firstSeenAt: null })).toBe('iPhone (not asked yet)');
+    expect(phoneText({ permission: 'notAsked', platform: 'ios', deviceName: '', appVersion: '', lastSeenAt: null, firstSeenAt: null })).toBe('iPhone (not turned on)');
   });
 });
 

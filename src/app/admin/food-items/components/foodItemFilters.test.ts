@@ -26,12 +26,17 @@ describe('foodItemFilterParams', () => {
     expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, allowInstructions: 'yes' })).toEqual([['allowInstructions', 'yes']]);
     expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, allowInstructions: 'no' })).toEqual([['allowInstructions', 'no']]);
   });
+  it('sends the allergen filter', () => {
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, allergen: 'milk' })).toEqual([['allergen', 'milk']]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, allergen: 'none' })).toEqual([['allergen', 'none']]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, allergen: 'all' })).toEqual([]);
+  });
   it('sends the sticker filter', () => {
     expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, sticker: 'yes' })).toEqual([['sticker', 'yes']]);
   });
 
   it('sends all four together', () => {
-    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', sticker: 'all', splitSticker: 'all', chefsPick: 'all', allowInstructions: 'all', stock: 'all', category: 'all', subCategory: 'all' })).toEqual([
+    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', allergen: 'all', sticker: 'all', splitSticker: 'all', chefsPick: 'all', allowInstructions: 'all', stock: 'all', category: 'all', subCategory: 'all' })).toEqual([
       ['veg', 'true'],
       ['available', 'false'],
       ['itemType', 'combo'],
