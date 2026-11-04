@@ -56,7 +56,10 @@ export async function GET(request: NextRequest) {
 
     // for people with no reminder yet: why none has gone out (a reminder to them within the last 2 days, no email, too old...)
     const now = new Date();
-    const gapSince = new Date(now.getTime() - REMINDER_GAP_DAYS * 24 * 3_600_000);
+    // reminders far enough back to explain the oldest row on the page (its own window started up to 2 days before it)
+    const rowTimes = [...built.to_contact, ...built.contacted].map((r) => new Date(r.lastActivityAt).getTime()).filter(Number.isFinite);
+    const oldest = rowTimes.length > 0 ? Math.min(...rowTimes) : now.getTime();
+    const gapSince = new Date(Math.min(oldest, now.getTime()) - REMINDER_GAP_DAYS * 24 * 3_600_000);
     const gapResult = await db.read<{ userId?: string; customer?: { email?: string }; reminderEmail?: { claimedAt?: Date; status?: string } }>(
       'checkoutDrafts',
       { 'reminderEmail.claimedAt': { $gte: gapSince } } as never,
