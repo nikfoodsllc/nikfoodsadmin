@@ -436,7 +436,10 @@ export default function AbandonedCheckoutsPage() {
   const rows = [...split.waiting, ...split.emailed].sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
   const paidRows = data?.paid ?? [];
   const allRows = [...split.waiting, ...split.emailed];
-  const waitingValue = Math.round(split.waiting.reduce((sum, r) => sum + r.total, 0) * 100) / 100;
+  // only the people whose reminder is really coming are "waiting": the 2-day rule, no email, no items or a checkout past 24 hours mean none goes out
+  const comingRows = split.waiting.filter((r) => !r.waitingNote || r.waitingNote.code === 'soon' || r.waitingNote.code === 'waiting');
+  const notComing = split.waiting.length - comingRows.length;
+  const waitingValue = Math.round(comingRows.reduce((sum, r) => sum + r.total, 0) * 100) / 100;
   const detailRow = detailUserId ? allRows.find((r) => r.userId === detailUserId) ?? null : null;
   const createOrderFor = (row: AbandonedRow) => router.push(`/admin/create-order?fromCheckout=${encodeURIComponent(row.id)}`);
 
@@ -474,8 +477,13 @@ export default function AbandonedCheckoutsPage() {
           {data.metrics && <AbandonedMetricsPanel metrics={data.metrics} onOpenConversions={setConversionKind} onOpenPerson={setDetailUserId} />}
           <Paper elevation={0} sx={{ p: 1.5, mb: 1.5, border: '1px solid #FBD38D', bgcolor: '#FFF8EC', borderRadius: 2 }}>
             <Typography sx={{ fontWeight: 800, fontSize: 16 }}>
-              {split.waiting.length === 0 ? 'No one is waiting for the reminder email' : `${split.waiting.length} ${split.waiting.length === 1 ? 'person' : 'people'} waiting for the reminder email · ${money(waitingValue)} in their carts`}
+              {comingRows.length === 0 ? 'No one is waiting for the reminder email' : `${comingRows.length} ${comingRows.length === 1 ? 'person' : 'people'} waiting for the reminder email · ${money(waitingValue)} in their carts`}
             </Typography>
+            {notComing > 0 && (
+              <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
+                {`${notComing} more ${notComing === 1 ? 'has' : 'have'} no automatic reminder (the reason is on their card)`}
+              </Typography>
+            )}
             {data.orderedSince > 0 && (
               <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.25 }}>
                 {data.orderedSince} other {data.orderedSince === 1 ? 'person' : 'people'} left a checkout but ordered afterwards, so they are not listed.
@@ -509,11 +517,13 @@ export default function AbandonedCheckoutsPage() {
               </Typography>
             </Paper>
           )}
-          <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-            {rows.map((row) => (
-              <PersonCard key={row.id} row={row} onHide={setHideRow} onRemind={setRemindRow} onCreateOrder={createOrderFor} />
-            ))}
-          </Box>
+          {tab !== 'recovered' && (
+            <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+              {rows.map((row) => (
+                <PersonCard key={row.id} row={row} onHide={setHideRow} onRemind={setRemindRow} onCreateOrder={createOrderFor} />
+              ))}
+            </Box>
+          )}
         </>
       )}
 
