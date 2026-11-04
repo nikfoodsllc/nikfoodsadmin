@@ -38,6 +38,7 @@ import { AllergenBulkMode, AllergenKey } from '@/utils/allergens';
 import AllergensField from './AllergensField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import HeatingInstructionsField from './HeatingInstructionsField';
+import { HEATING_LIST_CHANGED } from './ManageHeatingInstructionsDialog';
 import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, buildCategoryTree, foodItemFilterParams, type CategoryTree } from './foodItemFilters';
 import TablePagination from './TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
@@ -436,6 +437,15 @@ export default function FoodItemsPage() {
 
   useEffect(() => {
     fetchItems();
+  }, [fetchItems]);
+
+  // a Heating/Storage instruction was renamed or deleted: the table shows the new texts
+  useEffect(() => {
+    const reload = () => {
+      void fetchItems();
+    };
+    window.addEventListener(HEATING_LIST_CHANGED, reload);
+    return () => window.removeEventListener(HEATING_LIST_CHANGED, reload);
   }, [fetchItems]);
 
   // =========================
