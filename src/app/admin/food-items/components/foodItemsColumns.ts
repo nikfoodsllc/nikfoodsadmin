@@ -27,6 +27,7 @@ export const FOOD_ITEMS_COLUMNS: FoodItemsColumnDef[] = [
   { key: 'allergens', label: 'Allergens', defaultWidth: 230, skeleton: 'pill', skeletonWidth: 120 },
   { key: 'sticker', label: 'Sticker', defaultWidth: 110, skeleton: 'pill', skeletonWidth: 60 },
   { key: 'splitSticker', label: 'Split Sticker', defaultWidth: 120, skeleton: 'pill', skeletonWidth: 60 },
+  { key: 'heatingInstructions', label: 'Heating/Storage', defaultWidth: 240, skeleton: 'text', skeletonWidth: 160 },
   { key: 'price', label: 'Price', defaultWidth: 140, skeleton: 'text', skeletonWidth: 70 },
   { key: 'veg', label: 'Veg/Non-Veg', defaultWidth: 130, skeleton: 'pill', skeletonWidth: 70 },
   { key: 'type', label: 'Type', defaultWidth: 110, skeleton: 'pill', skeletonWidth: 70 },

@@ -12,6 +12,8 @@ import { writeStockLog } from '@/lib/stockLog';
 import { isPreparationType } from '@/utils/preparationType';
 import { cleanAllergens } from '@/utils/allergens';
 import { isStickerFlag } from '@/utils/stickerFlag';
+import { cleanHeatingInstruction } from '@/utils/heatingInstructions';
+import { rememberHeatingInstruction } from '@/lib/heatingInstructionsLibrary';
 import { foodItemListFilters, stockLevelParam } from './listFilters';
 
 // Interface for available days
@@ -268,6 +270,8 @@ const foodItemSchema = z.object({
   stockAlertPercent: z.number().int().min(1).max(99).nullable().optional(),
   // Split Sticker: 'yes' = one sticker per box in the Stickers sheet; null on update = back to not set yet
   splitSticker: z.enum(['yes', 'no']).nullish(),
+  // Heating / storage instruction printed on the sticker; null or empty on update = clear it
+  heatingInstructions: z.string().max(300).nullish(),
 
   // Portions type fields
   portions: z.array(z.string()).optional(),
@@ -365,6 +369,7 @@ interface FoodItem {
   // 'yes' = its orders appear on the Stickers sheet, 'no' = they do not; missing = not set yet
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
+  heatingInstructions?: string;
   chefsPick?: boolean;
   allergens?: string[];
   allowInstructions?: boolean;
@@ -763,6 +768,8 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validationResult.data;
+    // a new heating instruction typed on the item is added to the list to pick from
+    await rememberHeatingInstruction(data.heatingInstructions);
     const stockProblem = stockUnitProblem(data, Array.isArray(data.portions) && data.portions.length > 0);
     if (stockProblem) return NextResponse.json({ error: stockProblem }, { status: 400 });
 
@@ -816,6 +823,7 @@ export async function POST(request: NextRequest) {
       // a new item is on the Stickers sheet unless it was created with Sticker = No
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
       chefsPick: data.chefsPick === true,
+      ...(cleanHeatingInstruction(data.heatingInstructions) ? { heatingInstructions: cleanHeatingInstruction(data.heatingInstructions) as string } : {}),
       allergens: cleanAllergens(data.allergens),
       allowInstructions: data.allowInstructions === true,
       ...stockFieldsForCreate(data, new Date()),
@@ -999,6 +1007,7 @@ export async function PUT(request: NextRequest) {
 
     const existingItem = existingResult.data;
    const data = validationResult.data;
+   await rememberHeatingInstruction(data.heatingInstructions);
     const stockProblem = stockUnitProblem(data, Array.isArray(data.portions) && data.portions.length > 0);
     if (stockProblem) return NextResponse.json({ error: stockProblem }, { status: 400 });
     // order limit (inventory): what to save, and what to write in the item's stock log
@@ -1045,6 +1054,7 @@ const updateData: Partial<FoodItem> = {
   ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
   ...(typeof data.chefsPick === 'boolean' ? { chefsPick: data.chefsPick } : {}),
+  ...(cleanHeatingInstruction(data.heatingInstructions) ? { heatingInstructions: cleanHeatingInstruction(data.heatingInstructions) as string } : {}),
   // sent = the new list (empty = none); left out = leave as it is
   ...(Array.isArray(data.allergens) ? { allergens: cleanAllergens(data.allergens) } : {}),
   ...(typeof data.allowInstructions === 'boolean' ? { allowInstructions: data.allowInstructions } : {}),
@@ -1140,6 +1150,8 @@ const updateData: Partial<FoodItem> = {
     const unset: Record<string, ''> = {};
     if (data.preparationType === null) unset.preparationType = '';
     if (data.sticker === null) unset.sticker = '';
+    // an empty or null heating instruction clears it; left out leaves it as it is
+    if (data.heatingInstructions !== undefined && cleanHeatingInstruction(data.heatingInstructions) === null) unset.heatingInstructions = '';
     // a combo without spice (or sent without a spice mode) goes back to no spice mode
     if (data.itemType === 'combo' && (data.hasSpiceLevel === false || data.spiceMode === null)) unset.spiceMode = '';
     if (data.splitSticker === null && data.sticker !== 'no') unset.splitSticker = '';
