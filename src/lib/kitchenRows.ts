@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
@@ -147,8 +148,9 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
 }
 
 /**
- * The order lines to put stickers on: the stickers are printed for the day the food is DELIVERED, so these are chosen by
- * delivery date (the item's actual delivery date, else its menu day), whatever day it was cooked or picked for.
+ * The order lines to put stickers on. Day-wise items (the daily Food Menu) follow their KITCHEN day, the menu day they were
+ * picked for; flat items (batters, sweets, pickles...) follow their DELIVERY date (the actual delivery date, else the menu day).
+ * An item counts as day-wise when it is listed day-wise for its menu day, otherwise as flat (same rule the cutoffs use).
  */
 export async function fetchStickerRows(range: DayRange): Promise<KitchenRow[]> {
   const within = { $gte: range.startDate, $lte: `${range.endDate}\uffff` };
@@ -164,7 +166,17 @@ export async function fetchStickerRows(range: DayRange): Promise<KitchenRow[]> {
     },
     CREDIT_ADJUST_STAGE,
     { $unwind: '$items' },
-    { $match: { $expr: { $and: [{ $gte: [deliveredOf, range.startDate] }, { $lte: [deliveredOf, `${range.endDate}\uffff`] }] } } },
+    // candidates: the kitchen day or the delivery date is in the range; the kind of item decides below which one counts
+    {
+      $match: {
+        $expr: {
+          $or: [
+            { $and: [{ $gte: ['$items.deliveryDate', range.startDate] }, { $lte: ['$items.deliveryDate', `${range.endDate}\uffff`] }] },
+            { $and: [{ $gte: [deliveredOf, range.startDate] }, { $lte: [deliveredOf, `${range.endDate}\uffff`] }] },
+          ],
+        },
+      },
+    },
     { $unwind: '$items.items' },
     {
       $project: {
@@ -189,7 +201,25 @@ export async function fetchStickerRows(range: DayRange): Promise<KitchenRow[]> {
   ];
   const result = await db.aggregate('orders', pipeline);
   if (!result.success) throw new Error(result.error || 'Failed to read orders');
-  return mapRows(result.data ?? []);
+  const rows = mapRows(result.data ?? []);
+
+  // which items are listed day-wise for which menu day
+  const ids = [...new Set(rows.map((r) => r.foodId).filter((id): id is string => !!id && /^[0-9a-fA-F]{24}$/.test(id)))];
+  const dayWise = new Set<string>(); // `${foodId}|${day}`
+  if (ids.length > 0) {
+    const mappings = await db.read<{ foodItemId?: unknown; mappingType?: string; day?: string }>('categoryfoodmapping', {
+      foodItemId: { $in: ids.map((id) => new ObjectId(id)) },
+      mappingType: 'DAY_WISE',
+    } as never);
+    for (const m of mappings.success ? mappings.data ?? [] : []) {
+      if (m.day) dayWise.add(`${String(m.foodItemId)}|${m.day.trim()}`);
+    }
+  }
+  const inRange = (day: string | null | undefined) => !!day && day >= range.startDate && day <= range.endDate;
+  return rows.filter((r) => {
+    const isDayWise = !!r.foodId && dayWise.has(`${r.foodId}|${r.day}`);
+    return isDayWise ? inRange(r.day) : inRange(r.deliveredOn || r.day);
+  });
 }
 
 /**
