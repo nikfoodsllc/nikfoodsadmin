@@ -38,6 +38,13 @@ describe('foodItemListFilters', () => {
     expect(f('allergen=bogus')).toEqual({});
   });
 
+  it('heating / storage: none, has, or one exact instruction', () => {
+    expect(f('heating=none')).toEqual({ heatingInstructions: { $in: [null, ''] } });
+    expect(f('heating=has')).toEqual({ heatingInstructions: { $exists: true, $nin: [null, ''] } });
+    expect(f('heating=is:Do not refrigerate')).toEqual({ heatingInstructions: 'Do not refrigerate' });
+    expect(f('heating=is:')).toEqual({});
+    expect(f('heating=maybe')).toEqual({});
+  });
   it('splitSticker, including "not set yet"', () => {
     expect(f('splitSticker=yes')).toEqual({ splitSticker: 'yes' });
     expect(f('splitSticker=not_set')).toEqual({ splitSticker: { $nin: ['yes', 'no'] } });

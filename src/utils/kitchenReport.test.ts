@@ -246,3 +246,16 @@ describe('sorting', () => {
     expect(sortDayItems(list, asc('spice'))).toBe(list);
   });
 });
+
+describe('heating / storage instruction on stickers', () => {
+  const heat = ({ name }: { name: string }) => (name === 'Pickle' ? 'Keep Refrigerated, Shake Well' : null);
+  it('goes on that item\'s sticker lines and not on others', () => {
+    const r = buildKitchenReport([row({ name: 'Pickle' }), row({ orderId: 'ORD-2', name: 'Achar' })], byName, stickerYes, () => null, heat);
+    expect(r.stickers.find((s) => s.item === 'Pickle')?.heating).toBe('Keep Refrigerated, Shake Well');
+    expect(r.stickers.find((s) => s.item === 'Achar')?.heating).toBeNull();
+  });
+  it('is found by the sticker search', () => {
+    const r = buildKitchenReport([row({ name: 'Pickle' }), row({ orderId: 'ORD-2', name: 'Achar' })], byName, stickerYes, () => null, heat);
+    expect(filterStickersBySearch(r.stickers, 'shake well').map((s) => s.item)).toEqual(['Pickle']);
+  });
+});

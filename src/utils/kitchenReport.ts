@@ -71,6 +71,8 @@ export interface PrepBlock {
 }
 
 export interface StickerLine {
+  /** The item's heating / storage instruction, printed on the sticker ('' = none) */
+  heating?: string | null;
   item: string;
   customerName: string;
   orderId: string;
@@ -100,6 +102,9 @@ export interface KitchenReport {
 export type TypeLookup = (food: { id?: string | null; name: string }) => PreparationType | null;
 /** Whether an item gets a packing sticker, looked up the same way (null = not set yet). */
 export type StickerLookup = (food: { id?: string | null; name: string }) => StickerFlag | null;
+
+/** The heating / storage instruction of an item, looked up the same way (null = none). */
+export type HeatingLookup = (food: { id?: string | null; name: string }) => string | null;
 
 const clean = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -202,7 +207,7 @@ function blockOf(name: string, group: PrepGroup, lines: PrepLine[]): PrepBlock {
 }
 
 /** `stickerOf`: every item gets a line on the Stickers sheet except the ones it answers 'no' for (items not set yet are included). */
-export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stickerOf: StickerLookup = () => null, splitOf: StickerLookup = () => null): KitchenReport {
+export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stickerOf: StickerLookup = () => null, splitOf: StickerLookup = () => null, heatOf: HeatingLookup = () => null): KitchenReport {
   const groups = new Map<string, { name: string; group: PrepGroup; lines: PrepLine[] }>();
   const stickers: StickerLine[] = [];
   for (const atom of atomsOf(rows)) {
@@ -218,8 +223,10 @@ export function buildKitchenReport(rows: KitchenRow[], typeOf: TypeLookup, stick
       // every other item is one line for the whole order line, with the total amount
       const split = splitOf({ id: atom.id, name: atom.name }) === 'yes';
       const boxes = split ? Math.max(1, Math.min(99, Math.round(atom.line.quantity) || 1)) : 1;
+      const heating = heatOf({ id: atom.id, name: atom.name });
       for (let box = 0; box < boxes; box += 1) stickers.push({
         item: atom.name,
+        heating,
         customerName: atom.line.customerName,
         orderId: atom.line.orderId,
         orderedOn: atom.line.orderedOn,
@@ -275,7 +282,7 @@ export function filterBlocksBySearch(blocks: PrepBlock[], query: string): PrepBl
 
 export function filterStickersBySearch(stickers: StickerLine[], query: string): StickerLine[] {
   if (!query.trim()) return stickers;
-  return stickers.filter((s) => matchesSearch(`${s.item} ${s.customerName} ${s.orderId} ${s.viaCombo ?? ''}`, query));
+  return stickers.filter((s) => matchesSearch(`${s.item} ${s.customerName} ${s.orderId} ${s.viaCombo ?? ''} ${s.heating ?? ''}`, query));
 }
 
 function sumText(lines: PrepLine[]): string {

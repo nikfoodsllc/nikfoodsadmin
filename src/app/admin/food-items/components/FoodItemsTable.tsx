@@ -33,6 +33,7 @@ interface FoodItem {
   preparationType?: 'cooked' | 'ready_to_eat';
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
+  heatingInstructions?: string;
   chefsPick?: boolean;
   allowInstructions?: boolean;
   allergens?: string[];
