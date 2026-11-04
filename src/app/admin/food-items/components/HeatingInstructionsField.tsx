@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Autocomplete, Box, TextField, Typography } from '@mui/material';
+import { Autocomplete, Box, TextField, Typography, createFilterOptions } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
 import { DEFAULT_HEATING_INSTRUCTIONS, MAX_HEATING_INSTRUCTION_LENGTH, mergeHeatingInstructions } from '@/utils/heatingInstructions';
+
+const defaultFilter = createFilterOptions<string>();
 
 interface HeatingInstructionsFieldProps {
   value?: string | null;
@@ -50,6 +52,8 @@ export default function HeatingInstructionsField({ value, onChange, disabled, co
         fullWidth
         size="small"
         options={options}
+        // when the box already holds one of the instructions, still list them all so another one can be picked
+        filterOptions={(opts, state) => (opts.some((o) => o === state.inputValue) ? opts : defaultFilter(opts, state))}
         disabled={disabled}
         inputValue={text}
         value={null}
