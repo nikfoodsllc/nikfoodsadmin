@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Autocomplete, Box, TextField, Typography, createFilterOptions } from '@mui/material';
+import { Autocomplete, Box, Link, TextField, Typography, createFilterOptions } from '@mui/material';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_HEATING_INSTRUCTIONS, MAX_HEATING_INSTRUCTION_LENGTH, mergeHeatingInstructions } from '@/utils/heatingInstructions';
+import { MAX_HEATING_INSTRUCTION_LENGTH } from '@/utils/heatingInstructions';
+import ManageHeatingInstructionsDialog, { HEATING_LIST_CHANGED } from './ManageHeatingInstructionsDialog';
 
 const defaultFilter = createFilterOptions<string>();
 
@@ -21,24 +22,30 @@ interface HeatingInstructionsFieldProps {
  */
 export default function HeatingInstructionsField({ value, onChange, disabled, compact = false }: HeatingInstructionsFieldProps) {
   const { token } = useAuth();
-  const [options, setOptions] = useState<string[]>(mergeHeatingInstructions([]));
+  const [options, setOptions] = useState<string[]>([]);
+  const [manage, setManage] = useState(false);
 
+  // the list comes from the server, and is read again whenever it is edited
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    fetch('/api/admin/heating-instructions', { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!cancelled && Array.isArray(json?.data)) setOptions(mergeHeatingInstructions(json.data as string[]));
-      })
-      .catch(() => {});
+    const load = () =>
+      fetch('/api/admin/heating-instructions', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (!cancelled && Array.isArray(json?.data)) setOptions(json.data as string[]);
+        })
+        .catch(() => {});
+    void load();
+    window.addEventListener(HEATING_LIST_CHANGED, load);
     return () => {
       cancelled = true;
+      window.removeEventListener(HEATING_LIST_CHANGED, load);
     };
   }, [token]);
 
   const text = value ?? '';
-  const isNew = text.trim() !== '' && !options.some((o) => o.toLowerCase() === text.trim().toLowerCase()) && !DEFAULT_HEATING_INSTRUCTIONS.includes(text.trim());
+  const isNew = text.trim() !== '' && !options.some((o) => o.toLowerCase() === text.trim().toLowerCase());
 
   return (
     <Box>
@@ -74,9 +81,13 @@ export default function HeatingInstructionsField({ value, onChange, disabled, co
       />
       {!compact && (
       <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', mt: 0.5, lineHeight: 1.35 }}>
-        {isNew ? 'New: it is added to the list when you save, so you can pick it next time.' : 'Printed on the sticker. Clear the box for none.'}
+        {isNew ? 'New: it is added to the list when you save, so you can pick it next time.' : 'Printed on the sticker. Clear the box for none.'}{' '}
+        <Link component="button" type="button" onClick={() => setManage(true)} sx={{ fontSize: 'inherit', verticalAlign: 'baseline' }}>
+          Edit list
+        </Link>
       </Typography>
       )}
+      <ManageHeatingInstructionsDialog open={manage} onClose={() => setManage(false)} />
     </Box>
   );
 }
