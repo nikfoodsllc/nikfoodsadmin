@@ -7,14 +7,16 @@ const readAll = vi.fn();
 const readCounts = vi.fn();
 const rename = vi.fn();
 const remove = vi.fn();
+const add = vi.fn();
 vi.mock('@/lib/heatingInstructionsLibrary', () => ({
   readHeatingInstructions: () => readAll(),
   readHeatingInstructionsWithCounts: () => readCounts(),
   renameHeatingInstruction: (...a: unknown[]) => rename(...a),
   deleteHeatingInstruction: (...a: unknown[]) => remove(...a),
+  addHeatingInstruction: (...a: unknown[]) => add(...a),
 }));
 
-import { DELETE, GET, PATCH } from './route';
+import { DELETE, GET, PATCH, POST } from './route';
 
 function req(method: string, opts: { body?: unknown; token?: string | null; query?: string } = {}) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -31,16 +33,25 @@ beforeEach(() => {
   readCounts.mockResolvedValue([{ text: 'A', count: 2 }]);
   rename.mockResolvedValue({ ok: true, updatedItems: 2, merged: false });
   remove.mockResolvedValue({ ok: true, clearedItems: 2 });
+  add.mockResolvedValue({ ok: true, text: 'New one' });
 });
 
 describe('heating-instructions route', () => {
   it('needs an admin for every method', async () => {
-    for (const [fn, m] of [[GET, 'GET'], [PATCH, 'PATCH'], [DELETE, 'DELETE']] as const) {
+    for (const [fn, m] of [[GET, 'GET'], [POST, 'POST'], [PATCH, 'PATCH'], [DELETE, 'DELETE']] as const) {
       expect((await fn(req(m, { token: null, body: m === 'GET' ? undefined : {} }))).status).toBe(401);
       expect((await fn(req(m, { token: 'user', body: m === 'GET' ? undefined : {} }))).status).toBe(401);
     }
     expect(rename).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
+    expect(add).not.toHaveBeenCalled();
+  });
+  it('adds an instruction and passes a refusal on', async () => {
+    const ok = await POST(req('POST', { body: { text: ' New   one ' } }));
+    expect(ok.status).toBe(201);
+    expect(add).toHaveBeenCalledWith(' New   one ');
+    add.mockResolvedValueOnce({ ok: false, error: 'That instruction is already in the list', status: 409 });
+    expect((await POST(req('POST', { body: { text: 'A' } }))).status).toBe(409);
   });
   it('lists the instructions, with counts on request', async () => {
     expect(await (await GET(req('GET'))).json()).toEqual({ data: ['A', 'B'] });

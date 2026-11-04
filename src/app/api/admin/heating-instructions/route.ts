@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtHandler } from '@/lib/jwt';
-import { deleteHeatingInstruction, readHeatingInstructions, readHeatingInstructionsWithCounts, renameHeatingInstruction } from '@/lib/heatingInstructionsLibrary';
+import { addHeatingInstruction, deleteHeatingInstruction, readHeatingInstructions, readHeatingInstructionsWithCounts, renameHeatingInstruction } from '@/lib/heatingInstructionsLibrary';
 
 function verifyAuth(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -29,6 +29,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: withCounts ? await readHeatingInstructionsWithCounts() : await readHeatingInstructions() });
   } catch (error) {
     console.error('Error in GET /api/admin/heating-instructions:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/** POST /api/admin/heating-instructions  { text }: adds an instruction to the list (without putting it on an item). */
+export async function POST(request: NextRequest) {
+  try {
+    const auth = verifyAuth(request);
+    if (!auth.success) return NextResponse.json({ error: auth.error }, { status: 401 });
+    const body = await bodyOf(request);
+    if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    const result = await addHeatingInstruction(body.text);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ data: { text: result.text }, message: 'Instruction added' }, { status: 201 });
+  } catch (error) {
+    console.error('Error in POST /api/admin/heating-instructions:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

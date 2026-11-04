@@ -64,6 +64,20 @@ export async function rememberHeatingInstruction(value: unknown): Promise<void> 
   }
 }
 
+export type AddResult = { ok: true; text: string } | { ok: false; error: string; status: number };
+
+/** Adds an instruction to the list without putting it on an item. An instruction already in the list (any capitals) is refused. */
+export async function addHeatingInstruction(textRaw: unknown): Promise<AddResult> {
+  const text = cleanHeatingInstruction(textRaw);
+  if (!text) return { ok: false, error: 'Type the instruction first', status: 400 };
+  await ensureSeeded();
+  const database = await db.getDb();
+  const key = heatingInstructionKey(text);
+  const result = await database.collection(COLLECTION).updateOne({ textKey: key }, { $setOnInsert: { text, textKey: key, createdAt: new Date() } }, { upsert: true });
+  if (result.upsertedCount === 0) return { ok: false, error: 'That instruction is already in the list', status: 409 };
+  return { ok: true, text };
+}
+
 export type RenameResult = { ok: true; updatedItems: number; merged: boolean } | { ok: false; error: string; status: number };
 
 /**

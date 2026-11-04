@@ -27,6 +27,7 @@ export default function ManageHeatingInstructionsDialog({ open, onClose }: { ope
   const [draft, setDraft] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [newText, setNewText] = useState('');
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -52,7 +53,7 @@ export default function ManageHeatingInstructionsDialog({ open, onClose }: { ope
     }
   }, [open, load]);
 
-  const call = async (method: 'PATCH' | 'DELETE', body: Record<string, string>) => {
+  const call = async (method: 'POST' | 'PATCH' | 'DELETE', body: Record<string, string>) => {
     setBusy(true);
     setError('');
     try {
@@ -61,6 +62,7 @@ export default function ManageHeatingInstructionsDialog({ open, onClose }: { ope
       if (!r.ok) throw new Error(json.error || 'That did not work');
       setEditing(null);
       setDeleting(null);
+      if (method === 'POST') setNewText('');
       window.dispatchEvent(new Event(HEATING_LIST_CHANGED));
       await load();
     } catch (e) {
@@ -75,8 +77,25 @@ export default function ManageHeatingInstructionsDialog({ open, onClose }: { ope
       <DialogTitle sx={{ fontWeight: 700 }}>Heating/Storage Instructions list</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" sx={{ color: '#6B7280', mb: 1.5 }}>
-          Rename an instruction to change it on every item that uses it. Delete one to take it off those items.
+          Add a new instruction, rename one to change it on every item that uses it, or delete one to take it off those items.
         </Typography>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Add a new instruction"
+            value={newText}
+            onChange={(e) => setNewText(e.target.value.slice(0, MAX_HEATING_INSTRUCTION_LENGTH))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newText.trim()) void call('POST', { text: newText });
+            }}
+            inputProps={{ 'aria-label': 'Add a new instruction' }}
+            disabled={busy}
+          />
+          <Button variant="contained" disabled={busy || !newText.trim()} onClick={() => call('POST', { text: newText })} sx={{ textTransform: 'none', flexShrink: 0 }}>
+            Add
+          </Button>
+        </Box>
         {error && (
           <Alert severity="error" sx={{ mb: 1.5 }}>
             {error}
