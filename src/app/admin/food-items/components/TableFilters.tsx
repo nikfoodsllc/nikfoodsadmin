@@ -1,9 +1,13 @@
 'use client';
 
-import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment, IconButton, Tooltip } from '@mui/material';
 import { IconSearch } from '@tabler/icons-react';
 import { FoodItemFilters } from './foodItemFilters';
 import { ALLERGENS } from '@/utils/allergens';
+import { useAuth } from '@/contexts/AuthContext';
+import { IconSettings } from '@tabler/icons-react';
+import ManageHeatingInstructionsDialog, { HEATING_LIST_CHANGED } from './ManageHeatingInstructionsDialog';
 
 interface TableFiltersProps {
   searchValue: string;
@@ -18,6 +22,32 @@ interface TableFiltersProps {
 export default function TableFilters({ searchValue, onSearchChange, filters, onFilterChange, categoryOptions }: TableFiltersProps) {
   const subsShown = (categoryOptions?.subs ?? []).filter((s) => filters.category === 'all' || s.parentId === filters.category);
   const selectSx = { backgroundColor: '#fff' };
+  // the heating / storage instructions to filter by (the shared list)
+  const { token } = useAuth();
+  const [heatingList, setHeatingList] = useState<string[]>([]);
+  const [manageHeating, setManageHeating] = useState(false);
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const load = () =>
+      fetch('/api/admin/heating-instructions', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (!cancelled && Array.isArray(json?.data)) setHeatingList(json.data as string[]);
+        })
+        .catch(() => {});
+    void load();
+    window.addEventListener(HEATING_LIST_CHANGED, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(HEATING_LIST_CHANGED, load);
+    };
+  }, [token]);
+  // an instruction that is picked as the filter but was renamed or deleted: back to All
+  useEffect(() => {
+    if (filters.heating.startsWith('is:') && heatingList.length > 0 && !heatingList.includes(filters.heating.slice(3))) onFilterChange('heating', 'all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heatingList]);
   return (
     <Box
       sx={{
@@ -228,6 +258,33 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="no">No</MenuItem>
         </Select>
       </FormControl>
+
+      {/* Heating/Storage */}
+      <FormControl size="small" sx={{ minWidth: 190, maxWidth: 260 }}>
+        <InputLabel>Heating/Storage</InputLabel>
+        <Select
+          value={filters.heating}
+          label="Heating/Storage"
+          onChange={(e) => onFilterChange('heating', e.target.value as FoodItemFilters['heating'])}
+          sx={selectSx}
+          MenuProps={{ PaperProps: { sx: { maxWidth: 360 } } }}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="none">(none set)</MenuItem>
+          <MenuItem value="has">Has one</MenuItem>
+          {heatingList.map((text) => (
+            <MenuItem key={text} value={`is:${text}`} sx={{ whiteSpace: 'normal' }}>
+              {text}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Tooltip title="Edit the Heating/Storage list">
+        <IconButton aria-label="Edit the Heating/Storage list" onClick={() => setManageHeating(true)} sx={{ alignSelf: 'center', color: '#6B7280' }}>
+          <IconSettings size={20} />
+        </IconButton>
+      </Tooltip>
+      <ManageHeatingInstructionsDialog open={manageHeating} onClose={() => setManageHeating(false)} />
 
       {/* Split Sticker */}
       <FormControl size="small" sx={{ minWidth: 140 }}>

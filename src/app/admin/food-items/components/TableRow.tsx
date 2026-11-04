@@ -27,6 +27,7 @@ interface FoodItem {
   preparationType?: 'cooked' | 'ready_to_eat';
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
+  heatingInstructions?: string;
   chefsPick?: boolean;
   allowInstructions?: boolean;
   allergens?: string[];
@@ -329,6 +330,14 @@ export default function TableRow({ item, index, columns, onEdit, onDelete, onDup
     splitSticker: (
       <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
         <StickerBadge value={item.splitSticker} />
+      </TableCell>
+    ),
+    // Heating/Storage instruction printed on the sticker (a dash when none)
+    heatingInstructions: (
+      <TableCell sx={{ padding: '8px', verticalAlign: 'middle' }}>
+        <Typography variant="body2" sx={{ color: item.heatingInstructions ? '#111827' : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }} title={item.heatingInstructions || undefined}>
+          {item.heatingInstructions || '-'}
+        </Typography>
       </TableCell>
     ),
     // Description

@@ -194,6 +194,7 @@ function StickersTab({ stickers, searching }: { stickers: StickerLine[]; searchi
                     </Box>
                   )}
                   {s.viaCombo && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>with {s.viaCombo}</Typography>}
+                  {s.heating && <Typography sx={{ fontSize: 12.5, color: '#4B5563', fontStyle: 'italic', wordBreak: 'break-word' }}>{s.heating}</Typography>}
                   <InstructionsNote text={s.note} />
                   {s.movedFrom && <Typography sx={{ fontSize: 12, color: '#B45309' }}>Moved from {formatDayShort(s.movedFrom)}</Typography>}
                   {s.day !== s.deliveryDate && (

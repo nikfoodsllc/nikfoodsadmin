@@ -1,0 +1,93 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Autocomplete, Box, Link, TextField, Typography, createFilterOptions } from '@mui/material';
+import { useAuth } from '@/contexts/AuthContext';
+import { MAX_HEATING_INSTRUCTION_LENGTH } from '@/utils/heatingInstructions';
+import ManageHeatingInstructionsDialog, { HEATING_LIST_CHANGED } from './ManageHeatingInstructionsDialog';
+
+const defaultFilter = createFilterOptions<string>();
+
+interface HeatingInstructionsFieldProps {
+  value?: string | null;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  /** no title or caption (for the bulk bar) */
+  compact?: boolean;
+}
+
+/**
+ * Heating / storage instruction for the edit dialogs: pick one from the list, or type a new one (it is saved to the list when the
+ * item is saved, so it can be picked next time). Printed on the item's sticker in the Kitchen Report. Admin-only.
+ */
+export default function HeatingInstructionsField({ value, onChange, disabled, compact = false }: HeatingInstructionsFieldProps) {
+  const { token } = useAuth();
+  const [options, setOptions] = useState<string[]>([]);
+  const [manage, setManage] = useState(false);
+
+  // the list comes from the server, and is read again whenever it is edited
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const load = () =>
+      fetch('/api/admin/heating-instructions', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (!cancelled && Array.isArray(json?.data)) setOptions(json.data as string[]);
+        })
+        .catch(() => {});
+    void load();
+    window.addEventListener(HEATING_LIST_CHANGED, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(HEATING_LIST_CHANGED, load);
+    };
+  }, [token]);
+
+  const text = value ?? '';
+  const isNew = text.trim() !== '' && !options.some((o) => o.toLowerCase() === text.trim().toLowerCase());
+
+  return (
+    <Box>
+      {!compact && (
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', lineHeight: 1.3, mb: 0.5 }}>
+          Heating/Storage Instructions
+        </Typography>
+      )}
+      <Autocomplete
+        freeSolo
+        fullWidth
+        size="small"
+        options={options}
+        // when the box already holds one of the instructions, still list them all so another one can be picked
+        filterOptions={(opts, state) => (opts.some((o) => o === state.inputValue) ? opts : defaultFilter(opts, state))}
+        disabled={disabled}
+        inputValue={text}
+        value={null}
+        onInputChange={(_, next, reason) => {
+          if (reason === 'reset' && next === '') return; // MUI clears the box after a pick; the pick is handled below
+          onChange(next.slice(0, MAX_HEATING_INSTRUCTION_LENGTH));
+        }}
+        onChange={(_, picked) => {
+          if (typeof picked === 'string') onChange(picked);
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder="Pick one or type a new one"
+            inputProps={{ ...params.inputProps, maxLength: MAX_HEATING_INSTRUCTION_LENGTH, 'aria-label': 'Heating/Storage Instructions' }}
+          />
+        )}
+      />
+      {!compact && (
+      <Typography variant="caption" sx={{ color: '#6B7280', display: 'block', mt: 0.5, lineHeight: 1.35 }}>
+        {isNew ? 'New: it is added to the list when you save, so you can pick it next time.' : 'Printed on the sticker. Clear the box for none.'}{' '}
+        <Link component="button" type="button" onClick={() => setManage(true)} sx={{ fontSize: 'inherit', verticalAlign: 'baseline' }}>
+          Edit list
+        </Link>
+      </Typography>
+      )}
+      <ManageHeatingInstructionsDialog open={manage} onClose={() => setManage(false)} />
+    </Box>
+  );
+}

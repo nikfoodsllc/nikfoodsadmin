@@ -37,6 +37,8 @@ import { PreparationType } from '@/utils/preparationType';
 import { AllergenBulkMode, AllergenKey } from '@/utils/allergens';
 import AllergensField from './AllergensField';
 import { StickerFlag } from '@/utils/stickerFlag';
+import HeatingInstructionsField from './HeatingInstructionsField';
+import { HEATING_LIST_CHANGED } from './ManageHeatingInstructionsDialog';
 import { DEFAULT_FOOD_ITEM_FILTERS, FoodItemFilters, buildCategoryTree, foodItemFilterParams, type CategoryTree } from './foodItemFilters';
 import TablePagination from './TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
@@ -69,6 +71,7 @@ interface FoodItem {
   preparationType?: PreparationType;
   sticker?: StickerFlag;
   splitSticker?: StickerFlag;
+  heatingInstructions?: string;
   chefsPick?: boolean;
   allowInstructions?: boolean;
   allergens?: string[];
@@ -168,7 +171,7 @@ interface ComboFoodItem {
   isDraft?: boolean;
 }
 
-type BulkField = 'available' | 'veg' | 'chefsPick' | 'allowInstructions' | 'preparation' | 'allergens' | 'sticker' | 'splitSticker';
+type BulkField = 'available' | 'veg' | 'chefsPick' | 'allowInstructions' | 'preparation' | 'allergens' | 'sticker' | 'splitSticker' | 'heating';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FoodItemFormData = any;
@@ -240,6 +243,7 @@ export default function FoodItemsPage() {
   const [filters, setFilters] = useState<FoodItemFilters>(DEFAULT_FOOD_ITEM_FILTERS);
   // which field the bulk bar is about to change: chosen first, then its options are shown
   const [bulkField, setBulkField] = useState<BulkField | null>(null);
+  const [bulkHeating, setBulkHeating] = useState('');
   const [bulkAllergens, setBulkAllergens] = useState<AllergenKey[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -435,6 +439,15 @@ export default function FoodItemsPage() {
     fetchItems();
   }, [fetchItems]);
 
+  // a Heating/Storage instruction was renamed or deleted: the table shows the new texts
+  useEffect(() => {
+    const reload = () => {
+      void fetchItems();
+    };
+    window.addEventListener(HEATING_LIST_CHANGED, reload);
+    return () => window.removeEventListener(HEATING_LIST_CHANGED, reload);
+  }, [fetchItems]);
+
   // =========================
   // BULK PREPARATION TYPE
   // =========================
@@ -579,6 +592,35 @@ export default function FoodItemsPage() {
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
       setBulkField(null);
+      await fetchItems();
+    } catch (error) {
+      console.error(error);
+      showSnackbar(error instanceof Error ? error.message : 'Failed to update items', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  // sets (or clears) the heating / storage instruction of every ticked item
+  const applyHeating = async (text: string | null) => {
+    if (selectedIds.size === 0) return;
+    if (text !== null && text.trim() === '') {
+      showSnackbar('Pick or type an instruction first', 'error');
+      return;
+    }
+    try {
+      setBulkLoading(true);
+      const response = await fetch('/api/admin/food-items/heating-instructions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: [...selectedIds], text }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update items');
+      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} ${text === null ? 'cleared of its heating/storage instruction' : 'set to: ' + text}`);
+      setSelectedIds(new Set());
+      setBulkField(null);
+      setBulkHeating('');
       await fetchItems();
     } catch (error) {
       console.error(error);
@@ -915,6 +957,7 @@ export default function FoodItemsPage() {
               <ToggleButton value="allergens">Allergens</ToggleButton>
               <ToggleButton value="sticker">Sticker</ToggleButton>
               <ToggleButton value="splitSticker">Split Sticker</ToggleButton>
+              <ToggleButton value="heating">Heating/Storage</ToggleButton>
             </ToggleButtonGroup>
           </Box>
 
@@ -1016,6 +1059,20 @@ export default function FoodItemsPage() {
               </Button>
               <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applySticker(null, 'splitSticker')} sx={{ textTransform: 'none' }}>
                 Clear (not set yet)
+              </Button>
+            </Box>
+          )}
+          {bulkField === 'heating' && (
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Typography sx={{ fontSize: 13, color: '#3730A3' }}>Set Heating/Storage to:</Typography>
+              <Box sx={{ width: { xs: '100%', sm: 360 }, backgroundColor: '#fff' }}>
+                <HeatingInstructionsField compact value={bulkHeating} onChange={setBulkHeating} disabled={bulkLoading} />
+              </Box>
+              <Button size="small" variant="contained" disabled={bulkLoading || bulkHeating.trim() === ''} onClick={() => applyHeating(bulkHeating)} sx={{ textTransform: 'none' }}>
+                Apply
+              </Button>
+              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyHeating(null)} sx={{ textTransform: 'none' }}>
+                Clear (none)
               </Button>
             </Box>
           )}

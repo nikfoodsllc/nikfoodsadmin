@@ -4,7 +4,8 @@ import { db } from '@/lib/db';
 import { jwtHandler } from '@/lib/jwt';
 import { fetchKitchenRows, fetchMovedKitchenRows, fetchStickerRows } from '@/lib/kitchenRows';
 import { buildKitchenDays, comboParts, enumerateDays, validateRange } from '@/utils/kitchenDashboard';
-import { buildKitchenReport, type StickerLookup, type TypeLookup } from '@/utils/kitchenReport';
+import { buildKitchenReport, type HeatingLookup, type StickerLookup, type TypeLookup } from '@/utils/kitchenReport';
+import { cleanHeatingInstruction } from '@/utils/heatingInstructions';
 import { normalizePreparationType, type PreparationType } from '@/utils/preparationType';
 import { normalizeSticker, type StickerFlag } from '@/utils/stickerFlag';
 
@@ -64,9 +65,11 @@ export async function GET(request: NextRequest) {
     const nameStickers = new Map<string, Set<string>>();
     const splitById = new Map<string, StickerFlag | null>();
     const nameSplits = new Map<string, Set<string>>();
+    const heatById = new Map<string, string | null>();
+    const nameHeats = new Map<string, Set<string>>();
     const objectIds = [...ids].filter((id) => /^[0-9a-fA-F]{24}$/.test(id)).map((id) => new ObjectId(id));
     if (objectIds.length > 0 || names.size > 0) {
-      const found = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown; sticker?: unknown; splitSticker?: unknown }>('fooditems', {
+      const found = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown; sticker?: unknown; splitSticker?: unknown; heatingInstructions?: unknown }>('fooditems', {
         $or: [{ _id: { $in: objectIds } }, { name: { $in: [...names] } }],
       } as never);
       for (const item of found.success ? found.data ?? [] : []) {
@@ -82,6 +85,12 @@ export async function GET(request: NextRequest) {
           const splitSet = nameSplits.get(item.name.trim()) ?? new Set<string>();
           splitSet.add(normalizeSticker(item.splitSticker) ?? 'none');
           nameSplits.set(item.name.trim(), splitSet);
+        }
+        heatById.set(String(item._id), cleanHeatingInstruction(item.heatingInstructions));
+        if (item.name) {
+          const heatSet = nameHeats.get(item.name.trim()) ?? new Set<string>();
+          heatSet.add(cleanHeatingInstruction(item.heatingInstructions) ?? '');
+          nameHeats.set(item.name.trim(), heatSet);
         }
         stickerById.set(String(item._id), normalizeSticker(item.sticker));
         splitById.set(String(item._id), normalizeSticker(item.splitSticker));
@@ -119,8 +128,16 @@ export async function GET(request: NextRequest) {
       return null;
     };
 
+    // the item's heating / storage instruction: by id, else by name when every item with that name agrees
+    const heatOf: HeatingLookup = ({ id, name }) => {
+      if (id && heatById.has(id)) return heatById.get(id) ?? null;
+      const set = nameHeats.get(name.trim());
+      if (set && set.size === 1) return [...set][0] || null;
+      return null;
+    };
+
     const report = buildKitchenReport(rows, typeOf, stickerOf, splitOf);
-    const stickers = buildKitchenReport(stickerRows, typeOf, stickerOf, splitOf).stickers;
+    const stickers = buildKitchenReport(stickerRows, typeOf, stickerOf, splitOf, heatOf).stickers;
     return NextResponse.json({
       data: {
         startDate: range.startDate,
