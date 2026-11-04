@@ -509,11 +509,13 @@ export default function AbandonedCheckoutsPage() {
               </Typography>
             </Paper>
           )}
-          <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-            {rows.map((row) => (
-              <PersonCard key={row.id} row={row} onHide={setHideRow} onRemind={setRemindRow} onCreateOrder={createOrderFor} />
-            ))}
-          </Box>
+          {tab !== 'recovered' && (
+            <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+              {rows.map((row) => (
+                <PersonCard key={row.id} row={row} onHide={setHideRow} onRemind={setRemindRow} onCreateOrder={createOrderFor} />
+              ))}
+            </Box>
+          )}
         </>
       )}
 
