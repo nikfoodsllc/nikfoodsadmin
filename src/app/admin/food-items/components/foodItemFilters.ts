@@ -17,6 +17,8 @@ export interface FoodItemFilters {
   allergen: AllergenFilter;
   sticker: StickerFilter;
   splitSticker: StickerFilter;
+  /** Heating/Storage: all = off, none = no instruction, has = any instruction, or `is:<instruction>` for one instruction */
+  heating: string;
   chefsPick: ChefsPickFilter;
   allowInstructions: InstructionsFilter;
   /** Order limit: none = no limit, has = any limit, ok / low / out = where the live count stands ('all' = off) */
@@ -59,6 +61,7 @@ export const DEFAULT_FOOD_ITEM_FILTERS: FoodItemFilters = {
   allergen: 'all',
   sticker: 'all',
   splitSticker: 'all',
+  heating: 'all',
   chefsPick: 'all',
   allowInstructions: 'all',
   stock: 'all',
@@ -80,6 +83,7 @@ export function foodItemFilterParams(filters: FoodItemFilters, tree?: CategoryTr
   if (filters.allergen !== 'all' && isAllergenFilter(filters.allergen)) params.push(['allergen', filters.allergen]);
   if (filters.sticker !== 'all' && isStickerFilter(filters.sticker)) params.push(['sticker', filters.sticker]);
   if (filters.splitSticker !== 'all' && isStickerFilter(filters.splitSticker)) params.push(['splitSticker', filters.splitSticker]);
+  if (filters.heating === 'none' || filters.heating === 'has' || (filters.heating.startsWith('is:') && filters.heating.length > 3)) params.push(['heating', filters.heating]);
   if (filters.chefsPick !== 'all' && isChefsPickFilter(filters.chefsPick)) params.push(['chefsPick', filters.chefsPick]);
   if (filters.allowInstructions !== 'all' && isInstructionsFilter(filters.allowInstructions)) params.push(['allowInstructions', filters.allowInstructions]);
   if (filters.stock !== 'all' && isStockFilter(filters.stock)) params.push(['stock', filters.stock]);

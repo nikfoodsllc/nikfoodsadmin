@@ -10,6 +10,7 @@ import { isAllergenKey } from '@/utils/allergens';
  *   preparationType=cooked|ready_to_eat|not_set
  *   sticker=yes|no|not_set
  *   splitSticker=yes|no|not_set
+ *   heating=none|has|is:<instruction>
  *   chefsPick=yes|no   (no = not marked yes)
  *   allowInstructions=yes|no   (no = not marked yes)
  *   stock=none|has|ok|low|out   (none = no order limit, has = any limit; ok / low / out follow the live count and are handled by the route)
@@ -51,6 +52,11 @@ export function foodItemListFilters(params: URLSearchParams): Record<string, unk
   const allergen = params.get('allergen');
   if (isAllergenKey(allergen)) filter.allergens = allergen;
   else if (allergen === 'none') filter.allergens = { $in: [null, []] };
+  // heating=none (no instruction) | has (any instruction) | is:<exact instruction>
+  const heating = params.get('heating');
+  if (heating === 'none') filter.heatingInstructions = { $in: [null, ''] };
+  else if (heating === 'has') filter.heatingInstructions = { $exists: true, $nin: [null, ''] };
+  else if (heating && heating.startsWith('is:') && heating.length > 3 && heating.length <= 3 + 300) filter.heatingInstructions = heating.slice(3);
   const splitSticker = params.get('splitSticker');
   if (splitSticker === 'yes' || splitSticker === 'no') filter.splitSticker = splitSticker;
   else if (splitSticker === 'not_set') filter.splitSticker = { $nin: ['yes', 'no'] };

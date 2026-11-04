@@ -36,7 +36,7 @@ describe('foodItemFilterParams', () => {
   });
 
   it('sends all four together', () => {
-    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', allergen: 'all', sticker: 'all', splitSticker: 'all', chefsPick: 'all', allowInstructions: 'all', stock: 'all', category: 'all', subCategory: 'all' })).toEqual([
+    expect(foodItemFilterParams({ veg: 'true', available: 'false', itemType: 'combo', preparation: 'cooked', allergen: 'all', sticker: 'all', splitSticker: 'all', heating: 'all', chefsPick: 'all', allowInstructions: 'all', stock: 'all', category: 'all', subCategory: 'all' })).toEqual([
       ['veg', 'true'],
       ['available', 'false'],
       ['itemType', 'combo'],
@@ -63,5 +63,16 @@ describe('category filters', () => {
   });
   it('with both off nothing is sent', () => {
     expect(categoryFilterIds(DEFAULT_FOOD_ITEM_FILTERS, tree)).toEqual([]);
+  });
+});
+
+describe('heating / storage filter', () => {
+  it('is left out when off and passed as none, has or one instruction', () => {
+    expect(foodItemFilterParams(DEFAULT_FOOD_ITEM_FILTERS)).toEqual([]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, heating: 'none' })).toEqual([['heating', 'none']]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, heating: 'has' })).toEqual([['heating', 'has']]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, heating: 'is:Do not refrigerate' })).toEqual([['heating', 'is:Do not refrigerate']]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, heating: 'is:' })).toEqual([]);
+    expect(foodItemFilterParams({ ...DEFAULT_FOOD_ITEM_FILTERS, heating: 'junk' })).toEqual([]);
   });
 });

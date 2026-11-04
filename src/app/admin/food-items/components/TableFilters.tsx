@@ -1,9 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Box, TextField, Select, MenuItem, FormControl, InputLabel, InputAdornment } from '@mui/material';
 import { IconSearch } from '@tabler/icons-react';
 import { FoodItemFilters } from './foodItemFilters';
 import { ALLERGENS } from '@/utils/allergens';
+import { useAuth } from '@/contexts/AuthContext';
+import { mergeHeatingInstructions } from '@/utils/heatingInstructions';
 
 interface TableFiltersProps {
   searchValue: string;
@@ -18,6 +21,22 @@ interface TableFiltersProps {
 export default function TableFilters({ searchValue, onSearchChange, filters, onFilterChange, categoryOptions }: TableFiltersProps) {
   const subsShown = (categoryOptions?.subs ?? []).filter((s) => filters.category === 'all' || s.parentId === filters.category);
   const selectSx = { backgroundColor: '#fff' };
+  // the heating / storage instructions to filter by (the shared list)
+  const { token } = useAuth();
+  const [heatingList, setHeatingList] = useState<string[]>(mergeHeatingInstructions([]));
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    fetch('/api/admin/heating-instructions', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (!cancelled && Array.isArray(json?.data)) setHeatingList(mergeHeatingInstructions(json.data as string[]));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
   return (
     <Box
       sx={{
@@ -226,6 +245,28 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="all">All</MenuItem>
           <MenuItem value="yes">Yes</MenuItem>
           <MenuItem value="no">No</MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* Heating/Storage */}
+      <FormControl size="small" sx={{ minWidth: 190, maxWidth: 260 }}>
+        <InputLabel>Heating/Storage</InputLabel>
+        <Select
+          value={filters.heating}
+          label="Heating/Storage"
+          onChange={(e) => onFilterChange('heating', e.target.value as FoodItemFilters['heating'])}
+          sx={selectSx}
+          MenuProps={{ PaperProps: { sx: { maxWidth: 360 } } }}
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="none">(none set)</MenuItem>
+          <MenuItem value="has">Has one</MenuItem>
+          {/* an instruction that is picked but not (yet) in the list still shows */}
+          {(filters.heating.startsWith('is:') && !heatingList.includes(filters.heating.slice(3)) ? [filters.heating.slice(3), ...heatingList] : heatingList).map((text) => (
+            <MenuItem key={text} value={`is:${text}`} sx={{ whiteSpace: 'normal' }}>
+              {text}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
 
