@@ -11,7 +11,6 @@ import {
   menuDayIndex,
   uniqueIds,
   filterNodes,
-  onlyAvailable,
   isValidDate,
   needsOptions,
   quantityFor,
@@ -57,7 +56,7 @@ export default function MenuPicker({
   const [open, setOpen] = useState<Set<string>>(() => new Set());
 
   const menuDays = useMemo(() => menuDayIndex(catalog), [catalog]);
-  const baseNodes = useMemo(() => onlyAvailable(view === 'all' ? allMenuNodes(catalog) : dayMenuNodes(catalog, date), catalog.items), [catalog, view, date]);
+  const baseNodes = useMemo(() => (view === 'all' ? allMenuNodes(catalog) : dayMenuNodes(catalog, date)), [catalog, view, date]);
   const nodes = useMemo(() => filterNodes(baseNodes, catalog.items, search), [baseNodes, catalog.items, search]);
   const searching = search.trim().length > 0;
   const totalItems = useMemo(() => uniqueIds(baseNodes).length, [baseNodes]);
@@ -90,7 +89,7 @@ export default function MenuPicker({
       <Box key={id} sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
         <Box sx={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, bgcolor: item.veg ? '#16A34A' : '#DC2626' }} aria-label={item.veg ? 'Vegetarian' : 'Non-vegetarian'} />
         <Box sx={{ minWidth: 0, flex: '0 1 auto' }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.name}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.name}{(item as MenuItem & { available?: boolean }).available === false && <Chip size="small" label="Out of stock" sx={{ ml: 1, height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#FEE2E2', color: '#991B1B' }} />}</Typography>
           <Typography sx={{ fontSize: 12, color: '#6B7280' }}>
             {item.portions?.length ? `from ${money(Math.min(...(item.portionPrices?.length ? item.portionPrices : [item.price])))}` : money(item.price)}
             {item.hasCombo ? ' · combo' : ''}
