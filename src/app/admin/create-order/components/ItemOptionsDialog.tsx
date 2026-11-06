@@ -266,7 +266,7 @@ export default function ItemOptionsDialog({
           slotProps={{ htmlInput: { min: date } }}
           sx={{ mb: 2 }}
         />
-        <TextField label="Note for the kitchen (optional)" value={notes} onChange={(e) => setNotes(e.target.value.slice(0, 300))} fullWidth size="small" multiline maxRows={3} sx={{ mb: 2 }} />
+        <TextField label={item.allowInstructions ? 'Special instructions (optional)' : 'Note for the kitchen (optional)'} value={notes} onChange={(e) => setNotes(e.target.value.slice(0, item.allowInstructions ? 40 : 300))} slotProps={{ htmlInput: { maxLength: item.allowInstructions ? 40 : 300 } }} helperText={item.allowInstructions ? `${notes.length}/40` : undefined} fullWidth size="small" multiline maxRows={3} sx={{ mb: 2 }} />
         <TextField
           label="Price for one (optional)"
           value={priceText}
