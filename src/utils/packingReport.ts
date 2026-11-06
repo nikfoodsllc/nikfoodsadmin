@@ -138,8 +138,10 @@ export function toLine(row: PackingRow, date: string): PackLine {
 
 /** Which orders sit in a roster stop: our own record first (by OptimoRoute id or order number), then the customer's name and street. */
 function ordersOfStop(stop: RosterStopInput, records: StopRecord[], rows: PackingRow[], claimed: Set<string>): string[] {
-  const rec = records.find((r) => (stop.id && r.optimoId === stop.id) || (stop.orderNo && r.optimoOrderNo === stop.orderNo));
-  if (rec && rec.orderIds.length > 0) return rec.orderIds.filter((id) => !claimed.has(id));
+  // one OptimoRoute stop can have several of our records (two orders of the same customer on the same day, the second one adopted the first one's stop): use all of them
+  const recs = records.filter((r) => (stop.id && r.optimoId === stop.id) || (stop.orderNo && r.optimoOrderNo === stop.orderNo));
+  const recordedIds = [...new Set(recs.flatMap((r) => r.orderIds))];
+  if (recordedIds.length > 0) return recordedIds.filter((id) => !claimed.has(id));
   const name = norm(stop.name);
   if (!name) return [];
   const byName = new Map<string, PackingRow[]>();

@@ -150,3 +150,20 @@ describe('filterByRoute', () => {
     expect(both.routes[0].stops.map((s) => s.customerName)).toEqual(['Bob Smith']); // Dev Patel (no Rajma) is gone
   });
 });
+
+describe('two orders of one customer in one OptimoRoute stop', () => {
+  it('shows both orders in the stop when two records point at it, and nothing is left unrouted', () => {
+    const two = [
+      row({ orderId: 'ORD-A', customerName: 'Pranav K', name: 'Kachori', street: '1 Main St' }),
+      row({ orderId: 'ORD-B', customerName: 'Pranav K', name: 'Roll', street: '1 Main St' }),
+    ];
+    const r = [{ driverSerial: '001', driverName: 'Driver A', vehicle: 'V1', stops: [stop(4, 'Pranav K', { id: 'x1', orderNo: 'ORD-A-1106', address: '1 Main St, Seattle' })] }];
+    // the first order's record and the second order's record (adopted) both name the same OptimoRoute stop
+    const recs = [{ orderIds: ['ORD-B'], optimoId: 'x1', optimoOrderNo: 'ORD-A-1106' }, { orderIds: ['ORD-A'], optimoId: 'x1', optimoOrderNo: 'ORD-A-1106' }];
+    const rep = buildPackingReport(DATE, two, r, recs);
+    expect(rep.routes[0].stops[0].orderIds.sort()).toEqual(['ORD-A', 'ORD-B']);
+    expect(rep.routes[0].stops[0].lines).toHaveLength(2);
+    expect(rep.unrouted).toEqual([]);
+    expect(rep.stats.unroutedStops).toBe(0);
+  });
+});
