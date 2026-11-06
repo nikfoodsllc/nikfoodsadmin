@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ALL_ROUTES, UNROUTED_ROUTE, buildPackingReport, filterByRoute, filterPackingReport, type PackingRow, type RosterRouteInput } from './packingReport';
+import { ALL_ROUTES, deliveryCounts, deliveryHeadline, UNROUTED_ROUTE, buildPackingReport, filterByRoute, filterPackingReport, type PackingRow, type RosterRouteInput } from './packingReport';
 
 const DATE = '2026-10-13';
 const row = (o: Partial<PackingRow>): PackingRow => ({ orderId: 'ORD-1', day: DATE, name: 'Rajma', quantity: 1, customerName: 'Asha Rao', street: '12 Pine St, Seattle', ...o });
@@ -148,5 +148,42 @@ describe('filterByRoute', () => {
     expect(both.routes).toHaveLength(1);
     expect(both.routes[0].driverName).toBe('Driver B');
     expect(both.routes[0].stops.map((s) => s.customerName)).toEqual(['Bob Smith']); // Dev Patel (no Rajma) is gone
+  });
+});
+
+describe('two orders of one customer in one OptimoRoute stop', () => {
+  it('shows both orders in the stop when two records point at it, and nothing is left unrouted', () => {
+    const two = [
+      row({ orderId: 'ORD-A', customerName: 'Pranav K', name: 'Kachori', street: '1 Main St' }),
+      row({ orderId: 'ORD-B', customerName: 'Pranav K', name: 'Roll', street: '1 Main St' }),
+    ];
+    const r = [{ driverSerial: '001', driverName: 'Driver A', vehicle: 'V1', stops: [stop(4, 'Pranav K', { id: 'x1', orderNo: 'ORD-A-1106', address: '1 Main St, Seattle' })] }];
+    // the first order's record and the second order's record (adopted) both name the same OptimoRoute stop
+    const recs = [{ orderIds: ['ORD-B'], optimoId: 'x1', optimoOrderNo: 'ORD-A-1106' }, { orderIds: ['ORD-A'], optimoId: 'x1', optimoOrderNo: 'ORD-A-1106' }];
+    const rep = buildPackingReport(DATE, two, r, recs);
+    expect(rep.routes[0].stops[0].orderIds.sort()).toEqual(['ORD-A', 'ORD-B']);
+    expect(rep.routes[0].stops[0].lines).toHaveLength(2);
+    expect(rep.unrouted).toEqual([]);
+    expect(rep.stats.unroutedStops).toBe(0);
+  });
+});
+
+describe('delivery headline', () => {
+  it('counts stops with something to deliver and says how many orders share a stop', () => {
+    const two = [
+      row({ orderId: 'ORD-A', customerName: 'Pranav K', street: '1 Main St' }),
+      row({ orderId: 'ORD-B', customerName: 'Pranav K', name: 'Roll', street: '1 Main St' }),
+      row({ orderId: 'ORD-C', customerName: 'Late Customer', street: '9 Late Rd' }),
+    ];
+    const r = [{ driverSerial: '001', driverName: 'A', vehicle: 'V1', stops: [stop(1, 'Pranav K', { id: 'x1', address: '1 Main St, Seattle' }), stop(2, 'Empty Stop', { id: 'x2' })] }];
+    const rep = buildPackingReport(DATE, two, r, [{ orderIds: ['ORD-A', 'ORD-B'], optimoId: 'x1' }]);
+    const c = deliveryCounts(rep);
+    expect(c).toEqual({ stops: 2, orders: 3, sharedOrders: 1 });
+    expect(deliveryHeadline(c)).toBe('2 stops · 3 orders (1 shares a stop with another order)');
+  });
+  it('says nothing about sharing when every order has its own stop, and handles singular', () => {
+    expect(deliveryHeadline({ stops: 140, orders: 140, sharedOrders: 0 })).toBe('140 stops · 140 orders');
+    expect(deliveryHeadline({ stops: 1, orders: 1, sharedOrders: 0 })).toBe('1 stop · 1 order');
+    expect(deliveryHeadline({ stops: 140, orders: 148, sharedOrders: 8 })).toBe('140 stops · 148 orders (8 share a stop with another order)');
   });
 });

@@ -138,8 +138,10 @@ export function toLine(row: PackingRow, date: string): PackLine {
 
 /** Which orders sit in a roster stop: our own record first (by OptimoRoute id or order number), then the customer's name and street. */
 function ordersOfStop(stop: RosterStopInput, records: StopRecord[], rows: PackingRow[], claimed: Set<string>): string[] {
-  const rec = records.find((r) => (stop.id && r.optimoId === stop.id) || (stop.orderNo && r.optimoOrderNo === stop.orderNo));
-  if (rec && rec.orderIds.length > 0) return rec.orderIds.filter((id) => !claimed.has(id));
+  // one OptimoRoute stop can have several of our records (two orders of the same customer on the same day, the second one adopted the first one's stop): use all of them
+  const recs = records.filter((r) => (stop.id && r.optimoId === stop.id) || (stop.orderNo && r.optimoOrderNo === stop.orderNo));
+  const recordedIds = [...new Set(recs.flatMap((r) => r.orderIds))];
+  if (recordedIds.length > 0) return recordedIds.filter((id) => !claimed.has(id));
   const name = norm(stop.name);
   if (!name) return [];
   const byName = new Map<string, PackingRow[]>();
@@ -249,4 +251,19 @@ export function filterByRoute(report: PackingReport, key: string): PackingReport
   const routes = report.routes.filter((route) => route.key === key);
   if (routes.length === 0) return report;
   return { ...report, routes, unrouted: [] };
+}
+
+/** The numbers behind the line above the report: stops that have something to deliver, the orders, and how many orders ride in a stop that already has another order. */
+export function deliveryCounts(report: Pick<PackingReport, 'routes' | 'unrouted' | 'stats'>): { stops: number; orders: number; sharedOrders: number } {
+  const stops = report.routes.reduce((n, r) => n + r.stops.filter((s) => s.orderIds.length > 0 && s.lines.length > 0).length, 0) + report.unrouted.length;
+  const orders = report.stats.orders;
+  return { stops, orders, sharedOrders: Math.max(0, orders - stops) };
+}
+
+/** "140 stops · 148 orders (8 share a stop with another order)". */
+export function deliveryHeadline(counts: { stops: number; orders: number; sharedOrders: number }): string {
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const orders = plural(counts.orders, 'order');
+  const shared = counts.sharedOrders > 0 ? ` (${counts.sharedOrders} ${counts.sharedOrders === 1 ? 'shares' : 'share'} a stop with another order)` : '';
+  return `${plural(counts.stops, 'stop')} · ${orders}${shared}`;
 }

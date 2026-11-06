@@ -12,7 +12,7 @@ import { addDays, formatDayShort, isDayString, pacificDayOf, shortSpiceLabel } f
 import { formatPSTDateISO } from '@/utils/timezone';
 import { applyColumnChoice, TONE_COLORS } from '@/utils/kitchenReportSheets';
 import { buildPackingSheets, PACKING_SHEET_CHOICES } from '@/utils/packingReportSheets';
-import { ALL_ROUTES, UNROUTED_ROUTE, filterByRoute, filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
+import { ALL_ROUTES, UNROUTED_ROUTE, deliveryCounts, deliveryHeadline, filterByRoute, filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
 import ReportColumnsDialog from '../../kitchen/components/ReportColumnsDialog';
@@ -369,7 +369,7 @@ export default function PackingReportPage() {
       {date && (
         <Typography sx={{ fontSize: 14, color: '#374151', fontWeight: 600, mb: 1.5 }}>
           Delivery {formatDayShort(date)}
-          {data && !loading ? ` · ${data.stats.orders} order${data.stats.orders === 1 ? '' : 's'} · ${data.stats.units} unit${data.stats.units === 1 ? '' : 's'}${data.stats.eco > 0 ? ` · ♻️ ${data.stats.eco} eco` : ''}` : ''}
+          {data && !loading ? ` · ${deliveryHeadline(deliveryCounts(data))} · ${data.stats.units} unit${data.stats.units === 1 ? '' : 's'}${data.stats.eco > 0 ? ` · ♻️ ${data.stats.eco} eco` : ''}` : ''}
           {data && !loading && loadedAt ? ` · ${updatedAtText(loadedAt)}` : ''}
         </Typography>
       )}
