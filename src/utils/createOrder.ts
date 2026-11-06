@@ -43,6 +43,12 @@ export interface MenuItem {
   spiceMode?: 'inherit' | 'combo';
   isEcoFriendlyContainer?: boolean;
   ecoContainerCharge?: number;
+  /** the item has the Special instructions box switched on in Food Items */
+  allowInstructions?: boolean;
+  /** switched off, a draft, or only in an unpublished category (the picker tags it, it can still be ordered) */
+  unavailable?: boolean;
+  /** reached its order limit (the picker tags it, it can still be ordered) */
+  soldOut?: boolean;
   hasCombo?: boolean;
   sections?: MenuComboSection[];
 }
@@ -543,17 +549,6 @@ export function defaultDayFor(menuDays: string[] | undefined, currentDate: strin
 /** Every item of every category, whatever its date. */
 export function allMenuNodes(catalog: CatalogPayload): MenuNode[] {
   return catalog.categories.map((c) => toNode(c, (cat) => cat.allItemIds ?? [], null, false)).filter((n): n is MenuNode => n !== null);
-}
-
-/** Drops items marked not available (and the categories left empty); an item with no flag counts as available. */
-export function onlyAvailable(nodes: MenuNode[], items: Record<string, MenuItem>): MenuNode[] {
-  const walk = (node: MenuNode): MenuNode | null => {
-    const itemIds = node.itemIds.filter((id) => (items[id] as MenuItem & { available?: boolean } | undefined)?.available !== false);
-    const children = node.children.map(walk).filter((n): n is MenuNode => n !== null);
-    const total = uniqueIds([{ ...node, itemIds, children, total: 0 }]).length;
-    return total === 0 ? null : { ...node, itemIds, children, total };
-  };
-  return nodes.map(walk).filter((n): n is MenuNode => n !== null);
 }
 
 /** Keeps only the items whose name matches, and the categories that still hold something. */
