@@ -43,6 +43,8 @@ export interface MenuItem {
   spiceMode?: 'inherit' | 'combo';
   isEcoFriendlyContainer?: boolean;
   ecoContainerCharge?: number;
+  /** the item has the Special instructions box switched on in Food Items */
+  allowInstructions?: boolean;
   hasCombo?: boolean;
   sections?: MenuComboSection[];
 }
