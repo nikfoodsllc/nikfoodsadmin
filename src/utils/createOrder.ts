@@ -45,6 +45,10 @@ export interface MenuItem {
   ecoContainerCharge?: number;
   /** the item has the Special instructions box switched on in Food Items */
   allowInstructions?: boolean;
+  /** switched off, a draft, or only in an unpublished category (the picker tags it, it can still be ordered) */
+  unavailable?: boolean;
+  /** reached its order limit (the picker tags it, it can still be ordered) */
+  soldOut?: boolean;
   hasCombo?: boolean;
   sections?: MenuComboSection[];
 }
