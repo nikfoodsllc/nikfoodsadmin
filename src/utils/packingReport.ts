@@ -252,3 +252,18 @@ export function filterByRoute(report: PackingReport, key: string): PackingReport
   if (routes.length === 0) return report;
   return { ...report, routes, unrouted: [] };
 }
+
+/** The numbers behind the line above the report: stops that have something to deliver, the orders, and how many orders ride in a stop that already has another order. */
+export function deliveryCounts(report: Pick<PackingReport, 'routes' | 'unrouted' | 'stats'>): { stops: number; orders: number; sharedOrders: number } {
+  const stops = report.routes.reduce((n, r) => n + r.stops.filter((s) => s.orderIds.length > 0 && s.lines.length > 0).length, 0) + report.unrouted.length;
+  const orders = report.stats.orders;
+  return { stops, orders, sharedOrders: Math.max(0, orders - stops) };
+}
+
+/** "140 stops · 148 orders (8 share a stop with another order)". */
+export function deliveryHeadline(counts: { stops: number; orders: number; sharedOrders: number }): string {
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const orders = plural(counts.orders, 'order');
+  const shared = counts.sharedOrders > 0 ? ` (${counts.sharedOrders} ${counts.sharedOrders === 1 ? 'shares' : 'share'} a stop with another order)` : '';
+  return `${plural(counts.stops, 'stop')} · ${orders}${shared}`;
+}
