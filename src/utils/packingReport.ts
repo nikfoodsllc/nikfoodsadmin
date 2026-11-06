@@ -267,3 +267,33 @@ export function deliveryHeadline(counts: { stops: number; orders: number; shared
   const shared = counts.sharedOrders > 0 ? ` (${counts.sharedOrders} ${counts.sharedOrders === 1 ? 'shares' : 'share'} a stop with another order)` : '';
   return `${plural(counts.stops, 'stop')} · ${orders}${shared}`;
 }
+
+export interface EmptyStop {
+  routeTitle: string;
+  driverName: string;
+  number: number;
+  customerName: string;
+  address: string;
+  /** '1:58 PM' or '' */
+  time: string;
+}
+
+const clock = (hhmm: string): string => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm);
+  if (!m) return '';
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+
+/** Stops on a route that no order of ours matches (added by hand in OptimoRoute, or an order that is not counted): nothing to pack, listed so someone can cross-check them. */
+export function emptyStops(report: Pick<PackingReport, 'routes'>): EmptyStop[] {
+  return report.routes.flatMap((r) =>
+    r.stops.filter((s) => s.lines.length === 0).map((s) => ({ routeTitle: r.title, driverName: r.driverName, number: s.number, customerName: s.customerName, address: s.address, time: clock(s.scheduledAt) }))
+  );
+}
+
+/** "140 stops" or "140 stops (1 has nothing to pack)". */
+export function rosterStopsText(total: number, empty: number): string {
+  const stops = `${total} stop${total === 1 ? '' : 's'}`;
+  return empty > 0 ? `${stops} (${empty} ${empty === 1 ? 'has' : 'have'} nothing to pack)` : stops;
+}
