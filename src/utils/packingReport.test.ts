@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ALL_ROUTES, deliveryCounts, deliveryHeadline, UNROUTED_ROUTE, buildPackingReport, filterByRoute, filterPackingReport, type PackingRow, type RosterRouteInput } from './packingReport';
+import { ALL_ROUTES, deliveryCounts, deliveryHeadline, emptyStops, rosterStopsText, UNROUTED_ROUTE, buildPackingReport, filterByRoute, filterPackingReport, type PackingRow, type RosterRouteInput } from './packingReport';
 
 const DATE = '2026-10-13';
 const row = (o: Partial<PackingRow>): PackingRow => ({ orderId: 'ORD-1', day: DATE, name: 'Rajma', quantity: 1, customerName: 'Asha Rao', street: '12 Pine St, Seattle', ...o });
@@ -185,5 +185,22 @@ describe('delivery headline', () => {
     expect(deliveryHeadline({ stops: 140, orders: 140, sharedOrders: 0 })).toBe('140 stops · 140 orders');
     expect(deliveryHeadline({ stops: 1, orders: 1, sharedOrders: 0 })).toBe('1 stop · 1 order');
     expect(deliveryHeadline({ stops: 140, orders: 148, sharedOrders: 8 })).toBe('140 stops · 148 orders (8 share a stop with another order)');
+  });
+});
+
+describe('stops with nothing to pack', () => {
+  it('lists them with their route, time, name and address, and words the stop count', () => {
+    const one = [row({ orderId: 'ORD-A', customerName: 'Asha Rao', street: '12 Pine St, Seattle' })];
+    const r = [{ driverSerial: '003', driverName: 'BelRed', vehicle: 'V3', stops: [stop(1, 'Asha Rao', { id: 'x1', address: '12 Pine St, Seattle' }), stop(5, 'Hand Added', { id: 'x5', address: '7 Oak Ave, Seattle', scheduledAt: '13:58' })] }];
+    const rep = buildPackingReport(DATE, one, r, []);
+    expect(emptyStops(rep)).toEqual([{ routeTitle: 'Route 1', driverName: 'BelRed', number: 5, customerName: 'Hand Added', address: '7 Oak Ave, Seattle', time: '1:58 PM' }]);
+    expect(rosterStopsText(140, 1)).toBe('140 stops (1 has nothing to pack)');
+    expect(rosterStopsText(140, 2)).toBe('140 stops (2 have nothing to pack)');
+    expect(rosterStopsText(140, 0)).toBe('140 stops');
+    expect(rosterStopsText(1, 0)).toBe('1 stop');
+  });
+  it('formats times around noon and midnight', () => {
+    const rep = buildPackingReport(DATE, [], [{ driverSerial: '1', driverName: 'D', vehicle: 'V', stops: [stop(1, 'A', { scheduledAt: '00:05' }), stop(2, 'B', { scheduledAt: '12:00' }), stop(3, 'C', { scheduledAt: '' })] }], []);
+    expect(emptyStops(rep).map((s) => s.time)).toEqual(['12:05 AM', '12:00 PM', '']);
   });
 });

@@ -12,7 +12,7 @@ import { addDays, formatDayShort, isDayString, pacificDayOf, shortSpiceLabel } f
 import { formatPSTDateISO } from '@/utils/timezone';
 import { applyColumnChoice, TONE_COLORS } from '@/utils/kitchenReportSheets';
 import { buildPackingSheets, PACKING_SHEET_CHOICES } from '@/utils/packingReportSheets';
-import { ALL_ROUTES, UNROUTED_ROUTE, deliveryCounts, deliveryHeadline, filterByRoute, filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
+import { ALL_ROUTES, UNROUTED_ROUTE, deliveryCounts, deliveryHeadline, emptyStops, filterByRoute, rosterStopsText, filterPackingReport, type PackLine, type PackRoute, type PackStop, type PackTotal, type PackingReport } from '@/utils/packingReport';
 import { buildReportWorkbook, downloadBlob } from '@/utils/downloadReportExcel';
 import { buildReportPdf } from '@/utils/reportPdf';
 import ReportColumnsDialog from '../../kitchen/components/ReportColumnsDialog';
@@ -381,13 +381,25 @@ export default function PackingReportPage() {
       {data && !loading && (
         data.roster ? (
           <Typography className="no-print" sx={{ fontSize: 13, color: '#6B7280', mb: 1.5 }}>
-            Routes from OptimoRoute{readAt ? `, read at ${readAt}` : ''} · {data.roster.drivers} driver{data.roster.drivers === 1 ? '' : 's'} · {data.stats.stops} stop{data.stats.stops === 1 ? '' : 's'}. If they changed since, press the route button to read them again.
+            Routes from OptimoRoute{readAt ? `, read at ${readAt}` : ''} · {data.roster.drivers} driver{data.roster.drivers === 1 ? '' : 's'} · {rosterStopsText(data.stats.stops, emptyStops(data).length)}. If they changed since, press the route button to read them again.
           </Typography>
         ) : (
           <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
             There are no routes for this day yet (OptimoRoute plans them at 8 PM the evening before). Everything for the day is listed under &quot;Not on a route yet&quot; for now.
           </Alert>
         )
+      )}
+      {data && !loading && data.roster && emptyStops(data).length > 0 && (
+        <Alert className="no-print" severity="info" sx={{ mb: 2 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 0.5 }}>
+            {emptyStops(data).length === 1 ? '1 stop on the routes has' : `${emptyStops(data).length} stops on the routes have`} no order to pack. No order of ours matches {emptyStops(data).length === 1 ? 'it' : 'them'}: {emptyStops(data).length === 1 ? 'it was' : 'they were'} probably added by hand in OptimoRoute. Check {emptyStops(data).length === 1 ? 'it' : 'them'} there:
+          </Typography>
+          {emptyStops(data).map((s) => (
+            <Typography key={`${s.routeTitle}-${s.number}`} sx={{ fontSize: 13 }}>
+              {s.routeTitle} · {s.driverName} · stop {s.number}{s.time ? ` · ${s.time}` : ''} · {s.customerName || 'no name'}{s.address ? ` · ${s.address}` : ''}
+            </Typography>
+          ))}
+        </Alert>
       )}
       {data && !loading && data.roster && data.unrouted.length > 0 && (
         <Alert className="no-print" severity="warning" sx={{ mb: 2 }}>
