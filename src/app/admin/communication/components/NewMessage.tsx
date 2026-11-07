@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -24,7 +24,6 @@ import {
 import { IconSearch } from '@tabler/icons-react';
 import {
   EMAIL_LIMIT,
-  PLACEHOLDERS,
   SUBJECT_LIMIT,
   TEXT_LIMIT,
   addDays,
@@ -34,6 +33,7 @@ import {
   pacificLocalToIso,
   pacificText,
   pacificToday,
+  placeholdersFor,
   previewValues,
   reachOf,
   textTimeOk,
@@ -60,7 +60,14 @@ async function call<T>(token: string, path: string, init?: RequestInit): Promise
   }
 }
 
-const KIND_LABEL: Record<AudienceKind, string> = { delivery_date: 'Due for delivery', menu_day: 'Ordered for a menu day', ordered_between: 'Ordered between' };
+const KIND_LABEL: Record<AudienceKind, string> = { delivery_date: 'Due for delivery', menu_day: 'Ordered for a menu day', ordered_between: 'Ordered between', people: 'Specific people', all: 'Everyone' };
+
+interface Person {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
 
 function StepTitle({ n, children }: { n: number; children: React.ReactNode }) {
   return (
@@ -73,11 +80,11 @@ function StepTitle({ n, children }: { n: number; children: React.ReactNode }) {
   );
 }
 
-function PlaceholderChips({ onPick }: { onPick: (p: string) => void }) {
+function PlaceholderChips({ onPick, allowed }: { onPick: (p: string) => void; allowed: string[] }) {
   return (
     <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 0.75, alignItems: 'center' }}>
       <Typography sx={{ fontSize: 12, color: '#6B7280' }}>Insert:</Typography>
-      {PLACEHOLDERS.map((p) => (
+      {allowed.map((p) => (
         <Chip key={p} size="small" label={p} onClick={() => onPick(p)} sx={{ fontFamily: 'monospace', fontSize: 12 }} />
       ))}
     </Box>
@@ -90,7 +97,28 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [date, setDate] = useState(addDays(today, 1));
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
-  const filter: AudienceFilter = kind === 'ordered_between' ? { kind, from, to } : { kind, date };
+  const [people, setPeople] = useState<Person[]>([]);
+  const [pq, setPq] = useState('');
+  const [results, setResults] = useState<Person[]>([]);
+  const searchSeq = useRef(0);
+  const filter: AudienceFilter =
+    kind === 'ordered_between' ? { kind, from, to } : kind === 'people' ? { kind, userIds: people.map((p) => p.id) } : kind === 'all' ? { kind } : { kind, date };
+  const allowedPlaceholders = placeholdersFor(kind);
+
+  // search customers by hand (only the newest answer is used, so a slow earlier search cannot overwrite it)
+  useEffect(() => {
+    if (kind !== 'people' || pq.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    const mine = ++searchSeq.current;
+    const t = setTimeout(async () => {
+      const r = await call<Person[]>(token, `/customers?q=${encodeURIComponent(pq.trim())}`);
+      if (mine !== searchSeq.current) return;
+      setResults(r.ok && r.data ? r.data : []);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [pq, kind, token]);
 
   const [customers, setCustomers] = useState<AudienceCustomer[] | null>(null);
   const [foundFilter, setFoundFilter] = useState<AudienceFilter | null>(null);
@@ -113,6 +141,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [when, setWhen] = useState<'now' | 'later'>('now');
   const [local, setLocal] = useState('');
   const [confirm, setConfirm] = useState(false);
+  const [everyoneOk, setEveryoneOk] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
 
@@ -139,7 +168,8 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
     setCustomers([...r.data.customers].sort((a, b) => reachable(a) - reachable(b)));
     setFoundFilter(filter);
     setSmsMode(r.data.smsMode);
-    setPicked(new Set(r.data.customers.filter((c) => c.email || c.textOk).map((c) => c.key)));
+    // people named by hand stay selected (a missing email shows on the row); the others start with the ones we can reach
+    setPicked(new Set(r.data.customers.filter((c) => filter.kind === 'people' || c.email || c.textOk).map((c) => c.key)));
     if (r.data.smsMode === 'off') setText(false);
   };
 
@@ -219,6 +249,37 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
               <Chip size="small" label="Last 7 days" onClick={() => { setFrom(addDays(today, -6)); setTo(today); }} />
             </Box>
           </Box>
+        ) : kind === 'people' ? (
+          <Box>
+            <TextField label="Search by name, email or phone" size="small" fullWidth value={pq} onChange={(e) => setPq(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }} sx={{ maxWidth: 420 }} />
+            {results.length > 0 && (
+              <Box sx={{ mt: 1, border: '1px solid #E5E7EB', borderRadius: 1.5, maxHeight: 260, overflowY: 'auto', maxWidth: 560 }}>
+                {results.map((r) => {
+                  const added = people.some((p) => p.id === r.id);
+                  return (
+                    <Box key={r.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: 14, wordBreak: 'break-word' }}>{r.name || 'No name'}</Typography>
+                        <Typography sx={{ fontSize: 12.5, color: '#6B7280', wordBreak: 'break-word' }}>{r.email || 'No email'} · {r.phone || 'No phone'}</Typography>
+                      </Box>
+                      <Button size="small" variant={added ? 'text' : 'outlined'} disabled={added} onClick={() => setPeople((cur) => [...cur, r])} sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}>{added ? 'Added' : 'Add'}</Button>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+            {pq.trim().length >= 2 && results.length === 0 && <Typography sx={{ fontSize: 13, color: '#6B7280', mt: 0.75 }}>No customers match.</Typography>}
+            {people.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1.25 }}>
+                {people.map((p) => (
+                  <Chip key={p.id} label={p.name || p.email} onDelete={() => setPeople((cur) => cur.filter((x) => x.id !== p.id))} />
+                ))}
+              </Box>
+            )}
+            <Typography sx={{ fontSize: 13, mt: 1 }}>{people.length === 0 ? 'No one added yet.' : `${people.length} ${people.length === 1 ? 'person' : 'people'} added.`}</Typography>
+          </Box>
+        ) : kind === 'all' ? (
+          <Alert severity="warning" sx={{ maxWidth: 560 }}>This is every customer account. Use it for important notices only. You can still untick people in the list below.</Alert>
         ) : (
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
             <TextField label={kind === 'delivery_date' ? 'Delivery date' : 'Menu day'} type="date" size="small" value={date} onChange={(e) => setDate(e.target.value)} InputLabelProps={{ shrink: true }} />
@@ -232,10 +293,12 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           {kind === 'delivery_date' && 'Customers whose order is delivered on this date (the date it is really delivered on, also for items that were moved).'}
           {kind === 'menu_day' && 'Customers who ordered something from this menu day, even if it is delivered on another day.'}
           {kind === 'ordered_between' && 'Customers who placed an order in this period. Pick the same day twice for one day. Pacific time.'}
+          {kind === 'people' && 'Search the customer accounts and add the people you want. Only the people you add are messaged.'}
+          {kind === 'all' && 'Every active customer account, whether or not they have ordered lately.'}
         </Typography>
-        <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>Paid orders only; cancelled, failed and refunded orders are left out. One row per customer.</Typography>
+        {(kind === 'delivery_date' || kind === 'menu_day' || kind === 'ordered_between') && <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>Paid orders only; cancelled, failed and refunded orders are left out. One row per customer.</Typography>}
         <Button variant="contained" disabled={!filterReady(filter) || finding} onClick={find} sx={{ mt: 1.5, textTransform: 'none', fontWeight: 700, bgcolor: '#1F1712', '&:hover': { bgcolor: '#3A2A1E' } }}>
-          {finding ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Find customers'}
+          {finding ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : kind === 'people' ? 'Continue' : 'Find customers'}
         </Button>
         {findError && <Alert severity="error" sx={{ mt: 1.5 }}>{findError}</Alert>}
 
@@ -248,7 +311,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
             ) : (
               <>
                 <Typography sx={{ fontSize: 14, mb: 1 }}>
-                  <b>{customers.length}</b> customers · <b>{customers.filter((c) => c.email).length}</b> can be emailed · <b>{customers.filter((c) => c.textOk).length}</b> can be texted
+                  <b>{customers.length}</b> {customers.length === 1 ? 'customer' : 'customers'} · <b>{customers.filter((c) => c.email).length}</b> can be emailed · <b>{customers.filter((c) => c.textOk).length}</b> can be texted
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
                   <TextField
@@ -264,7 +327,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
                   <Typography sx={{ fontSize: 13, color: '#6B7280' }}>{picked.size} selected</Typography>
                 </Box>
                 <Box sx={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #E5E7EB', borderRadius: 1.5 }}>
-                  {shown.map((c) => (
+                  {shown.slice(0, 300).map((c) => (
                     <Box key={c.key} component="label" sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, px: 1, py: 0.75, borderBottom: '1px solid #F3F4F6', cursor: 'pointer', bgcolor: picked.has(c.key) ? '#FFFBF3' : '#fff' }}>
                       <Checkbox size="small" checked={picked.has(c.key)} onChange={() => toggle(c.key)} sx={{ p: 0.5, mt: 0.25 }} />
                       <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -280,6 +343,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
                     </Box>
                   ))}
                   {shown.length === 0 && <Typography sx={{ p: 1.5, color: '#6B7280', fontSize: 14 }}>No one matches the search.</Typography>}
+                  {shown.length > 300 && <Typography sx={{ p: 1.5, color: '#6B7280', fontSize: 13 }}>Showing the first 300 of {shown.length}. Use the search to find others. Everyone ticked is still included.</Typography>}
                 </Box>
               </>
             )}
@@ -300,9 +364,9 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
         {email && (
           <Box sx={{ mb: 2 }}>
             <TextField label="Email subject" size="small" fullWidth value={subject} onChange={(e) => setSubject(e.target.value.slice(0, SUBJECT_LIMIT))} helperText={`${subject.length}/${SUBJECT_LIMIT}`} />
-            <PlaceholderChips onPick={(p) => setSubject((s) => withPlaceholder(s, p))} />
+            <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setSubject((s) => withPlaceholder(s, p))} />
             <TextField label="Email message" fullWidth multiline minRows={5} value={emailBody} onChange={(e) => setEmailBody(e.target.value.slice(0, EMAIL_LIMIT))} sx={{ mt: 1.5 }} helperText="A blank line starts a new paragraph." />
-            <PlaceholderChips onPick={(p) => setEmailBody((s) => withPlaceholder(s, p))} />
+            <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setEmailBody((s) => withPlaceholder(s, p))} />
             <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: '#FFFBF5', borderRadius: 1.5 }}>
               <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
               <Typography sx={{ fontWeight: 800, fontSize: 16, mt: 0.5 }}>{fillPlaceholders(subject, preview) || 'Subject'}</Typography>
@@ -321,7 +385,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
         {text && (
           <Box>
             <TextField label="Text message" fullWidth multiline minRows={3} value={textBody} onChange={(e) => setTextBody(e.target.value.slice(0, TEXT_LIMIT))} helperText={`${textBody.length}/${TEXT_LIMIT}. Short is best. Customers can reply STOP to stop texts.`} />
-            <PlaceholderChips onPick={(p) => setTextBody((s) => withPlaceholder(s, p))} />
+            <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setTextBody((s) => withPlaceholder(s, p))} />
             <Box sx={{ mt: 1.5, p: 1.25, bgcolor: '#E5F2FF', borderRadius: 2, maxWidth: 340, fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{fillPlaceholders(textBody, preview) || 'Your text'}</Box>
           </Box>
         )}
@@ -336,16 +400,16 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           <>
             <Box sx={{ display: 'grid', gap: 0.25, mb: 1.5, fontSize: 14 }}>
               <Typography sx={{ fontSize: 14 }}>
-                <b>{reach.customers}</b> customers selected.
+                <b>{reach.customers}</b> {reach.customers === 1 ? 'customer' : 'customers'} selected.
               </Typography>
               {email && (
                 <Typography sx={{ fontSize: 14 }}>
-                  Email: <b>{reach.email}</b> will get it{reach.noEmail > 0 ? `, ${reach.noEmail} have no email and are skipped` : ''}.
+                  Email: <b>{reach.email}</b> will get it{reach.noEmail > 0 ? `, ${reach.noEmail} ${reach.noEmail === 1 ? 'has' : 'have'} no email and ${reach.noEmail === 1 ? 'is' : 'are'} skipped` : ''}.
                 </Typography>
               )}
               {text && (
                 <Typography sx={{ fontSize: 14 }}>
-                  Text: <b>{reach.text}</b> will get it{reach.noText > 0 ? `, ${reach.noText} have not agreed to texts and are skipped` : ''}.
+                  Text: <b>{reach.text}</b> will get it{reach.noText > 0 ? `, ${reach.noText} ${reach.noText === 1 ? 'has' : 'have'} not agreed to texts and ${reach.noText === 1 ? 'is' : 'are'} skipped` : ''}.
                 </Typography>
               )}
             </Box>
@@ -362,7 +426,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
             {scheduleProblem && <Typography sx={{ color: '#B45309', fontSize: 13, mb: 1 }}>{scheduleProblem}</Typography>}
             {!reachOk && <Typography sx={{ color: '#B45309', fontSize: 13, mb: 1 }}>Nobody selected can receive this message. Pick customers or change the channels.</Typography>}
             {sendError && <Alert severity="error" sx={{ mb: 1.5 }}>{sendError}</Alert>}
-            <Button variant="contained" disabled={!canSend} onClick={() => setConfirm(true)} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: '#F89C35', color: '#1A1106', '&:hover': { bgcolor: '#E08A28' } }}>
+            <Button variant="contained" disabled={!canSend} onClick={() => { setEveryoneOk(false); setConfirm(true); }} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: '#F89C35', color: '#1A1106', '&:hover': { bgcolor: '#E08A28' } }}>
               {when === 'later' ? 'Schedule message' : 'Send message'}
             </Button>
           </>
@@ -373,15 +437,16 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
         <DialogTitle>{when === 'later' ? 'Schedule this message?' : 'Send this message?'}</DialogTitle>
         <DialogContent>
           <DialogContentText component="div" sx={{ fontSize: 14 }}>
-            {email && <Box>Email to <b>{reach.email}</b> customers: “{subject}”</Box>}
-            {text && <Box>Text to <b>{reach.text}</b> customers</Box>}
+            {email && <Box>Email to <b>{reach.email}</b> {reach.email === 1 ? 'customer' : 'customers'}: “{subject}”</Box>}
+            {text && <Box>Text to <b>{reach.text}</b> {reach.text === 1 ? 'customer' : 'customers'}</Box>}
             <Box sx={{ mt: 1 }}>{audienceTitle(foundFilter ?? filter)}.</Box>
+            {foundFilter?.kind === 'all' && <FormControlLabel sx={{ mt: 1 }} control={<Checkbox checked={everyoneOk} onChange={(e) => setEveryoneOk(e.target.checked)} />} label={`I want to send this to ${reach.customers} customers`} />}
             <Box sx={{ mt: 1 }}>{scheduledIso ? `It goes out ${pacificText(scheduledIso)} (Pacific). The customers are looked up again at that time.` : 'It starts right away and cannot be recalled once sent. You can stop it from History while it is still going.'}</Box>
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirm(false)} disabled={sending} sx={{ textTransform: 'none' }}>Back</Button>
-          <Button variant="contained" onClick={send} disabled={sending} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: '#F89C35', color: '#1A1106', '&:hover': { bgcolor: '#E08A28' } }}>
+          <Button variant="contained" onClick={send} disabled={sending || (foundFilter?.kind === 'all' && !everyoneOk)} sx={{ textTransform: 'none', fontWeight: 800, bgcolor: '#F89C35', color: '#1A1106', '&:hover': { bgcolor: '#E08A28' } }}>
             {sending ? <CircularProgress size={18} /> : when === 'later' ? 'Schedule' : 'Send'}
           </Button>
         </DialogActions>

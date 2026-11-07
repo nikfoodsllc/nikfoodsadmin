@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
+import { placeholdersFor, whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
 
 const c = (key: string, o: Partial<AudienceCustomer> = {}): AudienceCustomer => ({ key, name: key, email: `${key}@x.com`, phone: null, orders: ['ORD-1'], textOk: false, textReason: null, ...o });
 
@@ -76,5 +76,24 @@ describe('when a message goes out', () => {
     expect(whenText({ status: 'cancelled', scheduledFor: '2026-11-08T17:30:00.000Z' })).toBe('Was scheduled for Sun, Nov 8 at 9:30 AM');
     expect(whenText({ status: 'done', startedAt: '2026-11-08T17:30:00.000Z' })).toBe('Started Sun, Nov 8 at 9:30 AM');
     expect(whenText({ status: 'sending' })).toBe('');
+  });
+});
+
+describe('specific people and everyone', () => {
+  it('titles and readiness', () => {
+    expect(audienceTitle({ kind: 'all' })).toBe('Everyone');
+    expect(audienceTitle({ kind: 'people', userIds: ['a'] })).toBe('1 chosen person');
+    expect(audienceTitle({ kind: 'people', userIds: ['a', 'b'] })).toBe('2 chosen people');
+    expect(filterReady({ kind: 'all' })).toBe(true);
+    expect(filterReady({ kind: 'people', userIds: [] })).toBe(false);
+    expect(filterReady({ kind: 'people' })).toBe(false);
+    expect(filterReady({ kind: 'people', userIds: ['a'] })).toBe(true);
+  });
+  it('offers only the placeholders that make sense', () => {
+    expect(placeholdersFor('delivery_date')).toEqual(['{firstName}', '{orderNumber}', '{date}']);
+    expect(placeholdersFor('menu_day')).toEqual(['{firstName}', '{orderNumber}', '{date}']);
+    expect(placeholdersFor('ordered_between')).toEqual(['{firstName}', '{orderNumber}']);
+    expect(placeholdersFor('people')).toEqual(['{firstName}']);
+    expect(placeholdersFor('all')).toEqual(['{firstName}']);
   });
 });
