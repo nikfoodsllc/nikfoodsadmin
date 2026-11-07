@@ -143,3 +143,10 @@ export function previewValues(first?: AudienceCustomer, filter?: AudienceFilter)
 export function fillPlaceholders(text: string, v: { firstName: string; orderNumber: string; date: string }): string {
   return text.replace(/\{firstName\}/g, v.firstName).replace(/\{orderNumber\}/g, v.orderNumber).replace(/\{date\}/g, v.date);
 }
+
+/** When a message goes out or went out: 'Goes out ...', 'Was scheduled for ...' (stopped before it started), 'Started ...'. */
+export function whenText(c: { status: string; scheduledFor?: string; startedAt?: string }): string {
+  if (c.status === 'scheduled' && c.scheduledFor) return `Goes out ${pacificText(c.scheduledFor)}`;
+  if (!c.startedAt && c.scheduledFor) return `Was scheduled for ${pacificText(c.scheduledFor)}`;
+  return c.startedAt ? `Started ${pacificText(c.startedAt)}` : '';
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
+import { whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
 
 const c = (key: string, o: Partial<AudienceCustomer> = {}): AudienceCustomer => ({ key, name: key, email: `${key}@x.com`, phone: null, orders: ['ORD-1'], textOk: false, textReason: null, ...o });
 
@@ -67,5 +67,14 @@ describe('message helpers', () => {
     const v = previewValues(c('x', { name: 'Asha Rao', orders: ['ORD-9'] }), { kind: 'delivery_date', date: '2026-11-06' });
     expect(fillPlaceholders('Hi {firstName}, {orderNumber} on {date}', v)).toBe('Hi Asha, ORD-9 on Friday, November 6');
     expect(previewValues(undefined, { kind: 'ordered_between', from: '2026-11-01', to: '2026-11-02' })).toEqual({ firstName: 'Alex', orderNumber: 'ORD-0000000000000', date: '' });
+  });
+});
+
+describe('when a message goes out', () => {
+  it('says what is true for each state', () => {
+    expect(whenText({ status: 'scheduled', scheduledFor: '2026-11-08T17:30:00.000Z' })).toBe('Goes out Sun, Nov 8 at 9:30 AM');
+    expect(whenText({ status: 'cancelled', scheduledFor: '2026-11-08T17:30:00.000Z' })).toBe('Was scheduled for Sun, Nov 8 at 9:30 AM');
+    expect(whenText({ status: 'done', startedAt: '2026-11-08T17:30:00.000Z' })).toBe('Started Sun, Nov 8 at 9:30 AM');
+    expect(whenText({ status: 'sending' })).toBe('');
   });
 });

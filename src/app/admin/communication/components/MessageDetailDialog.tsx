@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
-import { audienceTitle, countLine, pacificText } from '@/utils/communication';
+import { audienceTitle, countLine, pacificText, whenText } from '@/utils/communication';
 import type { MessageSummary } from './HistoryTab';
 
 interface Recipient {
@@ -93,9 +93,7 @@ export default function MessageDetailDialog({ token, id, onClose, onChanged }: {
         {c && (
           <>
             <Typography sx={{ fontSize: 13.5, color: '#6B7280', mb: 1 }}>
-              {audienceTitle(c.filter)} · {c.status === 'scheduled' && c.scheduledFor ? `goes out ${pacificText(c.scheduledFor)}` : c.startedAt ? `started ${pacificText(c.startedAt)}` : ''}
-              {c.finishedAt ? ` · finished ${pacificText(c.finishedAt)}` : ''}
-              {c.createdBy?.name ? ` · by ${c.createdBy.name}` : ''}
+              {[audienceTitle(c.filter), whenText(c), c.finishedAt ? `finished ${pacificText(c.finishedAt)}` : '', c.createdBy?.name ? `by ${c.createdBy.name}` : ''].filter(Boolean).join(' · ')}
             </Typography>
             {c.channels.email && <Typography sx={{ fontSize: 14 }}><b>Email</b> {countLine(c.counts.email)}</Typography>}
             {c.channels.text && <Typography sx={{ fontSize: 14 }}><b>Text</b> {countLine(c.counts.text)}</Typography>}

@@ -134,7 +134,9 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
       setFindError(r.error ?? 'Could not find the customers.');
       return;
     }
-    setCustomers(r.data.customers);
+    // the customers we can actually reach come first, then the others (each group by name, as the server sorted them)
+    const reachable = (c: AudienceCustomer) => (c.email || c.textOk ? 0 : 1);
+    setCustomers([...r.data.customers].sort((a, b) => reachable(a) - reachable(b)));
     setFoundFilter(filter);
     setSmsMode(r.data.smsMode);
     setPicked(new Set(r.data.customers.filter((c) => c.email || c.textOk).map((c) => c.key)));

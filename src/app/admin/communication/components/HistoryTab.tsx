@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Chip, CircularProgress, Paper, Typography } from '@mui/material';
-import { audienceTitle, countLine, pacificText, totalOf, type AudienceFilter } from '@/utils/communication';
+import { audienceTitle, countLine, totalOf, whenText, type AudienceFilter } from '@/utils/communication';
 import MessageDetailDialog from './MessageDetailDialog';
 
 export interface MessageSummary {
@@ -82,8 +82,7 @@ export default function HistoryTab({ token }: { token: string }) {
               {audienceTitle(m.filter)} · {[m.channels.email && 'Email', m.channels.text && 'Text'].filter(Boolean).join(' + ')}
             </Typography>
             <Typography sx={{ fontSize: 13, color: '#6B7280' }}>
-              {m.status === 'scheduled' && m.scheduledFor ? `Goes out ${pacificText(m.scheduledFor)}` : m.startedAt ? `Started ${pacificText(m.startedAt)}` : ''}
-              {m.createdBy?.name ? ` · by ${m.createdBy.name}` : ''}
+              {[whenText(m), m.createdBy?.name ? `by ${m.createdBy.name}` : ''].filter(Boolean).join(' · ')}
             </Typography>
             {m.channels.email && totalOf(m.counts.email) > 0 && <Typography sx={{ fontSize: 13.5, mt: 0.75 }}><b>Email</b> {countLine(m.counts.email)}</Typography>}
             {m.channels.text && totalOf(m.counts.text) > 0 && <Typography sx={{ fontSize: 13.5 }}><b>Text</b> {countLine(m.counts.text)}</Typography>}
