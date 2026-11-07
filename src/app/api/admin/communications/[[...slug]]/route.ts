@@ -27,6 +27,7 @@ function targetFor(slug: string[], method: string): string | null {
   if (slug.length === 1) {
     const [first] = slug;
     if (method === 'POST' && (first === 'audience' || first === 'send' || first === 'test')) return `/api/admin/communications/${first}`;
+    if (method === 'GET' && first === 'customers') return '/api/admin/communications/customers';
     if (method === 'GET' && ID.test(first)) return `/api/admin/communications/${first}`;
     return null;
   }
@@ -46,7 +47,9 @@ async function forward(request: NextRequest, { params }: { params: Promise<{ slu
   if (request.method === 'POST') init.body = await request.text();
 
   try {
-    const response = await fetch(`${livesiteBase()}${target}`, init);
+    // only the customer search takes a query string (?q=)
+    const search = request.method === 'GET' && target.endsWith('/customers') ? new URL(request.url).search : '';
+    const response = await fetch(`${livesiteBase()}${target}${search}`, init);
     const text = await response.text();
     let body: unknown;
     try {

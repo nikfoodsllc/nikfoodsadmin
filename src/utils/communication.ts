@@ -3,13 +3,15 @@
  * The server (customer site) decides who gets what; nothing here sends anything.
  */
 
-export type AudienceKind = 'delivery_date' | 'menu_day' | 'ordered_between';
+export type AudienceKind = 'delivery_date' | 'menu_day' | 'ordered_between' | 'people' | 'all';
 
 export interface AudienceFilter {
   kind: AudienceKind;
   date?: string;
   from?: string;
   to?: string;
+  /** people: the accounts picked by hand */
+  userIds?: string[];
 }
 
 export interface AudienceCustomer {
@@ -27,9 +29,18 @@ export const SUBJECT_LIMIT = 150;
 export const EMAIL_LIMIT = 5000;
 export const PLACEHOLDERS = ['{firstName}', '{orderNumber}', '{date}'] as const;
 
+/** Which placeholders make sense for a choice: {orderNumber} needs orders, {date} needs one day. */
+export function placeholdersFor(kind: AudienceKind): string[] {
+  if (kind === 'delivery_date' || kind === 'menu_day') return [...PLACEHOLDERS];
+  if (kind === 'ordered_between') return ['{firstName}', '{orderNumber}'];
+  return ['{firstName}'];
+}
+
 const dayLong = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export function audienceTitle(f: AudienceFilter): string {
+  if (f.kind === 'all') return 'Everyone';
+  if (f.kind === 'people') return `${f.userIds?.length ?? 0} chosen ${(f.userIds?.length ?? 0) === 1 ? 'person' : 'people'}`;
   if (f.kind === 'delivery_date' && f.date) return `Due for delivery ${dayLong(f.date)}`;
   if (f.kind === 'menu_day' && f.date) return `Ordered for the ${dayLong(f.date)} menu`;
   if (f.kind === 'ordered_between' && f.from && f.to) return f.from === f.to ? `Ordered on ${dayLong(f.from)}` : `Ordered ${dayLong(f.from)} to ${dayLong(f.to)}`;
@@ -39,6 +50,8 @@ export function audienceTitle(f: AudienceFilter): string {
 /** True when the filter has what it needs (real days, start not after end). */
 export function filterReady(f: AudienceFilter): boolean {
   const real = (v?: string) => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)));
+  if (f.kind === 'all') return true;
+  if (f.kind === 'people') return (f.userIds?.length ?? 0) > 0;
   if (f.kind === 'ordered_between') return real(f.from) && real(f.to) && (f.from as string) <= (f.to as string);
   return real(f.date);
 }
