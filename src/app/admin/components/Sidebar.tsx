@@ -38,6 +38,7 @@ import { IconMessage2,
   IconDeviceMobile,
   IconUserCheck,
   IconPhoto,
+  IconSpeakerphone,
 } from '@tabler/icons-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +64,7 @@ const adminNavItems: NavItem[] = [
       { title: 'Order', href: '/admin/orders', icon: IconShoppingCart },
       { title: 'Create Offline Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
       { title: 'Abandoned Checkout', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
+      { title: 'Communication (BETA)', href: '/admin/communication', icon: IconSpeakerphone },
       { title: 'Store Credit', href: '/admin/store-credit', icon: IconCoin },
     ],
   },
