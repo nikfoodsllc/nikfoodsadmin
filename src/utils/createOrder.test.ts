@@ -541,10 +541,10 @@ describe('Zelle orders in Recent orders', () => {
 
 describe('delivery day per item', () => {
   const base = { date: '2026-10-14', foodItemId: 'a', quantity: 1 };
-  it('is sent only when it is after the kitchen day', () => {
+  it('is sent whenever it differs from the kitchen day, earlier or later', () => {
     expect(orderLinePayload({ ...base, deliverOn: '2026-10-16' }).deliverOn).toBe('2026-10-16');
     expect('deliverOn' in orderLinePayload({ ...base, deliverOn: '2026-10-14' })).toBe(false);
-    expect('deliverOn' in orderLinePayload({ ...base, deliverOn: '2026-10-13' })).toBe(false);
+    expect(orderLinePayload({ ...base, deliverOn: '2026-10-13' }).deliverOn).toBe('2026-10-13');
     expect('deliverOn' in orderLinePayload(base)).toBe(false);
   });
   it('makes a different line from the same pick delivered on its kitchen day', () => {

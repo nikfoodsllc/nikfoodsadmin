@@ -120,7 +120,7 @@ export interface OrderLine {
 export function orderLinePayload(l: OrderLine) {
   return {
     date: l.date,
-    ...(l.deliverOn && l.deliverOn > l.date ? { deliverOn: l.deliverOn } : {}),
+    ...(l.deliverOn && l.deliverOn !== l.date ? { deliverOn: l.deliverOn } : {}),
     foodItemId: l.foodItemId,
     quantity: l.quantity,
     selectedPortion: l.selectedPortion,
@@ -147,7 +147,7 @@ export function lineSignature(line: OrderLine): string {
     .sort()
     .map((k) => `${k}:${[...(line.comboSelections?.[k] ?? [])].sort().join('+')}`)
     .join('|');
-  return [line.date, line.deliverOn && line.deliverOn > line.date ? line.deliverOn : '', line.foodItemId, line.selectedPortion ?? '', line.selectedSpiceLevel ?? '', line.isEcoFriendlyContainer ? 'eco' : '', combo, (line.notes ?? '').trim(), line.unitPriceEdited !== undefined ? `price:${line.unitPriceEdited}` : ''].join('~');
+  return [line.date, line.deliverOn && line.deliverOn !== line.date ? line.deliverOn : '', line.foodItemId, line.selectedPortion ?? '', line.selectedSpiceLevel ?? '', line.isEcoFriendlyContainer ? 'eco' : '', combo, (line.notes ?? '').trim(), line.unitPriceEdited !== undefined ? `price:${line.unitPriceEdited}` : ''].join('~');
 }
 
 export function addLine(lines: CartLine[], incoming: Omit<CartLine, 'key'>): CartLine[] {
