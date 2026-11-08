@@ -75,6 +75,16 @@ export default function MenuPicker({
 
   const known = new Set(catalog.dates.map((d) => d.date));
   const dateChips = [...catalog.dates.map((d) => ({ date: d.date, hint: d.state === 'past' ? 'past' : d.state === 'closed' ? 'closed' : '' }))];
+  // every calendar day from a week back to six weeks ahead can be picked, whether or not it is switched on in Manage Days
+  for (let i = -7; i <= 42; i++) {
+    const d = new Date(`${catalog.today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    if (!known.has(iso)) {
+      known.add(iso);
+      dateChips.push({ date: iso, hint: i < 0 ? 'past' : '' });
+    }
+  }
   if (date && !known.has(date)) dateChips.push({ date, hint: date < catalog.today ? 'past' : '' });
   dateChips.sort((a, b) => a.date.localeCompare(b.date));
 
