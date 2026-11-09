@@ -7,6 +7,7 @@ import { IconBell, IconSend, IconTrash, IconUserCheck, IconUsers } from '@tabler
 import { useAuth } from '@/contexts/AuthContext';
 import AppCustomersTab from './AppCustomersTab';
 import AppUpdateCard from './AppUpdateCard';
+import OpensSection from './OpensSection';
 import SelectCustomersDialog from './SelectCustomersDialog';
 import { selectedSendNotice } from '@/utils/pickCustomers';
 
@@ -356,6 +357,8 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
           </Button>
         </DialogActions>
       </Dialog>
+
+      {tab === 'send' && <OpensSection call={call} />}
 
       <SelectCustomersDialog open={pickerOpen} call={call} chosen={chosen} onChange={setChosen} onClose={() => setPickerOpen(false)} />
 
