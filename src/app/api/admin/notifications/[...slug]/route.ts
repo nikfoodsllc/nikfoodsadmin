@@ -40,7 +40,8 @@ async function forward(request: NextRequest, { params }: { params: Promise<{ slu
     init.body = JSON.stringify(slug[0] === 'send-menu' || slug[0] === 'app-update' ? { ...body, adminName: admin.name } : body);
   }
   try {
-    const response = await fetch(`${livesiteBase()}${target}`, init);
+    const query = slug[0] === 'opens' ? request.nextUrl.search : '';
+    const response = await fetch(`${livesiteBase()}${target}${query}`, init);
     const text = await response.text();
     let json: unknown;
     try {
