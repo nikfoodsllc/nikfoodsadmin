@@ -8,6 +8,7 @@ export function notificationsTarget(slug: string[], method: string): string | nu
     if (first === 'templates' && (method === 'GET' || method === 'POST')) return '/api/admin/push/templates';
     if (first === 'send-menu' && method === 'POST') return '/api/admin/push/send-menu';
     if (first === 'app-update' && (method === 'GET' || method === 'PUT' || method === 'POST')) return '/api/admin/push/app-update';
+    if (first === 'opens' && method === 'GET') return '/api/admin/push/opens';
     if (first === 'test' && method === 'POST') return '/api/admin/push/test';
     return null;
   }
