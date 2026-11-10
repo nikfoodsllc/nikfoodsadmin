@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       $or: [{ isActive: true }, { isActive: { $exists: false } }],
     };
 
-    // Search by name, email, or phone (typed text, so special characters like ( or + are matched as they are)
+    // Search by name, email, phone, or customer id (typed text, so special characters like ( or + are matched as they are)
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$and = [
@@ -72,6 +72,8 @@ export async function GET(request: NextRequest) {
             { name: { $regex: escaped, $options: 'i' } },
             { email: { $regex: escaped, $options: 'i' } },
             { phone: { $regex: escaped, $options: 'i' } },
+            // a customer id (as shown in Google Analytics) finds that customer
+            ...(ObjectId.isValid(search.trim()) && /^[a-f0-9]{24}$/i.test(search.trim()) ? [{ _id: new ObjectId(search.trim()) }] : []),
           ],
         },
       ];
