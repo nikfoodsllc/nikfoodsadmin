@@ -34,6 +34,8 @@ export interface DraftDoc {
   status: string;
   orderId?: string;
   source?: string;
+  /** 'mobile' when the checkout was opened in the iPhone app, 'web' on the website (checkouts from before this was recorded have none) */
+  channel?: string;
   createdAt: Date | string;
   lastActivityAt: Date | string;
   contacted?: { at: Date | string; by?: string; note?: string };
@@ -61,6 +63,7 @@ export interface PaidOrderRef {
 
 export interface OrderInfo {
   orderId: string;
+  channel?: string;
   status?: string;
   paymentStatus?: string;
   paymentError?: { code?: string; declineCode?: string; message?: string };
@@ -123,6 +126,8 @@ export interface AbandonedRow {
   /** The minimum order value of this zip, when the list route looked it up (used to work out which day is delivered when) */
   minCartValue?: number;
   lastActivityAt: string;
+  /** Where the checkout was opened: the iPhone app or the website (unset when we cannot tell) */
+  channel?: 'web' | 'mobile';
   /** More checkouts this person left behind before this one */
   earlierCheckouts: number;
   /** They pressed Pay (an order row exists) but the payment did not go through */
@@ -177,6 +182,24 @@ export function problemText(info: OrderInfo | undefined): string | undefined {
  *    if they have a checkout newer than their last paid order;
  *  - several drafts of one person show as one row (the latest), noting how many came before.
  */
+export type ChannelFilter = 'all' | 'mobile' | 'web';
+
+export function parseChannelFilter(value: unknown): ChannelFilter {
+  return value === 'mobile' || value === 'web' ? value : 'all';
+}
+
+/** Where a checkout was opened: what the checkout itself recorded, else what its order says; undefined for older ones with neither. */
+export function draftChannel(d: Pick<DraftDoc, 'channel' | 'orderId'>, orderInfo: Map<string, OrderInfo>): 'web' | 'mobile' | undefined {
+  const own = d.channel ?? (d.orderId ? orderInfo.get(d.orderId)?.channel : undefined);
+  return own === 'mobile' ? 'mobile' : own === 'web' ? 'web' : undefined;
+}
+
+/** App = known to be the app. Website = everything else (like the Orders list: nothing recorded counts as the website). */
+export function matchesChannel(filter: ChannelFilter, channel: 'web' | 'mobile' | undefined): boolean {
+  if (filter === 'all') return true;
+  return filter === 'mobile' ? channel === 'mobile' : channel !== 'mobile';
+}
+
 export function buildAbandonedRows(
   drafts: DraftDoc[],
   paidOrders: PaidOrderRef[],
@@ -224,6 +247,7 @@ export function buildAbandonedRows(
       deliveryDates: latest.deliveryDates ?? [],
       ...(latest.zip ? { zip: latest.zip } : {}),
       lastActivityAt: iso(latest.lastActivityAt),
+      ...(draftChannel(latest, orderInfo) ? { channel: draftChannel(latest, orderInfo) } : {}),
       earlierCheckouts: sorted.length - 1,
       triedToPay: Boolean(latest.orderId),
       ...(problemText(info) && latest.orderId ? { problem: problemText(info) } : {}),

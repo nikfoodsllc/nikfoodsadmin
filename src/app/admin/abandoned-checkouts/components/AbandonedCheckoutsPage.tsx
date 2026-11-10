@@ -27,6 +27,7 @@ import AbandonedMetricsPanel from './AbandonedMetricsPanel';
 import type { AbandonedMetrics, ConversionPerson } from '@/utils/abandonedMetrics';
 import type { PaidReason, PaidRow } from '@/utils/abandonedPaid';
 import { layoutCheckoutDays, weekdayName } from '@/utils/checkoutDays';
+import type { ChannelFilter } from '@/utils/abandonedCheckouts';
 import { pacificToday, QUIET_MINUTES, reachOutEmail, RETENTION_DAYS, splitByReminder, type AbandonedRow, type ReminderView, type View } from '@/utils/abandonedCheckouts';
 
 const REFRESH_MS = 60_000;
@@ -217,6 +218,7 @@ function PersonCard({ row, onHide, onRemind, onCreateOrder }: { row: AbandonedRo
       </Box>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
+        {row.channel === 'mobile' && <Chip size="small" label="App" sx={{ fontWeight: 700, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
         {row.triedToPay ? <Chip size="small" color="warning" label="Pressed Pay, payment did not go through" sx={{ fontWeight: 600 }} /> : <Chip size="small" label="Never pressed Pay" sx={{ fontWeight: 600 }} />}
         {!row.reminder && (
           <Chip
@@ -337,7 +339,8 @@ export default function AbandonedCheckoutsPage() {
   const [preset, setPreset] = useState<Preset>('today');
   const today = pacificToday();
   // what to ask the server for
-  const queryString = preset === 'today' ? `from=${today}&to=${today}` : `days=${preset}`;
+  const [channel, setChannel] = useState<ChannelFilter>('all');
+  const queryString = (preset === 'today' ? `from=${today}&to=${today}` : `days=${preset}`) + (channel === 'all' ? '' : `&channel=${channel}`);
   const [tab, setTab] = useState<'abandoned' | 'recovered'>('abandoned');
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
@@ -461,6 +464,11 @@ export default function AbandonedCheckoutsPage() {
           <ToggleButton value={2}>2 days</ToggleButton>
           <ToggleButton value={5}>5 days</ToggleButton>
           <ToggleButton value={7}>7 days</ToggleButton>
+        </ToggleButtonGroup>
+        <ToggleButtonGroup exclusive size="small" value={channel} onChange={(_, v: ChannelFilter | null) => v && setChannel(v)} aria-label="Where the checkout was opened" sx={{ flexWrap: 'wrap', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 1.25 }, '& .Mui-selected': { bgcolor: '#FDE9C4 !important', color: '#7A4300' } }}>
+          <ToggleButton value="all">Everyone</ToggleButton>
+          <ToggleButton value="mobile">App</ToggleButton>
+          <ToggleButton value="web">Website</ToggleButton>
         </ToggleButtonGroup>
       </Box>
       {data && (

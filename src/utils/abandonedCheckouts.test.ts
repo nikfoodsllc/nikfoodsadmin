@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAbandonedRows, splitByReminder, reminderView, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
+import { draftChannel, matchesChannel, parseChannelFilter, buildAbandonedRows, splitByReminder, reminderView, pacificDayStart, pacificToday, problemText, reachOutEmail, resolveRange, summarize, QUIET_MINUTES, type DraftDoc, type OrderInfo } from './abandonedCheckouts';
 
 const NOW = new Date('2026-10-07T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60 * 1000);
@@ -235,5 +235,29 @@ describe('splitByReminder', () => {
     const rows = build([draft({ paymentIntentId: 'pi_contacted01', userId: 'c', lastActivityAt: ago(60), contacted: { at: ago(30), by: 'A' } })]);
     expect(rows.contacted).toHaveLength(1);
     expect(splitByReminder([...rows.to_contact, ...rows.contacted]).waiting).toHaveLength(1);
+  });
+});
+
+describe('where a checkout was opened (app or website)', () => {
+  const info = new Map<string, OrderInfo>([['ORD-1', { orderId: 'ORD-1', channel: 'mobile' }], ['ORD-2', { orderId: 'ORD-2', channel: 'web' }]]);
+  it('uses what the checkout recorded, else its order, else nothing', () => {
+    expect(draftChannel({ channel: 'mobile' }, info)).toBe('mobile');
+    expect(draftChannel({ channel: 'web', orderId: 'ORD-1' }, info)).toBe('web');
+    expect(draftChannel({ orderId: 'ORD-1' }, info)).toBe('mobile');
+    expect(draftChannel({ orderId: 'ORD-2' }, info)).toBe('web');
+    expect(draftChannel({ orderId: 'ORD-9' }, info)).toBeUndefined();
+    expect(draftChannel({}, info)).toBeUndefined();
+  });
+  it('the filter: App is known app only, Website is everything else, Everyone is all', () => {
+    expect(['mobile', 'web', undefined].map((c) => matchesChannel('mobile', c as never))).toEqual([true, false, false]);
+    expect(['mobile', 'web', undefined].map((c) => matchesChannel('web', c as never))).toEqual([false, true, true]);
+    expect(['mobile', 'web', undefined].map((c) => matchesChannel('all', c as never))).toEqual([true, true, true]);
+    expect(parseChannelFilter('mobile')).toBe('mobile');
+    expect(parseChannelFilter('x')).toBe('all');
+  });
+  it('the row carries the app tag', () => {
+    const r = build([draft({ paymentIntentId: 'pi_1', userId: 'u1', channel: 'mobile' }), draft({ paymentIntentId: 'pi_2', userId: 'u2' })]);
+    const byId = Object.fromEntries(r.to_contact.map((x) => [x.id, x.channel]));
+    expect(byId).toEqual({ pi_1: 'mobile', pi_2: undefined });
   });
 });
