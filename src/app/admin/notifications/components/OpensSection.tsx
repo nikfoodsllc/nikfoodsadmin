@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogContent, DialogTitle, Paper, Typography } from '@mui/material';
 import { IconRefresh } from '@tabler/icons-react';
-import { audienceCounts, hasRecipients, openedText, sendLabel, sentTo, splitPeople, type AudienceData, type Person, type SendRow } from '@/utils/pushOpens';
+import { audienceCounts, groupNote, groupSends, hasRecipients, mergePeople, openedText, sendLabel, sentTo, splitPeople, type AudienceData, type Person, type SendGroup, type SendRow } from '@/utils/pushOpens';
 
 type Call = (path: string) => Promise<{ ok: boolean; status: number; json: { data?: unknown; error?: string } }>;
 
@@ -36,17 +36,17 @@ function PersonRow({ p }: { p: Person }) {
  * are counted (iPhone does not say when a notification was only read on the lock screen), and older app versions do not report taps.
  */
 export default function OpensSection({ call }: { call: Call }) {
-  const [rows, setRows] = useState<SendRow[] | null>(null);
+  const [rows, setRows] = useState<SendGroup[] | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState<SendRow | null>(null);
+  const [open, setOpen] = useState<SendGroup | null>(null);
   const [audience, setAudience] = useState<AudienceData | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await call('opens?limit=30&days=30');
+    const r = await call('opens?limit=200&days=30');
     if (r.ok) {
-      setRows((r.json.data as { sends: SendRow[] }).sends.filter(hasRecipients));
+      setRows(groupSends((r.json.data as { sends: SendRow[] }).sends.filter(hasRecipients)).slice(0, 40));
       setError('');
     } else setError(r.json.error || 'Could not load.');
     setLoading(false);
@@ -56,11 +56,12 @@ export default function OpensSection({ call }: { call: Call }) {
     void load();
   }, [load]);
 
-  const show = async (row: SendRow) => {
+  const show = async (row: SendGroup) => {
     setOpen(row);
     setAudience(null);
-    const r = await call(`opens?pushId=${encodeURIComponent(row.pushId)}`);
-    setAudience(r.ok ? (r.json.data as AudienceData) : { recipientsKnown: false, people: [] });
+    const answers = await Promise.all(row.pushIds.map((id) => call(`opens?pushId=${encodeURIComponent(id)}`)));
+    const good = answers.filter((a) => a.ok).map((a) => a.json.data as AudienceData);
+    setAudience(good.length === 0 ? { recipientsKnown: false, people: [] } : { recipientsKnown: good.every((g) => g.recipientsKnown), people: mergePeople(good.map((g) => g.people)) });
   };
 
   const counts = audience ? audienceCounts(audience.people) : null;
@@ -90,8 +91,8 @@ export default function OpensSection({ call }: { call: Call }) {
           sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5, py: 1, borderTop: '1px solid #F3F4F6', cursor: 'pointer', '&:hover': { bgcolor: '#FAFAFA' } }}
         >
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 700, wordBreak: 'break-word' }}>{r.title || sendLabel(r)}</Typography>
-            <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{sendLabel(r)} · {when(r.sentAt)}</Typography>
+            <Typography sx={{ fontSize: 14, fontWeight: 700, wordBreak: 'break-word' }}>{r.pushIds.length > 1 ? sendLabel(r) : r.title || sendLabel(r)}</Typography>
+            <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{sendLabel(r)} · {when(r.sentAt)}{groupNote(r) ? ` · ${groupNote(r)}` : ''}</Typography>
           </Box>
           <Typography sx={{ fontSize: 13, fontWeight: 700, color: r.openedBy > 0 ? '#166534' : '#6B7280', textAlign: 'right', flexShrink: 0 }}>{openedText(r.openedBy, sentTo(r))}</Typography>
         </Box>
@@ -99,7 +100,7 @@ export default function OpensSection({ call }: { call: Call }) {
 
       <Dialog open={Boolean(open)} onClose={() => setOpen(null)} fullWidth maxWidth="xs" scroll="paper">
         <DialogTitle sx={{ fontWeight: 800, pr: 2 }}>
-          {open?.title || (open ? sendLabel(open) : '')}
+          {open ? (open.pushIds.length > 1 ? sendLabel(open) : open.title || sendLabel(open)) : ''}
           <Typography sx={{ fontSize: 13, color: '#6B7280', fontWeight: 500 }}>
             {open ? `${when(open.sentAt)} · ${openedText(counts && audience?.recipientsKnown ? counts.opened : open.openedBy, audience?.recipientsKnown && counts ? counts.total : sentTo(open))}` : ''}
           </Typography>
