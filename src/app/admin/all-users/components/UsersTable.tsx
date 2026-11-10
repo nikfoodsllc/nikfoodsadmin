@@ -62,6 +62,9 @@ export default function UsersTable({
                 Texts
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
+                Emails
+              </TableCell>
+              <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Registered On
               </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
@@ -74,7 +77,7 @@ export default function UsersTable({
               <UserSkeleton />
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={7} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No users found
                   </Typography>

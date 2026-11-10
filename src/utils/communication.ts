@@ -3,7 +3,7 @@
  * The server (customer site) decides who gets what; nothing here sends anything.
  */
 
-export type AudienceKind = 'delivery_date' | 'menu_day' | 'ordered_between' | 'people' | 'all';
+export type AudienceKind = 'delivery_date' | 'menu_day' | 'ordered_between' | 'people' | 'all' | 'subscribers';
 
 export interface AudienceFilter {
   kind: AudienceKind;
@@ -22,11 +22,16 @@ export interface AudienceCustomer {
   orders: string[];
   textOk: boolean;
   textReason: string | null;
+  /** on the unsubscribe list: no emails are sent to this customer */
+  unsubscribed?: boolean;
 }
 
 export const TEXT_LIMIT = 320;
 export const SUBJECT_LIMIT = 150;
 export const EMAIL_LIMIT = 5000;
+/** A custom HTML email: Gmail cuts a message off at about 102 KB */
+export const EMAIL_HTML_LIMIT = 90_000;
+export type EmailFormat = 'text' | 'html';
 export const PLACEHOLDERS = ['{firstName}', '{orderNumber}', '{date}'] as const;
 
 /** Which placeholders make sense for a choice: {orderNumber} needs orders, {date} needs one day. */
@@ -40,6 +45,7 @@ const dayLong = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString
 
 export function audienceTitle(f: AudienceFilter): string {
   if (f.kind === 'all') return 'Everyone';
+  if (f.kind === 'subscribers') return 'Agreed to get emails';
   if (f.kind === 'people') return `${f.userIds?.length ?? 0} chosen ${(f.userIds?.length ?? 0) === 1 ? 'person' : 'people'}`;
   if (f.kind === 'delivery_date' && f.date) return `Due for delivery ${dayLong(f.date)}`;
   if (f.kind === 'menu_day' && f.date) return `Ordered for the ${dayLong(f.date)} menu`;
@@ -50,7 +56,7 @@ export function audienceTitle(f: AudienceFilter): string {
 /** True when the filter has what it needs (real days, start not after end). */
 export function filterReady(f: AudienceFilter): boolean {
   const real = (v?: string) => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)));
-  if (f.kind === 'all') return true;
+  if (f.kind === 'all' || f.kind === 'subscribers') return true;
   if (f.kind === 'people') return (f.userIds?.length ?? 0) > 0;
   if (f.kind === 'ordered_between') return real(f.from) && real(f.to) && (f.from as string) <= (f.to as string);
   return real(f.date);
@@ -118,7 +124,7 @@ export interface Reach {
 
 export function reachOf(customers: AudienceCustomer[], picked: Set<string>): Reach {
   const chosen = customers.filter((c) => picked.has(c.key));
-  const email = chosen.filter((c) => c.email).length;
+  const email = chosen.filter((c) => c.email && !c.unsubscribed).length;
   const text = chosen.filter((c) => c.textOk).length;
   return { customers: chosen.length, email, noEmail: chosen.length - email, text, noText: chosen.length - text };
 }
@@ -162,4 +168,29 @@ export function whenText(c: { status: string; scheduledFor?: string; startedAt?:
   if (c.status === 'scheduled' && c.scheduledFor) return `Goes out ${pacificText(c.scheduledFor)}`;
   if (!c.startedAt && c.scheduledFor) return `Was scheduled for ${pacificText(c.scheduledFor)}`;
   return c.startedAt ? `Started ${pacificText(c.startedAt)}` : '';
+}
+
+/** What may not be in a custom HTML email (the server refuses the same things). Null when it is fine. */
+export function htmlProblem(html: string): string | null {
+  const tag = html.match(/<\s*(script|iframe|object|embed|form|input|button|textarea|select|link|base)\b/i);
+  if (tag) return `Remove the <${tag[1].toLowerCase()}> tag: email apps do not allow it.`;
+  if (/\son[a-z]+\s*=/i.test(html)) return 'Remove the onclick-style attributes (onclick, onload, ...): email apps do not allow them.';
+  if (/javascript\s*:/i.test(html)) return 'Remove the javascript: link: email apps do not allow it.';
+  return null;
+}
+
+/** The logo the emails attach as cid:nikfoods-logo; the preview cannot attach, so it loads the same picture from the site. */
+export const PREVIEW_LOGO_URL = 'https://www.nikfoods.com/images/logo.png';
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** The page shown in the preview frame: placeholders filled (escaped, like the real send), logo from the site, wrapped when it is a snippet. */
+export function previewHtml(html: string, v: { firstName: string; orderNumber: string; date: string }): string {
+  const filled = html
+    .replace(/\{firstName\}/g, esc(v.firstName))
+    .replace(/\{orderNumber\}/g, esc(v.orderNumber))
+    .replace(/\{date\}/g, v.date)
+    .replace(/\{unsubscribeUrl\}/g, '#')
+    .replace(/cid:nikfoods-logo/g, PREVIEW_LOGO_URL);
+  return /<html[\s>]/i.test(filled) ? filled : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;">${filled}</body></html>`;
 }
