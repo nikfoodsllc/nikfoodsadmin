@@ -47,8 +47,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 /**
  * PUT /api/admin/users/{userId}/email { optedOut: boolean }
  * true = turn off the emails sent from the Communication tab for this customer (their address goes on the unsubscribe list, the same
- * list the unsubscribe link in the emails uses); false = turn them back on (the address comes off that list). Order emails (confirmation,
- * payment) are never affected.
+ * list the unsubscribe link in the emails uses); false = turn them back on (the address comes off that list AND the customer is subscribed
+ * again, so they show as Subscribed). Order emails (confirmation, payment) are never affected.
  */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const auth = verifyAdminRequest(request);
@@ -69,6 +69,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await optOuts.updateOne({ email }, { $setOnInsert: { email, createdAt: new Date(), source: 'admin', by: auth.userId } }, { upsert: true });
     } else {
       await optOuts.deleteOne({ email });
+      // turning emails back on makes the customer subscribed again (the subscription may have been switched off by their own unsubscribe)
+      const subs = database.collection('menu_subscriptions');
+      const now = new Date();
+      const existing = await subs.countDocuments({ $or: [{ email }, { userId }] });
+      if (existing > 0) {
+        await subs.updateMany({ $or: [{ email }, { userId }] }, { $set: { isActive: true, consentGiven: true, updatedAt: now }, $unset: { unsubscribedAt: '' } });
+      } else {
+        await subs.insertOne({ email, userId, subscribedAt: now, consentGiven: true, isActive: true, source: 'admin', by: auth.userId, createdAt: now, updatedAt: now });
+      }
     }
     return NextResponse.json({ data: await status(userId, found.data) });
   } catch (error) {
