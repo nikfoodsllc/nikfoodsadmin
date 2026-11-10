@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { IconSearch } from '@tabler/icons-react';
 import { EMAIL_TEMPLATES, type EmailTemplate } from '@/utils/emailTemplates';
+import { EMAIL_DESIGN_GUIDE } from '@/utils/emailDesignGuide';
 import {
   EMAIL_HTML_LIMIT,
   EMAIL_LIMIT,
@@ -139,6 +140,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [emailBody, setEmailBody] = useState('');
   const [emailFormat, setEmailFormat] = useState<EmailFormat>('text');
   const [pendingTemplate, setPendingTemplate] = useState<EmailTemplate | null>(null);
+  const [guideCopied, setGuideCopied] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<'phone' | 'computer'>('phone');
   const [textBody, setTextBody] = useState('');
 
@@ -412,6 +414,31 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
                     Replace what is in the box with “{pendingTemplate.name}”?
                   </Alert>
                 )}
+                <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: '#FFFBF5' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontSize: 14, fontWeight: 800 }}>Notes for an AI assistant</Typography>
+                      <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>Designing with ChatGPT or Claude? Paste these instructions first, then describe the email you want. It will follow what works in our tool.</Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(EMAIL_DESIGN_GUIDE);
+                          setGuideCopied(true);
+                          setTimeout(() => setGuideCopied(false), 2500);
+                        } catch {
+                          setGuideCopied(false);
+                        }
+                      }}
+                      sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#1F1712', '&:hover': { bgcolor: '#3A2A1E' }, flexShrink: 0 }}
+                    >
+                      {guideCopied ? 'Copied' : 'Copy instructions'}
+                    </Button>
+                  </Box>
+                  <TextField label="Instructions" fullWidth multiline minRows={6} maxRows={12} value={EMAIL_DESIGN_GUIDE} InputProps={{ readOnly: true }} inputProps={{ style: { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, lineHeight: 1.45 } }} sx={{ mt: 1.25 }} />
+                </Paper>
                 <TextField
                   label="Email HTML"
                   fullWidth

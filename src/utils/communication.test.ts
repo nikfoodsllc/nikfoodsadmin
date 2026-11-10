@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { EMAIL_DESIGN_GUIDE } from './emailDesignGuide';
 import { EMAIL_TEMPLATES } from './emailTemplates';
 import { htmlProblem, previewHtml, placeholdersFor, whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
 
@@ -140,5 +141,11 @@ describe('unsubscribed customers', () => {
       { key: 'b', name: 'B', email: 'b@x.com', phone: null, orders: [], textOk: false, textReason: null, unsubscribed: true },
     ];
     expect(reachOf(list, new Set(['a', 'b']))).toEqual({ customers: 2, email: 1, noEmail: 1, text: 0, noText: 2 });
+  });
+});
+
+describe('AI design instructions', () => {
+  it('state the rules the server enforces', () => {
+    for (const w of ['cid:nikfoods-logo', '{unsubscribeUrl}', '{firstName}', '90,000', '<script>', 'bgcolor', 'support@nikfoods.com']) expect(EMAIL_DESIGN_GUIDE).toContain(w);
   });
 });
