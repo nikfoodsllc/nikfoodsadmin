@@ -9,7 +9,7 @@ describe('allergens', () => {
   });
 
   it('writes the list as text, None when empty', () => {
-    expect(allergensText(['tree_nuts', 'milk'])).toBe('Milk, Tree nuts');
+    expect(allergensText(['tree_nuts', 'milk'])).toBe('Dairy, Tree nuts');
     expect(allergensText([])).toBe('None');
     expect(allergensText(null)).toBe('None');
   });
