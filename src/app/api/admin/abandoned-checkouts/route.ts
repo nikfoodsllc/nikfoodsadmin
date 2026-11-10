@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { computeMetrics, type PaidOrderForMetrics } from '@/utils/abandonedMetrics';
 import { buildPaidRows, type PaidOrderRef as PaidOrderWithId } from '@/utils/abandonedPaid';
 import { REMINDER_GAP_DAYS, recentReminders, waitingNote } from '@/utils/abandonedWaiting';
-import { buildAbandonedRows, resolveRange, summarize, type DraftDoc, type OrderInfo, type PaidOrderRef } from '@/utils/abandonedCheckouts';
+import { buildAbandonedRows, draftChannel, matchesChannel, parseChannelFilter, resolveRange, summarize, type DraftDoc, type OrderInfo, type PaidOrderRef } from '@/utils/abandonedCheckouts';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,18 @@ export async function GET(request: NextRequest) {
 
     const draftsResult = await db.read<DraftDoc>('checkoutDrafts', { status: 'open', createdAt: { $gte: since, ...(range.until ? { $lt: range.until } : {}) } } as never, { sort: { lastActivityAt: -1 }, limit: 2000, projection: { cartLines: 0, 'reminderEmail.token': 0 } });
     if (!draftsResult.success) throw new Error(draftsResult.error || 'Could not read the checkouts');
-    const drafts = draftsResult.data ?? [];
+    const channelFilter = parseChannelFilter(params.get('channel'));
+    const allDrafts = draftsResult.data ?? [];
+    // an order's own record says where its checkout was opened when the checkout itself did not record it
+    const info = new Map<string, OrderInfo>();
+    {
+      const ids = [...new Set(allDrafts.map((d) => d.orderId).filter((x): x is string => Boolean(x)))];
+      if (ids.length > 0) {
+        const orders = await db.read<OrderInfo>('orders', { orderId: { $in: ids } } as never, { projection: { orderId: 1, status: 1, paymentStatus: 1, paymentError: 1, channel: 1 } });
+        for (const o of orders.data ?? []) info.set(o.orderId, o);
+      }
+    }
+    const drafts = allDrafts.filter((d) => matchesChannel(channelFilter, draftChannel(d, info)));
 
     const userIds = [...new Set(drafts.map((d) => d.userId).filter(Boolean))];
     let paidOrders: PaidOrderRef[] = [];
@@ -43,13 +54,6 @@ export async function GET(request: NextRequest) {
       const paid = await db.read<PaidOrderRef>('orders', { user: { $in: userIds }, paymentStatus: 'paid', createdAt: { $gte: new Date(since.getTime() - 24 * 3600 * 1000) } } as never, { projection: { user: 1, createdAt: 1 } });
       if (!paid.success) throw new Error(paid.error || 'Could not read the orders');
       paidOrders = paid.data ?? [];
-    }
-
-    const orderIds = [...new Set(drafts.map((d) => d.orderId).filter((x): x is string => Boolean(x)))];
-    const info = new Map<string, OrderInfo>();
-    if (orderIds.length > 0) {
-      const orders = await db.read<OrderInfo>('orders', { orderId: { $in: orderIds } } as never, { projection: { orderId: 1, status: 1, paymentStatus: 1, paymentError: 1 } });
-      for (const o of orders.data ?? []) info.set(o.orderId, o);
     }
 
     const built = buildAbandonedRows(drafts, paidOrders, info);
@@ -88,7 +92,15 @@ export async function GET(request: NextRequest) {
       projection: { cartLines: 0, 'reminderEmail.token': 0 },
     });
     if (!everyone.success) throw new Error(everyone.error || 'Could not read the checkouts');
-    const metricDrafts = everyone.data ?? [];
+    const everyoneDrafts = everyone.data ?? [];
+    {
+      const ids = [...new Set(everyoneDrafts.map((d) => d.orderId).filter((x): x is string => Boolean(x) && !info.has(x as string)))];
+      if (ids.length > 0) {
+        const more = await db.read<OrderInfo>('orders', { orderId: { $in: ids } } as never, { projection: { orderId: 1, channel: 1 } });
+        for (const o of more.data ?? []) info.set(o.orderId, o);
+      }
+    }
+    const metricDrafts = everyoneDrafts.filter((d) => matchesChannel(channelFilter, draftChannel(d, info)));
     // paid orders of everyone who opened checkout (a newer paid order means they did order), from a day before the range starts
     const metricUsers = [...new Set(metricDrafts.map((d) => d.userId).filter(Boolean))];
     let metricOrders: Array<PaidOrderForMetrics & { orderId?: string }> = [];
