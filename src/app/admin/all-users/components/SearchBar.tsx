@@ -11,7 +11,7 @@ interface SearchBarProps {
 export default function SearchBar({ value, onChange }: SearchBarProps) {
   return (
     <TextField
-      placeholder="Search by name, email, or phone..."
+      placeholder="Name, email, phone, or customer ID"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       size="small"
