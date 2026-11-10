@@ -101,7 +101,7 @@ export default function EmailConsentSection({ userId, token }: { userId: string;
           <Box sx={{ mt: 1 }}>
             {view.status === 'stopped' ? (
               <Button size="small" variant="outlined" disabled={busy} onClick={() => change(false)} sx={{ textTransform: 'none', fontWeight: 700 }}>
-                {busy ? <CircularProgress size={16} /> : 'Turn emails back on'}
+                {busy ? <CircularProgress size={16} /> : 'Turn emails back on (subscribe)'}
               </Button>
             ) : ask ? (
               <Alert severity="warning" action={<><Button size="small" color="inherit" disabled={busy} onClick={() => change(true)} sx={{ textTransform: 'none', fontWeight: 800 }}>{busy ? '...' : 'Turn off'}</Button><Button size="small" color="inherit" onClick={() => setAsk(false)} sx={{ textTransform: 'none' }}>Cancel</Button></>}>
