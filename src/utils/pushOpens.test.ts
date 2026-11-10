@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasRecipients, openedText, sendLabel } from './pushOpens';
+import { audienceCounts, hasRecipients, openedText, sendLabel, sentTo, splitPeople, type Person } from './pushOpens';
 
 describe('openedText', () => {
   it('shows opens out of customers with a percentage', () => {
@@ -26,5 +26,25 @@ describe('hasRecipients', () => {
   it('needs a phone or a customer', () => {
     expect(hasRecipients({ sent: 0, customers: 0 })).toBe(false);
     expect(hasRecipients({ sent: 2, customers: 1 })).toBe(true);
+  });
+});
+
+const person = (id: string, opened: boolean): Person => ({ userId: id, name: id, email: '', opened, firstOpenedAt: opened ? '2026-11-09T18:00:00Z' : null, openCount: opened ? 1 : 0 });
+
+describe('who got it', () => {
+  it('counts and splits the list', () => {
+    const people = [person('a', true), person('b', false), person('c', false)];
+    expect(audienceCounts(people)).toEqual({ total: 3, opened: 1, notOpened: 2 });
+    const s = splitPeople(people);
+    expect(s.opened.map((p) => p.userId)).toEqual(['a']);
+    expect(s.notOpened.map((p) => p.userId)).toEqual(['b', 'c']);
+  });
+  it('an empty list is all zeros', () => {
+    expect(audienceCounts([])).toEqual({ total: 0, opened: 0, notOpened: 0 });
+  });
+  it('sentTo prefers who it reached', () => {
+    expect(sentTo({ reached: 5, customers: 36 })).toBe(5);
+    expect(sentTo({ reached: null, customers: 36 })).toBe(36);
+    expect(sentTo({ customers: 12 })).toBe(12);
   });
 });
