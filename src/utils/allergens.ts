@@ -15,7 +15,7 @@ export interface AllergenInfo {
 }
 
 export const ALLERGENS: readonly AllergenInfo[] = [
-  { key: 'milk', label: 'Milk', emoji: '\u{1F95B}', color: '#1D4ED8', bg: '#DBEAFE' },
+  { key: 'milk', label: 'Dairy', emoji: '\u{1F95B}', color: '#1D4ED8', bg: '#DBEAFE' },
   { key: 'eggs', label: 'Eggs', emoji: '\u{1F95A}', color: '#A16207', bg: '#FEF3C7' },
   { key: 'fish', label: 'Fish', emoji: '\u{1F41F}', color: '#0E7490', bg: '#CFFAFE' },
   { key: 'shellfish', label: 'Shellfish', emoji: '\u{1F990}', color: '#B91C1C', bg: '#FEE2E2' },
@@ -44,7 +44,7 @@ export function allergenLabel(key: string): string {
   return ALLERGENS.find((a) => a.key === key)?.label ?? key;
 }
 
-/** "Milk, Gluten" for a list, or "None" when empty. */
+/** "Dairy, Gluten" for a list, or "None" when empty. */
 export function allergensText(value: unknown): string {
   const list = cleanAllergens(value);
   return list.length === 0 ? 'None' : list.map(allergenLabel).join(', ');
