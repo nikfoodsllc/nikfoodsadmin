@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
-import { audienceTitle, countLine, pacificText, whenText } from '@/utils/communication';
+import { audienceTitle, countLine, pacificText, previewHtml, whenText } from '@/utils/communication';
 import type { MessageSummary } from './HistoryTab';
 
 interface Recipient {
@@ -21,7 +21,7 @@ interface Recipient {
 }
 
 interface Detail {
-  campaign: MessageSummary & { emailBody: string; textBody: string };
+  campaign: MessageSummary & { emailBody: string; emailFormat?: 'text' | 'html'; textBody: string };
   recipients: Recipient[];
 }
 
@@ -99,8 +99,12 @@ export default function MessageDetailDialog({ token, id, onClose, onChanged }: {
             {c.channels.text && <Typography sx={{ fontSize: 14 }}><b>Text</b> {countLine(c.counts.text)}</Typography>}
             {c.emailBody && c.channels.email && (
               <Box sx={{ mt: 1.5, p: 1.25, bgcolor: '#FFFBF5', border: '1px solid #EADBC3', borderRadius: 1.5 }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#A85A00', letterSpacing: '0.08em' }}>EMAIL</Typography>
-                <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 13.5, wordBreak: 'break-word' }}>{c.emailBody}</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#A85A00', letterSpacing: '0.08em' }}>EMAIL{c.emailFormat === 'html' ? ' (CUSTOM DESIGN, SAMPLE NAME)' : ''}</Typography>
+                {c.emailFormat === 'html' ? (
+                  <Box component="iframe" title="Email" sandbox="" srcDoc={previewHtml(c.emailBody, { firstName: 'Alex', orderNumber: 'ORD-0000000000000', date: '' })} sx={{ width: '100%', height: 420, border: '1px solid #EADBC3', borderRadius: 1, bgcolor: '#fff', mt: 0.5 }} />
+                ) : (
+                  <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 13.5, wordBreak: 'break-word' }}>{c.emailBody}</Typography>
+                )}
               </Box>
             )}
             {c.textBody && c.channels.text && (

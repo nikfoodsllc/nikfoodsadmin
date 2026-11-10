@@ -49,3 +49,40 @@ export function textFilterClause(filter: TextFilter, subs: SubscriberPhones): Re
   if (filter === 'stopped') return { $and: [notAgreed, everAgreed] };
   return { $and: [notAgreed, { $nor: everAgreed.$or }] };
 }
+
+/**
+ * Email choice (separate from texts). agreed = on the menu alerts list (active, consent given) by email or account and not stopped;
+ * stopped = the address is on the unsubscribe list (they used the link in an email, or an admin turned emails off);
+ * never = neither. Stopped wins over agreed.
+ */
+export type EmailFilter = 'all' | 'agreed' | 'stopped' | 'never';
+export type EmailStatus = Exclude<EmailFilter, 'all'>;
+export const EMAIL_FILTERS: EmailFilter[] = ['all', 'agreed', 'stopped', 'never'];
+
+export function parseEmailFilter(value: unknown): EmailFilter {
+  return EMAIL_FILTERS.includes(value as EmailFilter) ? (value as EmailFilter) : 'all';
+}
+
+/** The people on each list: emails lower case, account ids as text */
+export interface EmailLists {
+  agreedEmails: string[];
+  agreedIds: string[];
+  stoppedEmails: string[];
+}
+
+export function emailStatusFor(user: { _id?: unknown; email?: unknown }, lists: { agreedEmails: Set<string>; agreedIds: Set<string>; stoppedEmails: Set<string> }): EmailStatus {
+  const email = String(user.email ?? '').trim().toLowerCase();
+  if (email && lists.stoppedEmails.has(email)) return 'stopped';
+  if ((email && lists.agreedEmails.has(email)) || lists.agreedIds.has(String(user._id ?? ''))) return 'agreed';
+  return 'never';
+}
+
+/** Mongo condition on the users collection for an email choice, or null for "all" (run with the case-insensitive collation). */
+export function emailFilterClause(filter: EmailFilter, lists: EmailLists, toId: (id: string) => unknown): Record<string, unknown> | null {
+  if (filter === 'all') return null;
+  const ids = lists.agreedIds.map(toId);
+  const agreed = { $or: [{ email: { $in: lists.agreedEmails } }, ...(ids.length ? [{ _id: { $in: ids } }] : [])] };
+  if (filter === 'stopped') return { email: { $in: lists.stoppedEmails } };
+  if (filter === 'agreed') return { $and: [agreed, { email: { $nin: lists.stoppedEmails } }] };
+  return { $and: [{ $nor: agreed.$or }, { email: { $nin: lists.stoppedEmails } }] };
+}

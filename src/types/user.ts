@@ -41,4 +41,6 @@ export interface UserWithAddresses extends Omit<UserDocument, 'password' | 'addr
   addresses?: Address[];
   /** Text-message choice (list only): agreed, stopped or never */
   textStatus?: 'agreed' | 'stopped' | 'never';
+  /** Email choice (list only): on the menu alerts list, stopped (unsubscribed) or never */
+  emailStatus?: 'agreed' | 'stopped' | 'never';
 }
