@@ -3,6 +3,7 @@ import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { UserDocument, Address } from '@/types/user';
 import { ObjectId } from 'mongodb';
+import { emailFilterClause, emailStatusFor, parseEmailFilter } from '@/utils/userFilters';
 import { smsConsentView, type SmsConsentRecord, type SmsSubscriberRecord } from '@/utils/smsConsentView';
 import { parseTextFilter, parseUserSort, textFilterClause, userSortSpec } from '@/utils/userFilters';
 
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100000, Math.max(1, parseInt(searchParams.get('limit') || '10', 10) || 10));
     const skip = (page - 1) * limit;
     const textFilter = parseTextFilter(searchParams.get('texts'));
+    const emailFilter = parseEmailFilter(searchParams.get('emails'));
     const sort = parseUserSort(searchParams.get('sort'));
 
     // Build filter query
@@ -89,8 +91,23 @@ export async function GET(request: NextRequest) {
       if (clause) filter.$and = [...(filter.$and || []), clause];
     }
 
+    // Email choice: the menu alerts list (who agreed) and the unsubscribe list (who stopped), both small
+    const [subRows, stopRows] = await Promise.all([
+      database.collection('menu_subscriptions').find({ isActive: true, consentGiven: true }, { projection: { email: 1, userId: 1 } }).limit(50000).toArray(),
+      database.collection('emailOptOuts').find({}, { projection: { email: 1 } }).limit(50000).toArray(),
+    ]);
+    const stoppedEmails = [...new Set(stopRows.map((x) => String(x.email ?? '').trim().toLowerCase()).filter(Boolean))];
+    const emailLists = {
+      agreedEmails: [...new Set(subRows.map((x) => String(x.email ?? '').trim().toLowerCase()).filter(Boolean))],
+      agreedIds: [...new Set(subRows.map((x) => String(x.userId ?? '')).filter((x) => ObjectId.isValid(x)))],
+      stoppedEmails,
+    };
+    const emailClause = emailFilterClause(emailFilter, emailLists, (id) => new ObjectId(id));
+    if (emailClause) filter.$and = [...(filter.$and || []), emailClause];
+    const listSets = { agreedEmails: new Set(emailLists.agreedEmails), agreedIds: new Set(emailLists.agreedIds), stoppedEmails: new Set(stoppedEmails) };
+
     // Get total count for pagination
-    const total = await database.collection('users').countDocuments(filter);
+    const total = await database.collection('users').countDocuments(filter, { collation: { locale: 'en', strength: 2 } });
 
     // Fetch paginated users (exclude password)
     // (case-insensitive collation so name sorting ignores capital letters)
@@ -119,6 +136,7 @@ export async function GET(request: NextRequest) {
           subByPhone.get(phone10) ?? null,
           user.phone
         ).status;
+        const emailStatus = emailStatusFor(user, listSets);
         if (user.addresses && user.addresses.length > 0) {
           // Convert ObjectId[] to filter
           const addressIds = user.addresses.map(id =>
@@ -132,6 +150,7 @@ export async function GET(request: NextRequest) {
           return {
             ...user,
             textStatus,
+            emailStatus,
             addresses: addressResult.data || [],
           };
         }
@@ -139,6 +158,7 @@ export async function GET(request: NextRequest) {
         return {
           ...user,
           textStatus,
+          emailStatus,
           addresses: [],
         };
       })

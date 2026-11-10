@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { placeholdersFor, whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
+import { EMAIL_TEMPLATES } from './emailTemplates';
+import { htmlProblem, previewHtml, placeholdersFor, whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
 
 const c = (key: string, o: Partial<AudienceCustomer> = {}): AudienceCustomer => ({ key, name: key, email: `${key}@x.com`, phone: null, orders: ['ORD-1'], textOk: false, textReason: null, ...o });
 
@@ -95,5 +96,49 @@ describe('specific people and everyone', () => {
     expect(placeholdersFor('ordered_between')).toEqual(['{firstName}', '{orderNumber}']);
     expect(placeholdersFor('people')).toEqual(['{firstName}']);
     expect(placeholdersFor('all')).toEqual(['{firstName}']);
+  });
+});
+
+describe('custom HTML email', () => {
+  it('refuses what mail apps block', () => {
+    expect(htmlProblem('<p>a</p><script>x()</script>')).toMatch(/script/);
+    expect(htmlProblem('<a onclick="x()">a</a>')).toMatch(/onclick/);
+    expect(htmlProblem('<a href="javascript:x()">a</a>')).toMatch(/javascript/);
+    expect(htmlProblem('<form></form>')).toMatch(/form/);
+    expect(htmlProblem('<p>Press the button below</p>')).toBeNull();
+  });
+  it('fills placeholders safely and swaps the logo for the preview', () => {
+    const out = previewHtml('<img src="cid:nikfoods-logo">Hi {firstName}', { firstName: '<b>x</b>', orderNumber: '', date: '' });
+    expect(out).toContain('https://www.nikfoods.com/images/logo.png');
+    expect(out).toContain('Hi &lt;b&gt;x&lt;/b&gt;');
+    expect(out.startsWith('<!DOCTYPE html>')).toBe(true);
+  });
+  it('keeps a full page as it is', () => {
+    expect(previewHtml('<html><body>x</body></html>', { firstName: 'A', orderNumber: '', date: '' })).toBe('<html><body>x</body></html>');
+  });
+  it('every ready-made design is clean, uses the logo and only known placeholders', () => {
+    for (const t of EMAIL_TEMPLATES) {
+      expect(htmlProblem(t.html)).toBeNull();
+      expect(t.html).toContain('cid:nikfoods-logo');
+      expect(t.html.length).toBeLessThan(30_000);
+      const names = [...t.html.matchAll(/\{([A-Za-z]+)\}/g)].map((m) => m[1]);
+      for (const n of names) expect(['firstName', 'orderNumber', 'date', 'unsubscribeUrl']).toContain(n);
+      expect(t.html).toContain('{unsubscribeUrl}');
+    }
+  });
+  it('the new audience has a title and needs nothing else', () => {
+    expect(audienceTitle({ kind: 'subscribers' })).toBe('Agreed to get emails');
+    expect(filterReady({ kind: 'subscribers' })).toBe(true);
+    expect(placeholdersFor('subscribers')).toEqual(['{firstName}']);
+  });
+});
+
+describe('unsubscribed customers', () => {
+  it('are not counted as reachable by email', () => {
+    const list: AudienceCustomer[] = [
+      { key: 'a', name: 'A', email: 'a@x.com', phone: null, orders: [], textOk: false, textReason: null },
+      { key: 'b', name: 'B', email: 'b@x.com', phone: null, orders: [], textOk: false, textReason: null, unsubscribed: true },
+    ];
+    expect(reachOf(list, new Set(['a', 'b']))).toEqual({ customers: 2, email: 1, noEmail: 1, text: 0, noText: 2 });
   });
 });

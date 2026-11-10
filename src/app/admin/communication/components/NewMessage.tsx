@@ -22,8 +22,13 @@ import {
   Typography,
 } from '@mui/material';
 import { IconSearch } from '@tabler/icons-react';
+import { EMAIL_TEMPLATES, type EmailTemplate } from '@/utils/emailTemplates';
 import {
+  EMAIL_HTML_LIMIT,
   EMAIL_LIMIT,
+  htmlProblem,
+  previewHtml,
+  type EmailFormat,
   SUBJECT_LIMIT,
   TEXT_LIMIT,
   addDays,
@@ -60,7 +65,7 @@ async function call<T>(token: string, path: string, init?: RequestInit): Promise
   }
 }
 
-const KIND_LABEL: Record<AudienceKind, string> = { delivery_date: 'Due for delivery', menu_day: 'Ordered for a menu day', ordered_between: 'Ordered between', people: 'Specific people', all: 'Everyone' };
+const KIND_LABEL: Record<AudienceKind, string> = { delivery_date: 'Due for delivery', menu_day: 'Ordered for a menu day', ordered_between: 'Ordered between', people: 'Specific people', subscribers: 'Agreed to emails', all: 'Everyone' };
 
 interface Person {
   id: string;
@@ -102,7 +107,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [results, setResults] = useState<Person[]>([]);
   const searchSeq = useRef(0);
   const filter: AudienceFilter =
-    kind === 'ordered_between' ? { kind, from, to } : kind === 'people' ? { kind, userIds: people.map((p) => p.id) } : kind === 'all' ? { kind } : { kind, date };
+    kind === 'ordered_between' ? { kind, from, to } : kind === 'people' ? { kind, userIds: people.map((p) => p.id) } : kind === 'all' || kind === 'subscribers' ? { kind } : { kind, date };
   const allowedPlaceholders = placeholdersFor(kind);
 
   // search customers by hand (only the newest answer is used, so a slow earlier search cannot overwrite it)
@@ -132,6 +137,9 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [text, setText] = useState(false);
   const [subject, setSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+  const [emailFormat, setEmailFormat] = useState<EmailFormat>('text');
+  const [pendingTemplate, setPendingTemplate] = useState<EmailTemplate | null>(null);
+  const [previewWidth, setPreviewWidth] = useState<'phone' | 'computer'>('phone');
   const [textBody, setTextBody] = useState('');
 
   const [testTo, setTestTo] = useState(adminEmail);
@@ -152,6 +160,12 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
     if (!customers) return [];
     return q ? customers.filter((c) => `${c.name} ${c.email ?? ''} ${c.phone ?? ''} ${c.orders.join(' ')}`.toLowerCase().includes(q)) : customers;
   }, [customers, search]);
+  const applyTemplate = (t: EmailTemplate) => {
+    setEmailFormat('html');
+    setSubject(t.subject);
+    setEmailBody(t.html);
+    setPendingTemplate(null);
+  };
   const preview = previewValues(customers?.find((c) => picked.has(c.key)), foundFilter ?? filter);
 
   const find = async () => {
@@ -164,12 +178,12 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
       return;
     }
     // the customers we can actually reach come first, then the others (each group by name, as the server sorted them)
-    const reachable = (c: AudienceCustomer) => (c.email || c.textOk ? 0 : 1);
+    const reachable = (c: AudienceCustomer) => ((c.email && !c.unsubscribed) || c.textOk ? 0 : 1);
     setCustomers([...r.data.customers].sort((a, b) => reachable(a) - reachable(b)));
     setFoundFilter(filter);
     setSmsMode(r.data.smsMode);
     // people named by hand stay selected (a missing email shows on the row); the others start with the ones we can reach
-    setPicked(new Set(r.data.customers.filter((c) => filter.kind === 'people' || c.email || c.textOk).map((c) => c.key)));
+    setPicked(new Set(r.data.customers.filter((c) => filter.kind === 'people' || (c.email && !c.unsubscribed) || c.textOk).map((c) => c.key)));
     if (r.data.smsMode === 'off') setText(false);
   };
 
@@ -184,7 +198,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const sendTest = async () => {
     setTestNote(null);
     setTesting(true);
-    const r = await call<{ messageId?: string }>(token, '/test', { method: 'POST', body: JSON.stringify({ to: testTo, subject, emailBody, date: foundFilter?.date ?? filter.date ?? '' }) });
+    const r = await call<{ messageId?: string }>(token, '/test', { method: 'POST', body: JSON.stringify({ to: testTo, subject, emailBody, emailFormat, date: foundFilter?.date ?? filter.date ?? '' }) });
     setTesting(false);
     setTestNote(r.ok ? { ok: true, message: `Test sent to ${testTo}. Placeholders show sample values.` } : { ok: false, message: r.error ?? 'The test could not be sent.' });
   };
@@ -199,7 +213,8 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           : ''
       : '';
 
-  const messageOk = (email ? subject.trim() && emailBody.trim() : true) && (text ? textBody.trim() : true) && (email || text);
+  const htmlError = email && emailFormat === 'html' ? htmlProblem(emailBody) : null;
+  const messageOk = !htmlError && (email ? subject.trim() && emailBody.trim() : true) && (text ? textBody.trim() : true) && (email || text);
   const reachOk = (email && reach.email > 0) || (text && reach.text > 0);
   const stale = Boolean(foundFilter) && JSON.stringify(foundFilter) !== JSON.stringify(filter);
   const canSend = Boolean(customers) && !stale && messageOk && reachOk && !scheduleProblem && !sending;
@@ -212,6 +227,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
       channels: { email, text },
       subject,
       emailBody,
+      emailFormat,
       textBody,
       excludeKeys: (customers ?? []).filter((c) => !picked.has(c.key)).map((c) => c.key),
       ...(scheduledIso ? { scheduledFor: scheduledIso } : {}),
@@ -278,6 +294,8 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
             )}
             <Typography sx={{ fontSize: 13, mt: 1 }}>{people.length === 0 ? 'No one added yet.' : `${people.length} ${people.length === 1 ? 'person' : 'people'} added.`}</Typography>
           </Box>
+        ) : kind === 'subscribers' ? (
+          <Alert severity="info" sx={{ maxWidth: 560 }}>Everyone who signed up for NikFoods email updates (the menu alerts list) and agreed to get them. You can still untick people in the list below.</Alert>
         ) : kind === 'all' ? (
           <Alert severity="warning" sx={{ maxWidth: 560 }}>This is every customer account. Use it for important notices only. You can still untick people in the list below.</Alert>
         ) : (
@@ -294,6 +312,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           {kind === 'menu_day' && 'Customers who ordered something from this menu day, even if it is delivered on another day.'}
           {kind === 'ordered_between' && 'Customers who placed an order in this period. Pick the same day twice for one day. Pacific time.'}
           {kind === 'people' && 'Search the customer accounts and add the people you want. Only the people you add are messaged.'}
+          {kind === 'subscribers' && 'People on the menu alerts list who agreed to emails, with or without an account. Texts need their own agreement, so this choice is for email.'}
           {kind === 'all' && 'Every active customer account, whether or not they have ordered lately.'}
         </Typography>
         {(kind === 'delivery_date' || kind === 'menu_day' || kind === 'ordered_between') && <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>Paid orders only; cancelled, failed and refunded orders are left out. One row per customer.</Typography>}
@@ -311,7 +330,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
             ) : (
               <>
                 <Typography sx={{ fontSize: 14, mb: 1 }}>
-                  <b>{customers.length}</b> {customers.length === 1 ? 'customer' : 'customers'} · <b>{customers.filter((c) => c.email).length}</b> can be emailed · <b>{customers.filter((c) => c.textOk).length}</b> can be texted
+                  <b>{customers.length}</b> {customers.length === 1 ? 'customer' : 'customers'} · <b>{customers.filter((c) => c.email && !c.unsubscribed).length}</b> can be emailed · <b>{customers.filter((c) => c.textOk).length}</b> can be texted
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 1 }}>
                   <TextField
@@ -338,6 +357,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {!c.email && <Chip size="small" label="No email" sx={{ height: 20, fontSize: 11, bgcolor: '#FEF3C7', color: '#92400E' }} />}
+                        {c.email && c.unsubscribed && <Chip size="small" label="Unsubscribed" title="Stopped our emails. No emails are sent to them." sx={{ height: 20, fontSize: 11, bgcolor: '#FEE2E2', color: '#B91C1C' }} />}
                         {c.textOk ? <Chip size="small" label="Text OK" sx={{ height: 20, fontSize: 11, bgcolor: '#DCFCE7', color: '#166534' }} /> : <Chip size="small" label="No text" title={c.textReason ?? ''} sx={{ height: 20, fontSize: 11, bgcolor: '#F3F4F6', color: '#4B5563' }} />}
                       </Box>
                     </Box>
@@ -365,13 +385,68 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           <Box sx={{ mb: 2 }}>
             <TextField label="Email subject" size="small" fullWidth value={subject} onChange={(e) => setSubject(e.target.value.slice(0, SUBJECT_LIMIT))} helperText={`${subject.length}/${SUBJECT_LIMIT}`} />
             <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setSubject((s) => withPlaceholder(s, p))} />
-            <TextField label="Email message" fullWidth multiline minRows={5} value={emailBody} onChange={(e) => setEmailBody(e.target.value.slice(0, EMAIL_LIMIT))} sx={{ mt: 1.5 }} helperText="A blank line starts a new paragraph." />
-            <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setEmailBody((s) => withPlaceholder(s, p))} />
-            <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: '#FFFBF5', borderRadius: 1.5 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
-              <Typography sx={{ fontWeight: 800, fontSize: 16, mt: 0.5 }}>{fillPlaceholders(subject, preview) || 'Subject'}</Typography>
-              <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#54442F', mt: 0.5, wordBreak: 'break-word' }}>{fillPlaceholders(emailBody, preview) || 'Your message'}</Typography>
-            </Paper>
+            <ToggleButtonGroup exclusive size="small" value={emailFormat} onChange={(_, v) => v && setEmailFormat(v)} sx={{ mt: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600 } }}>
+              <ToggleButton value="text">Simple text (NikFoods style)</ToggleButton>
+              <ToggleButton value="html">My own design (HTML)</ToggleButton>
+            </ToggleButtonGroup>
+            {emailFormat === 'text' ? (
+              <>
+                <TextField label="Email message" fullWidth multiline minRows={5} value={emailBody} onChange={(e) => setEmailBody(e.target.value.slice(0, EMAIL_LIMIT))} sx={{ mt: 1.5 }} helperText="A blank line starts a new paragraph." />
+                <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setEmailBody((s) => withPlaceholder(s, p))} />
+                <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: '#FFFBF5', borderRadius: 1.5 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: 16, mt: 0.5 }}>{fillPlaceholders(subject, preview) || 'Subject'}</Typography>
+                  <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#54442F', mt: 0.5, wordBreak: 'break-word' }}>{fillPlaceholders(emailBody, preview) || 'Your message'}</Typography>
+                </Paper>
+              </>
+            ) : (
+              <Box sx={{ mt: 1.5 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Start from a design</Typography>
+                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                  {EMAIL_TEMPLATES.map((t) => (
+                    <Chip key={t.id} label={t.name} title={t.blurb} variant="outlined" onClick={() => (emailBody.trim() && emailBody !== t.html ? setPendingTemplate(t) : applyTemplate(t))} sx={{ fontWeight: 600 }} />
+                  ))}
+                </Box>
+                {pendingTemplate && (
+                  <Alert severity="warning" sx={{ mt: 1 }} action={<><Button size="small" color="inherit" onClick={() => applyTemplate(pendingTemplate)} sx={{ textTransform: 'none', fontWeight: 800 }}>Replace</Button><Button size="small" color="inherit" onClick={() => setPendingTemplate(null)} sx={{ textTransform: 'none' }}>Keep mine</Button></>}>
+                    Replace what is in the box with “{pendingTemplate.name}”?
+                  </Alert>
+                )}
+                <TextField
+                  label="Email HTML"
+                  fullWidth
+                  multiline
+                  minRows={10}
+                  maxRows={24}
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value.slice(0, EMAIL_HTML_LIMIT))}
+                  error={Boolean(htmlError)}
+                  helperText={htmlError ?? `${emailBody.length.toLocaleString('en-US')} / ${EMAIL_HTML_LIMIT.toLocaleString('en-US')}. Paste a full email or just the body. The logo: <img src="cid:nikfoods-logo">. Other pictures need a public https link.`}
+                  inputProps={{ spellCheck: false, style: { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.45 } }}
+                  sx={{ mt: 1.5 }}
+                />
+                <PlaceholderChips allowed={[...allowedPlaceholders, '{unsubscribeUrl}']} onPick={(p) => setEmailBody((s) => withPlaceholder(s, p))} />
+                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>Every email gets an Unsubscribe link at the bottom. Put <code>{'{unsubscribeUrl}'}</code> in a link to place it yourself; otherwise one is added for you.</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
+                  <ToggleButtonGroup exclusive size="small" value={previewWidth} onChange={(_, v) => v && setPreviewWidth(v)} sx={{ '& .MuiToggleButton-root': { textTransform: 'none', py: 0.25, fontSize: 12 } }}>
+                    <ToggleButton value="phone">Phone</ToggleButton>
+                    <ToggleButton value="computer">Computer</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+                <Typography sx={{ fontWeight: 800, fontSize: 15, mt: 0.75 }}>Subject: {fillPlaceholders(subject, preview) || '(none yet)'}</Typography>
+                <Box sx={{ mt: 0.75, border: '1px solid #E5E7EB', borderRadius: 1.5, bgcolor: '#E5E7EB', p: { xs: 0.5, sm: 1.5 }, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+                  <Box
+                    component="iframe"
+                    title="Email preview"
+                    sandbox=""
+                    srcDoc={emailBody.trim() && !htmlError ? previewHtml(emailBody, preview) : '<p style="font-family:sans-serif;color:#6B7280;padding:24px">Your email shows here.</p>'}
+                    sx={{ width: previewWidth === 'phone' ? 375 : '100%', maxWidth: '100%', height: previewWidth === 'phone' ? 640 : 720, border: 0, bgcolor: '#fff', borderRadius: 1 }}
+                  />
+                </Box>
+                <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.75 }}>The preview is close to what customers see. Press “Send test email” to see the real thing in your own inbox (try it on your phone and in dark mode).</Typography>
+              </Box>
+            )}
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1.5 }}>
               <TextField label="Send a test to" size="small" value={testTo} onChange={(e) => setTestTo(e.target.value)} sx={{ flex: '1 1 240px', maxWidth: 340 }} />
               <Button variant="outlined" disabled={testing || !subject.trim() || !emailBody.trim() || !testTo.trim()} onClick={sendTest} sx={{ textTransform: 'none', fontWeight: 700 }}>
@@ -404,7 +479,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
               </Typography>
               {email && (
                 <Typography sx={{ fontSize: 14 }}>
-                  Email: <b>{reach.email}</b> will get it{reach.noEmail > 0 ? `, ${reach.noEmail} ${reach.noEmail === 1 ? 'has' : 'have'} no email and ${reach.noEmail === 1 ? 'is' : 'are'} skipped` : ''}.
+                  Email: <b>{reach.email}</b> will get it{reach.noEmail > 0 ? `, ${reach.noEmail} ${reach.noEmail === 1 ? 'has' : 'have'} no email or ${reach.noEmail === 1 ? 'has' : 'have'} unsubscribed and ${reach.noEmail === 1 ? 'is' : 'are'} skipped` : ''}.
                 </Typography>
               )}
               {text && (

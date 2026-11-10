@@ -28,7 +28,7 @@ import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
 import { UserWithAddresses } from '@/types/user';
 import { useAuth } from '@/contexts/AuthContext';
-import { type TextFilter, type UserSort, parseTextFilter, parseUserSort } from '@/utils/userFilters';
+import { type EmailFilter, type TextFilter, type UserSort, parseEmailFilter, parseTextFilter, parseUserSort } from '@/utils/userFilters';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -53,6 +53,7 @@ export default function UsersPage() {
   const searchQuery = searchBox.query;
   const beginRequest = useLatestRequest();
   const [textFilter, setTextFilter] = useState<TextFilter>('all');
+  const [emailFilter, setEmailFilter] = useState<EmailFilter>('all');
   const [sort, setSort] = useState<UserSort>('newest');
   const [totalUsers, setTotalUsers] = useState(0);
   // rows per page: 10 / 50 / 100 / all (100 unless changed; remembered in this browser)
@@ -93,6 +94,7 @@ export default function UsersPage() {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
       if (textFilter !== 'all') params.append('texts', textFilter);
+      if (emailFilter !== 'all') params.append('emails', emailFilter);
       if (sort !== 'newest') params.append('sort', sort);
       params.append('page', currentPage.toString());
       params.append('limit', itemsPerPage.toString());
@@ -119,7 +121,7 @@ export default function UsersPage() {
     } finally {
       if (request.isCurrent()) setLoading(false);
     }
-  }, [token, isAuthenticated, router, searchQuery, textFilter, sort, currentPage, itemsPerPage, beginRequest]);
+  }, [token, isAuthenticated, router, searchQuery, textFilter, emailFilter, sort, currentPage, itemsPerPage, beginRequest]);
 
   // Fetch users when filters change
   useEffect(() => {
@@ -295,6 +297,19 @@ export default function UsersPage() {
           <MenuItem value="agreed">Agreed to texts</MenuItem>
           <MenuItem value="stopped">Stopped texts</MenuItem>
           <MenuItem value="never">Never agreed</MenuItem>
+        </TextField>
+        <TextField
+          select
+          size="small"
+          label="Emails"
+          value={emailFilter}
+          onChange={(e) => { setEmailFilter(parseEmailFilter(e.target.value)); setCurrentPage(1); }}
+          sx={{ minWidth: 190, backgroundColor: '#fff' }}
+        >
+          <MenuItem value="all">All customers</MenuItem>
+          <MenuItem value="agreed">Subscribed to emails</MenuItem>
+          <MenuItem value="stopped">Stopped emails</MenuItem>
+          <MenuItem value="never">Not subscribed</MenuItem>
         </TextField>
         <TextField
           select
