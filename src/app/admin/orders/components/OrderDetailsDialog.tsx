@@ -47,6 +47,7 @@ import { creditLeft, whyNotCreditable } from '@/utils/storeCredit';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 import { comboQuantityText } from '@/utils/comboQuantity';
 import { getOptionSpice, getSectionSpice } from '@/utils/comboSpice';
+import { dismissedText, splitClientReports } from '@/utils/paymentDismissed';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -725,12 +726,17 @@ export default function OrderDetailsDialog({
                 {new Date(order.paymentActionRequiredAt).toLocaleString()}
               </Typography>
             )}
-            {order.clientPaymentErrors && order.clientPaymentErrors.length > 0 && (
+            {splitClientReports(order.clientPaymentErrors).dismissed && (
+              <Typography variant="body2" sx={{ color: '#B45309' }}>
+                {dismissedText(splitClientReports(order.clientPaymentErrors).dismissed!)}
+              </Typography>
+            )}
+            {splitClientReports(order.clientPaymentErrors).errors.length > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ color: '#6B7280', marginBottom: 0.5 }}>
                   Errors shown to the customer at checkout
                 </Typography>
-                {order.clientPaymentErrors.map((e, i) => (
+                {splitClientReports(order.clientPaymentErrors).errors.map((e, i) => (
                   <Typography key={i} variant="caption" sx={{ display: 'block', color: '#374151' }}>
                     {new Date(e.at).toLocaleTimeString()} · {e.stage}
                     {e.code ? ` · ${e.code}` : ''}
