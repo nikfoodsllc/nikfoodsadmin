@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { imagesForSave, isAcceptedPhoto, isGif, isHeic, movePhoto, photoProblem, photosFromItem, removedPublicIds, storedImages, storedPhotoUrl } from './itemImages';
+import { emailPhotoUrl, imagesForSave, isAcceptedPhoto, isGif, isHeic, movePhoto, photoProblem, photosFromItem, removedPublicIds, storedImages, storedPhotoUrl } from './itemImages';
 
 describe('which files are accepted', () => {
   it('takes JPG, PNG, WebP, GIF and HEIC/HEIF, by type or by name', () => {
@@ -72,5 +72,22 @@ describe('photos of an item', () => {
     expect(storedImages({ url: 'u1', public_id: 'p1' })).toEqual([{ url: 'u1', public_id: 'p1' }]);
     expect(storedImages({ url: 'u1', public_id: 'p1', images: [{ url: 'u2', public_id: 'p2' }] })).toEqual([{ url: 'u1', public_id: 'p1' }, { url: 'u2', public_id: 'p2' }]);
     expect(storedImages({})).toEqual([]);
+  });
+});
+
+describe('emailPhotoUrl', () => {
+  const base = 'https://res.cloudinary.com/dpjcegnvb/image/upload/';
+  it('makes a 640 px JPEG link from a stored photo', () => {
+    expect(emailPhotoUrl(`${base}v1779341631/nikfoods/abc.webp`)).toBe(`${base}w_640,c_limit,q_auto,f_jpg/v1779341631/nikfoods/abc.webp`);
+    expect(emailPhotoUrl(`${base}v12/x/y.png`)).toBe(`${base}w_640,c_limit,q_auto,f_jpg/v12/x/y.png`);
+  });
+  it('keeps animated GIFs as GIFs', () => {
+    expect(emailPhotoUrl(`${base}v12/x/y.gif`)).toBe(`${base}w_640,c_limit,q_auto/v12/x/y.gif`);
+  });
+  it('leaves other links and links that already have a size alone', () => {
+    expect(emailPhotoUrl('https://example.com/a.jpg')).toBe('https://example.com/a.jpg');
+    expect(emailPhotoUrl(`${base}w_300,c_fill/v12/x/y.jpg`)).toBe(`${base}w_300,c_fill/v12/x/y.jpg`);
+    expect(emailPhotoUrl('blob:https://nikfoodsadmin.vercel.app/abc')).toBe('blob:https://nikfoodsadmin.vercel.app/abc');
+    expect(emailPhotoUrl('')).toBe('');
   });
 });
