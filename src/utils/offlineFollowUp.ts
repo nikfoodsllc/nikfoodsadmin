@@ -20,3 +20,19 @@ export function canMakeOfflineOrder(order: FollowUpOrder): boolean {
 export function offlineOrderHref(orderId: string): string {
   return `/admin/create-order?fromOrder=${encodeURIComponent(orderId)}`;
 }
+
+/** What happened to the unpaid order after the offline order was made from it (sent back by the customer site). */
+export interface FollowedUp {
+  orderId: string;
+  cancelled: boolean;
+  reason?: 'email_not_sent' | 'already_paid' | 'payment_not_closed' | 'not_saved';
+  error?: string;
+}
+
+/** The sentence shown on the result card. The unpaid order is cancelled only once the customer's email has gone out. */
+export function followedUpMessage(f: FollowedUp): string {
+  if (f.cancelled) return `The unpaid order ${f.orderId} was cancelled, so the customer only has this one to pay.`;
+  if (f.reason === 'email_not_sent') return `The email to the customer did not go out, so the unpaid order ${f.orderId} was left as it is. Send the link again from Recent orders, then cancel ${f.orderId} yourself if you want.`;
+  if (f.reason === 'already_paid') return `${f.orderId} was paid in the meantime, so it was not cancelled. The customer now has two orders: check the Orders list.`;
+  return `The new order was created, but the unpaid order ${f.orderId} could not be cancelled${f.error ? ` (${f.error})` : ''}. Check the Orders list.`;
+}

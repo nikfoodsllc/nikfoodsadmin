@@ -28,6 +28,7 @@ import {
   tipFields,
   tipProblem,
 } from '@/utils/createOrder';
+import { followedUpMessage } from '@/utils/offlineFollowUp';
 import CustomerSection, { EMPTY_ADDRESS, type FoundCustomer } from './CustomerSection';
 import MenuPicker, { dayChipLabel } from './MenuPicker';
 import ItemOptionsDialog from './ItemOptionsDialog';
@@ -451,7 +452,7 @@ export default function CreateOrderPage() {
       )}
       {fromOrder && !result && (
         <Alert severity={fromOrder.followUp ? 'warning' : 'info'} sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>Stop</Button>}>
-          Started from the unpaid order {fromOrder.id} of {fromOrder.name}. Check the items, the address and the tip, then press Create: they get a payment link by email. The unpaid order itself is left as it is.
+          Started from the unpaid order {fromOrder.id} of {fromOrder.name}. Check the items, the address and the tip, then press Create: they get a payment link by email, and once it is sent the unpaid order is cancelled.
           {fromOrder.followUp ? ` An offline order (${fromOrder.followUp.orderId}) was already made from it on ${new Date(fromOrder.followUp.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}.` : ''}
         </Alert>
       )}
@@ -465,6 +466,11 @@ export default function CreateOrderPage() {
           {result.replaced.cancelled
             ? `${result.replaced.orderId} was cancelled and replaced by this order.`
             : `The new order was created, but ${result.replaced.orderId} could not be cancelled (${result.replaced.error || 'unknown reason'}). Check the Recent orders list.`}
+        </Alert>
+      )}
+      {result?.followedUp && (
+        <Alert severity={result.followedUp.cancelled ? 'success' : 'warning'} sx={{ mb: 2 }}>
+          {followedUpMessage(result.followedUp)}
         </Alert>
       )}
       {result ? (
