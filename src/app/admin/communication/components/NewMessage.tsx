@@ -337,8 +337,8 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
         )}
         {kind !== 'people' && (
           <Box sx={{ mt: 2 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Add other people (they get it whatever the choice above finds)</Typography>
-            <PeopleLookup label="Look up a customer to add" pq={pq} setPq={setPq} results={results} chosen={extra} onAdd={(r) => setExtra((cur) => [...cur, r])} onRemove={(id) => setExtra((cur) => cur.filter((x) => x.id !== id))} summary={extra.length > 0 ? `${extra.length} added by hand.` : undefined} />
+            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Add more customers</Typography>
+            <PeopleLookup label="Search by name, email or phone" pq={pq} setPq={setPq} results={results} chosen={extra} onAdd={(r) => setExtra((cur) => [...cur, r])} onRemove={(id) => setExtra((cur) => cur.filter((x) => x.id !== id))} summary={extra.length > 0 ? `${extra.length} added.` : undefined} />
           </Box>
         )}
         <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 1 }}>
