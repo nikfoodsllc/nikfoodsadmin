@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Dialog, IconButton, Tooltip, Typography } from '@mui/material';
-import { IconArrowLeft, IconArrowRight, IconArrowsMaximize, IconPhotoPlus, IconX, IconZoomIn, IconZoomOut } from '@tabler/icons-react';
-import { DraftPhoto, MAX_ITEM_PHOTOS, PHOTO_ACCEPT, movePhoto, newPhotoKey, photoProblem } from '@/utils/itemImages';
+import { Alert, Box, Button, Dialog, IconButton, Tooltip, Typography } from '@mui/material';
+import { IconArrowLeft, IconArrowRight, IconArrowsMaximize, IconCheck, IconLink, IconPhotoPlus, IconX, IconZoomIn, IconZoomOut } from '@tabler/icons-react';
+import { DraftPhoto, MAX_ITEM_PHOTOS, PHOTO_ACCEPT, emailPhotoUrl, movePhoto, newPhotoKey, photoProblem } from '@/utils/itemImages';
 
 const tile = 104;
 
@@ -35,6 +35,7 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
   const [notice, setNotice] = useState('');
   const [viewing, setViewing] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [copied, setCopied] = useState<string | null>(null);
   const urls = useRef<string[]>([]);
 
   // free the preview addresses of photos that were dropped or when the form closes
@@ -76,6 +77,26 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
   };
   const shown = viewing !== null ? photos[viewing] : null;
 
+  // copies the email-ready link of a saved photo (a photo that is not saved yet has no link)
+  const copyLink = async (photo: DraftPhoto) => {
+    if (photo.file) return;
+    const link = emailPhotoUrl(photo.url);
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      const box = document.createElement('textarea');
+      box.value = link;
+      box.style.position = 'fixed';
+      box.style.opacity = '0';
+      document.body.appendChild(box);
+      box.select();
+      document.execCommand('copy');
+      document.body.removeChild(box);
+    }
+    setCopied(photo.key);
+    setTimeout(() => setCopied((cur) => (cur === photo.key ? null : cur)), 2500);
+  };
+
   const iconBtn = { width: 28, height: 28, bgcolor: 'rgba(255,255,255,0.94)', color: '#111827', boxShadow: '0 1px 4px rgba(0,0,0,0.25)', '&:hover': { bgcolor: '#fff' } } as const;
 
   return (
@@ -85,6 +106,15 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
         {photos.map((photo, i) => (
           <Box key={photo.key} sx={{ position: 'relative', width: tile, height: tile, borderRadius: 2, overflow: 'hidden', border: '2px solid', borderColor: i === 0 ? '#4F8CFF' : '#E5E7EB', bgcolor: '#fff' }}>
             <Thumb photo={photo} />
+            <Box sx={{ position: 'absolute', top: 3, left: 3 }}>
+              <Tooltip title={photo.file ? 'Save the item first to get this photo\'s link' : copied === photo.key ? 'Link copied' : 'Copy picture link for emails'}>
+                <span>
+                  <IconButton aria-label="Copy photo link" size="small" sx={{ ...iconBtn, color: copied === photo.key ? '#166534' : '#111827' }} onClick={() => copyLink(photo)} disabled={Boolean(photo.file)}>
+                    {copied === photo.key ? <IconCheck size={15} /> : <IconLink size={15} />}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Box>
             {i === 0 && (
               <Typography sx={{ position: 'absolute', left: 0, bottom: 0, px: 0.75, py: 0.1, bgcolor: '#4F8CFF', color: '#fff', fontSize: 11, fontWeight: 600, borderTopRightRadius: 6 }}>Main</Typography>
             )}
@@ -115,8 +145,9 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
         )}
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-        {photos.length} of {MAX_ITEM_PHOTOS} · The first photo is the main one on the menu; customers can swipe through the rest. JPG, PNG, WebP, GIF or HEIC, up to 10 MB each. Move a photo with the arrows.
+        {photos.length} of {MAX_ITEM_PHOTOS} · The first photo is the main one on the menu; customers can swipe through the rest. JPG, PNG, WebP, GIF or HEIC, up to 10 MB each. Move a photo with the arrows. The link button copies a picture link sized for emails.
       </Typography>
+      {copied && <Alert severity="success" sx={{ mt: 1 }}>Link copied. Paste it where the email design needs a picture address.</Alert>}
       {notice && <Alert severity="warning" sx={{ mt: 1 }} onClose={() => setNotice('')}>{notice}</Alert>}
 
       <Dialog open={shown !== null} onClose={() => setViewing(null)} maxWidth="md" fullWidth>
@@ -125,6 +156,11 @@ export default function ItemPhotos({ photos, onChange, disabled }: { photos: Dra
             <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={shown.url} alt="" style={zoom === 1 ? { margin: 'auto', width: '100%', height: '100%', objectFit: 'contain' } : { margin: 'auto', width: `${zoom * 100}%`, maxWidth: 'none', flexShrink: 0 }} />
+            </Box>
+            <Box sx={{ position: 'absolute', top: 8, left: 8 }}>
+              <Button size="small" variant="contained" startIcon={shown && copied === shown.key ? <IconCheck size={16} /> : <IconLink size={16} />} onClick={() => copyLink(shown)} disabled={Boolean(shown.file)} sx={{ textTransform: 'none', fontWeight: 700, bgcolor: 'rgba(255,255,255,0.94)', color: '#111827', '&:hover': { bgcolor: '#fff' } }}>
+                {shown.file ? 'Save the item to get a link' : copied === shown.key ? 'Link copied' : 'Copy link for emails'}
+              </Button>
             </Box>
             <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
               <IconButton aria-label="Close" onClick={() => setViewing(null)} sx={{ ...iconBtn, width: 36, height: 36 }}><IconX size={20} /></IconButton>

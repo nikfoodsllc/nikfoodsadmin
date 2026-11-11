@@ -122,3 +122,18 @@ export function storedImages(doc: { url?: string | null; public_id?: string | nu
   if (doc.url && !out.some((i) => i.url === doc.url)) out.unshift({ url: doc.url, ...(doc.public_id ? { public_id: doc.public_id } : {}) });
   return out;
 }
+
+/** Width of the picture link made for emails: sharp on a phone, light enough to load fast. */
+export const EMAIL_PHOTO_WIDTH = 640;
+
+/**
+ * The link to paste into an email for a saved photo: the same picture, at most 640 px wide, as a JPEG (every mail app shows JPEG; some,
+ * like desktop Outlook, do not show WebP) and lightly compressed. Animated GIFs keep their format. A link that is not one of our
+ * stored photos, or already has a size set, is returned as it is.
+ */
+export function emailPhotoUrl(url: string): string {
+  const m = /^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(v\d+\/.+)$/.exec(url);
+  if (!m) return url;
+  const isGif = /\.gif(\?.*)?$/i.test(url);
+  return `${m[1]}w_${EMAIL_PHOTO_WIDTH},c_limit,q_auto${isGif ? '' : ',f_jpg'}/${m[2]}`;
+}
