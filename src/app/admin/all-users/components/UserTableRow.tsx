@@ -1,6 +1,6 @@
 'use client';
 
-import { TableRow as MuiTableRow, TableCell, Typography, Chip, Box, IconButton, Tooltip } from '@mui/material';
+import { TableRow as MuiTableRow, TableCell, Typography, Chip, Box, IconButton, Tooltip, Checkbox } from '@mui/material';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { UserWithAddresses } from '@/types/user';
 import { formatPSTDate } from '@/utils/timezone';
@@ -11,6 +11,9 @@ interface UserTableRowProps {
   onViewDetails: (user: UserWithAddresses) => void;
   onEditUser: (user: UserWithAddresses) => void;
   onDeleteUser: (user: UserWithAddresses) => void;
+  /** ticked for a bulk update (admin accounts cannot be ticked) */
+  selected?: boolean;
+  onToggle?: (user: UserWithAddresses) => void;
 }
 
 export default function UserTableRow({
@@ -19,6 +22,8 @@ export default function UserTableRow({
   onViewDetails,
   onEditUser,
   onDeleteUser,
+  selected = false,
+  onToggle,
 }: UserTableRowProps) {
   return (
     <MuiTableRow
@@ -31,6 +36,10 @@ export default function UserTableRow({
       }}
       onClick={() => onViewDetails(user)}
     >
+      {/* Tick for a bulk update */}
+      <TableCell padding="checkbox" sx={{ width: 48, verticalAlign: 'middle' }} onClick={(e) => e.stopPropagation()}>
+        <Checkbox size="small" checked={selected} disabled={user.role === 'ADMIN' || !onToggle} onChange={() => onToggle?.(user)} inputProps={{ 'aria-label': `Select ${user.name || 'customer'}` }} />
+      </TableCell>
       {/* Name */}
       <TableCell sx={{ padding: '16px 12px', verticalAlign: 'middle' }}>
         <Typography

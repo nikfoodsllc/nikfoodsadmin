@@ -52,8 +52,8 @@ interface NavItem {
 }
 
 /**
- * The admin menu: Order (incl. Abandoned Checkout), Reporting (Kitchen Dashboard first: the page admins land on), Manage Days, Delivery Zones,
- * Food Catalog and User Administration. Pages that are no longer in the menu (the old stats Dashboard at
+ * The admin menu: Order (incl. Abandoned Checkout), Marketing (Communication and Banners), Reporting (Kitchen Dashboard first: the page admins land on), Manage Days,
+ * Mobile App, Food Catalog, User Administration, Understanding Admin and, last, Delivery Zones. Pages that are no longer in the menu (the old stats Dashboard at
  * /admin/dashboard, Modifiers) still work when opened by their address.
  */
 const adminNavItems: NavItem[] = [
@@ -64,8 +64,15 @@ const adminNavItems: NavItem[] = [
       { title: 'Order', href: '/admin/orders', icon: IconShoppingCart },
       { title: 'Create Offline Order', href: '/admin/create-order', icon: IconShoppingCartPlus },
       { title: 'Abandoned Checkout', href: '/admin/abandoned-checkouts', icon: IconShoppingCartOff },
-      { title: 'Communication (BETA)', href: '/admin/communication', icon: IconSpeakerphone },
       { title: 'Store Credit', href: '/admin/store-credit', icon: IconCoin },
+    ],
+  },
+  {
+    title: 'Marketing',
+    icon: IconSpeakerphone,
+    children: [
+      { title: 'Communication (BETA)', href: '/admin/communication', icon: IconSpeakerphone },
+      { title: 'Banners', href: '/admin/banners', icon: IconPhoto },
     ],
   },
   {
@@ -85,11 +92,6 @@ const adminNavItems: NavItem[] = [
     icon: IconCalendarEvent,
   },
   {
-    title: 'Delivery Zones',
-    href: '/admin/min-cart-value',
-    icon: IconMapPin,
-  },
-  {
     title: 'Mobile App',
     icon: IconDeviceMobile,
     children: [
@@ -104,7 +106,6 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'Food Items', href: '/admin/food-items', icon: IconToolsKitchen2 },
       { title: 'Food Category', href: '/admin/food-category', icon: IconCategory },
-      { title: 'Banners', href: '/admin/banners', icon: IconPhoto },
     ],
   },
   {
@@ -119,6 +120,11 @@ const adminNavItems: NavItem[] = [
     title: 'Understanding Admin',
     href: '/admin/understanding-admin',
     icon: IconBook,
+  },
+  {
+    title: 'Delivery Zones',
+    href: '/admin/min-cart-value',
+    icon: IconMapPin,
   },
 ];
 
