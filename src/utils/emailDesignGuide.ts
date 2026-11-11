@@ -20,7 +20,8 @@ STRUCTURE (top to bottom, in this order)
 5. Body: 1-2 short paragraphs, at most 45 words in total. 16-17px, line-height 1.65, colour #54442F, sans-serif system stack, maximum width about 460px, centred block with the text centred if it is 2 lines or fewer and left-aligned if longer. Greet once at most: "Hi {firstName},".
 6. One button: pill shape (border-radius:999px on the cell), background #F89C35 with text #1A1106, 16px bold, letter-spacing 0.02em, padding 16px 38px, so it is at least 48px tall. Never a second button. A small plain text link below it is allowed only when really needed.
 7. Quiet sign-off line, e.g. "With thanks, the NikFoods kitchen", 14px, colour #76664F.
-8. A thin divider (1px #EADBC3), then a small footer: 12-13px, colour #76664F, with support@nikfoods.com, the address https://www.nikfoods.com and the required Unsubscribe link.
+8. The app invitation (REQUIRED in every email, see ALWAYS INVITE PEOPLE TO GET THE APP below).
+9. A thin divider (1px #EADBC3), then a small footer: 12-13px, colour #76664F, with support@nikfoods.com, the address https://www.nikfoods.com and the required Unsubscribe link.
 
 SPACING AND SIZE
 - Card: width 640 on computers, rounded 20px (border-radius:20px; overflow:hidden; border-collapse:separate; border:1px solid #EADBC3). Side padding 44px on computers and 24px on phones; at least 40px above the headline; 28-36px between blocks.
@@ -35,15 +36,23 @@ PICTURES
 - Never stretch or crop with CSS tricks, never put text on top of a picture, never use a picture as the background.
 - Logo: <img src="cid:nikfoods-logo" alt="NikFoods" width="150" style="display:block;margin:0 auto;"> on the dark #1E1409 strip. Use exactly cid:nikfoods-logo (the tool attaches the logo). Do not invent logo URLs.
 
+ALWAYS INVITE PEOPLE TO GET THE APP (every email, no exception)
+- Every email must invite the reader to download the NikFoods iPhone app from the App Store, whatever the email is about. Put it in its own quiet block between the sign-off and the footer divider, centred, with the same breathing room as the other blocks.
+- The block is: one short line in 15px #54442F, then the App Store badge as a link. Write the line to fit the message and keep it under 8 words, for example "Order faster in our app", "Your menu, one tap away", or "Get the NikFoods app". Never "Download now!!" and never more than one line.
+- The badge, exactly as written: <a href="https://apps.apple.com/us/app/id6767141830" style="display:inline-block;margin-top:8px;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:block;border:0;width:120px;height:40px;"></a>. Use exactly cid:app-store-badge (the tool attaches the badge picture, like the logo) and exactly that App Store link. Never invent a badge link, never redraw the badge, never use another app link.
+- This block is the ONLY link allowed besides the main button and the footer. It is quiet on purpose: it never competes with the main button, so do not make it a coloured button.
+- If the email is itself about the app (its main button already goes to the App Store), do not repeat the badge: make that button link to https://apps.apple.com/us/app/id6767141830 and keep the one-line invitation above the footer instead.
+
 TONE
 - Warm, confident, short. Write like a host, not an advertiser. Plain words, no jargon, no exclamation marks, no ALL CAPS sentences (only the small label), no emoji, no discounts or coupons (NikFoods does not do discounts), no urgency tricks.
-- Website: https://www.nikfoods.com . iPhone app: https://apps.apple.com/app/id6767141830 . Support: support@nikfoods.com .
+- Website: https://www.nikfoods.com . iPhone app (App Store): https://apps.apple.com/us/app/id6767141830 . Support: support@nikfoods.com .
 
 HOW THE EMAIL IS SENT (technical rules, follow exactly)
 - The HTML is sent exactly as written, to each customer separately. Gmail, Apple Mail (iPhone) and Outlook must all show it correctly. Most customers read it on an iPhone.
 - It is NOT a web page. Build it like a classic email: nested <table role="presentation"> layouts, inline style="" on every element, and a small <style> block in <head> only for the mobile @media rule.
 - Never use: <script>, <iframe>, <form>, <input>, <button>, <link>, <object>, <embed>, <base>, onclick-style attributes, or javascript: links. They are refused. No JavaScript, no web fonts, no CSS grid/flexbox/variables, no position, no background images, no gradients.
 - Make buttons from a table cell with bgcolor plus a padded <a>, never <button>.
+- The only pictures the tool attaches itself are cid:nikfoods-logo and cid:app-store-badge. Every other picture needs a real https:// link.
 - Keep it under 90,000 characters (Gmail cuts longer emails). Aim for under 20,000.
 - One centred column, width="640" and max-width:640px, full width on phones. Add @media only screen and (max-width:620px) rules: .wrap{width:100%!important;border-radius:0!important}, .px{padding-left:24px!important;padding-right:24px!important}, .h1{font-size:28px!important;line-height:33px!important}.
 - Outer page background plus an inner card. Put a bgcolor="#RRGGBB" ATTRIBUTE on every coloured table/cell in addition to the CSS background (Apple Mail dark mode otherwise darkens boxes but not their text). Use the brand colours below, never pure white or pure black.
@@ -66,4 +75,5 @@ CHECK BEFORE YOU ANSWER
 3. Every coloured block has a bgcolor attribute. No banned tags or attributes. No gradients, shadows, emoji or pure black/white.
    Every picture link is exactly one the person pasted (or there are no pictures), each with width and alt text.
 4. Logo uses cid:nikfoods-logo. Footer has the {unsubscribeUrl} link, support@nikfoods.com and https://www.nikfoods.com.
-5. Exactly one call to action. Then give the subject line and the preheader, one line each, after the code.`;
+5. The app invitation block is present: one short line plus the App Store badge (cid:app-store-badge) linking to https://apps.apple.com/us/app/id6767141830.
+6. Exactly one main call to action (the app invitation and the footer links do not count). Then give the subject line and the preheader, one line each, after the code.`;

@@ -190,16 +190,19 @@ export function htmlProblem(html: string): string | null {
 
 /** The logo the emails attach as cid:nikfoods-logo; the preview cannot attach, so it loads the same picture from the site. */
 export const PREVIEW_LOGO_URL = 'https://www.nikfoods.com/images/logo.png';
+/** The App Store badge the emails attach as cid:app-store-badge; the preview loads the same picture from the site. */
+export const PREVIEW_BADGE_URL = 'https://www.nikfoods.com/images/app-store-badge.png';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** The page shown in the preview frame: placeholders filled (escaped, like the real send), logo from the site, wrapped when it is a snippet. */
+/** The page shown in the preview frame: placeholders filled (escaped, like the real send), logo and App Store badge from the site, wrapped when it is a snippet. */
 export function previewHtml(html: string, v: { firstName: string; orderNumber: string; date: string }): string {
   const filled = html
     .replace(/\{firstName\}/g, esc(v.firstName))
     .replace(/\{orderNumber\}/g, esc(v.orderNumber))
     .replace(/\{date\}/g, v.date)
     .replace(/\{unsubscribeUrl\}/g, '#')
-    .replace(/cid:nikfoods-logo/g, PREVIEW_LOGO_URL);
+    .replace(/cid:nikfoods-logo/g, PREVIEW_LOGO_URL)
+    .replace(/cid:app-store-badge/g, PREVIEW_BADGE_URL);
   return /<html[\s>]/i.test(filled) ? filled : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;">${filled}</body></html>`;
 }

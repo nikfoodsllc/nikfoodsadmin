@@ -144,6 +144,22 @@ describe('unsubscribed customers', () => {
   });
 });
 
+describe('App Store invitation in every email', () => {
+  const badge = '<a href="https://apps.apple.com/us/app/id6767141830"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40"></a>';
+  it('the AI instructions require it, with the exact badge, link and one-line rule', () => {
+    for (const w of ['ALWAYS INVITE PEOPLE TO GET THE APP', 'every email, no exception', 'cid:app-store-badge', 'https://apps.apple.com/us/app/id6767141830', 'under 8 words', 'ONLY link allowed besides the main button']) expect(EMAIL_DESIGN_GUIDE).toContain(w);
+  });
+  it('never mentions the old app link that differs from the one the site uses', () => {
+    expect(EMAIL_DESIGN_GUIDE).not.toContain('apps.apple.com/app/id');
+  });
+  it('a design with the badge passes the checks and the preview shows the badge from the site', () => {
+    expect(htmlProblem(`<html><body><p>Hi</p>${badge}<a href="{unsubscribeUrl}">Unsubscribe</a></body></html>`)).toBeNull();
+    const shown = previewHtml(badge, { firstName: 'A', orderNumber: '', date: '' });
+    expect(shown).toContain('https://www.nikfoods.com/images/app-store-badge.png');
+    expect(shown).not.toContain('cid:app-store-badge');
+  });
+});
+
 describe('AI design instructions', () => {
   it('state the rules the server enforces', () => {
     for (const w of ['cid:nikfoods-logo', '{unsubscribeUrl}', '{firstName}', '90,000', '<script>', 'bgcolor', 'support@nikfoods.com']) expect(EMAIL_DESIGN_GUIDE).toContain(w);
