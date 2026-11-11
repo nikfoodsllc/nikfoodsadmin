@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -48,11 +48,18 @@ import {
   type AudienceFilter,
   type AudienceKind,
 } from '@/utils/communication';
+import { worthSaving, type DraftContent } from '@/utils/communicationDraft';
 
 interface Props {
   token: string;
   adminEmail: string;
   onSent: (message: string) => void;
+  /** a draft to carry on with (the form starts from it and keeps saving into it) */
+  initialDraft?: { id: string; content: DraftContent; updatedBy?: string } | null;
+  /** the list of drafts changed (one was saved, created or removed) */
+  onDraftsChanged?: () => void;
+  /** false while another tab is showing (the form stays alive but hidden): saves what is typed at once */
+  active?: boolean;
 }
 
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<{ ok: boolean; data?: T; error?: string }> {
@@ -130,15 +137,16 @@ function PeopleLookup({ pq, setPq, results, chosen, onAdd, onRemove, summary, la
   );
 }
 
-export default function NewMessage({ token, adminEmail, onSent }: Props) {
+export default function NewMessage({ token, adminEmail, onSent, initialDraft = null, onDraftsChanged, active = true }: Props) {
   const today = pacificToday();
-  const [kind, setKind] = useState<AudienceKind>('delivery_date');
-  const [date, setDate] = useState(addDays(today, 1));
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
-  const [people, setPeople] = useState<Person[]>([]);
+  const init = initialDraft?.content;
+  const [kind, setKind] = useState<AudienceKind>(init?.kind ?? 'delivery_date');
+  const [date, setDate] = useState(init?.date || addDays(today, 1));
+  const [from, setFrom] = useState(init?.from || today);
+  const [to, setTo] = useState(init?.to || today);
+  const [people, setPeople] = useState<Person[]>(init?.people ?? []);
   // people added by hand on top of any other choice
-  const [extra, setExtra] = useState<Person[]>([]);
+  const [extra, setExtra] = useState<Person[]>(init?.extra ?? []);
   const [pq, setPq] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const searchSeq = useRef(0);
@@ -170,22 +178,22 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [finding, setFinding] = useState(false);
   const [findError, setFindError] = useState('');
 
-  const [email, setEmail] = useState(true);
-  const [text, setText] = useState(false);
-  const [subject, setSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
-  const [emailFormat, setEmailFormat] = useState<EmailFormat>('text');
+  const [email, setEmail] = useState(init?.email ?? true);
+  const [text, setText] = useState(init?.text ?? false);
+  const [subject, setSubject] = useState(init?.subject ?? '');
+  const [emailBody, setEmailBody] = useState(init?.emailBody ?? '');
+  const [emailFormat, setEmailFormat] = useState<EmailFormat>(init?.emailFormat ?? 'text');
   const [pendingTemplate, setPendingTemplate] = useState<EmailTemplate | null>(null);
   const [guideCopied, setGuideCopied] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<'phone' | 'computer'>('phone');
-  const [textBody, setTextBody] = useState('');
+  const [textBody, setTextBody] = useState(init?.textBody ?? '');
 
   const [testTo, setTestTo] = useState(adminEmail);
   const [testing, setTesting] = useState(false);
   const [testNote, setTestNote] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const [when, setWhen] = useState<'now' | 'later'>('now');
-  const [local, setLocal] = useState('');
+  const [when, setWhen] = useState<'now' | 'later'>(init?.when ?? 'now');
+  const [local, setLocal] = useState(init?.local ?? '');
   const [confirm, setConfirm] = useState(false);
   const [everyoneOk, setEveryoneOk] = useState(false);
   const [sending, setSending] = useState(false);
@@ -205,6 +213,72 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
     setPendingTemplate(null);
   };
   const preview = previewValues(customers?.find((c) => picked.has(c.key)), foundFilter ?? filter);
+
+  // ---- the message saves itself as a draft while it is written (shared with the other admins) ----
+  const draftContent: DraftContent = useMemo(() => ({ kind, date, from, to, people, extra, email, text, subject, emailBody, emailFormat, textBody, when, local }), [kind, date, from, to, people, extra, email, text, subject, emailBody, emailFormat, textBody, when, local]);
+  const latestDraft = useRef(draftContent);
+  latestDraft.current = draftContent;
+  const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
+  // an opened draft counts as saved as it is (just opening it must not change who saved it last)
+  const lastSaved = useRef<string | null>(null);
+  if (lastSaved.current === null) lastSaved.current = initialDraft ? JSON.stringify(draftContent) : '';
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const sentRef = useRef(false);
+  const [saveState, setSaveState] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; at?: string }>({ status: initialDraft ? 'saved' : 'idle' });
+  const saveDraft = useCallback(() => {
+    saveChain.current = saveChain.current.then(async () => {
+      if (sentRef.current) return;
+      const content = latestDraft.current;
+      const body = JSON.stringify(content);
+      if (body === lastSaved.current) return;
+      if (!draftIdRef.current && !worthSaving(content)) return;
+      setSaveState((cur) => ({ ...cur, status: 'saving' }));
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const existing = draftIdRef.current;
+          const res = await fetch(existing ? `/api/admin/communication-drafts/${existing}` : '/api/admin/communication-drafts', {
+            method: existing ? 'PUT' : 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body,
+            cache: 'no-store',
+            keepalive: body.length < 60_000,
+          });
+          const json = await res.json().catch(() => ({}));
+          if (res.status === 404 && existing) {
+            // the draft was deleted somewhere else: keep the text by starting a new one
+            draftIdRef.current = null;
+            continue;
+          }
+          if (!res.ok) throw new Error('save failed');
+          if (!existing) draftIdRef.current = json.data.id as string;
+          lastSaved.current = body;
+          setSaveState({ status: 'saved', at: json.data.updatedAt as string });
+          onDraftsChanged?.();
+          return;
+        } catch {
+          break;
+        }
+      }
+      setSaveState((cur) => ({ status: 'error', at: cur.at }));
+    });
+  }, [token, onDraftsChanged]);
+  useEffect(() => {
+    const t = setTimeout(saveDraft, 1500);
+    return () => clearTimeout(t);
+  }, [draftContent, saveDraft]);
+  // moving to another tab saves what is there at once
+  useEffect(() => {
+    if (!active) saveDraft();
+  }, [active, saveDraft]);
+  // leaving the page or this screen saves what is there at once
+  useEffect(() => {
+    window.addEventListener('pagehide', saveDraft);
+    return () => {
+      window.removeEventListener('pagehide', saveDraft);
+      saveDraft();
+    };
+  }, [saveDraft]);
+  const savedTime = saveState.at ? new Date(saveState.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) : '';
 
   const find = async (opts?: { filter?: AudienceFilter; keepPicks?: boolean }) => {
     const f = opts?.filter ?? withExtra;
@@ -295,6 +369,12 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
       return;
     }
     setConfirm(false);
+    // the message is on its way: its draft is no longer needed
+    sentRef.current = true;
+    const doneDraft = draftIdRef.current;
+    if (doneDraft) {
+      fetch(`/api/admin/communication-drafts/${doneDraft}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, keepalive: true }).catch(() => undefined).finally(() => onDraftsChanged?.());
+    }
     onSent(scheduledIso ? `Scheduled for ${pacificText(scheduledIso)} (Pacific).` : 'Sending started. Watch the progress below.');
   };
 
@@ -302,7 +382,13 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
     <Box sx={{ display: 'grid', gap: 2 }}>
       {/* 1. Who */}
       <Paper sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: 2 }}>
-        <StepTitle n={1}>Who should get it?</StepTitle>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+          <StepTitle n={1}>Who should get it?</StepTitle>
+          <Typography sx={{ fontSize: 12.5, color: saveState.status === 'error' ? '#B45309' : '#6B7280', mt: 0.5 }} aria-live="polite">
+            {saveState.status === 'saving' ? 'Saving draft…' : saveState.status === 'saved' ? `Draft saved${savedTime ? ` ${savedTime}` : ''}` : saveState.status === 'error' ? 'Could not save the draft. Trying again as you type.' : 'Saved as a draft as you write'}
+          </Typography>
+        </Box>
+        {initialDraft && !customers && <Alert severity="info" sx={{ mb: 1.5 }}>Draft opened{initialDraft.updatedBy ? ` (last saved by ${initialDraft.updatedBy})` : ''}. Press {kind === 'people' ? 'Continue' : 'Find customers'} to see who will get it.</Alert>}
         <ToggleButtonGroup exclusive size="small" value={kind} onChange={(_, v) => v && setKind(v)} sx={{ flexWrap: 'wrap', mb: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600 } }}>
           {(Object.keys(KIND_LABEL) as AudienceKind[]).map((k) => (
             <ToggleButton key={k} value={k}>
