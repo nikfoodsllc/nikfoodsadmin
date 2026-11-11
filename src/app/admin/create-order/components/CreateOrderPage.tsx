@@ -35,6 +35,19 @@ import OrderSummary, { type PaymentChoice, type PreviewData } from './OrderSumma
 import OrderResult, { type CreatedOrder } from './OrderResult';
 import RecentOrders from './RecentOrders';
 
+/** An order as the customer site lays it out for this form (Edit, and 'make an offline order' from a failed order) */
+interface FormOrder {
+  customer: CustomerForm;
+  address: typeof EMPTY_ADDRESS;
+  lines: Array<CartLine & { unitPriceEdited?: number }>;
+  tipPercentage: number;
+  tipAmount?: number;
+  waivePlatformFee: boolean;
+  countBeforePayment?: boolean;
+  discount: number;
+  payKind: 'link' | 'zelle';
+}
+
 async function callApi(token: string, path: string, init?: RequestInit) {
   const res = await fetch(`/api/admin/create-order/${path}`, {
     ...init,
@@ -119,6 +132,9 @@ export default function CreateOrderPage() {
   // started from an abandoned checkout (?fromCheckout=pi_...): who it is for, and a note about anything that could not be added
   const [fromCheckout, setFromCheckout] = useState<{ name: string; skipped: number; noCart: boolean; email: string } | null>(null);
   const fromCheckoutDone = useRef(false);
+  // started from a failed or unpaid website order (?fromOrder=ORD-...): which one, and whether an offline order was already made from it
+  const [fromOrder, setFromOrder] = useState<{ id: string; name: string; followUp?: { orderId: string; at: string } } | null>(null);
+  const fromOrderDone = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) router.push('/login');
@@ -246,6 +262,7 @@ export default function CreateOrderPage() {
       requestId,
       ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
       ...(editing ? { replacesOrderId: editing } : {}),
+      ...(fromOrder && !editing ? { fromOrderId: fromOrder.id } : {}),
     };
     const r = await callApi(token, 'create', { method: 'POST', body: JSON.stringify(body) });
     setSubmitting(false);
@@ -284,19 +301,12 @@ export default function CreateOrderPage() {
     setPreview(null);
     setSubmitError('');
     setEditing(null);
+    setFromOrder(null);
     setEditError('');
   };
 
-  // Edit: load a sent, unpaid order into the form; pressing Create makes the new version and cancels the old one
-  const startEdit = async (orderId: string) => {
-    if (!token) return;
-    setEditError('');
-    const r = await callApi(token, `orders/${encodeURIComponent(orderId)}`);
-    if (!r.ok) {
-      setEditError(r.body?.error || 'Could not open that order for editing');
-      return;
-    }
-    const o = r.body.data;
+  // fills the whole form from an order laid out by the customer site (used by Edit and by 'make an offline order' for a failed order)
+  const loadIntoForm = (o: FormOrder) => {
     setTab('create');
     setResult(null);
     setRequestId(crypto.randomUUID());
@@ -325,6 +335,45 @@ export default function CreateOrderPage() {
     setNote('');
     setSubmitError('');
     setDate((d) => o.lines[0]?.date || d);
+  };
+
+  // Make an offline order from a failed or unpaid website order: same items, address and customer, to be sent as a pay link
+  const startFromOrder = async (orderId: string) => {
+    if (!token) return;
+    setEditError('');
+    const r = await callApi(token, `rebuild/${encodeURIComponent(orderId)}`);
+    if (!r.ok) {
+      setEditError(r.body?.error || 'Could not open that order');
+      return;
+    }
+    const o = r.body.data;
+    loadIntoForm(o);
+    setEditing(null);
+    setFromOrder({ id: orderId, name: o.customer.name || o.customer.email, ...(o.fromOrder?.followUp ? { followUp: o.fromOrder.followUp } : {}) });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (!token || fromOrderDone.current) return;
+    const id = new URLSearchParams(window.location.search).get('fromOrder');
+    if (!id) return;
+    fromOrderDone.current = true;
+    window.history.replaceState(null, '', window.location.pathname);
+    void startFromOrder(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Edit: load a sent, unpaid order into the form; pressing Create makes the new version and cancels the old one
+  const startEdit = async (orderId: string) => {
+    if (!token) return;
+    setEditError('');
+    const r = await callApi(token, `orders/${encodeURIComponent(orderId)}`);
+    if (!r.ok) {
+      setEditError(r.body?.error || 'Could not open that order for editing');
+      return;
+    }
+    loadIntoForm(r.body.data);
+    setFromOrder(null);
     setEditing(orderId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -398,6 +447,12 @@ export default function CreateOrderPage() {
           Started from the abandoned checkout of {fromCheckout.name}.
           {fromCheckout.noCart ? ' Their cart was not saved for this checkout, so add the items yourself.' : ' Check the items, the address and how they pay, then create the order.'}
           {fromCheckout.skipped > 0 ? ` ${fromCheckout.skipped} item${fromCheckout.skipped === 1 ? ' is' : 's are'} no longer on the menu and ${fromCheckout.skipped === 1 ? 'was' : 'were'} left out.` : ''}
+        </Alert>
+      )}
+      {fromOrder && !result && (
+        <Alert severity={fromOrder.followUp ? 'warning' : 'info'} sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>Stop</Button>}>
+          Started from the unpaid order {fromOrder.id} of {fromOrder.name}. Check the items, the address and the tip, then press Create: they get a payment link by email. The unpaid order itself is left as it is.
+          {fromOrder.followUp ? ` An offline order (${fromOrder.followUp.orderId}) was already made from it on ${new Date(fromOrder.followUp.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}.` : ''}
         </Alert>
       )}
       {editing && !result && (
