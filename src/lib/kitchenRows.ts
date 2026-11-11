@@ -2,7 +2,7 @@ import { ObjectId } from 'mongodb';
 import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
-import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
+import { pacificDayOf, toDayString, unpackSaverCombo, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 
 /**
  * The order lines the kitchen has to produce within a date range, one per ordered item, flattened for
@@ -69,7 +69,7 @@ function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): Kit
     if (!kitchenDay) continue;
     // an item an admin moved to another date is cooked for the date it is delivered on
     const day = movedFrom ? toDayString(raw.deliveredOn) || kitchenDay : kitchenDay;
-    rows.push({
+    rows.push(unpackSaverCombo({
       orderId: String(raw.orderId ?? ''),
       day,
       name: String(raw.name ?? ''),
@@ -87,7 +87,7 @@ function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): Kit
       orderedOn: pacificDayOf(raw.orderedAt),
       orderedAt: raw.orderedAt instanceof Date || typeof raw.orderedAt === 'string' ? new Date(raw.orderedAt).toISOString() : null,
       movedFrom: movedFrom ? kitchenDay : null,
-    });
+    }));
   }
   return rows;
 }

@@ -106,6 +106,28 @@ export function formatRangeLabel(range: DayRange): string {
 // Counting
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * A "saver combo" flat item keeps its size and how many it holds only in its name, e.g.
+ * "Idli Batter (Saver Combo) 32Oz x 2" = two tubs of "Idli Batter (32Oz)". Returns the plain item's
+ * name and how many of it one saver combo holds, or null when the name does not follow that pattern.
+ */
+export function parseSaverComboName(name: string): { name: string; each: number } | null {
+  const m = /^(.*?)\s*\(\s*saver\s*combo\s*\)\s*(\d+(?:\.\d+)?\s*[A-Za-z]+)\s*[x\u00d7]\s*(\d+)\s*$/i.exec(clean(name));
+  if (!m) return null;
+  const base = m[1].trim();
+  const each = Number(m[3]);
+  if (!base || !Number.isInteger(each) || each < 1) return null;
+  return { name: `${base} (${m[2].replace(/\s+/g, '')})`, each };
+}
+
+/** Counts a saver combo line as the plain item it contains (quantity x how many it holds). Other rows are returned unchanged. */
+export function unpackSaverCombo<T extends { name: string; quantity: number; sections?: unknown }>(row: T): T {
+  if (Array.isArray(row.sections) && row.sections.length > 0) return row;
+  const parsed = parseSaverComboName(row.name);
+  if (!parsed) return row;
+  return { ...row, name: parsed.name, quantity: row.quantity * parsed.each };
+}
+
 /** One ordered line (one item of one order day), flattened for counting. */
 export interface KitchenRow {
   orderId: string;
