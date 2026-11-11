@@ -5,6 +5,8 @@ import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/ma
 import { paidMethodValue, type PaidChoice } from '@/utils/createOrder';
 import PaidMethodPicker from './PaidMethodPicker';
 
+import type { FollowedUp } from '@/utils/offlineFollowUp';
+
 export interface CreatedOrder {
   orderId: string;
   totalPaid: number;
@@ -15,6 +17,8 @@ export interface CreatedOrder {
   emailError?: string;
   /** Set when this order replaced another (an edit) */
   replaced?: { orderId: string; cancelled: boolean; error?: string };
+  /** Set when this order was started from an unpaid or failed website order: whether that order is now cancelled */
+  followedUp?: FollowedUp;
 }
 
 /** What happened after Create: the order number, the pay link (copy it, resend it), and whether the emails went out. */
