@@ -111,6 +111,12 @@ export async function GET(request: NextRequest) {
     // Get total count for pagination
     const total = await database.collection('users').countDocuments(filter, { collation: { locale: 'en', strength: 2 } });
 
+    // idsOnly=1: just the ids of everyone who matches (for "select all matching" before a bulk update)
+    if (searchParams.get('idsOnly') === '1') {
+      const idRows = await database.collection('users').find(filter, { projection: { _id: 1 } }).collation({ locale: 'en', strength: 2 }).sort(userSortSpec(sort)).limit(20000).toArray();
+      return NextResponse.json({ data: { ids: idRows.map((r) => String(r._id)), total } });
+    }
+
     // Fetch paginated users (exclude password)
     // (case-insensitive collation so name sorting ignores capital letters)
     const users = (await database

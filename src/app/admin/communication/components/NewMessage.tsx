@@ -97,6 +97,39 @@ function PlaceholderChips({ onPick, allowed }: { onPick: (p: string) => void; al
   );
 }
 
+function PeopleLookup({ pq, setPq, results, chosen, onAdd, onRemove, summary, label = 'Search by name, email or phone' }: { pq: string; setPq: (v: string) => void; results: Person[]; chosen: Person[]; onAdd: (p: Person) => void; onRemove: (id: string) => void; summary?: string; label?: string }) {
+  return (
+    <Box>
+      <TextField label={label} size="small" fullWidth value={pq} onChange={(e) => setPq(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }} sx={{ maxWidth: 420 }} />
+      {results.length > 0 && (
+        <Box sx={{ mt: 1, border: '1px solid #E5E7EB', borderRadius: 1.5, maxHeight: 260, overflowY: 'auto', maxWidth: 560 }}>
+          {results.map((r) => {
+            const added = chosen.some((p) => p.id === r.id);
+            return (
+              <Box key={r.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 14, wordBreak: 'break-word' }}>{r.name || 'No name'}</Typography>
+                  <Typography sx={{ fontSize: 12.5, color: '#6B7280', wordBreak: 'break-word' }}>{r.email || 'No email'} · {r.phone || 'No phone'}</Typography>
+                </Box>
+                <Button size="small" variant={added ? 'text' : 'outlined'} disabled={added} onClick={() => onAdd(r)} sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}>{added ? 'Added' : 'Add'}</Button>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+      {pq.trim().length >= 2 && results.length === 0 && <Typography sx={{ fontSize: 13, color: '#6B7280', mt: 0.75 }}>No customers match.</Typography>}
+      {chosen.length > 0 && (
+        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1.25 }}>
+          {chosen.map((p) => (
+            <Chip key={p.id} label={p.name || p.email} onDelete={() => onRemove(p.id)} />
+          ))}
+        </Box>
+      )}
+      {summary && <Typography sx={{ fontSize: 13, mt: 1 }}>{summary}</Typography>}
+    </Box>
+  );
+}
+
 export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const today = pacificToday();
   const [kind, setKind] = useState<AudienceKind>('delivery_date');
@@ -104,16 +137,19 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const [people, setPeople] = useState<Person[]>([]);
+  // people added by hand on top of any other choice
+  const [extra, setExtra] = useState<Person[]>([]);
   const [pq, setPq] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const searchSeq = useRef(0);
   const filter: AudienceFilter =
     kind === 'ordered_between' ? { kind, from, to } : kind === 'people' ? { kind, userIds: people.map((p) => p.id) } : kind === 'all' || kind === 'subscribers' ? { kind } : { kind, date };
+  const withExtra: AudienceFilter = kind !== 'people' && extra.length > 0 ? { ...filter, alsoUserIds: extra.map((p) => p.id) } : filter;
   const allowedPlaceholders = placeholdersFor(kind);
 
   // search customers by hand (only the newest answer is used, so a slow earlier search cannot overwrite it)
   useEffect(() => {
-    if (kind !== 'people' || pq.trim().length < 2) {
+    if (pq.trim().length < 2) {
       setResults([]);
       return;
     }
@@ -124,7 +160,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
       setResults(r.ok && r.data ? r.data : []);
     }, 350);
     return () => clearTimeout(t);
-  }, [pq, kind, token]);
+  }, [pq, token]);
 
   const [customers, setCustomers] = useState<AudienceCustomer[] | null>(null);
   const [foundFilter, setFoundFilter] = useState<AudienceFilter | null>(null);
@@ -170,10 +206,11 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   };
   const preview = previewValues(customers?.find((c) => picked.has(c.key)), foundFilter ?? filter);
 
-  const find = async () => {
+  const find = async (opts?: { filter?: AudienceFilter; keepPicks?: boolean }) => {
+    const f = opts?.filter ?? withExtra;
     setFindError('');
     setFinding(true);
-    const r = await call<{ customers: AudienceCustomer[]; smsMode: 'off' | 'dry' | 'on' }>(token, '/audience', { method: 'POST', body: JSON.stringify({ filter }) });
+    const r = await call<{ customers: AudienceCustomer[]; smsMode: 'off' | 'dry' | 'on' }>(token, '/audience', { method: 'POST', body: JSON.stringify({ filter: f }) });
     setFinding(false);
     if (!r.ok || !r.data) {
       setFindError(r.error ?? 'Could not find the customers.');
@@ -182,12 +219,28 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
     // the customers we can actually reach come first, then the others (each group by name, as the server sorted them)
     const reachable = (c: AudienceCustomer) => ((c.email && !c.unsubscribed) || c.textOk ? 0 : 1);
     setCustomers([...r.data.customers].sort((a, b) => reachable(a) - reachable(b)));
-    setFoundFilter(filter);
+    setFoundFilter(f);
     setSmsMode(r.data.smsMode);
     // people named by hand stay selected (a missing email shows on the row); the others start with the ones we can reach
-    setPicked(new Set(r.data.customers.filter((c) => filter.kind === 'people' || (c.email && !c.unsubscribed) || c.textOk).map((c) => c.key)));
+    // people added by hand are always ticked; when only the added people changed, the ticks the admin made stay as they were
+    setPicked((prev) => new Set(r.data!.customers.filter((c) => c.added || f.kind === 'people' || (opts?.keepPicks ? prev.has(c.key) : (c.email && !c.unsubscribed) || c.textOk)).map((c) => c.key)));
     if (r.data.smsMode === 'off') setText(false);
   };
+
+  // adding or removing a hand-picked person while the list is showing refreshes the list at once (the ticks the admin made stay)
+  const extraKey = extra.map((p) => p.id).join(',');
+  const firstExtraRun = useRef(true);
+  useEffect(() => {
+    if (firstExtraRun.current) {
+      firstExtraRun.current = false;
+      return;
+    }
+    if (!customers || !foundFilter || foundFilter.kind === 'people') return;
+    const base: AudienceFilter = { ...foundFilter };
+    delete base.alsoUserIds;
+    void find({ filter: extra.length > 0 ? { ...base, alsoUserIds: extra.map((p) => p.id) } : base, keepPicks: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraKey]);
 
   const toggle = (key: string) =>
     setPicked((cur) => {
@@ -218,7 +271,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
   const htmlError = email && emailFormat === 'html' ? htmlProblem(emailBody) : null;
   const messageOk = !htmlError && (email ? subject.trim() && emailBody.trim() : true) && (text ? textBody.trim() : true) && (email || text);
   const reachOk = (email && reach.email > 0) || (text && reach.text > 0);
-  const stale = Boolean(foundFilter) && JSON.stringify(foundFilter) !== JSON.stringify(filter);
+  const stale = Boolean(foundFilter) && JSON.stringify(foundFilter) !== JSON.stringify(withExtra);
   const canSend = Boolean(customers) && !stale && messageOk && reachOk && !scheduleProblem && !sending;
 
   const send = async () => {
@@ -268,34 +321,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
             </Box>
           </Box>
         ) : kind === 'people' ? (
-          <Box>
-            <TextField label="Search by name, email or phone" size="small" fullWidth value={pq} onChange={(e) => setPq(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><IconSearch size={16} /></InputAdornment> }} sx={{ maxWidth: 420 }} />
-            {results.length > 0 && (
-              <Box sx={{ mt: 1, border: '1px solid #E5E7EB', borderRadius: 1.5, maxHeight: 260, overflowY: 'auto', maxWidth: 560 }}>
-                {results.map((r) => {
-                  const added = people.some((p) => p.id === r.id);
-                  return (
-                    <Box key={r.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: 0.75, borderBottom: '1px solid #F3F4F6' }}>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: 14, wordBreak: 'break-word' }}>{r.name || 'No name'}</Typography>
-                        <Typography sx={{ fontSize: 12.5, color: '#6B7280', wordBreak: 'break-word' }}>{r.email || 'No email'} · {r.phone || 'No phone'}</Typography>
-                      </Box>
-                      <Button size="small" variant={added ? 'text' : 'outlined'} disabled={added} onClick={() => setPeople((cur) => [...cur, r])} sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}>{added ? 'Added' : 'Add'}</Button>
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-            {pq.trim().length >= 2 && results.length === 0 && <Typography sx={{ fontSize: 13, color: '#6B7280', mt: 0.75 }}>No customers match.</Typography>}
-            {people.length > 0 && (
-              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1.25 }}>
-                {people.map((p) => (
-                  <Chip key={p.id} label={p.name || p.email} onDelete={() => setPeople((cur) => cur.filter((x) => x.id !== p.id))} />
-                ))}
-              </Box>
-            )}
-            <Typography sx={{ fontSize: 13, mt: 1 }}>{people.length === 0 ? 'No one added yet.' : `${people.length} ${people.length === 1 ? 'person' : 'people'} added.`}</Typography>
-          </Box>
+          <PeopleLookup pq={pq} setPq={setPq} results={results} chosen={people} onAdd={(r) => setPeople((cur) => [...cur, r])} onRemove={(id) => setPeople((cur) => cur.filter((x) => x.id !== id))} summary={people.length === 0 ? 'No one added yet.' : `${people.length} ${people.length === 1 ? 'person' : 'people'} added.`} />
         ) : kind === 'subscribers' ? (
           <Alert severity="info" sx={{ maxWidth: 560 }}>Everyone who signed up for NikFoods email updates (the menu alerts list) and agreed to get them. You can still untick people in the list below.</Alert>
         ) : kind === 'all' ? (
@@ -309,6 +335,12 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
             </Box>
           </Box>
         )}
+        {kind !== 'people' && (
+          <Box sx={{ mt: 2 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Add other people (they get it whatever the choice above finds)</Typography>
+            <PeopleLookup label="Look up a customer to add" pq={pq} setPq={setPq} results={results} chosen={extra} onAdd={(r) => setExtra((cur) => [...cur, r])} onRemove={(id) => setExtra((cur) => cur.filter((x) => x.id !== id))} summary={extra.length > 0 ? `${extra.length} added by hand.` : undefined} />
+          </Box>
+        )}
         <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 1 }}>
           {kind === 'delivery_date' && 'Customers whose order is delivered on this date (the date it is really delivered on, also for items that were moved).'}
           {kind === 'menu_day' && 'Customers who ordered something from this menu day, even if it is delivered on another day.'}
@@ -318,14 +350,14 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           {kind === 'all' && 'Every active customer account, whether or not they have ordered lately.'}
         </Typography>
         {(kind === 'delivery_date' || kind === 'menu_day' || kind === 'ordered_between') && <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>Paid orders only; cancelled, failed and refunded orders are left out. One row per customer.</Typography>}
-        <Button variant="contained" disabled={!filterReady(filter) || finding} onClick={find} sx={{ mt: 1.5, textTransform: 'none', fontWeight: 700, bgcolor: '#1F1712', '&:hover': { bgcolor: '#3A2A1E' } }}>
+        <Button variant="contained" disabled={!filterReady(filter) || finding} onClick={() => void find()} sx={{ mt: 1.5, textTransform: 'none', fontWeight: 700, bgcolor: '#1F1712', '&:hover': { bgcolor: '#3A2A1E' } }}>
           {finding ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : kind === 'people' ? 'Continue' : 'Find customers'}
         </Button>
         {findError && <Alert severity="error" sx={{ mt: 1.5 }}>{findError}</Alert>}
 
         {customers && (
           <Box sx={{ mt: 2 }}>
-            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>{audienceTitle(foundFilter ?? filter)}</Typography>
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>{audienceTitle(foundFilter ?? withExtra)}</Typography>
             {stale && <Alert severity="info" sx={{ mb: 1 }}>The choice above changed. Press Find customers again before sending.</Alert>}
             {customers.length === 0 ? (
               <Typography sx={{ color: '#6B7280' }}>No customers found for this choice.</Typography>
@@ -358,6 +390,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {c.added && <Chip size="small" label="Added" title="You added this person by hand" sx={{ height: 20, fontSize: 11, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
                         {!c.email && <Chip size="small" label="No email" sx={{ height: 20, fontSize: 11, bgcolor: '#FEF3C7', color: '#92400E' }} />}
                         {c.email && c.unsubscribed && <Chip size="small" label="Unsubscribed" title="Stopped our emails. No emails are sent to them." sx={{ height: 20, fontSize: 11, bgcolor: '#FEE2E2', color: '#B91C1C' }} />}
                         {c.textOk ? <Chip size="small" label="Text OK" sx={{ height: 20, fontSize: 11, bgcolor: '#DCFCE7', color: '#166534' }} /> : <Chip size="small" label="No text" title={c.textReason ?? ''} sx={{ height: 20, fontSize: 11, bgcolor: '#F3F4F6', color: '#4B5563' }} />}
@@ -541,7 +574,7 @@ export default function NewMessage({ token, adminEmail, onSent }: Props) {
           <DialogContentText component="div" sx={{ fontSize: 14 }}>
             {email && <Box>Email to <b>{reach.email}</b> {reach.email === 1 ? 'customer' : 'customers'}: “{subject}”</Box>}
             {text && <Box>Text to <b>{reach.text}</b> {reach.text === 1 ? 'customer' : 'customers'}</Box>}
-            <Box sx={{ mt: 1 }}>{audienceTitle(foundFilter ?? filter)}.</Box>
+            <Box sx={{ mt: 1 }}>{audienceTitle(foundFilter ?? withExtra)}.</Box>
             {foundFilter?.kind === 'all' && <FormControlLabel sx={{ mt: 1 }} control={<Checkbox checked={everyoneOk} onChange={(e) => setEveryoneOk(e.target.checked)} />} label={`I want to send this to ${reach.customers} customers`} />}
             <Box sx={{ mt: 1 }}>{scheduledIso ? `It goes out ${pacificText(scheduledIso)} (Pacific). The customers are looked up again at that time.` : 'It starts right away and cannot be recalled once sent. You can stop it from History while it is still going.'}</Box>
           </DialogContentText>

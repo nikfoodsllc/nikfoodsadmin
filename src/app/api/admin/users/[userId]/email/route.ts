@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { verifyAdminRequest } from '@/lib/adminAuth';
 import { emailStatusFor } from '@/utils/userFilters';
+import { setEmailChoice } from '@/lib/server/userPreferences';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,23 +63,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!found.success || !found.data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const email = cleanEmail(found.data.email);
     if (!email) return NextResponse.json({ error: 'This customer has no email address.' }, { status: 400 });
-    const database = await db.getDb();
-    const optOuts = database.collection('emailOptOuts');
-    if (body.optedOut) {
-      await optOuts.createIndex({ email: 1 }, { unique: true });
-      await optOuts.updateOne({ email }, { $setOnInsert: { email, createdAt: new Date(), source: 'admin', by: auth.userId } }, { upsert: true });
-    } else {
-      await optOuts.deleteOne({ email });
-      // turning emails back on makes the customer subscribed again (the subscription may have been switched off by their own unsubscribe)
-      const subs = database.collection('menu_subscriptions');
-      const now = new Date();
-      const existing = await subs.countDocuments({ $or: [{ email }, { userId }] });
-      if (existing > 0) {
-        await subs.updateMany({ $or: [{ email }, { userId }] }, { $set: { isActive: true, consentGiven: true, updatedAt: now }, $unset: { unsubscribedAt: '' } });
-      } else {
-        await subs.insertOne({ email, userId, subscribedAt: now, consentGiven: true, isActive: true, source: 'admin', by: auth.userId, createdAt: now, updatedAt: now });
-      }
-    }
+    await setEmailChoice(await db.getDb(), { userId, email, optedOut: body.optedOut, adminId: auth.userId });
     return NextResponse.json({ data: await status(userId, found.data) });
   } catch (error) {
     console.error('Error in PUT /api/admin/users/[userId]/email:', error);
