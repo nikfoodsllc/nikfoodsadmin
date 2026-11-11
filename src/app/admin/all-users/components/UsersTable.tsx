@@ -10,6 +10,7 @@ import {
   TableRow,
   Paper,
   Typography,
+  Checkbox,
 } from '@mui/material';
 import UserTableRow from './UserTableRow';
 import UserSkeleton from './UserSkeleton';
@@ -21,6 +22,11 @@ interface UsersTableProps {
   onViewDetails: (user: UserWithAddresses) => void;
   onEditUser: (user: UserWithAddresses) => void;
   onDeleteUser: (user: UserWithAddresses) => void;
+  /** ids ticked for a bulk update */
+  selected?: Set<string>;
+  onToggle?: (user: UserWithAddresses) => void;
+  /** tick or untick every customer on this page */
+  onTogglePage?: (checked: boolean) => void;
 }
 
 export default function UsersTable({
@@ -29,7 +35,13 @@ export default function UsersTable({
   onViewDetails,
   onEditUser,
   onDeleteUser,
+  selected,
+  onToggle,
+  onTogglePage,
 }: UsersTableProps) {
+  const idOf = (u: UserWithAddresses) => (u._id ? String(u._id) : '');
+  const selectable = users.filter((u) => u.role !== 'ADMIN' && idOf(u));
+  const pickedHere = selectable.filter((u) => selected?.has(idOf(u))).length;
   return (
     <Box sx={{ width: '100%', overflowX: 'auto' }}>
       <TableContainer
@@ -49,6 +61,9 @@ export default function UsersTable({
                 backgroundColor: '#F9FAFB',
               }}
             >
+              <TableCell padding="checkbox" sx={{ width: 48 }}>
+                <Checkbox size="small" checked={selectable.length > 0 && pickedHere === selectable.length} indeterminate={pickedHere > 0 && pickedHere < selectable.length} disabled={!onTogglePage || selectable.length === 0} onChange={(e) => onTogglePage?.(e.target.checked)} inputProps={{ 'aria-label': 'Select everyone on this page' }} />
+              </TableCell>
               <TableCell sx={{ padding: '12px', fontWeight: 600, color: '#374151', fontSize: '13px' }}>
                 Name
               </TableCell>
@@ -77,7 +92,7 @@ export default function UsersTable({
               <UserSkeleton />
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} sx={{ textAlign: 'center', padding: '48px 16px' }}>
+                <TableCell colSpan={8} sx={{ textAlign: 'center', padding: '48px 16px' }}>
                   <Typography variant="body2" color="text.secondary">
                     No users found
                   </Typography>
@@ -92,6 +107,8 @@ export default function UsersTable({
                   onViewDetails={onViewDetails}
                   onEditUser={onEditUser}
                   onDeleteUser={onDeleteUser}
+                  selected={selected?.has(idOf(user)) ?? false}
+                  onToggle={onToggle}
                 />
               ))
             )}

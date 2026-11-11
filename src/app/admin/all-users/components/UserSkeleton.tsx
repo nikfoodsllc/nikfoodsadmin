@@ -7,6 +7,10 @@ export default function UserSkeleton() {
     <>
       {[...Array(10)].map((_, index) => (
         <TableRow key={index}>
+          {/* Tick box */}
+          <TableCell sx={{ width: 48 }}>
+            <Skeleton variant="rectangular" width={18} height={18} />
+          </TableCell>
           {/* Name */}
           <TableCell>
             <Skeleton variant="text" width={140} />

@@ -59,3 +59,16 @@ export async function forwardGetToLivesite(request: NextRequest, path: string, l
     return NextResponse.json({ success: false, error: 'Could not reach the customer site. Please try again.' }, { status: 502 });
   }
 }
+
+/** Calls the customer site as the signed-in admin (their own login attached) with a JSON body, for routes that act for several customers. */
+export async function postJsonToLivesiteAs(request: NextRequest, path: string, body: unknown): Promise<{ ok: boolean; status: number; error?: string }> {
+  const auth = verifyAdminHeader(request);
+  if (!auth) return { ok: false, status: 401, error: 'Unauthorized' };
+  try {
+    const response = await fetch(`${livesiteBase()}${path}`, { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
+    const json = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: response.ok, status: response.status, error: response.ok ? undefined : json.error };
+  } catch {
+    return { ok: false, status: 502, error: 'Could not reach the customer site.' };
+  }
+}

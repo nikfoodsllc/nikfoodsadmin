@@ -14,6 +14,7 @@ import {
   DialogActions,
   Button,
   MenuItem,
+  Paper,
   TextField,
 } from '@mui/material';
 import { IconDownload } from '@tabler/icons-react';
@@ -23,6 +24,8 @@ import { useSearchBox } from '@/hooks/useSearchBox';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import UserDetailsDialog from './UserDetailsDialog';
 import ExportCustomersDialog, { UNSUBSCRIBED_TEXT } from './ExportCustomersDialog';
+import BulkUpdateDialog from './BulkUpdateDialog';
+import { BULK_MAX_CUSTOMERS } from '@/utils/bulkUsers';
 import TablePagination from '../../food-items/components/TablePagination';
 import { usePageSize } from '@/hooks/usePageSize';
 import { PageSize, pageSizeToLimit, totalPagesFor } from '@/utils/pageSize';
@@ -48,8 +51,12 @@ export default function UsersPage() {
 
   // Filters and pagination
   const [currentPage, setCurrentPage] = useState(1);
+  // customers ticked for a bulk update (kept across pages; cleared when the search or a filter changes)
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   // what is typed vs what the list is filtered by (it follows the box after a typing pause); only the newest load may update the list
-  const searchBox = useSearchBox(() => setCurrentPage(1));
+  const searchBox = useSearchBox(() => { setCurrentPage(1); setSelected(new Set()); });
   const searchQuery = searchBox.query;
   const beginRequest = useLatestRequest();
   const [textFilter, setTextFilter] = useState<TextFilter>('all');
@@ -231,6 +238,49 @@ export default function UsersPage() {
     searchBox.setInput(value);
   };
 
+  const idOf = (u: UserWithAddresses) => (u._id ? String(u._id) : '');
+  const toggleOne = (u: UserWithAddresses) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      const id = idOf(u);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const togglePage = (checked: boolean) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      for (const u of users) {
+        if (u.role === 'ADMIN' || !idOf(u)) continue;
+        if (checked) next.add(idOf(u));
+        else next.delete(idOf(u));
+      }
+      return next;
+    });
+  // everyone who matches the current search and filters, across all pages
+  const selectAllMatching = async () => {
+    if (!token) return;
+    setSelectingAll(true);
+    try {
+      const params = new URLSearchParams({ idsOnly: '1' });
+      if (searchQuery) params.append('search', searchQuery);
+      if (textFilter !== 'all') params.append('texts', textFilter);
+      if (emailFilter !== 'all') params.append('emails', emailFilter);
+      const response = await fetch(`/api/admin/users?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = (await response.json().catch(() => ({}))) as { data?: { ids: string[]; total: number } };
+      if (!response.ok || !json.data) throw new Error('failed');
+      if (json.data.ids.length > BULK_MAX_CUSTOMERS) {
+        showSnackbar(`That is ${json.data.ids.length} customers. Narrow the search or filters to ${BULK_MAX_CUSTOMERS} or fewer.`, 'error');
+        return;
+      }
+      setSelected(new Set(json.data.ids));
+    } catch {
+      showSnackbar('Could not select everyone. Try again.', 'error');
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -290,7 +340,7 @@ export default function UsersPage() {
           size="small"
           label="Text messages"
           value={textFilter}
-          onChange={(e) => { setTextFilter(parseTextFilter(e.target.value)); setCurrentPage(1); }}
+          onChange={(e) => { setTextFilter(parseTextFilter(e.target.value)); setCurrentPage(1); setSelected(new Set()); }}
           sx={{ minWidth: 190, backgroundColor: '#fff' }}
         >
           <MenuItem value="all">All customers</MenuItem>
@@ -303,7 +353,7 @@ export default function UsersPage() {
           size="small"
           label="Emails"
           value={emailFilter}
-          onChange={(e) => { setEmailFilter(parseEmailFilter(e.target.value)); setCurrentPage(1); }}
+          onChange={(e) => { setEmailFilter(parseEmailFilter(e.target.value)); setCurrentPage(1); setSelected(new Set()); }}
           sx={{ minWidth: 190, backgroundColor: '#fff' }}
         >
           <MenuItem value="all">All customers</MenuItem>
@@ -334,6 +384,9 @@ export default function UsersPage() {
           onViewDetails={handleViewDetails}
           onEditUser={handleEditUser}
           onDeleteUser={handleDeleteUser}
+          selected={selected}
+          onToggle={toggleOne}
+          onTogglePage={togglePage}
         />
       </Box>
 
@@ -359,6 +412,25 @@ export default function UsersPage() {
         onChanged={fetchUsers}
         onClose={handleDialogClose}
       />
+
+      {/* Bulk update bar: appears once someone is ticked */}
+      {selected.size > 0 && (
+        <>
+        {/* room under the table so the bar never hides the last rows */}
+        <Box sx={{ height: 84 }} />
+        <Paper elevation={6} sx={{ position: 'fixed', bottom: 12, left: '50%', transform: 'translateX(-50%)', width: 'min(720px, calc(100vw - 24px))', zIndex: 1200, p: 1.25, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', border: '1px solid #E5E7EB' }}>
+          <Typography sx={{ fontWeight: 800, fontSize: 14, mr: 'auto' }}>{selected.size} selected</Typography>
+          {selected.size < totalUsers && (
+            <Button size="small" disabled={selectingAll} onClick={selectAllMatching} sx={{ textTransform: 'none', fontWeight: 700 }}>
+              {selectingAll ? 'Selecting…' : `Select all ${totalUsers} matching`}
+            </Button>
+          )}
+          <Button size="small" onClick={() => setSelected(new Set())} sx={{ textTransform: 'none' }}>Clear</Button>
+          <Button size="small" variant="contained" onClick={() => setBulkOpen(true)} sx={{ textTransform: 'none', fontWeight: 700 }}>Update selected</Button>
+        </Paper>
+        </>
+      )}
+      <BulkUpdateDialog open={bulkOpen} token={token} ids={[...selected]} onClose={() => setBulkOpen(false)} onChanged={() => { setSelected(new Set()); fetchUsers(); }} />
 
       <ExportCustomersDialog open={exportOpen} token={token} onClose={() => setExportOpen(false)} />
       <ExportCustomersDialog open={unsubOpen} token={token} onClose={() => setUnsubOpen(false)} text={UNSUBSCRIBED_TEXT} />

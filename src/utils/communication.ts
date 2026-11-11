@@ -12,6 +12,8 @@ export interface AudienceFilter {
   to?: string;
   /** people: the accounts picked by hand */
   userIds?: string[];
+  /** every other choice: accounts added by hand on top of the filter (they get the message whatever the filter finds) */
+  alsoUserIds?: string[];
 }
 
 export interface AudienceCustomer {
@@ -24,6 +26,8 @@ export interface AudienceCustomer {
   textReason: string | null;
   /** on the unsubscribe list: no emails are sent to this customer */
   unsubscribed?: boolean;
+  /** added by hand on top of the filter */
+  added?: boolean;
 }
 
 export const TEXT_LIMIT = 320;
@@ -44,6 +48,11 @@ export function placeholdersFor(kind: AudienceKind): string[] {
 const dayLong = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export function audienceTitle(f: AudienceFilter): string {
+  const more = f.kind !== 'people' && (f.alsoUserIds?.length ?? 0) > 0 ? ` + ${f.alsoUserIds?.length} added` : '';
+  return `${baseAudienceTitle(f)}${more}`;
+}
+
+function baseAudienceTitle(f: AudienceFilter): string {
   if (f.kind === 'all') return 'Everyone';
   if (f.kind === 'subscribers') return 'Agreed to get emails';
   if (f.kind === 'people') return `${f.userIds?.length ?? 0} chosen ${(f.userIds?.length ?? 0) === 1 ? 'person' : 'people'}`;
