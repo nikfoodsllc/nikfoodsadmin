@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canMakeOfflineOrder, offlineOrderHref } from './offlineFollowUp';
+import { canMakeOfflineOrder, followedUpMessage, offlineOrderHref } from './offlineFollowUp';
 
 describe('canMakeOfflineOrder', () => {
   it('allows an unpaid or failed order that is pending or cancelled', () => {
@@ -29,5 +29,22 @@ describe('canMakeOfflineOrder', () => {
 describe('offlineOrderHref', () => {
   it('points at Create Order with the order number', () => {
     expect(offlineOrderHref('ORD-1794')).toBe('/admin/create-order?fromOrder=ORD-1794');
+  });
+});
+
+describe('followedUpMessage', () => {
+  it('says the unpaid order was cancelled', () => {
+    expect(followedUpMessage({ orderId: 'ORD-1', cancelled: true })).toBe('The unpaid order ORD-1 was cancelled, so the customer only has this one to pay.');
+  });
+  it('says it was left as it is when the email did not go out', () => {
+    const t = followedUpMessage({ orderId: 'ORD-1', cancelled: false, reason: 'email_not_sent' });
+    expect(t).toContain('did not go out');
+    expect(t).toContain('left as it is');
+  });
+  it('warns about two orders when the customer paid meanwhile', () => {
+    expect(followedUpMessage({ orderId: 'ORD-1', cancelled: false, reason: 'already_paid' })).toContain('two orders');
+  });
+  it('shows the reason when it could not be cancelled', () => {
+    expect(followedUpMessage({ orderId: 'ORD-1', cancelled: false, reason: 'payment_not_closed', error: 'Stripe is down' })).toContain('(Stripe is down)');
   });
 });
