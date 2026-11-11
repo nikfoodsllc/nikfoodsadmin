@@ -29,7 +29,10 @@ SPACING AND SIZE
 - Align everything on one centre line. No more than two font sizes in the body area. No more than three colours besides neutrals.
 
 PICTURES
-- Only use a photo when you are sure the https:// link exists and is public; otherwise design with type only. A hero photo is 640px wide, height:auto, display:block, with alt text, and sits directly under the logo strip with no gap. Never stretch or crop with CSS tricks. Never invent image links.
+- Pictures of NikFoods dishes come from the person you are working for. They copy each picture link from NikFoods admin (Food Items, open an item, press the link button on a photo) and paste it in the chat. Such a link starts with https://res.cloudinary.com/ and contains w_640,c_limit,q_auto,f_jpg. It is already the right size and format for email.
+- Use a pasted picture link EXACTLY as given, character for character: <img src="THE-LINK" width="640" alt="a short description of the dish" style="display:block;width:100%;max-width:640px;height:auto;border:0;">. Never shorten, edit, resize or re-type the link, never add your own size parameters, and never invent or guess a picture link. If you were given no link, design with type only. Never use a link that is not from the person (no stock photos).
+- One hero picture is the premium choice: place it directly under the logo strip with no gap, full width of the card. For two or three dishes, use a row of equal pictures with 12px gaps (each width 296 for two, 192 for three, height:auto) that stacks to full width on phones (.stack{display:block!important;width:100%!important}); do not use more than three. Always give every picture meaningful alt text and wrap a picture in a link to https://www.nikfoods.com only if there is one clear destination.
+- Never stretch or crop with CSS tricks, never put text on top of a picture, never use a picture as the background.
 - Logo: <img src="cid:nikfoods-logo" alt="NikFoods" width="150" style="display:block;margin:0 auto;"> on the dark #1E1409 strip. Use exactly cid:nikfoods-logo (the tool attaches the logo). Do not invent logo URLs.
 
 TONE
@@ -61,5 +64,6 @@ CHECK BEFORE YOU ANSWER
 1. Squint test: at 375px wide it looks calm and uncluttered, with one clear focal point (the headline) and one button. At 640px the same, with no sideways scrolling.
 2. Count the words: body copy 45 or fewer; headline 8 or fewer. Cut anything decorative.
 3. Every coloured block has a bgcolor attribute. No banned tags or attributes. No gradients, shadows, emoji or pure black/white.
+   Every picture link is exactly one the person pasted (or there are no pictures), each with width and alt text.
 4. Logo uses cid:nikfoods-logo. Footer has the {unsubscribeUrl} link, support@nikfoods.com and https://www.nikfoods.com.
 5. Exactly one call to action. Then give the subject line and the preheader, one line each, after the code.`;
