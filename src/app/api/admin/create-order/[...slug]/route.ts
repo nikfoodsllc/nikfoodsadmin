@@ -35,6 +35,8 @@ function targetFor(slug: string[], method: string): string | null {
     return null;
   }
   if (slug.length === 2 && first === 'places' && second === 'details' && method === 'GET') return '/api/places/details';
+  // a failed or unpaid website order laid out for the form (to make an offline order from it)
+  if (slug.length === 2 && first === 'rebuild' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'GET') return `/api/admin/offline-orders/rebuild/${encodeURIComponent(second)}`;
   if (slug.length === 2 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'GET') return `/api/admin/offline-orders/${encodeURIComponent(second)}`;
   if (slug.length === 3 && first === 'orders' && /^[A-Za-z0-9-]{4,60}$/.test(second) && method === 'POST') {
     const action = slug[2];

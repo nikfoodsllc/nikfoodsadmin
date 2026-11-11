@@ -27,11 +27,13 @@ import {
 } from '@mui/material';
 import { IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import StatusBadge from './StatusBadge';
 import DeleteOrdersDialog from './DeleteOrdersDialog';
 import { deliveryProgressLines } from '@/utils/deliveryProgress';
 import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils/refunds';
 import { getItemPortionLabel } from '@/utils/portions';
+import { canMakeOfflineOrder, offlineOrderHref } from '@/utils/offlineFollowUp';
 import { Order, OrderStatus } from '@/types/order';
 import { safeFormatCurrency } from '@/utils/currency';
 import { formatPSTDateTime, formatPSTDate } from '@/utils/timezone';
@@ -73,6 +75,7 @@ export default function OrderDetailsDialog({
   onOrderChanged,
   onDeleted,
 }: OrderDetailsDialogProps) {
+  const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('pending');
   const [updating, setUpdating] = useState(false);
@@ -869,6 +872,17 @@ export default function OrderDetailsDialog({
       </DialogContent>
 
       <DialogActions sx={{ paddingX: { xs: 2, sm: 3 }, paddingY: 2, borderTop: '1px solid #E5E7EB', flexWrap: 'wrap', gap: 1 }}>
+        {(order.offlineFollowUp || order.rebuiltFromOrderId) && (
+          <Typography sx={{ flexBasis: '100%', fontSize: 13, color: '#6B7280' }}>
+            {order.offlineFollowUp ? `Offline order ${order.offlineFollowUp.orderId} was made from this order.` : ''}
+            {order.rebuiltFromOrderId ? `Made from the unpaid order ${order.rebuiltFromOrderId}.` : ''}
+          </Typography>
+        )}
+        {canMakeOfflineOrder(order) && (
+          <Button variant="outlined" onClick={() => router.push(offlineOrderHref(order.orderId))} disabled={updating} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {order.offlineFollowUp ? 'Make another offline order' : 'Make offline order'}
+          </Button>
+        )}
         {token && (
           <Button color="error" variant="outlined" onClick={() => setDeleteOpen(true)} disabled={updating} sx={{ textTransform: 'none', mr: 'auto' }}>
             Delete order
