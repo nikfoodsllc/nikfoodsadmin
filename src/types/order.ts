@@ -270,6 +270,12 @@ export interface Order {
     openCount?: number;
     filledFromHistory?: boolean;
   };
+  /** Set to 'admin' on an order entered in Create Order (absent on website and app orders) */
+  source?: 'admin';
+  /** A failed or unpaid website order that an admin followed up with an offline order (pay link): which order and when */
+  offlineFollowUp?: { orderId: string; at: Date | string; by?: string };
+  /** On an admin-entered order that was started from a failed or unpaid website order: that order's number */
+  rebuiltFromOrderId?: string;
   /** Where the customer placed the order: the website or the iPhone app (absent on older orders = website; admin-entered orders have `source: 'admin'`) */
   channel?: 'web' | 'mobile';
   /** Where the delivery stop(s) stand in OptimoRoute, written by the live site when it sends them */
