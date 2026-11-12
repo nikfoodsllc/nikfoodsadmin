@@ -10,6 +10,8 @@ export interface FoundCustomer {
   name: string;
   email: string;
   phone: string;
+  /** Store credit balance in dollars */
+  storeCreditBalance?: number;
   addresses: Array<{ id: string; street_address: string; apartment?: string; city: string; postal_code: string; entrance?: string; floor?: string; isDefault: boolean }>;
 }
 

@@ -74,6 +74,7 @@ export default function CreateOrderPage() {
   const [customer, setCustomer] = useState<CustomerForm>({ name: '', email: '', phone: '' });
   const [address, setAddress] = useState(EMPTY_ADDRESS);
   const [existing, setExisting] = useState<FoundCustomer | null>(null);
+  const [applyCredit, setApplyCredit] = useState(false);
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [optionsItem, setOptionsItem] = useState<MenuItem | null>(null);
@@ -128,6 +129,11 @@ export default function CreateOrderPage() {
   const [listVersion, setListVersion] = useState(0);
   // editing an order that was sent: its number (creating replaces it) and any problem loading it
   const [editing, setEditing] = useState<string | null>(null);
+  // store credit can be taken off a NEW payment-link order of a customer who has a balance (not when editing, which replaces an order)
+  const creditBalance = existing && !editing ? existing.storeCreditBalance ?? 0 : 0;
+  // a different customer starts without the credit ticked
+  const existingId = existing?.id;
+  useEffect(() => setApplyCredit(false), [existingId]);
   const [editError, setEditError] = useState('');
   const [listRows, setListRows] = useState<OrderListRow[]>([]);
   // started from an abandoned checkout (?fromCheckout=pi_...): who it is for, and a note about anything that could not be added
@@ -259,6 +265,7 @@ export default function CreateOrderPage() {
       waivePlatformFee: waiveFee,
       discount: discountValue,
       ...(countNow && (payment === 'link' || payment === 'zelle') ? { countBeforePayment: true } : {}),
+      ...(payment === 'link' && applyCredit && creditBalance > 0 ? { applyStoreCredit: true } : {}),
       payment: payment === 'link' ? { mode: 'link' } : payment === 'zelle' ? { mode: 'zelle' } : payment === 'quote' ? { mode: 'quote' } : { mode: 'offline', method: paidMethodValue(paidChoice, paidTyped), note },
       requestId,
       ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
@@ -288,6 +295,7 @@ export default function CreateOrderPage() {
     setCustomer({ name: '', email: '', phone: '' });
     setAddress(EMPTY_ADDRESS);
     setExisting(null);
+    setApplyCredit(false);
     setLines([]);
     setTip(0);
     setTipOther('');
@@ -403,6 +411,9 @@ export default function CreateOrderPage() {
       onDiscount={setDiscount}
       payment={payment}
       onPayment={changePayment}
+      creditBalance={creditBalance}
+      applyCredit={applyCredit && creditBalance > 0}
+      onApplyCredit={setApplyCredit}
       paidChoice={paidChoice}
       onPaidChoice={setPaidChoice}
       paidTyped={paidTyped}
