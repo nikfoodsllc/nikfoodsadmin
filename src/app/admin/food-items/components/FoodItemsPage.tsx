@@ -266,7 +266,7 @@ export default function FoodItemsPage() {
   };
 
   // Column order, widths and hidden columns, saved to this admin's account
-  const columnPrefs = useColumnPreferences(FOOD_ITEMS_COLUMNS_STORAGE_KEY, FOOD_ITEMS_COLUMNS, 'food-items');
+  const columnPrefs = useColumnPreferences(FOOD_ITEMS_COLUMNS_STORAGE_KEY, FOOD_ITEMS_COLUMNS, 'food-items', { migrateBrowserLayout: true });
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;

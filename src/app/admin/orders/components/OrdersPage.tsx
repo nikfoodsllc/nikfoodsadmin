@@ -86,7 +86,7 @@ export default function OrdersPage() {
   const itemsPerPage = pageSizeToLimit(pageSize);
 
   // Column order, widths and hidden columns, saved to this admin's account
-  const columnPrefs = useColumnPreferences(ORDERS_COLUMNS_STORAGE_KEY, ORDERS_COLUMNS, 'orders');
+  const columnPrefs = useColumnPreferences(ORDERS_COLUMNS_STORAGE_KEY, ORDERS_COLUMNS, 'orders', { migrateBrowserLayout: true });
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
