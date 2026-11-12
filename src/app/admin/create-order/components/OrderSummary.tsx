@@ -68,6 +68,10 @@ export default function OrderSummary(props: {
   onDiscount: (v: string) => void;
   payment: PaymentChoice;
   onPayment: (p: PaymentChoice) => void;
+  /** The customer's store credit balance in dollars (existing customer, new order), else 0 */
+  creditBalance: number;
+  applyCredit: boolean;
+  onApplyCredit: (v: boolean) => void;
   paidChoice: PaidChoice;
   onPaidChoice: (c: PaidChoice) => void;
   paidTyped: string;
@@ -205,6 +209,12 @@ export default function OrderSummary(props: {
         <FormControlLabel value="paid" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Already paid (cash, Zelle, other…)</Typography>} />
         <FormControlLabel value="quote" control={<Radio size="small" color="warning" />} label={<Typography sx={{ fontSize: 14 }}>Send a quote (no emails)</Typography>} />
       </RadioGroup>
+      {props.payment === 'link' && props.creditBalance > 0 && (
+        <Box sx={{ mt: 0.5 }}>
+          <FormControlLabel sx={{ display: 'flex' }} control={<Checkbox size="small" color="warning" checked={props.applyCredit} onChange={(e) => props.onApplyCredit(e.target.checked)} />} label={<Typography sx={{ fontSize: 14 }}>Apply store credit (${props.creditBalance.toFixed(2)} available)</Typography>} />
+          {props.applyCredit && <Typography sx={{ fontSize: 12, color: '#6B7280', ml: 4 }}>The credit is taken off now: the link and email show what the card pays. The customer can switch it off on the pay page, and it goes back if the order is cancelled.</Typography>}
+        </Box>
+      )}
       {props.payment === 'paid' && (
         <Box sx={{ mt: 1 }}>
           <Typography sx={{ fontSize: 13, color: '#4B5563', mb: 0.75 }}>How was it paid?</Typography>
