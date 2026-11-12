@@ -33,10 +33,14 @@ const API_PATH = '/api/admin/preferences/table';
  * - `serverTable` names the table on the server; leave it out for a browser-only layout.
  * - `defs` must be a stable array (define it at module level).
  *
- * The saved layout wins when it loads. A layout that only exists in this browser (set before layouts
- * were saved to the account) is uploaded the first time.
+ * The saved layout wins when it loads. With `migrateBrowserLayout` (only for tables that were browser-only before
+ * layouts were saved to the account: Orders and Food Items) a layout that only exists in this browser is
+ * uploaded the first time. For every other table "nothing saved" simply means the default layout: an old copy
+ * in the browser must never come back (it did: after "Show all" deleted the saved layout, a stale copy was
+ * uploaded again and the report columns showed up blank).
  */
-export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs: T[], serverTable?: string) {
+export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs: T[], serverTable?: string, options: { migrateBrowserLayout?: boolean } = {}) {
+  const migrate = options.migrateBrowserLayout === true;
   const { user, token } = useAuth();
   const userId = user?.id ?? null;
   const storageKey = userScopedStorageKey(baseKey, userId);
@@ -55,12 +59,12 @@ export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs:
   useEffect(() => {
     serverChecked.current = false;
     let local = loadColumnPrefs(storageKey, defs);
-    if (userId && JSON.stringify(local) === JSON.stringify(emptyColumnPrefs())) {
+    if (migrate && userId && JSON.stringify(local) === JSON.stringify(emptyColumnPrefs())) {
       local = loadColumnPrefs(baseKey, defs);
     }
     setPrefs(local);
     setReady(true);
-  }, [storageKey, baseKey, userId, defs]);
+  }, [storageKey, baseKey, userId, defs, migrate]);
 
   // 2) the layout saved in the admin's account
   useEffect(() => {
@@ -80,7 +84,10 @@ export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs:
         } else {
           lastServerJson.current = JSON.stringify(emptyColumnPrefs());
           const local = latest.current.prefs;
-          if (JSON.stringify(local) !== lastServerJson.current) {
+          if (!migrate) {
+            // nothing saved in the account = the default layout (also clears a stale copy kept in this browser)
+            setPrefs(emptyColumnPrefs());
+          } else if (JSON.stringify(local) !== lastServerJson.current) {
             // first time: upload the layout that so far only lived in this browser
             const put = await fetch(API_PATH, {
               method: 'PUT',
@@ -99,7 +106,7 @@ export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs:
     return () => {
       cancelled = true;
     };
-  }, [ready, serverTable, token, userId, defs]);
+  }, [ready, serverTable, token, userId, defs, migrate]);
 
   // 3) keep the browser copy up to date, and save changes to the account shortly after they stop
   const sendToServer = useCallback(async (json: string, keepalive = false) => {
@@ -122,7 +129,8 @@ export function useColumnPreferences<T extends ColumnDef>(baseKey: string, defs:
 
   useEffect(() => {
     if (!ready) return;
-    saveColumnPrefs(storageKey, prefs);
+    // before the admin is known the key has no admin in it: never write to it (it would be shared by every admin of this browser)
+    if (!(serverTable && !userId)) saveColumnPrefs(storageKey, prefs);
     if (!serverTable || !serverChecked.current) return;
     const json = JSON.stringify(prefs);
     if (json === lastServerJson.current) return;
