@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Chip, Collapse, InputAdornment, Paper, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { IconChevronDown, IconChevronRight, IconSearch } from '@tabler/icons-react';
 import {
@@ -74,6 +74,13 @@ export default function MenuPicker({
   // every category and sub-category starts closed (the menu is long): search, or open the ones you need
 
   const known = new Set(catalog.dates.map((d) => d.date));
+  const chipRow = useRef<HTMLDivElement>(null);
+  // keep the chosen day in view inside the row (only the row scrolls, never the page)
+  useEffect(() => {
+    const row = chipRow.current;
+    const chip = row?.querySelector<HTMLElement>('[data-selected="true"]');
+    if (row && chip) row.scrollLeft = Math.max(0, chip.offsetLeft - row.offsetLeft - 12);
+  }, [date]);
   const dateChips = [...catalog.dates.map((d) => ({ date: d.date, hint: d.state === 'past' ? 'past' : d.state === 'closed' ? 'closed' : '' }))];
   // every calendar day from a week back to six weeks ahead can be picked, whether or not it is switched on in Manage Days
   for (let i = -7; i <= 42; i++) {
@@ -168,10 +175,11 @@ export default function MenuPicker({
         Pick the delivery date, then add items. No cutoff applies here: any day can be used, also closed or past ones, and any item can go on any day.
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 0.75, overflowX: 'auto', pb: 1, mb: 1, alignItems: 'center' }}>
+      <Box ref={chipRow} sx={{ display: 'flex', gap: 0.75, overflowX: 'auto', pb: 1, mb: 1, alignItems: 'center' }}>
         {dateChips.map(({ date: d, hint }) => (
           <Chip
             key={d}
+            data-selected={d === date ? 'true' : undefined}
             label={`${dayChipLabel(d)}${hint ? ` (${hint})` : ''}${counts[d] ? ` · ${counts[d]}` : ''}`}
             color={d === date ? 'warning' : 'default'}
             variant={d === date ? 'filled' : 'outlined'}

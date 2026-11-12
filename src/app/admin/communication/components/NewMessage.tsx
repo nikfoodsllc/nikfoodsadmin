@@ -576,7 +576,7 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
                   <ToggleButtonGroup exclusive size="small" value={previewWidth} onChange={(_, v) => v && setPreviewWidth(v)} sx={{ '& .MuiToggleButton-root': { textTransform: 'none', py: 0.25, fontSize: 12 } }}>
-                    <ToggleButton value="phone">Phone</ToggleButton>
+                    <ToggleButton value="phone">Mobile</ToggleButton>
                     <ToggleButton value="computer">Computer</ToggleButton>
                   </ToggleButtonGroup>
                 </Box>
