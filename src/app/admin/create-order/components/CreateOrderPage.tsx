@@ -153,8 +153,8 @@ export default function CreateOrderPage() {
       }
       const data = r.body.data as CatalogPayload;
       setMenu(data);
-      // start on the first day that is still open, else today (any date can be picked afterwards)
-      setDate((d) => d || data.dates.find((x) => x.state === 'open')?.date || data.today);
+      // start on today (Pacific); any other date can be picked afterwards
+      setDate((d) => d || data.today);
     })();
     return () => {
       cancelled = true;
