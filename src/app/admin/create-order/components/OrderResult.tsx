@@ -13,6 +13,10 @@ export interface CreatedOrder {
   mode: 'link' | 'offline' | 'zelle' | 'quote';
   accountCreated: boolean;
   payLink?: string;
+  /** Store credit applied while the order was made */
+  credit?: { used: number; covered: boolean };
+  /** Store credit was asked for but could not be applied */
+  creditNote?: string;
   emailSent: boolean;
   emailError?: string;
   /** Set when this order replaced another (an edit) */
@@ -90,6 +94,8 @@ export default function OrderResult({ result, token, onAnother, onChanged, liste
       <Typography sx={{ fontSize: 15, mt: 0.5 }}>
         Order <strong>{result.orderId}</strong> · ${result.totalPaid.toFixed(2)} · {cancelled ? 'cancelled' : (result.mode === 'link' || result.mode === 'zelle') && !paid ? 'waiting for payment' : 'paid'}
       </Typography>
+      {result.credit && <Alert severity="success" sx={{ mt: 1.5 }}>Store credit applied: ${result.credit.used.toFixed(2)}. {result.credit.covered ? 'It pays the whole order, so the link shows Place order instead of the card form.' : `The card pays $${Math.max(0, result.totalPaid - result.credit.used).toFixed(2)}.`}</Alert>}
+      {result.creditNote && <Alert severity="warning" sx={{ mt: 1.5 }}>Store credit was not applied: {result.creditNote} The customer pays the full amount.</Alert>}
       {result.accountCreated && <Alert severity="info" sx={{ mt: 1.5 }}>A new customer account was created for this email (the customer sets a password with Forgot password).</Alert>}
       {cancelled ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>This order was cancelled. Its payment link no longer works.</Alert>
