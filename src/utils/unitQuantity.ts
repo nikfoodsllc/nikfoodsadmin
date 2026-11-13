@@ -1,7 +1,7 @@
 /**
- * "Quantity per order" of a flat food item (admin reporting only, customers never see it).
+ * "Quantity per order" of a simple food item (admin reporting only, customers never see it).
  *
- * A shop sells "Makki Roti" only in twos, so the flat item is called "2 Makki Roti" and one order of it makes 2 rotis. With
+ * A shop sells "Makki Roti" only in twos, so the item is called "2 Makki Roti" and one order of it makes 2 rotis. With
  * a quantity of 2 on the item, the Kitchen Dashboard and the Kitchen Report count pieces (an order of 3 = 6 rotis) and
  * nobody has to multiply by hand. Missing, 1 or anything that is not a whole number from 2 to 99 means "one per order".
  */
