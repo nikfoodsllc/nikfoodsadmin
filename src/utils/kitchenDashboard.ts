@@ -8,6 +8,7 @@
  */
 
 import { comboItemQuantity, comboQuantityText } from './comboQuantity';
+import { cleanUnitQuantity } from './unitQuantity';
 import { getOptionSpice, getSectionSpice, sectionTakesSpice, spiceForSection } from './comboSpice';
 
 export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
@@ -129,6 +130,8 @@ export interface KitchenRow {
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
+  /** Combo lines only: the "quantity per order" of the items inside the combo (food item id -> pieces), so a part counts pieces like the same item ordered on its own. */
+  partUnits?: Record<string, number> | null;
   /** What the customer wrote in the item's Special instructions box (when the item has one). */
   notes?: string | null;
   /** Only filled when tracing an item back to the people who ordered it. */
@@ -348,7 +351,7 @@ export function partSpices(row: Pick<KitchenRow, 'sections' | 'comboSelections' 
 }
 
 /** The picked options of a combo as separate items. `quantity` is how many of that item come with ONE combo (Chapati x 4); 1 when the combo does not say. */
-export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; quantity: number; id?: string }> {
+export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections' | 'partUnits'>): Array<{ name: string; portion: string | null; quantity: number; id?: string }> {
   if (!row.sections?.length || !row.comboSelections) return [];
   const parts: Array<{ name: string; portion: string | null; quantity: number; id?: string }> = [];
   for (const section of row.sections) {
@@ -358,7 +361,8 @@ export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>
       const name = clean(option?.item?.name);
       if (!name) continue;
       const foodId = option?.item?._id ? String(option.item._id) : '';
-      const quantity = comboItemQuantity(option?.quantity);
+      // "Qty per combo" (packs of the item) times the item's own quantity per order (pieces in a pack)
+      const quantity = comboItemQuantity(option?.quantity) * (foodId && row.partUnits ? cleanUnitQuantity(row.partUnits[foodId]) : 1);
       parts.push(foodId ? { name, portion: clean(option?.portion) || null, quantity, id: foodId } : { name, portion: clean(option?.portion) || null, quantity });
     }
   }
