@@ -14,6 +14,8 @@ export interface AudienceFilter {
   userIds?: string[];
   /** every other choice: accounts added by hand on top of the filter (they get the message whatever the filter finds) */
   alsoUserIds?: string[];
+  /** every choice: email addresses typed by hand (people who may not be customers) */
+  alsoEmails?: string[];
 }
 
 export interface AudienceCustomer {
@@ -48,14 +50,20 @@ export function placeholdersFor(kind: AudienceKind): string[] {
 const dayLong = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 export function audienceTitle(f: AudienceFilter): string {
-  const more = f.kind !== 'people' && (f.alsoUserIds?.length ?? 0) > 0 ? ` + ${f.alsoUserIds?.length} added` : '';
+  const people = f.kind !== 'people' ? (f.alsoUserIds?.length ?? 0) : 0;
+  // a choice made only of typed addresses is already titled by them
+  const emails = f.kind === 'people' && (f.userIds?.length ?? 0) === 0 ? 0 : (f.alsoEmails?.length ?? 0);
+  const more = `${people > 0 ? ` + ${people} added` : ''}${emails > 0 ? ` + ${emails} ${emails === 1 ? 'email address' : 'email addresses'}` : ''}`;
   return `${baseAudienceTitle(f)}${more}`;
 }
 
 function baseAudienceTitle(f: AudienceFilter): string {
   if (f.kind === 'all') return 'Everyone';
   if (f.kind === 'subscribers') return 'Agreed to get emails';
-  if (f.kind === 'people') return `${f.userIds?.length ?? 0} chosen ${(f.userIds?.length ?? 0) === 1 ? 'person' : 'people'}`;
+  if (f.kind === 'people') {
+    const n = f.userIds?.length ?? 0;
+    return n === 0 && (f.alsoEmails?.length ?? 0) > 0 ? 'Email addresses you typed' : `${n} chosen ${n === 1 ? 'person' : 'people'}`;
+  }
   if (f.kind === 'delivery_date' && f.date) return `Due for delivery ${dayLong(f.date)}`;
   if (f.kind === 'menu_day' && f.date) return `Ordered for the ${dayLong(f.date)} menu`;
   if (f.kind === 'ordered_between' && f.from && f.to) return f.from === f.to ? `Ordered on ${dayLong(f.from)}` : `Ordered ${dayLong(f.from)} to ${dayLong(f.to)}`;
@@ -66,7 +74,7 @@ function baseAudienceTitle(f: AudienceFilter): string {
 export function filterReady(f: AudienceFilter): boolean {
   const real = (v?: string) => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)));
   if (f.kind === 'all' || f.kind === 'subscribers') return true;
-  if (f.kind === 'people') return (f.userIds?.length ?? 0) > 0;
+  if (f.kind === 'people') return (f.userIds?.length ?? 0) > 0 || (f.alsoEmails?.length ?? 0) > 0;
   if (f.kind === 'ordered_between') return real(f.from) && real(f.to) && (f.from as string) <= (f.to as string);
   return real(f.date);
 }
@@ -164,7 +172,8 @@ export function withPlaceholder(text: string, placeholder: string): string {
 
 /** A sample of what one customer gets, for the preview (the first customer picked, else a made-up one). */
 export function previewValues(first?: AudienceCustomer, filter?: AudienceFilter): { firstName: string; orderNumber: string; date: string } {
-  const firstName = (first?.name ?? '').trim().split(/\s+/)[0] || 'Alex';
+  // a customer without a name is greeted "there" when it is sent, so the preview shows that; the sample name is only for no customer at all
+  const firstName = (first?.name ?? '').trim().split(/\s+/)[0] || (first ? 'there' : 'Alex');
   return { firstName, orderNumber: (first?.orders?.[0] ?? 'ORD-0000000000000').replace(/^#/, ''), date: filter?.date ? new Date(`${filter.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }) : '' };
 }
 
@@ -205,4 +214,21 @@ export function previewHtml(html: string, v: { firstName: string; orderNumber: s
     .replace(/cid:nikfoods-logo/g, PREVIEW_LOGO_URL)
     .replace(/cid:app-store-badge/g, PREVIEW_BADGE_URL);
   return /<html[\s>]/i.test(filled) ? filled : `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="margin:0;padding:0;">${filled}</body></html>`;
+}
+
+/**
+ * Email addresses pasted or typed into the "add an email address" box: one or many, separated by commas, semicolons, spaces or
+ * new lines. `valid` are lower case and without repeats, `invalid` are the pieces that are not an address (shown so nothing
+ * is dropped silently). Placeholder and test domains are not valid (nothing can be delivered to them).
+ */
+export function splitEmails(text: string): { valid: string[]; invalid: string[] } {
+  const valid: string[] = [];
+  const invalid: string[] = [];
+  for (const piece of String(text ?? '').split(/[\s,;]+/).map((p) => p.replace(/^<|>$/g, '').trim()).filter(Boolean)) {
+    const e = piece.toLowerCase();
+    const ok = e.length <= 254 && /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(e) && !e.endsWith('.invalid') && !e.endsWith('@example.com') && !e.endsWith('@example.org');
+    if (!ok) invalid.push(piece);
+    else if (!valid.includes(e)) valid.push(e);
+  }
+  return { valid, invalid };
 }
