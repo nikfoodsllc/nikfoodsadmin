@@ -21,6 +21,8 @@ export interface DraftContent {
   people: DraftPerson[];
   /** "Add more customers" under the other choices */
   extra: DraftPerson[];
+  /** email addresses typed by hand (people who may not be customers) */
+  emails: string[];
   email: boolean;
   text: boolean;
   subject: string;
@@ -55,6 +57,17 @@ function people(v: unknown): DraftPerson[] {
   return out;
 }
 
+function emailList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const e of v) {
+    const s = typeof e === 'string' ? e.trim().toLowerCase().slice(0, 254) : '';
+    if (/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(s) && !out.includes(s)) out.push(s);
+    if (out.length >= MAX_DRAFT_PEOPLE) break;
+  }
+  return out;
+}
+
 /** Cleans whatever the browser sent into a draft the screen can load back. Never throws. */
 export function parseDraftContent(input: unknown): DraftContent {
   const b = (input ?? {}) as Record<string, unknown>;
@@ -67,6 +80,7 @@ export function parseDraftContent(input: unknown): DraftContent {
     to: typeof b.to === 'string' && DAY.test(b.to) ? b.to : '',
     people: people(b.people),
     extra: people(b.extra),
+    emails: emailList(b.emails),
     email: b.email !== false,
     text: b.text === true,
     subject: str(b.subject, SUBJECT_LIMIT),
@@ -80,7 +94,7 @@ export function parseDraftContent(input: unknown): DraftContent {
 
 /** True when there is something worth keeping (a draft is not created for an untouched form). */
 export function worthSaving(d: DraftContent): boolean {
-  return Boolean(d.subject.trim() || d.emailBody.trim() || d.textBody.trim() || d.people.length || d.extra.length);
+  return Boolean(d.subject.trim() || d.emailBody.trim() || d.textBody.trim() || d.people.length || d.extra.length || d.emails.length);
 }
 
 /** The name shown for a draft in the list. */
