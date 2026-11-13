@@ -3,11 +3,13 @@ import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
-import { cleanUnitQuantity, scaleRowsByUnitQuantity } from '@/utils/unitQuantity';
+import { cleanUnitQuantity, comboPartIds, scaleRowsByUnitQuantity } from '@/utils/unitQuantity';
 
-/** A flat item that is sold as several pieces ("2 Makki Roti") counts its pieces: the ordered quantity times the item's quantity per order. */
+/** An item sold as several pieces ("2 Makki Roti") counts its pieces, on its own and inside combos: the ordered quantity times the item's quantity per order. */
 async function withUnitQuantities(rows: KitchenRow[]): Promise<KitchenRow[]> {
-  const ids = [...new Set(rows.filter((r) => !(r.sections && r.sections.length > 0)).map((r) => r.foodId).filter((id): id is string => !!id && /^[0-9a-fA-F]{24}$/.test(id)))];
+  // the items ordered on their own and the items inside combos
+  const wanted = rows.flatMap((r) => (r.sections && r.sections.length > 0 ? comboPartIds(r.sections) : [r.foodId ?? '']));
+  const ids = [...new Set(wanted.filter((id): id is string => !!id && /^[0-9a-fA-F]{24}$/.test(id)))];
   if (ids.length === 0) return rows;
   const found = await db.read<{ _id: ObjectId; unitQuantity?: unknown }>('fooditems', { _id: { $in: ids.map((id) => new ObjectId(id)) }, unitQuantity: { $gt: 1 } } as never);
   const units = new Map<string, number>();

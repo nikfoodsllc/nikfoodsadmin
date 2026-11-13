@@ -120,6 +120,33 @@ const combo = {
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-07', name: 'Rajma', quantity: 1, ...over });
 
+describe('comboParts with a quantity per order on the items inside', () => {
+  const makkiCombo = {
+    sections: [
+      { _id: 's1', selectedItems: [{ _id: 'o1', portion: '16Oz', quantity: null, item: { _id: 'saag', name: 'Sarson Ka Saag' } }] },
+      { _id: 's2', selectedItems: [{ _id: 'o2', portion: '', quantity: 2, item: { _id: 'roti', name: 'Makki Roti (2Pc)' } }] },
+    ],
+    comboSelections: { s1: ['o1'], s2: ['o2'] },
+  };
+  it('Qty per combo 2 of a 2-piece item = 4 pieces per combo', () => {
+    expect(comboParts({ ...makkiCombo, partUnits: { roti: 2 } }).map((p) => [p.name, p.quantity])).toEqual([['Sarson Ka Saag', 1], ['Makki Roti (2Pc)', 4]]);
+  });
+  it('without quantities per order nothing changes', () => {
+    expect(comboParts(makkiCombo).map((p) => [p.name, p.quantity])).toEqual([['Sarson Ka Saag', 1], ['Makki Roti (2Pc)', 2]]);
+    expect(comboParts({ ...makkiCombo, partUnits: {} }).map((p) => p.quantity)).toEqual([1, 2]);
+  });
+  it('a day counts the pieces: 3 combos + 1 plain order of 2 pieces', () => {
+    const rows: KitchenRow[] = [
+      { orderId: 'A', day: '2026-11-13', name: 'Sarson Ka Saag 16Oz n 4 Makki Roti Combo', quantity: 3, ...makkiCombo, partUnits: { roti: 2 } },
+      // the plain item order, already multiplied by the kitchen rows (1 ordered x 2 pieces)
+      { orderId: 'B', day: '2026-11-13', name: 'Makki Roti (2Pc)', quantity: 2 },
+    ];
+    const roti = buildKitchenDays(rows, ['2026-11-13'])[0].items.find((i) => i.name === 'Makki Roti (2Pc)')!;
+    expect(roti.quantity).toBe(14); // 3 x 4 inside combos + 2 on its own
+    expect(roti.inCombos).toBe(12);
+  });
+});
+
 describe('comboParts', () => {
   it('lists the picked options with their sizes', () => {
     expect(comboParts({ ...combo, comboSelections: { s1: ['a1'], s2: ['b2'], s3: ['c2'] } })).toEqual([
