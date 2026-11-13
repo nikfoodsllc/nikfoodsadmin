@@ -3,6 +3,20 @@ import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
 import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
+import { cleanUnitQuantity, scaleRowsByUnitQuantity } from '@/utils/unitQuantity';
+
+/** A flat item that is sold as several pieces ("2 Makki Roti") counts its pieces: the ordered quantity times the item's quantity per order. */
+async function withUnitQuantities(rows: KitchenRow[]): Promise<KitchenRow[]> {
+  const ids = [...new Set(rows.filter((r) => !(r.sections && r.sections.length > 0)).map((r) => r.foodId).filter((id): id is string => !!id && /^[0-9a-fA-F]{24}$/.test(id)))];
+  if (ids.length === 0) return rows;
+  const found = await db.read<{ _id: ObjectId; unitQuantity?: unknown }>('fooditems', { _id: { $in: ids.map((id) => new ObjectId(id)) }, unitQuantity: { $gt: 1 } } as never);
+  const units = new Map<string, number>();
+  for (const item of found.success ? found.data ?? [] : []) {
+    const unit = cleanUnitQuantity(item.unitQuantity);
+    if (unit > 1) units.set(String(item._id), unit);
+  }
+  return scaleRowsByUnitQuantity(rows, units);
+}
 
 /**
  * The order lines the kitchen has to produce within a date range, one per ordered item, flattened for
@@ -59,7 +73,7 @@ export async function fetchKitchenRows(range: DayRange, options: { report?: bool
 
   const rows: KitchenRow[] = [];
   rows.push(...mapRows(result.data ?? []));
-  return rows;
+  return withUnitQuantities(rows);
 }
 
 function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): KitchenRow[] {
@@ -144,7 +158,7 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
     if (options.earlierOnly) return false;
     return kitchen < range.startDate || kitchen > range.endDate; // moved later: only when its kitchen day is not in the range
   });
-  return mapRows(keep, true);
+  return withUnitQuantities(mapRows(keep, true));
 }
 
 /**

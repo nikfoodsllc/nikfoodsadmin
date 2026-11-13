@@ -156,11 +156,11 @@ export type PrepView = 'all' | 'cooked' | 'ready_to_eat';
 const PREP_GROUPS: Array<{ key: 'cooked' | 'ready_to_eat' | 'none'; label: string; color: string; bg: string }> = [
   { key: 'cooked', label: 'Cooked', color: '#9A3412', bg: '#FFEDD5' },
   { key: 'ready_to_eat', label: 'Ready to eat', color: '#166534', bg: '#DCFCE7' },
-  { key: 'none', label: 'Not set yet', color: '#6B7280', bg: '#F3F4F6' },
+  { key: 'none', label: 'Prep Type N/A', color: '#6B7280', bg: '#F3F4F6' },
 ];
 const prepKey = (prep: 'cooked' | 'ready_to_eat' | null | undefined): 'cooked' | 'ready_to_eat' | 'none' => (prep === 'cooked' ? 'cooked' : prep === 'ready_to_eat' ? 'ready_to_eat' : 'none');
 
-/** The items and the combos to pack of one day or of the whole range, split into Cooked, Ready to eat and Not set yet. Tapping an item or combo traces it to the orders. */
+/** The items and the combos to pack of one day or of the whole range, split into Cooked, Ready to eat and Prep Type N/A. Tapping an item or combo traces it to the orders. */
 function BlockBody({
   items,
   combos,
@@ -327,7 +327,7 @@ export default function KitchenDashboardPage() {
   const [tab, setTab] = useState<'days' | 'week'>('days');
   // search by item name (a combo also by the parts chosen in it)
   const [search, setSearch] = useState('');
-  // which kind of items to show: all (split into Cooked / Ready to eat / Not set yet), or just one kind
+  // which kind of items to show: all (split into Cooked / Ready to eat / Prep Type N/A), or just one kind
   const [prepView, setPrepView] = useState<PrepView>('all');
   // the item whose orders are shown (day null = every day of the range)
   const [trace, setTrace] = useState<{ item: string; day: string | null } | null>(null);

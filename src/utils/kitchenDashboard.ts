@@ -639,16 +639,19 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: amountTextOf(row.portion, row.quantity), choices: [] });
     }
   }
-  // spice level first (mild to hot, no spice last), then the size on the order (16Oz before 12Oz before 8Oz, no size
-  // last), then the newest order first, then the customer's name; every order line is listed (nothing is merged)
+  // spice level first (mild to hot, no spice last); then the combos this item is in come before its plain orders; then, inside each
+  // group, the biggest size first (16Oz before 12Oz before 8Oz, no size last) and the combo's name; then the larger quantity first;
+  // then the newest order, the customer's name. Every order line is listed (nothing is merged).
   return lines.sort(
     (a, b) =>
       spiceRank(a.spice) - spiceRank(b.spice) ||
       clean(a.spice).localeCompare(clean(b.spice)) ||
+      (a.viaCombo ? 0 : 1) - (b.viaCombo ? 0 : 1) ||
       sizeRank(b.portion) - sizeRank(a.portion) ||
+      clean(a.viaCombo).localeCompare(clean(b.viaCombo), undefined, { sensitivity: 'base' }) ||
+      b.quantity - a.quantity ||
       (Date.parse(b.orderedAt ?? '') || 0) - (Date.parse(a.orderedAt ?? '') || 0) ||
       a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
-      b.quantity - a.quantity ||
       a.day.localeCompare(b.day) ||
       a.orderId.localeCompare(b.orderId)
   );

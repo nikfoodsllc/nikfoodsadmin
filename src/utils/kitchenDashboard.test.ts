@@ -472,7 +472,7 @@ describe('who ordered: sorted by spice level, then size, then name', () => {
     ];
     expect(order(rows)).toEqual(['Mild (Kid Friendly):4:g', 'Mild (Kid Friendly):1:d', 'Normal:3:e', 'Normal:1:c', 'Medium Spice:2:f', 'Spicy:1:a', 'Hot:1:h', 'none:9:b']);
   });
-  it('inside a spice level: biggest size first (16Oz, 12Oz, 8Oz), then by customer name', () => {
+  it('inside a spice level: biggest size first (16Oz, 12Oz, 8Oz), then the larger quantity, then the customer name', () => {
     const rows = [
       r({ orderId: 'a', portion: '12Oz', customerName: 'Kavita' }),
       r({ orderId: 'b', portion: '16Oz', customerName: 'Hiral' }),
@@ -482,8 +482,38 @@ describe('who ordered: sorted by spice level, then size, then name', () => {
       r({ orderId: 'f', portion: null, customerName: 'Zed', quantity: 9 }),
       r({ orderId: 'g', portion: '1Lb', customerName: 'Gita' }),
     ];
-    // 1Lb and 16Oz are the same size: Gita, Hiral, Meher; then 12Oz: Anand, Kavita; then 8Oz; no size last
-    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['g', 'b', 'd', 'e', 'a', 'c', 'f']);
+    // 1Lb and 16Oz are the same size: Meher (2) first, then Gita, Hiral; then 12Oz: Anand (3), Kavita; then 8Oz; no size last
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['d', 'g', 'b', 'e', 'a', 'c', 'f']);
+  });
+  it('the combos an item is in come before its plain orders (same spice level), then quantity', () => {
+    const makki = (id: string, size: string, comboName: string, qty: number) =>
+      r({
+        orderId: id,
+        name: comboName,
+        quantity: qty,
+        portion: undefined,
+        spiceLevel: 'Medium Spice',
+        sections: [{ _id: 's1', selectedItems: [{ _id: `${id}-a`, portion: size, item: { name: 'Sarson Ka Saag' } }, { _id: `${id}-b`, portion: '', item: { name: 'Makki Roti' } }] }],
+        comboSelections: { s1: [`${id}-a`, `${id}-b`] },
+      });
+    const rows = [
+      r({ orderId: 'plain-3', name: 'Sarson Ka Saag', quantity: 3, portion: '16Oz', spiceLevel: 'Medium Spice', customerName: 'P3' }),
+      makki('c12', '12Oz', 'Sarson Ka Saag 12Oz n 2 Makki Roti Combo', 1),
+      r({ orderId: 'plain-1', name: 'Sarson Ka Saag', quantity: 1, portion: '12Oz', spiceLevel: 'Medium Spice', customerName: 'P1' }),
+      makki('c16', '16Oz', 'Sarson Ka Saag 16Oz n 4 Makki Roti Combo', 1),
+      r({ orderId: 'plain-hot', name: 'Sarson Ka Saag', quantity: 1, portion: '8Oz', spiceLevel: 'Hot', customerName: 'P4' }),
+    ];
+    const lines = buildItemOrders(rows, 'Sarson Ka Saag');
+    // medium: both combos first (16Oz before 12Oz), then the plain orders (16Oz x3, then 12Oz); hot comes after medium
+    expect(lines.map((l) => l.orderId)).toEqual(['c16', 'c12', 'plain-3', 'plain-1', 'plain-hot']);
+    expect(lines.map((l) => l.viaCombo === null)).toEqual([false, false, true, true, true]);
+  });
+  it('two plain orders of one size: the larger quantity first, whatever the customer name', () => {
+    const rows = [
+      r({ orderId: 'a', customerName: 'Aarav', quantity: 1, portion: '12Oz' }),
+      r({ orderId: 'z', customerName: 'Zoya', quantity: 4, portion: '12Oz' }),
+    ];
+    expect(buildItemOrders(rows, 'Matar Paneer Bhurji').map((l) => l.orderId)).toEqual(['z', 'a']);
   });
   it('inside a spice level and size: the newest order first, and the time is carried on each line', () => {
     const rows = [

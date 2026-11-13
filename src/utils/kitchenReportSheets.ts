@@ -132,7 +132,7 @@ function boxSheet(key: SheetKey, name: string, main: PrepBlock[], notSet: PrepBl
   prepRows(main, rows, true);
   if (notSet.length > 0) {
     if (main.length > 0) rows.push({ kind: 'blank', cells: [] });
-    rows.push({ kind: 'section', cells: ['Preparation type not set yet (set Cooked or Ready to eat in Food Items)'] });
+    rows.push({ kind: 'section', cells: ['Prep Type N/A (set Cooked or Ready to eat in Food Items)'] });
     prepRows(notSet, rows, false);
   }
   return { key, columnKeys: PREP_COLUMNS.map((c) => c.key), name, widths: PREP_WIDTHS, margin: 2, rows };
