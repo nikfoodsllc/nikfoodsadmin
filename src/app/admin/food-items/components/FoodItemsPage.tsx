@@ -513,7 +513,7 @@ export default function FoodItemsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to update items');
-      const label = preparationType === 'cooked' ? 'Cooked' : preparationType === 'ready_to_eat' ? 'Ready to eat' : 'not set yet';
+      const label = preparationType === 'cooked' ? 'Cooked' : preparationType === 'ready_to_eat' ? 'Ready to eat' : 'Prep Type N/A';
       showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
       setSelectedIds(new Set());
       setBulkField(null);
@@ -1016,7 +1016,7 @@ export default function FoodItemsPage() {
                 Ready to eat
               </Button>
               <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
-                Clear (not set yet)
+                Clear (Prep Type N/A)
               </Button>
             </Box>
           )}

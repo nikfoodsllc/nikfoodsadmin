@@ -8,7 +8,8 @@ export type PreparationType = 'cooked' | 'ready_to_eat';
 
 export const PREPARATION_TYPES: PreparationType[] = ['cooked', 'ready_to_eat'];
 
-export const NOT_SET_LABEL = '(not set yet)';
+/** What shows for an item with no preparation type (mostly combos, which are split into their parts in the kitchen reports). */
+export const NOT_SET_LABEL = 'Prep Type N/A';
 
 const LABELS: Record<PreparationType, string> = {
   cooked: 'Cooked',
@@ -19,7 +20,7 @@ export function isPreparationType(value: unknown): value is PreparationType {
   return value === 'cooked' || value === 'ready_to_eat';
 }
 
-/** 'Cooked', 'Ready to eat' or '(not set yet)' for anything else. */
+/** 'Cooked', 'Ready to eat' or 'Prep Type N/A' for anything else. */
 export function preparationTypeLabel(value: unknown): string {
   return isPreparationType(value) ? LABELS[value] : NOT_SET_LABEL;
 }

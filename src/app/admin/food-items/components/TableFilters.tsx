@@ -173,7 +173,7 @@ export default function TableFilters({ searchValue, onSearchChange, filters, onF
           <MenuItem value="all">All</MenuItem>
           <MenuItem value="cooked">Cooked</MenuItem>
           <MenuItem value="ready_to_eat">Ready to eat</MenuItem>
-          <MenuItem value="not_set">(not set yet)</MenuItem>
+          <MenuItem value="not_set">Prep Type N/A</MenuItem>
         </Select>
       </FormControl>
 

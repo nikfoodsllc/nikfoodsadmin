@@ -2,6 +2,7 @@ export interface RawCategory {
   _id?: unknown;
   name: string;
   parentCategoryId?: unknown;
+  listingType?: string;
 }
 
 export interface SubCategoryOption {
@@ -9,6 +10,8 @@ export interface SubCategoryOption {
   name: string;
   parentName: string;
   label: string;
+  /** The category is a flat one (its sub-categories follow their parent); only flat items get a quantity per order */
+  flat: boolean;
 }
 
 export interface CategoryLookup {
@@ -44,11 +47,13 @@ export function buildSubCategoryOptions(raw: RawCategory[]): SubCategoryOption[]
     _id: toIdString(cat._id),
     name: cat.name,
     parentCategoryId: categoryHasParent(cat) ? toIdString(cat.parentCategoryId) : '',
+    listingType: cat.listingType,
   }));
 
   const parentNameById = new Map(
     all.filter((c) => !c.parentCategoryId).map((c) => [c._id, c.name])
   );
+  const parentTypeById = new Map(all.filter((c) => !c.parentCategoryId).map((c) => [c._id, c.listingType]));
 
   return all
     .filter((c) => c.parentCategoryId)
@@ -59,6 +64,7 @@ export function buildSubCategoryOptions(raw: RawCategory[]): SubCategoryOption[]
         name: c.name,
         parentName,
         label: `${parentName} → ${c.name}`,
+        flat: (parentTypeById.get(c.parentCategoryId) ?? c.listingType) !== 'day-wise',
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
