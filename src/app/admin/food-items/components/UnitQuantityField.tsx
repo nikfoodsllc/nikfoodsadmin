@@ -10,7 +10,7 @@ interface UnitQuantityFieldProps {
 }
 
 /**
- * Quantity per order, for flat items only (the dialog shows it when the item is in a flat category). An item sold as "2 Makki Roti"
+ * Quantity per order, for simple items. An item sold as "2 Makki Roti"
  * is set to 2, so the Kitchen Dashboard and Kitchen Report count pieces (an order of 3 = 6). Customers never see it.
  */
 export default function UnitQuantityField({ value, onChange, disabled }: UnitQuantityFieldProps) {
