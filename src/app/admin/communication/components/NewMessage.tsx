@@ -36,6 +36,7 @@ import {
   audienceTitle,
   fillPlaceholders,
   filterReady,
+  splitEmails,
   pacificLocalToIso,
   pacificText,
   pacificToday,
@@ -147,12 +148,24 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
   const [people, setPeople] = useState<Person[]>(init?.people ?? []);
   // people added by hand on top of any other choice
   const [extra, setExtra] = useState<Person[]>(init?.extra ?? []);
+  // email addresses typed by hand (people who may not be customers)
+  const [emails, setEmails] = useState<string[]>(init?.emails ?? []);
+  const [emailText, setEmailText] = useState('');
+  const [emailProblem, setEmailProblem] = useState('');
   const [pq, setPq] = useState('');
   const [results, setResults] = useState<Person[]>([]);
   const searchSeq = useRef(0);
   const filter: AudienceFilter =
     kind === 'ordered_between' ? { kind, from, to } : kind === 'people' ? { kind, userIds: people.map((p) => p.id) } : kind === 'all' || kind === 'subscribers' ? { kind } : { kind, date };
-  const withExtra: AudienceFilter = kind !== 'people' && extra.length > 0 ? { ...filter, alsoUserIds: extra.map((p) => p.id) } : filter;
+  const withPeople: AudienceFilter = kind !== 'people' && extra.length > 0 ? { ...filter, alsoUserIds: extra.map((p) => p.id) } : filter;
+  const withExtra: AudienceFilter = emails.length > 0 ? { ...withPeople, alsoEmails: emails } : withPeople;
+  const addEmails = () => {
+    const { valid, invalid } = splitEmails(emailText);
+    if (valid.length === 0 && invalid.length === 0) return;
+    setEmails((cur) => [...cur, ...valid.filter((e) => !cur.includes(e))].slice(0, 500));
+    setEmailText(invalid.join(' '));
+    setEmailProblem(invalid.length > 0 ? `Not an email address we can send to: ${invalid.join(', ')}` : '');
+  };
   const allowedPlaceholders = placeholdersFor(kind);
 
   // search customers by hand (only the newest answer is used, so a slow earlier search cannot overwrite it)
@@ -215,7 +228,7 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
   const preview = previewValues(customers?.find((c) => picked.has(c.key)), foundFilter ?? filter);
 
   // ---- the message saves itself as a draft while it is written (shared with the other admins) ----
-  const draftContent: DraftContent = useMemo(() => ({ kind, date, from, to, people, extra, email, text, subject, emailBody, emailFormat, textBody, when, local }), [kind, date, from, to, people, extra, email, text, subject, emailBody, emailFormat, textBody, when, local]);
+  const draftContent: DraftContent = useMemo(() => ({ kind, date, from, to, people, extra, emails, email, text, subject, emailBody, emailFormat, textBody, when, local }), [kind, date, from, to, people, extra, emails, email, text, subject, emailBody, emailFormat, textBody, when, local]);
   const latestDraft = useRef(draftContent);
   latestDraft.current = draftContent;
   const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
@@ -302,7 +315,7 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
   };
 
   // adding or removing a hand-picked person while the list is showing refreshes the list at once (the ticks the admin made stay)
-  const extraKey = extra.map((p) => p.id).join(',');
+  const extraKey = `${extra.map((p) => p.id).join(',')}|${emails.join(',')}`;
   const firstExtraRun = useRef(true);
   useEffect(() => {
     if (firstExtraRun.current) {
@@ -312,7 +325,8 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
     if (!customers || !foundFilter || foundFilter.kind === 'people') return;
     const base: AudienceFilter = { ...foundFilter };
     delete base.alsoUserIds;
-    void find({ filter: extra.length > 0 ? { ...base, alsoUserIds: extra.map((p) => p.id) } : base, keepPicks: true });
+    delete base.alsoEmails;
+    void find({ filter: { ...base, ...(extra.length > 0 ? { alsoUserIds: extra.map((p) => p.id) } : {}), ...(emails.length > 0 ? { alsoEmails: emails } : {}) }, keepPicks: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extraKey]);
 
@@ -427,6 +441,30 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
             <PeopleLookup label="Search by name, email or phone" pq={pq} setPq={setPq} results={results} chosen={extra} onAdd={(r) => setExtra((cur) => [...cur, r])} onRemove={(id) => setExtra((cur) => cur.filter((x) => x.id !== id))} summary={extra.length > 0 ? `${extra.length} added.` : undefined} />
           </Box>
         )}
+        <Box sx={{ mt: 2 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.25 }}>Add email addresses</Typography>
+          <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 0.75 }}>For people who are not in our customers. Paste one or many, separated by commas or new lines. They get the same email, with an Unsubscribe link.</Typography>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <TextField
+              label="Email address"
+              size="small"
+              value={emailText}
+              onChange={(e) => { setEmailText(e.target.value); if (emailProblem) setEmailProblem(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEmails(); } }}
+              onPaste={(e) => { const t = e.clipboardData.getData('text'); if (/[\s,;]/.test(t.trim())) { e.preventDefault(); setEmailText(t); setTimeout(() => document.getElementById('comm-add-emails')?.click(), 0); } }}
+              inputProps={{ inputMode: 'email', autoCapitalize: 'none', spellCheck: false }}
+              error={Boolean(emailProblem)}
+              sx={{ flex: '1 1 260px', maxWidth: 420 }}
+            />
+            <Button id="comm-add-emails" size="small" variant="outlined" onClick={addEmails} disabled={emailText.trim() === ''} sx={{ textTransform: 'none', fontWeight: 700, height: 40 }}>Add</Button>
+          </Box>
+          {emailProblem && <Typography sx={{ fontSize: 12.5, color: '#B91C1C', mt: 0.5 }}>{emailProblem}</Typography>}
+          {emails.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
+              {emails.map((e) => <Chip key={e} label={e} onDelete={() => setEmails((cur) => cur.filter((x) => x !== e))} sx={{ maxWidth: '100%' }} />)}
+            </Box>
+          )}
+        </Box>
         <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 1 }}>
           {kind === 'delivery_date' && 'Customers whose order is delivered on this date (the date it is really delivered on, also for items that were moved).'}
           {kind === 'menu_day' && 'Customers who ordered something from this menu day, even if it is delivered on another day.'}
@@ -436,7 +474,7 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
           {kind === 'all' && 'Every active customer account, whether or not they have ordered lately.'}
         </Typography>
         {(kind === 'delivery_date' || kind === 'menu_day' || kind === 'ordered_between') && <Typography sx={{ fontSize: 12.5, color: '#6B7280' }}>Paid orders only; cancelled, failed and refunded orders are left out. One row per customer.</Typography>}
-        <Button variant="contained" disabled={!filterReady(filter) || finding} onClick={() => void find()} sx={{ mt: 1.5, textTransform: 'none', fontWeight: 700, bgcolor: '#1F1712', '&:hover': { bgcolor: '#3A2A1E' } }}>
+        <Button variant="contained" disabled={!filterReady(withExtra) || finding} onClick={() => void find()} sx={{ mt: 1.5, textTransform: 'none', fontWeight: 700, bgcolor: '#1F1712', '&:hover': { bgcolor: '#3A2A1E' } }}>
           {finding ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : kind === 'people' ? 'Continue' : 'Find customers'}
         </Button>
         {findError && <Alert severity="error" sx={{ mt: 1.5 }}>{findError}</Alert>}
@@ -476,7 +514,8 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        {c.added && <Chip size="small" label="Added" title="You added this person by hand" sx={{ height: 20, fontSize: 11, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
+                        {c.textReason === 'Email only' && <Chip size="small" label="Email only" title="Not a customer account: an address you typed" sx={{ height: 20, fontSize: 11, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
+                        {c.added && c.textReason !== 'Email only' && <Chip size="small" label="Added" title="You added this person by hand" sx={{ height: 20, fontSize: 11, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
                         {!c.email && <Chip size="small" label="No email" sx={{ height: 20, fontSize: 11, bgcolor: '#FEF3C7', color: '#92400E' }} />}
                         {c.email && c.unsubscribed && <Chip size="small" label="Unsubscribed" title="Stopped our emails. No emails are sent to them." sx={{ height: 20, fontSize: 11, bgcolor: '#FEE2E2', color: '#B91C1C' }} />}
                         {c.textOk ? <Chip size="small" label="Text OK" sx={{ height: 20, fontSize: 11, bgcolor: '#DCFCE7', color: '#166534' }} /> : <Chip size="small" label="No text" title={c.textReason ?? ''} sx={{ height: 20, fontSize: 11, bgcolor: '#F3F4F6', color: '#4B5563' }} />}

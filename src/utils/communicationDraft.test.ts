@@ -52,6 +52,7 @@ describe('worthSaving, title and preview', () => {
     expect(worthSaving(parseDraftContent({ textBody: 'x' }))).toBe(true);
     expect(worthSaving(parseDraftContent({ extra: [{ id: id(1) }] }))).toBe(true);
     expect(worthSaving(parseDraftContent({ people: [{ id: id(1) }] }))).toBe(true);
+    expect(worthSaving(parseDraftContent({ emails: ['ann@gmail.com'] }))).toBe(true);
   });
   it('names a draft by its subject, else by what it holds', () => {
     expect(draftTitle({ subject: ' New menu ', emailBody: '', textBody: '' })).toBe('New menu');
@@ -65,5 +66,17 @@ describe('worthSaving, title and preview', () => {
     expect(draftPreview({ emailBody: '<style>p{color:red}</style><p>Hi&nbsp;<b>you</b></p>', emailFormat: 'html', textBody: '' })).toBe('Hi you');
     expect(draftPreview({ emailBody: '', emailFormat: 'text', textBody: 'Text only' })).toBe('Text only');
     expect(draftPreview({ emailBody: 'a'.repeat(300), emailFormat: 'text', textBody: '' }).length).toBe(138);
+  });
+});
+
+describe('typed email addresses in a draft', () => {
+  it('keeps real addresses, lower case, without repeats, and drops the rest', () => {
+    const d = parseDraftContent({ emails: ['Ann@Gmail.com', 'ann@gmail.com', 'nope', 'a b@c.com', 42, 'x@y.org'] });
+    expect(d.emails).toEqual(['ann@gmail.com', 'x@y.org']);
+  });
+  it('is empty for anything else and is capped', () => {
+    expect(parseDraftContent({}).emails).toEqual([]);
+    expect(parseDraftContent({ emails: 'a@b.com' }).emails).toEqual([]);
+    expect(parseDraftContent({ emails: Array.from({ length: MAX_DRAFT_PEOPLE + 20 }, (_, i) => `p${i}@x.com`) }).emails.length).toBe(MAX_DRAFT_PEOPLE);
   });
 });

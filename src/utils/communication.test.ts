@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EMAIL_DESIGN_GUIDE } from './emailDesignGuide';
 import { EMAIL_TEMPLATES } from './emailTemplates';
-import { htmlProblem, previewHtml, placeholdersFor, whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
+import { splitEmails, htmlProblem, previewHtml, placeholdersFor, whenText, addDays, audienceTitle, countLine, fillPlaceholders, filterReady, pacificLocalToIso, pacificText, previewValues, reachOf, textTimeOk, withPlaceholder, type AudienceCustomer } from './communication';
 
 const c = (key: string, o: Partial<AudienceCustomer> = {}): AudienceCustomer => ({ key, name: key, email: `${key}@x.com`, phone: null, orders: ['ORD-1'], textOk: false, textReason: null, ...o });
 
@@ -163,5 +163,32 @@ describe('App Store invitation in every email', () => {
 describe('AI design instructions', () => {
   it('state the rules the server enforces', () => {
     for (const w of ['cid:nikfoods-logo', '{unsubscribeUrl}', '{firstName}', '90,000', '<script>', 'bgcolor', 'support@nikfoods.com']) expect(EMAIL_DESIGN_GUIDE).toContain(w);
+  });
+});
+
+describe('typed email addresses', () => {
+  it('splits pasted text on commas, semicolons, spaces and new lines', () => {
+    const r = splitEmails('Ann@Gmail.com, bob@x.org;\ncara@y.com  <dev@z.io> ann@gmail.com');
+    expect(r.valid).toEqual(['ann@gmail.com', 'bob@x.org', 'cara@y.com', 'dev@z.io']);
+    expect(r.invalid).toEqual([]);
+  });
+  it('reports what is not an address and refuses test domains', () => {
+    const r = splitEmails('good@x.com nope a@b test@example.com z@q.invalid');
+    expect(r.valid).toEqual(['good@x.com']);
+    expect(r.invalid).toEqual(['nope', 'a@b', 'test@example.com', 'z@q.invalid']);
+  });
+  it('an empty box gives nothing', () => {
+    expect(splitEmails('  ')).toEqual({ valid: [], invalid: [] });
+  });
+  it('a filter with only typed addresses is ready, and its title says so', () => {
+    expect(filterReady({ kind: 'people', userIds: [], alsoEmails: ['a@b.com'] })).toBe(true);
+    expect(filterReady({ kind: 'people', userIds: [] })).toBe(false);
+    expect(audienceTitle({ kind: 'people', userIds: [], alsoEmails: ['a@b.com'] })).toBe('Email addresses you typed');
+    expect(audienceTitle({ kind: 'all', alsoEmails: ['a@b.com', 'c@d.com'] })).toBe('Everyone + 2 email addresses');
+    expect(audienceTitle({ kind: 'delivery_date', date: '2026-11-14', alsoUserIds: ['x'], alsoEmails: ['a@b.com'] })).toContain('+ 1 added + 1 email address');
+  });
+  it('the preview greets a customer without a name with "there", the sample name only when there is no customer', () => {
+    expect(previewValues({ key: 'a@b.com', name: '', email: 'a@b.com', phone: null, orders: [], textOk: false, textReason: 'Email only' }).firstName).toBe('there');
+    expect(previewValues(undefined).firstName).toBe('Alex');
   });
 });
