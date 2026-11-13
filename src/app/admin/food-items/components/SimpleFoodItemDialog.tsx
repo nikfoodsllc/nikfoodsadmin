@@ -496,6 +496,7 @@ export default function SimpleFoodItemDialog({
 
           <Divider />
 
+          <UnitQuantityField value={formData.unitQuantity} onChange={(value) => setFormData((prev) => ({ ...prev, unitQuantity: value }))} disabled={loading} />
           <ToggleRow label="Vegetarian" caption="Off means non-vegetarian." checked={formData.veg} onChange={(on) => handleChange('veg', on)} disabled={loading} />
 
           {/* Preparation Type: Cooked / Ready to eat (required for a new item; existing items may stay not set) */}
@@ -521,7 +522,6 @@ export default function SimpleFoodItemDialog({
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
           <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
           <StockField itemId={formData._id} hasSizes={false} value={formData} onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))} disabled={loading} />
-          <UnitQuantityField value={formData.unitQuantity} onChange={(value) => setFormData((prev) => ({ ...prev, unitQuantity: value }))} disabled={loading} />
           <HeatingInstructionsField value={formData.heatingInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, heatingInstructions: value }))} disabled={loading} />
           <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
           <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Needs a sticker first.' : 'One sticker for every box (off: one line per order).'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />
