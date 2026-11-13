@@ -8,6 +8,7 @@
  */
 
 import { comboItemQuantity, comboQuantityText } from './comboQuantity';
+import { cleanUnitQuantity } from './unitQuantity';
 import { getOptionSpice, getSectionSpice, sectionTakesSpice, spiceForSection } from './comboSpice';
 
 export type WeekPreset = 'thisWeek' | 'nextWeek' | 'lastWeek' | 'weekBeforeLast' | 'custom';
@@ -129,6 +130,8 @@ export interface KitchenRow {
   }> | null;
   /** What the customer picked: { sectionId: [option ids] }. */
   comboSelections?: Record<string, string[]> | null;
+  /** Combo lines only: the "quantity per order" of the items inside the combo (food item id -> pieces), so a part counts pieces like the same item ordered on its own. */
+  partUnits?: Record<string, number> | null;
   /** What the customer wrote in the item's Special instructions box (when the item has one). */
   notes?: string | null;
   /** Only filled when tracing an item back to the people who ordered it. */
@@ -348,7 +351,7 @@ export function partSpices(row: Pick<KitchenRow, 'sections' | 'comboSelections' 
 }
 
 /** The picked options of a combo as separate items. `quantity` is how many of that item come with ONE combo (Chapati x 4); 1 when the combo does not say. */
-export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>): Array<{ name: string; portion: string | null; quantity: number; id?: string }> {
+export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections' | 'partUnits'>): Array<{ name: string; portion: string | null; quantity: number; id?: string }> {
   if (!row.sections?.length || !row.comboSelections) return [];
   const parts: Array<{ name: string; portion: string | null; quantity: number; id?: string }> = [];
   for (const section of row.sections) {
@@ -358,7 +361,8 @@ export function comboParts(row: Pick<KitchenRow, 'sections' | 'comboSelections'>
       const name = clean(option?.item?.name);
       if (!name) continue;
       const foodId = option?.item?._id ? String(option.item._id) : '';
-      const quantity = comboItemQuantity(option?.quantity);
+      // "Qty per combo" (packs of the item) times the item's own quantity per order (pieces in a pack)
+      const quantity = comboItemQuantity(option?.quantity) * (foodId && row.partUnits ? cleanUnitQuantity(row.partUnits[foodId]) : 1);
       parts.push(foodId ? { name, portion: clean(option?.portion) || null, quantity, id: foodId } : { name, portion: clean(option?.portion) || null, quantity });
     }
   }
@@ -639,16 +643,19 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
       lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: amountTextOf(row.portion, row.quantity), choices: [] });
     }
   }
-  // spice level first (mild to hot, no spice last), then the size on the order (16Oz before 12Oz before 8Oz, no size
-  // last), then the newest order first, then the customer's name; every order line is listed (nothing is merged)
+  // spice level first (mild to hot, no spice last); then the combos this item is in come before its plain orders; then, inside each
+  // group, the biggest size first (16Oz before 12Oz before 8Oz, no size last) and the combo's name; then the larger quantity first;
+  // then the newest order, the customer's name. Every order line is listed (nothing is merged).
   return lines.sort(
     (a, b) =>
       spiceRank(a.spice) - spiceRank(b.spice) ||
       clean(a.spice).localeCompare(clean(b.spice)) ||
+      (a.viaCombo ? 0 : 1) - (b.viaCombo ? 0 : 1) ||
       sizeRank(b.portion) - sizeRank(a.portion) ||
+      clean(a.viaCombo).localeCompare(clean(b.viaCombo), undefined, { sensitivity: 'base' }) ||
+      b.quantity - a.quantity ||
       (Date.parse(b.orderedAt ?? '') || 0) - (Date.parse(a.orderedAt ?? '') || 0) ||
       a.customerName.localeCompare(b.customerName, undefined, { sensitivity: 'base' }) ||
-      b.quantity - a.quantity ||
       a.day.localeCompare(b.day) ||
       a.orderId.localeCompare(b.orderId)
   );

@@ -19,12 +19,12 @@ describe('preparation type', () => {
     expect(isPreparationType(1)).toBe(false);
   });
 
-  it('labels each state, and "(not set yet)" for everything else', () => {
+  it('labels each state, and "Prep Type N/A" for everything else', () => {
     expect(preparationTypeLabel('cooked')).toBe('Cooked');
     expect(preparationTypeLabel('ready_to_eat')).toBe('Ready to eat');
-    expect(preparationTypeLabel(undefined)).toBe('(not set yet)');
-    expect(preparationTypeLabel(null)).toBe('(not set yet)');
-    expect(preparationTypeLabel('fried')).toBe('(not set yet)');
+    expect(preparationTypeLabel(undefined)).toBe('Prep Type N/A');
+    expect(preparationTypeLabel(null)).toBe('Prep Type N/A');
+    expect(preparationTypeLabel('fried')).toBe('Prep Type N/A');
   });
 
   it('normalizes to a valid type or null', () => {

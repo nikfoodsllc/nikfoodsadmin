@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import PreparationTypeField from './PreparationTypeField';
 import StickerField from './StickerField';
+import UnitQuantityField from './UnitQuantityField';
 import HeatingInstructionsField from './HeatingInstructionsField';
 import { StickerFlag } from '@/utils/stickerFlag';
 import ChefsPickField from './ChefsPickField';
@@ -62,6 +63,7 @@ interface SimpleFoodItem {
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
   splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   heatingInstructions?: string | null; // printed on the sticker; missing = none
+  unitQuantity?: number | null; // pieces one order makes ("2 Makki Roti" = 2); missing = 1
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
   chefsPick?: boolean; // true = shown in the mobile app's Chef's Pick row
   allergens?: string[]; // keys from utils/allergens.ts; none ticked = no allergens
@@ -494,6 +496,7 @@ export default function SimpleFoodItemDialog({
 
           <Divider />
 
+          <UnitQuantityField value={formData.unitQuantity} onChange={(value) => setFormData((prev) => ({ ...prev, unitQuantity: value }))} disabled={loading} />
           <ToggleRow label="Vegetarian" caption="Off means non-vegetarian." checked={formData.veg} onChange={(on) => handleChange('veg', on)} disabled={loading} />
 
           {/* Preparation Type: Cooked / Ready to eat (required for a new item; existing items may stay not set) */}

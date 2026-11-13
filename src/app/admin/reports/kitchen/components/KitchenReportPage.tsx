@@ -595,7 +595,7 @@ export default function KitchenReportPage() {
           ))}
           {notSetCount > 0 && (
             <>
-              <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mt: 3, mb: 1 }}>Preparation type not set yet</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#92400E', mt: 3, mb: 1 }}>Prep Type N/A</Typography>
               {notSet.map((block) => (
                 <PrepCard key={`notset-${block.name}`} block={block} warn showKitchenDay={multiDay} />
               ))}
