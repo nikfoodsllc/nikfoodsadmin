@@ -74,6 +74,16 @@ export async function GET(request: NextRequest) {
         typesByName.set(key, set);
       }
     }
+    // recipe items (raita with biryani) are not food items: their type is on the recipe item itself
+    if (names.length > 0) {
+      const recipes = await db.read<{ name?: string; preparationType?: unknown }>('recipeitems', { name: { $in: names } } as never, { projection: { name: 1, preparationType: 1 } } as never);
+      for (const item of recipes.success ? recipes.data ?? [] : []) {
+        const key = (item.name ?? '').trim();
+        const set = typesByName.get(key) ?? new Set<string>();
+        set.add(normalizePreparationType(item.preparationType) ?? 'none');
+        typesByName.set(key, set);
+      }
+    }
     const typeByName = new Map<string, PreparationType | null>(
       [...typesByName].map(([name, set]) => [name, set.size === 1 && !set.has('none') ? ([...set][0] as PreparationType) : null])
     );

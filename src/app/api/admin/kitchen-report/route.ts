@@ -96,6 +96,19 @@ export async function GET(request: NextRequest) {
         splitById.set(String(item._id), normalizeSticker(item.splitSticker));
       }
     }
+    // recipe items (raita with biryani) are not food items: their type is on the recipe item itself
+    if (objectIds.length > 0) {
+      const recipes = await db.read<{ _id: ObjectId; name?: string; preparationType?: unknown }>('recipeitems', { _id: { $in: objectIds } } as never);
+      for (const item of recipes.success ? recipes.data ?? [] : []) {
+        const type = normalizePreparationType(item.preparationType);
+        byId.set(String(item._id), type);
+        if (item.name) {
+          const set = nameTypes.get(item.name.trim()) ?? new Set<string>();
+          set.add(type ?? 'none');
+          nameTypes.set(item.name.trim(), set);
+        }
+      }
+    }
     const typeOf: TypeLookup = ({ id, name }) => {
       if (id && byId.has(id)) return byId.get(id) ?? null;
       // no usable id: the name decides, but only when every item with that name is prepared the same way

@@ -3,6 +3,7 @@ import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrde
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString } from '@/utils/kitchenDashboard';
 import type { PackingRow } from '@/utils/packingReport';
+import { withRecipes } from '@/lib/recipeRows';
 
 /**
  * Every order line that is delivered on one date: an item's DELIVERY date counts (the day it goes out, after any cart
@@ -72,7 +73,8 @@ export async function fetchPackingRows(date: string): Promise<PackingRow[]> {
       street: typeof raw.street === 'string' ? raw.street : null,
     });
   }
-  return rows;
+  // the recipe items that go with the lines (raita with biryani) are packed too
+  return withRecipes(rows);
 }
 
 /** An order line made on the date's kitchen day that does NOT go out that day. */
