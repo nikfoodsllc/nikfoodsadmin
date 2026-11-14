@@ -132,6 +132,8 @@ export interface KitchenRow {
   comboSelections?: Record<string, string[]> | null;
   /** Combo lines only: the "quantity per order" of the items inside the combo (food item id -> pieces), so a part counts pieces like the same item ordered on its own. */
   partUnits?: Record<string, number> | null;
+  /** Set on a line made from a recipe item (raita with biryani): the name of the item it goes with. Not something a customer ordered. */
+  recipeOf?: string | null;
   /** What the customer wrote in the item's Special instructions box (when the item has one). */
   notes?: string | null;
   /** Only filled when tracing an item back to the people who ordered it. */
@@ -462,6 +464,8 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
   const combos = new Map<string, { quantity: number; eco: number; spice: Map<string, number>; parts: Map<string, { name: string; portion: string | null; quantity: number }>; deliveries: Map<string, number> }>();
   const orderIds = new Set<string>();
   let ecoContainers = 0;
+  // recipe items (raita with biryani) are counted like any item, but they are not dishes that were sold: left out of "units"
+  let recipeUnits = 0;
 
   const itemAcc = (name: string): ItemAcc => {
     let acc = items.get(name);
@@ -474,6 +478,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
 
   for (const row of dayRows) {
     orderIds.add(row.orderId);
+    if (row.recipeOf) recipeUnits += row.quantity;
     if (row.isEco) ecoContainers += row.quantity;
     const name = clean(row.name);
     const spice = clean(row.spiceLevel);
@@ -569,7 +574,7 @@ function buildKitchenBlock(dayRows: KitchenRow[]): KitchenBlock {
     items: itemList,
     combos: comboList,
     totals: {
-      units: itemList.reduce((sum, i) => sum + i.quantity, 0) - itemList.reduce((s, i) => s + i.inCombos, 0) + comboList.reduce((s, c) => s + c.quantity, 0),
+      units: itemList.reduce((sum, i) => sum + i.quantity, 0) - itemList.reduce((s, i) => s + i.inCombos, 0) + comboList.reduce((s, c) => s + c.quantity, 0) - recipeUnits,
       orders: orderIds.size,
       ecoContainers,
     },
@@ -640,7 +645,7 @@ export function buildItemOrders(rows: KitchenRow[], itemName: string, day?: stri
         }
       }
     } else if (clean(row.name) === wanted) {
-      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: null, amountText: amountTextOf(row.portion, row.quantity), choices: [] });
+      lines.push({ ...base, quantity: row.quantity, portion: clean(row.portion) || null, spice: clean(row.spiceLevel) || null, viaCombo: clean(row.recipeOf) || null, amountText: amountTextOf(row.portion, row.quantity), choices: [] });
     }
   }
   // spice level first (mild to hot, no spice last); then the combos this item is in come before its plain orders; then, inside each

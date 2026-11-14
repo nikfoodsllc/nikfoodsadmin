@@ -4,6 +4,7 @@ import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrde
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
 import { cleanUnitQuantity, comboPartIds, scaleRowsByUnitQuantity } from '@/utils/unitQuantity';
+import { withRecipes } from '@/lib/recipeRows';
 
 /** An item sold as several pieces ("2 Makki Roti") counts its pieces, on its own and inside combos: the ordered quantity times the item's quantity per order. */
 async function withUnitQuantities(rows: KitchenRow[]): Promise<KitchenRow[]> {
@@ -75,7 +76,8 @@ export async function fetchKitchenRows(range: DayRange, options: { report?: bool
 
   const rows: KitchenRow[] = [];
   rows.push(...mapRows(result.data ?? []));
-  return withUnitQuantities(rows);
+  // recipe items first (an amount is per order), then the pieces per order of the items
+  return withUnitQuantities(await withRecipes(rows));
 }
 
 function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): KitchenRow[] {
@@ -160,7 +162,7 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
     if (options.earlierOnly) return false;
     return kitchen < range.startDate || kitchen > range.endDate; // moved later: only when its kitchen day is not in the range
   });
-  return withUnitQuantities(mapRows(keep, true));
+  return withUnitQuantities(await withRecipes(mapRows(keep, true)));
 }
 
 /**

@@ -128,7 +128,8 @@ export function toLine(row: PackingRow, date: string): PackLine {
     spice: clean(row.spiceLevel) || null,
     isEco: Boolean(row.isEco),
     note: clean(row.notes) || null,
-    choices,
+    // a recipe item (raita with biryani) says what it goes with
+    choices: row.recipeOf ? [`Goes with ${clean(row.recipeOf)}`] : choices,
     pickedFor: row.day && row.day !== date ? row.day : null,
     ...(row.day && row.day < date ? { madeEarlier: true } : {}),
     day: row.day,
