@@ -222,7 +222,7 @@ export function buildPackingReport(date: string, rows: PackingRow[], roster: Ros
     routes,
     unrouted,
     totals,
-    stats: { stops: routes.reduce((n, r) => n + r.stops.length, 0), orders: orders.size, units: rows.reduce((n, r) => n + r.quantity, 0), eco: rows.reduce((n, r) => n + (r.isEco ? r.quantity : 0), 0), unroutedStops: unrouted.length },
+    stats: { stops: routes.reduce((n, r) => n + r.stops.length, 0), orders: orders.size, units: rows.reduce((n, r) => n + (r.recipeOf ? 0 : r.quantity), 0), eco: rows.reduce((n, r) => n + (r.isEco ? r.quantity : 0), 0), unroutedStops: unrouted.length },
   };
 }
 
