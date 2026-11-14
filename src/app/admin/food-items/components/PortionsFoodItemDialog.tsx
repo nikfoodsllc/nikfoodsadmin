@@ -24,6 +24,8 @@ import {
   Divider,
 } from '@mui/material';
 import PreparationTypeField from './PreparationTypeField';
+import RecipeLinesField from './RecipeLinesField';
+import { recipeLinesProblem, type RecipeLine } from '@/utils/recipeItems';
 import StickerField from './StickerField';
 import HeatingInstructionsField from './HeatingInstructionsField';
 import { StickerFlag } from '@/utils/stickerFlag';
@@ -61,6 +63,7 @@ interface PortionsFoodItem {
   preparationType?: PreparationType | null; // how the kitchen prepares it; null/missing = not set yet
   splitSticker?: StickerFlag | null; // 'yes' = one sticker per box on the Stickers sheet; null/missing = not set yet
   heatingInstructions?: string | null; // printed on the sticker; missing = none
+  recipeLines?: RecipeLine[] | null; // hidden recipe items that go with it (raita, chutney) and how much per size; missing = none
   sticker?: StickerFlag | null; // 'yes' = on the Stickers sheet; null/missing = not set yet
   chefsPick?: boolean; // true = shown in the mobile app's Chef's Pick row
   allergens?: string[]; // keys from utils/allergens.ts; none ticked = no allergens
@@ -217,6 +220,9 @@ export default function PortionsFoodItemDialog({
     if (selectedSubCategoryIds.length === 0) {
       newErrors.subCategory = 'At least one sub category is required';
     }
+
+    const recipeError = recipeLinesProblem(formData.recipeLines, true);
+    if (recipeError) newErrors.recipe = recipeError;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -405,6 +411,7 @@ export default function PortionsFoodItemDialog({
           <ChefsPickField value={formData.chefsPick} onChange={(value) => setFormData((prev) => ({ ...prev, chefsPick: value }))} disabled={loading} />
           <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
           <StockField itemId={formData._id} hasSizes={true} value={formData} onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))} disabled={loading} />
+          <RecipeLinesField value={formData.recipeLines} sizes={formData.portions} onChange={(lines) => setFormData((prev) => ({ ...prev, recipeLines: lines }))} disabled={loading} error={errors.recipe} />
           <HeatingInstructionsField value={formData.heatingInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, heatingInstructions: value }))} disabled={loading} />
           <StickerField allowNotSet={false} value={formData.sticker} onChange={(value) => setFormData((prev) => ({ ...prev, sticker: value, ...(value === 'no' ? { splitSticker: 'no' as const } : {}) }))} disabled={loading} />
           <StickerField label="Split Sticker" caption={formData.sticker === 'no' ? 'Needs a sticker first.' : 'One sticker for every box (off: one line per order).'} value={formData.sticker === 'no' ? 'no' : formData.splitSticker} onChange={(value) => setFormData((prev) => ({ ...prev, splitSticker: value }))} disabled={loading || formData.sticker === 'no'} />

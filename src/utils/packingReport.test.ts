@@ -204,3 +204,23 @@ describe('stops with nothing to pack', () => {
     expect(emptyStops(rep).map((s) => s.time)).toEqual(['12:05 AM', '12:00 PM', '']);
   });
 });
+
+describe('recipe items (raita with biryani)', () => {
+  const lines = [
+    row({ orderId: 'R-1', customerName: 'Ann Lee', name: 'Veg Biryani', portion: '16Oz', quantity: 2 }),
+    row({ orderId: 'R-1', customerName: 'Ann Lee', name: 'Raita', portion: '4Oz', quantity: 2, recipeOf: 'Veg Biryani' }),
+  ];
+  const report = buildPackingReport(DATE, lines, [], []);
+  const stopLines = report.unrouted.flatMap((s) => s.lines);
+
+  it('a recipe item is packed in the same stop and says what it goes with', () => {
+    const raita = stopLines.find((l) => l.name === 'Raita')!;
+    expect(raita).toMatchObject({ quantity: 2, portion: '4Oz', choices: ['Goes with Veg Biryani'] });
+    expect(stopLines.find((l) => l.name === 'Veg Biryani')!.choices).toEqual([]);
+  });
+  it('it is in the item totals, but not in the units of the day', () => {
+    expect(report.totals.map((t) => t.name).sort()).toEqual(['Raita', 'Veg Biryani']);
+    expect(report.stats.units).toBe(2);
+    expect(report.stats.orders).toBe(1);
+  });
+});

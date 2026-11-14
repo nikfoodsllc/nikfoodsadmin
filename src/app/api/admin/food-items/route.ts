@@ -14,6 +14,7 @@ import { cleanAllergens } from '@/utils/allergens';
 import { isStickerFlag } from '@/utils/stickerFlag';
 import { cleanHeatingInstruction } from '@/utils/heatingInstructions';
 import { cleanUnitQuantity } from '@/utils/unitQuantity';
+import { cleanRecipeLines, type RecipeLine } from '@/utils/recipeItems';
 import { rememberHeatingInstruction } from '@/lib/heatingInstructionsLibrary';
 import { foodItemListFilters, stockLevelParam } from './listFilters';
 
@@ -273,6 +274,8 @@ const foodItemSchema = z.object({
   splitSticker: z.enum(['yes', 'no']).nullish(),
   // simple items only: how many pieces one order makes ("2 Makki Roti" = 2); the kitchen counts multiply by it. null / 1 = one per order
   unitQuantity: z.number().int().min(1).max(99).nullish(),
+  // hidden recipe items that go with the item (raita with biryani) and how much per size; an empty list takes them all off
+  recipeLines: z.array(z.object({ recipeItemId: z.string().max(40), amount: z.number().nullish(), bySize: z.record(z.string().max(40), z.number()).nullish() })).max(12).nullish(),
   // Heating / storage instruction printed on the sticker; null or empty on update = clear it
   heatingInstructions: z.string().max(300).nullish(),
 
@@ -373,6 +376,7 @@ interface FoodItem {
   sticker?: 'yes' | 'no';
   splitSticker?: 'yes' | 'no';
   unitQuantity?: number;
+  recipeLines?: RecipeLine[];
   heatingInstructions?: string;
   chefsPick?: boolean;
   allergens?: string[];
@@ -834,6 +838,7 @@ export async function POST(request: NextRequest) {
       // an item with no sticker has no split sticker either
       ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       ...(data.itemType === 'simple' && cleanUnitQuantity(data.unitQuantity) > 1 ? { unitQuantity: cleanUnitQuantity(data.unitQuantity) } : {}),
+      ...(data.itemType !== 'combo' && cleanRecipeLines(data.recipeLines).length > 0 ? { recipeLines: cleanRecipeLines(data.recipeLines) } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1067,6 +1072,7 @@ const updateData: Partial<FoodItem> = {
   // an item with no sticker has no split sticker either; otherwise the Split Sticker choice is saved as sent
   ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
   ...(data.itemType === 'simple' && cleanUnitQuantity(data.unitQuantity) > 1 ? { unitQuantity: cleanUnitQuantity(data.unitQuantity) } : {}),
+  ...(data.itemType !== 'combo' && cleanRecipeLines(data.recipeLines).length > 0 ? { recipeLines: cleanRecipeLines(data.recipeLines) } : {}),
   updatedAt: new Date(),
 };
 
@@ -1161,6 +1167,8 @@ const updateData: Partial<FoodItem> = {
     // a combo without spice (or sent without a spice mode) goes back to no spice mode
     if (data.itemType === 'combo' && (data.hasSpiceLevel === false || data.spiceMode === null)) unset.spiceMode = '';
     if (data.splitSticker === null && data.sticker !== 'no') unset.splitSticker = '';
+    // recipe lines: an empty list (or any combo) takes them all off; left out leaves them as they are
+    if (data.itemType === 'combo' || (data.recipeLines !== undefined && data.recipeLines !== null && cleanRecipeLines(data.recipeLines).length === 0)) unset.recipeLines = '';
     // quantity per order (simple items only): sent as null or 1 (or on any other item type) goes back to one per order; left out leaves it as it is
     if (data.itemType !== 'simple' || (data.unitQuantity !== undefined && cleanUnitQuantity(data.unitQuantity) === 1)) unset.unitQuantity = '';
     const updateResult = await db.updateOne<FoodItem>(

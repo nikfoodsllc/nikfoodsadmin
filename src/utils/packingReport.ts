@@ -128,7 +128,8 @@ export function toLine(row: PackingRow, date: string): PackLine {
     spice: clean(row.spiceLevel) || null,
     isEco: Boolean(row.isEco),
     note: clean(row.notes) || null,
-    choices,
+    // a recipe item (raita with biryani) says what it goes with
+    choices: row.recipeOf ? [`Goes with ${clean(row.recipeOf)}`] : choices,
     pickedFor: row.day && row.day !== date ? row.day : null,
     ...(row.day && row.day < date ? { madeEarlier: true } : {}),
     day: row.day,
@@ -221,7 +222,7 @@ export function buildPackingReport(date: string, rows: PackingRow[], roster: Ros
     routes,
     unrouted,
     totals,
-    stats: { stops: routes.reduce((n, r) => n + r.stops.length, 0), orders: orders.size, units: rows.reduce((n, r) => n + r.quantity, 0), eco: rows.reduce((n, r) => n + (r.isEco ? r.quantity : 0), 0), unroutedStops: unrouted.length },
+    stats: { stops: routes.reduce((n, r) => n + r.stops.length, 0), orders: orders.size, units: rows.reduce((n, r) => n + (r.recipeOf ? 0 : r.quantity), 0), eco: rows.reduce((n, r) => n + (r.isEco ? r.quantity : 0), 0), unroutedStops: unrouted.length },
   };
 }
 
