@@ -275,7 +275,7 @@ const foodItemSchema = z.object({
   // simple items only: how many pieces one order makes ("2 Makki Roti" = 2); the kitchen counts multiply by it. null / 1 = one per order
   unitQuantity: z.number().int().min(1).max(99).nullish(),
   // hidden recipe items that go with the item (raita with biryani) and how much per size; an empty list takes them all off
-  recipeLines: z.array(z.object({ recipeItemId: z.string().max(40), amount: z.string().max(20).nullish(), bySize: z.record(z.string().max(40), z.string().max(20)).nullish() })).max(12).nullish(),
+  recipeLines: z.array(z.object({ recipeItemId: z.string().max(40), amount: z.number().nullish(), bySize: z.record(z.string().max(40), z.number()).nullish() })).max(12).nullish(),
   // Heating / storage instruction printed on the sticker; null or empty on update = clear it
   heatingInstructions: z.string().max(300).nullish(),
 

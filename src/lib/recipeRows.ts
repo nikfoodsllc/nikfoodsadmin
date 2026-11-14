@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import type { KitchenRow } from '@/utils/kitchenDashboard';
-import { cleanRecipeLines, expandRecipeRows, recipeFoodIds, type RecipeLine } from '@/utils/recipeItems';
+import { cleanRecipeLines, expandRecipeRows, normalizeRecipeUnit, recipeFoodIds, type RecipeLine, type RecipeUnit } from '@/utils/recipeItems';
 
 export const RECIPE_ITEMS = 'recipeitems';
 
@@ -24,9 +24,9 @@ export async function withRecipes<T extends KitchenRow>(rows: T[]): Promise<T[]>
       for (const l of lines) wanted.add(l.recipeItemId);
     }
     if (linesByFoodId.size === 0) return rows;
-    const found = await db.read<{ _id: ObjectId; name?: string }>(RECIPE_ITEMS, { _id: { $in: [...wanted].map((id) => new ObjectId(id)) } } as never, { projection: { name: 1 } } as never);
-    const recipeById = new Map<string, { name: string }>();
-    for (const r of found.success ? found.data ?? [] : []) if (r.name?.trim()) recipeById.set(String(r._id), { name: r.name.trim() });
+    const found = await db.read<{ _id: ObjectId; name?: string; unit?: unknown }>(RECIPE_ITEMS, { _id: { $in: [...wanted].map((id) => new ObjectId(id)) } } as never, { projection: { name: 1, unit: 1 } } as never);
+    const recipeById = new Map<string, { name: string; unit: RecipeUnit }>();
+    for (const r of found.success ? found.data ?? [] : []) if (r.name?.trim()) recipeById.set(String(r._id), { name: r.name.trim(), unit: normalizeRecipeUnit(r.unit) });
     return expandRecipeRows(rows, linesByFoodId, recipeById);
   } catch (error) {
     console.error('[recipe items] could not add the recipe lines', error);
