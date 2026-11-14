@@ -5,10 +5,12 @@ import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, Dial
 import { IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { preparationTypeLabel } from '@/utils/preparationType';
+import { DEFAULT_RECIPE_UNIT, RECIPE_UNITS, recipeUnitLabel, type RecipeUnit } from '@/utils/recipeItems';
 
 interface RecipeItem {
   id: string;
   name: string;
+  unit: RecipeUnit;
   preparationType: 'cooked' | 'ready_to_eat' | null;
   usedBy: string[];
 }
@@ -26,6 +28,7 @@ export default function RecipeItemsPage() {
   const [editing, setEditing] = useState<RecipeItem | 'new' | null>(null);
   const [name, setName] = useState('');
   const [type, setType] = useState<'' | 'cooked' | 'ready_to_eat'>('');
+  const [unit, setUnit] = useState<RecipeUnit>(DEFAULT_RECIPE_UNIT);
   const [saving, setSaving] = useState(false);
   const [dialogError, setDialogError] = useState('');
   const [toDelete, setToDelete] = useState<RecipeItem | null>(null);
@@ -54,6 +57,7 @@ export default function RecipeItemsPage() {
     setEditing(item);
     setName(item === 'new' ? '' : item.name);
     setType(item === 'new' ? '' : item.preparationType ?? '');
+    setUnit(item === 'new' ? DEFAULT_RECIPE_UNIT : item.unit);
     setDialogError('');
   };
 
@@ -65,7 +69,7 @@ export default function RecipeItemsPage() {
       const res = await fetch(API, {
         method: editing === 'new' ? 'POST' : 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...(editing === 'new' ? {} : { id: editing.id }), name, preparationType: type || null }),
+        body: JSON.stringify({ ...(editing === 'new' ? {} : { id: editing.id }), name, unit, preparationType: type || null }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Could not save.');
@@ -133,6 +137,7 @@ export default function RecipeItemsPage() {
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Typography sx={{ fontWeight: 800, fontSize: 15.5, wordBreak: 'break-word' }}>{item.name}</Typography>
+              <Chip size="small" label={`Measured in ${recipeUnitLabel(item.unit).toLowerCase()}`} sx={{ height: 22, fontSize: 11.5, fontWeight: 700, bgcolor: '#E0E7FF', color: '#3730A3' }} />
               <Chip size="small" label={preparationTypeLabel(item.preparationType)} sx={{ height: 22, fontSize: 11.5, fontWeight: 700, bgcolor: item.preparationType === 'cooked' ? '#FEF3C7' : item.preparationType === 'ready_to_eat' ? '#DCFCE7' : '#F3F4F6', color: item.preparationType === 'cooked' ? '#92400E' : item.preparationType === 'ready_to_eat' ? '#166534' : '#4B5563' }} />
             </Box>
             <Typography sx={{ fontSize: 13, color: '#6B7280', mt: 0.25, wordBreak: 'break-word' }}>
@@ -154,6 +159,9 @@ export default function RecipeItemsPage() {
         <DialogTitle sx={{ fontWeight: 800 }}>{editing === 'new' ? 'New recipe item' : 'Edit recipe item'}</DialogTitle>
         <DialogContent>
           <TextField autoFocus label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth size="small" sx={{ mt: 1 }} placeholder="For example: Raita" inputProps={{ maxLength: 80 }} />
+          <TextField select label="Measured in" value={unit} onChange={(e) => setUnit(e.target.value as RecipeUnit)} fullWidth size="small" sx={{ mt: 2 }} helperText="The unit of every amount you give for it (4 means 4 oz if you pick ounces). Pieces for things you count.">
+            {RECIPE_UNITS.map((u) => <MenuItem key={u.key} value={u.key}>{u.name}</MenuItem>)}
+          </TextField>
           <TextField select label="How the kitchen makes it" value={type} onChange={(e) => setType(e.target.value as typeof type)} fullWidth size="small" sx={{ mt: 2 }} helperText="Decides where it shows in the Kitchen Report (Kitchen Prep or Ready to Eat).">
             <MenuItem value="">Prep Type N/A</MenuItem>
             <MenuItem value="cooked">Cooked</MenuItem>
