@@ -77,7 +77,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
   const handleManageItems = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     handleMenuClose();
-    router.push(`/admin/food-category/${category._id?.toString()}/items`);
+    router.push(`/admin/menu-builder/${category._id?.toString()}`);
   };
 
   const handleCardClick = () => {
@@ -371,7 +371,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
             <ListItemIcon>
               <IconListDetails size={18} />
             </ListItemIcon>
-            Manage Category Items
+            Menu Builder
           </MenuItem>
         )}
         {!isSubCategory && (
@@ -379,7 +379,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
             <ListItemIcon>
               <IconSortDescending size={18} />
             </ListItemIcon>
-            Item Sequence
+            Menu Item Sequence
           </MenuItem>
         )}
         <MenuItem onClick={handleEdit} sx={{ gap: 1.5 }}>

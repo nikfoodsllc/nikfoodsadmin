@@ -114,7 +114,7 @@ function CategoryEntry({
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const count = itemCountOf(category);
   const close = () => setAnchor(null);
-  const manageItems = () => router.push(`/admin/food-category/${category._id?.toString()}/items`);
+  const manageItems = () => router.push(`/admin/menu-builder/${category._id?.toString()}`);
   const image = `url("${category.url || DEFAULT_IMAGE}")`;
 
   const countChip =
@@ -287,7 +287,7 @@ function CategoryEntry({
             <ListItemIcon>
               <IconListDetails size={18} />
             </ListItemIcon>
-            Manage Category Items
+            Menu Builder
           </MenuItem>
         )}
         {isTop && (
@@ -301,7 +301,7 @@ function CategoryEntry({
             <ListItemIcon>
               <IconSortDescending size={18} />
             </ListItemIcon>
-            Item Sequence
+            Menu Item Sequence
           </MenuItem>
         )}
         <MenuItem
