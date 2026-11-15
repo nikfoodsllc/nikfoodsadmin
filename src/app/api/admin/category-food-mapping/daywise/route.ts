@@ -301,6 +301,8 @@ export async function POST(request: NextRequest) {
  * Query params:
  *   - day (optional): Delete all mappings for a specific day
  *   - categoryId (optional): Delete all mappings for a category
+ *   - fromDay (optional, with categoryId): only the mappings of that day and later are deleted; earlier days (last week's menu, which
+ *     the Lock row pattern is read from) are kept
  *   - foodItemId (optional): Delete all mappings for a food item
  *   - id (optional): Delete a specific mapping by ID
  *
@@ -320,6 +322,10 @@ export async function DELETE(request: NextRequest) {
     const day = searchParams.get('day');
     const categoryId = searchParams.get('categoryId');
     const foodItemId = searchParams.get('foodItemId');
+    const fromDay = searchParams.get('fromDay');
+    if (fromDay !== null && !/^\d{4}-\d{2}-\d{2}$/.test(fromDay)) {
+      return NextResponse.json({ error: 'fromDay must look like 2026-11-17' }, { status: 400 });
+    }
 
     if (!id && !day && !categoryId && !foodItemId) {
       return NextResponse.json(
@@ -366,6 +372,9 @@ export async function DELETE(request: NextRequest) {
 
       if (day) {
         filter.day = day;
+      } else if (fromDay) {
+        // from that day on (the days are 'YYYY-MM-DD' text, so text order is date order)
+        filter.day = { $gte: fromDay };
       }
 
       if (categoryId) {
@@ -399,6 +408,7 @@ export async function DELETE(request: NextRequest) {
       data: {
         deletedCount,
         ...(day && { day }),
+        ...(fromDay && !day && { fromDay }),
         ...(categoryId && { categoryId }),
         ...(foodItemId && { foodItemId }),
       },
