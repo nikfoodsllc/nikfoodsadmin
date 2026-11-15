@@ -66,7 +66,7 @@ function categoryHasParent(category: FoodCategory): boolean {
 
 export default function CategoryItemsPage() {
   const params = useParams();
-  // opened from Menu Builder in the left menu: Back returns there
+  // opened from Menu Builder in the left menu (the Food Menu only): there is no category list to go back to, so Back is hidden
   const pathname = usePathname();
   const fromMenuBuilder = Boolean(pathname?.startsWith('/admin/menu-builder'));
   const router = useRouter();
@@ -489,7 +489,7 @@ export default function CategoryItemsPage() {
 
   // Handle back navigation
   const handleBack = () => {
-    router.push(fromMenuBuilder ? '/admin/menu-builder' : '/admin/food-category');
+    router.push('/admin/food-category');
   };
 
   // Handle adding items - refresh the items list
@@ -566,11 +566,12 @@ export default function CategoryItemsPage() {
     return (
       <Box sx={{ p: 4, backgroundColor: '#F6FAFF', minHeight: '100vh' }}>
         <Button
+          style={fromMenuBuilder ? { display: 'none' } : undefined}
           startIcon={<IconArrowLeft size={20} />}
           onClick={handleBack}
           sx={{ marginBottom: 3, textTransform: 'none', color: '#4F8CFF' }}
         >
-          {fromMenuBuilder ? 'Back to Menu Builder' : 'Back to Categories'}
+          Back to Categories
         </Button>
         <Alert severity="error">{error}</Alert>
       </Box>
@@ -717,7 +718,8 @@ export default function CategoryItemsPage() {
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Button
-            startIcon={<IconArrowLeft size={20} />}
+            style={fromMenuBuilder ? { display: 'none' } : undefined}
+          startIcon={<IconArrowLeft size={20} />}
             onClick={handleBack}
             sx={{
               marginBottom: 2,
@@ -728,7 +730,7 @@ export default function CategoryItemsPage() {
               },
             }}
           >
-            {fromMenuBuilder ? 'Back to Menu Builder' : 'Back to Categories'}
+            Back to Categories
           </Button>
 
           <Typography

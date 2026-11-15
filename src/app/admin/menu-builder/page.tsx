@@ -1,17 +1,23 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import CategoryPickerList from './components/CategoryPickerList';
+import { Alert, Box, CircularProgress } from '@mui/material';
+import { useFoodMenuCategory } from './useFoodMenuCategory';
 
-/** Menu Builder: pick a category, then choose which items are on it (and on which days for a day-wise category). */
+/** Menu Builder (left menu): opens the Food Menu's builder straight away (which items are on which day). */
 export default function MenuBuilderPage() {
   const router = useRouter();
+  const { category, error } = useFoodMenuCategory();
+
+  useEffect(() => {
+    if (category?._id) router.replace(`/admin/menu-builder/${String(category._id)}`);
+  }, [category, router]);
+
+  if (error) return <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>;
   return (
-    <CategoryPickerList
-      title="Menu Builder"
-      description="Choose a category to decide which items are on its menu (for a day-wise category, on which days)."
-      actionLabel="Open"
-      onPick={(c) => router.push(`/admin/menu-builder/${String(c._id)}`)}
-    />
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+      <CircularProgress />
+    </Box>
   );
 }

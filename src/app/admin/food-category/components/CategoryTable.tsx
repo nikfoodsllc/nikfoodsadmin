@@ -114,7 +114,7 @@ function CategoryEntry({
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const count = itemCountOf(category);
   const close = () => setAnchor(null);
-  const manageItems = () => router.push(`/admin/menu-builder/${category._id?.toString()}`);
+  const manageItems = () => router.push(`/admin/food-category/${category._id?.toString()}/items`);
   const image = `url("${category.url || DEFAULT_IMAGE}")`;
 
   const countChip =
