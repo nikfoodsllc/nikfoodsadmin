@@ -24,6 +24,8 @@ import DayWiseItemSelector from '../../components/DayWiseItemSelector';
 import AddItemDialog from '../../components/AddItemDialog';
 import { safeFormatCurrency } from '@/utils/currency';
 import { useAvailableDates } from '@/hooks/useAvailableDates';
+import { pacificToday } from '@/utils/abandonedCheckouts';
+import { dayWiseItemsToSave as dayItemsToSave } from '@/utils/lockedMenu';
 
 interface FoodItem {
   _id: string;
@@ -384,8 +386,10 @@ export default function CategoryItemsPage() {
 
       if (category.listingType === 'day-wise') {
         // For day-wise categories, use the new POST /api/admin/category-food-mapping/daywise endpoint
-        // First, delete all existing day-wise mappings for this category
-        const deleteResponse = await fetch(`/api/admin/category-food-mapping/daywise?categoryId=${categoryId}`, {
+        // First, delete the existing day-wise mappings of this category from TODAY on. Earlier days are kept: they are last week's menu,
+        // which "Lock row (repeats weekly)" reads its weekdays from (deleting them made the lock forget what to repeat).
+        const fromDay = pacificToday();
+        const deleteResponse = await fetch(`/api/admin/category-food-mapping/daywise?categoryId=${categoryId}&fromDay=${fromDay}`, {
           method: 'DELETE',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -405,7 +409,7 @@ export default function CategoryItemsPage() {
           sequence: number;
         }> = [];
 
-        for (const dayItem of dayWiseItems) {
+        for (const dayItem of dayItemsToSave(dayWiseItems, fromDay)) {
           for (let sequence = 0; sequence < dayItem.items.length; sequence++) {
             mappings.push({
               foodItemId: dayItem.items[sequence],

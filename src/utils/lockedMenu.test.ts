@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, isDateKey, isTodayOrLater, kitchenWeekStart, lockedItemPlacement, weekdayIndex } from './lockedMenu';
+import { addDays, isDateKey, isTodayOrLater, kitchenWeekStart, lockedItemPlacement, weekdayIndex, dayWiseItemsToSave } from './lockedMenu';
 
 // Oct 8 2026 is a Thursday, Oct 9 a Friday
 const thuFri = [{ day: '2026-10-08', sequence: 3 }, { day: '2026-10-09', sequence: 5 }];
@@ -84,5 +84,31 @@ describe('isTodayOrLater (Pacific time)', () => {
   });
   it('not a date', () => {
     expect(isTodayOrLater('Thursday', nineThirtyPm)).toBe(false);
+  });
+});
+
+describe('dayWiseItemsToSave (what Save Changes writes)', () => {
+  const days = [{ day: '2026-11-12', items: ['a'] }, { day: '2026-11-13', items: ['a'] }, { day: '2026-11-17', items: ['a', 'b'] }, { day: '2026-11-18', items: [] }];
+  it('keeps today and later, drops the days before today', () => {
+    expect(dayWiseItemsToSave(days, '2026-11-14').map((d) => d.day)).toEqual(['2026-11-17', '2026-11-18']);
+    expect(dayWiseItemsToSave(days, '2026-11-17').map((d) => d.day)).toEqual(['2026-11-17', '2026-11-18']);
+  });
+  it('a day equal to today is kept', () => {
+    expect(dayWiseItemsToSave(days, '2026-11-13').map((d) => d.day)).toEqual(['2026-11-13', '2026-11-17', '2026-11-18']);
+  });
+  it('drops anything that is not a real day', () => {
+    expect(dayWiseItemsToSave([{ day: 'garbage' }, { day: '2026-11-20' }], '2026-11-14')).toEqual([{ day: '2026-11-20' }]);
+  });
+});
+
+describe('the lock still knows last week after a Save Changes', () => {
+  it('the rows of last week stay (only today and later are rewritten), so next week repeats the same weekdays', () => {
+    // last week's rows (Tue-Fri), kept by the save; the page rewrites only this week's days
+    const lastWeek = [{ day: '2026-11-10', sequence: 3 }, { day: '2026-11-12', sequence: 1 }, { day: '2026-11-13', sequence: 0 }];
+    expect(lockedItemPlacement('2026-11-17', lastWeek)).toEqual({ sequence: 3 });
+    expect(lockedItemPlacement('2026-11-19', lastWeek)).toEqual({ sequence: 1 });
+    expect(lockedItemPlacement('2026-11-18', lastWeek)).toBeNull(); // not a weekday it had last week
+    // what used to happen: the save deleted last week's rows, so there was nothing to repeat
+    expect(lockedItemPlacement('2026-11-17', [])).toBeNull();
   });
 });
