@@ -77,7 +77,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
   const handleManageItems = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     handleMenuClose();
-    router.push(`/admin/menu-builder/${category._id?.toString()}`);
+    router.push(`/admin/food-category/${category._id?.toString()}/items`);
   };
 
   const handleCardClick = () => {
