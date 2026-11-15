@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -66,6 +66,9 @@ function categoryHasParent(category: FoodCategory): boolean {
 
 export default function CategoryItemsPage() {
   const params = useParams();
+  // opened from Menu Builder in the left menu: Back returns there
+  const pathname = usePathname();
+  const fromMenuBuilder = Boolean(pathname?.startsWith('/admin/menu-builder'));
   const router = useRouter();
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   const categoryId = params.categoryId as string;
@@ -486,7 +489,7 @@ export default function CategoryItemsPage() {
 
   // Handle back navigation
   const handleBack = () => {
-    router.push('/admin/food-category');
+    router.push(fromMenuBuilder ? '/admin/menu-builder' : '/admin/food-category');
   };
 
   // Handle adding items - refresh the items list
@@ -567,7 +570,7 @@ export default function CategoryItemsPage() {
           onClick={handleBack}
           sx={{ marginBottom: 3, textTransform: 'none', color: '#4F8CFF' }}
         >
-          Back to Categories
+          {fromMenuBuilder ? 'Back to Menu Builder' : 'Back to Categories'}
         </Button>
         <Alert severity="error">{error}</Alert>
       </Box>
@@ -725,7 +728,7 @@ export default function CategoryItemsPage() {
               },
             }}
           >
-            Back to Categories
+            {fromMenuBuilder ? 'Back to Menu Builder' : 'Back to Categories'}
           </Button>
 
           <Typography
