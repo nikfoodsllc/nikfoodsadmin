@@ -287,7 +287,7 @@ function CategoryEntry({
             <ListItemIcon>
               <IconListDetails size={18} />
             </ListItemIcon>
-            Manage Category Items
+            Menu Builder
           </MenuItem>
         )}
         {isTop && (
@@ -301,7 +301,7 @@ function CategoryEntry({
             <ListItemIcon>
               <IconSortDescending size={18} />
             </ListItemIcon>
-            Item Sequence
+            Menu Item Sequence
           </MenuItem>
         )}
         <MenuItem

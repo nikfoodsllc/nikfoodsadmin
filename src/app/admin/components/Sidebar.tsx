@@ -38,7 +38,7 @@ import { IconMessage2,
   IconDeviceMobile,
   IconUserCheck,
   IconPhoto,
-  IconSpeakerphone, IconSoup } from '@tabler/icons-react';
+  IconSpeakerphone, IconSoup, IconListDetails, IconSortDescending } from '@tabler/icons-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -105,6 +105,8 @@ const adminNavItems: NavItem[] = [
     children: [
       { title: 'Food Items', href: '/admin/food-items', icon: IconToolsKitchen2 },
       { title: 'Food Category', href: '/admin/food-category', icon: IconCategory },
+      { title: 'Menu Builder', href: '/admin/menu-builder', icon: IconListDetails },
+      { title: 'Menu Item Sequence', href: '/admin/menu-item-sequence', icon: IconSortDescending },
       { title: 'Recipe Items', href: '/admin/recipe-items', icon: IconSoup },
     ],
   },

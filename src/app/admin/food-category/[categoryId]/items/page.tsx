@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -66,6 +66,9 @@ function categoryHasParent(category: FoodCategory): boolean {
 
 export default function CategoryItemsPage() {
   const params = useParams();
+  // opened from Menu Builder in the left menu (the Food Menu only): there is no category list to go back to, so Back is hidden
+  const pathname = usePathname();
+  const fromMenuBuilder = Boolean(pathname?.startsWith('/admin/menu-builder'));
   const router = useRouter();
   const { token, isAuthenticated, loading: authLoading } = useAuth();
   const categoryId = params.categoryId as string;
@@ -563,6 +566,7 @@ export default function CategoryItemsPage() {
     return (
       <Box sx={{ p: 4, backgroundColor: '#F6FAFF', minHeight: '100vh' }}>
         <Button
+          style={fromMenuBuilder ? { display: 'none' } : undefined}
           startIcon={<IconArrowLeft size={20} />}
           onClick={handleBack}
           sx={{ marginBottom: 3, textTransform: 'none', color: '#4F8CFF' }}
@@ -714,7 +718,8 @@ export default function CategoryItemsPage() {
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Button
-            startIcon={<IconArrowLeft size={20} />}
+            style={fromMenuBuilder ? { display: 'none' } : undefined}
+          startIcon={<IconArrowLeft size={20} />}
             onClick={handleBack}
             sx={{
               marginBottom: 2,

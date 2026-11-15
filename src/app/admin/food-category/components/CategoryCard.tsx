@@ -371,7 +371,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
             <ListItemIcon>
               <IconListDetails size={18} />
             </ListItemIcon>
-            Manage Category Items
+            Menu Builder
           </MenuItem>
         )}
         {!isSubCategory && (
@@ -379,7 +379,7 @@ export default function CategoryCard({ category, onEdit, onDelete, onRefresh, on
             <ListItemIcon>
               <IconSortDescending size={18} />
             </ListItemIcon>
-            Item Sequence
+            Menu Item Sequence
           </MenuItem>
         )}
         <MenuItem onClick={handleEdit} sx={{ gap: 1.5 }}>
