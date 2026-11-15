@@ -58,6 +58,14 @@ export function lockedItemPlacement(target: string, assigned: AssignedDay[]): { 
 }
 
 /**
+ * What "Save Changes" on the day-wise items page writes: only today and later. The page deletes the category's rows from today on
+ * and writes these back, so the rows of past days (last week's menu, where the Lock row pattern comes from) stay in the database.
+ */
+export function dayWiseItemsToSave<T extends { day: string }>(days: T[], today: string): T[] {
+  return days.filter((d) => isDateKey(d.day) && d.day >= today);
+}
+
+/**
  * Is this calendar day today (Pacific time) or later? The day-wise item page lists only these days. Comparing the
  * 'YYYY-MM-DD' text with today's Pacific date avoids the time-zone shift of parsing the text as a date, which used to hide today.
  */
