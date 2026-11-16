@@ -46,7 +46,9 @@ function Bars({ rows, color }: { rows: Array<{ day: string; value: number | null
   );
 }
 
-export default function AppActivitySection({ token }: { token: string | null }) {
+type Call = (path: string) => Promise<{ ok: boolean; status: number; json: { data?: unknown; error?: string } }>;
+
+export default function AppActivitySection({ call }: { call: Call }) {
   const [open, setOpen] = useState(true);
   const [days, setDays] = useState(14);
   const [data, setData] = useState<Activity | null>(null);
@@ -54,20 +56,14 @@ export default function AppActivitySection({ token }: { token: string | null }) 
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
-    try {
-      const r = await fetch(`/api/admin/notifications/app-activity?days=${days}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
-      const json = await r.json().catch(() => ({}));
-      if (r.ok && json.success !== false) {
-        setData(json.data as Activity);
-        setError('');
-      } else setError(json.error || 'Could not load the app activity');
-    } catch {
-      setError('Could not load the app activity');
-    }
+    const r = await call(`app-activity?days=${days}`);
+    if (r.ok) {
+      setData(r.json.data as Activity);
+      setError('');
+    } else setError(r.json.error || 'Could not load the app activity');
     setLoading(false);
-  }, [token, days]);
+  }, [call, days]);
 
   useEffect(() => {
     void load();
