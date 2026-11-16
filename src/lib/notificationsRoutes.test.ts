@@ -5,6 +5,8 @@ describe('notificationsTarget', () => {
   it('maps the page routes', () => {
     expect(notificationsTarget(['summary'], 'GET')).toBe('/api/admin/push/summary');
     expect(notificationsTarget(['app-users'], 'GET')).toBe('/api/admin/push/app-users');
+    expect(notificationsTarget(['app-activity'], 'GET')).toBe('/api/admin/push/app-activity');
+    expect(notificationsTarget(['app-activity'], 'POST')).toBeNull();
     expect(notificationsTarget(['templates'], 'GET')).toBe('/api/admin/push/templates');
     expect(notificationsTarget(['templates'], 'POST')).toBe('/api/admin/push/templates');
     expect(notificationsTarget(['send-menu'], 'POST')).toBe('/api/admin/push/send-menu');
