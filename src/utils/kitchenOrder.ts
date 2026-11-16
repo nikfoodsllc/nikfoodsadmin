@@ -76,3 +76,13 @@ export function orderBlock<T extends { items: Array<{ name: string }>; combos: A
   const rankOf = (name: string) => dayMap?.get(name) ?? ranks.overall.get(name);
   return { ...block, items: sortByRank(block.items, rankOf), combos: sortByRank(block.combos, rankOf) };
 }
+
+/** A to Z by name (ignores capitals, numbers in order: 2Pc before 10Pc). Combos and items are sorted separately. */
+export function sortByNameAZ<T extends { name: string }>(list: T[]): T[] {
+  return [...list].sort((a, b) => a.name.trim().localeCompare(b.name.trim(), 'en', { sensitivity: 'base', numeric: true }) || a.name.localeCompare(b.name));
+}
+
+/** The Kitchen Dashboard's order: items A to Z and combos A to Z (inside each Cooked / Ready to eat group the page keeps that order). */
+export function sortBlockAlphabetically<T extends { items: Array<{ name: string }>; combos: Array<{ name: string }> }>(block: T): T {
+  return { ...block, items: sortByNameAZ(block.items), combos: sortByNameAZ(block.combos) };
+}

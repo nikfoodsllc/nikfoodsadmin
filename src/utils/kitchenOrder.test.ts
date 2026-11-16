@@ -40,3 +40,16 @@ describe('kitchen dashboard category order', () => {
     expect(list.map((i) => i.name)).toEqual(['B', 'A']);
   });
 });
+
+describe('alphabetical order (Kitchen Dashboard)', () => {
+  it('sorts A to Z ignoring capitals, numbers in order, items and combos separately', async () => {
+    const { sortBlockAlphabetically, sortByNameAZ } = await import('./kitchenOrder');
+    expect(sortByNameAZ([{ name: 'paneer Paratha' }, { name: 'Amritsari Fish' }, { name: 'Veg 10Pc' }, { name: 'Veg 2Pc' }, { name: 'Aate Ka Halwa' }]).map((x) => x.name)).toEqual(['Aate Ka Halwa', 'Amritsari Fish', 'paneer Paratha', 'Veg 2Pc', 'Veg 10Pc']);
+    const input = { day: 'x', items: [{ name: 'Zeera' }, { name: 'apple' }], combos: [{ name: 'Veg Combo' }, { name: 'Non-Veg Combo' }] };
+    const out = sortBlockAlphabetically(input);
+    expect(out.items.map((i) => i.name)).toEqual(['apple', 'Zeera']);
+    expect(out.combos.map((c) => c.name)).toEqual(['Non-Veg Combo', 'Veg Combo']);
+    expect(out.day).toBe('x');
+    expect(input.items[0].name).toBe('Zeera');
+  });
+});
