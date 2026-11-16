@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amountForLine, amountLabel, cleanRecipeLines, expandRecipeRows, isRecipeUnit, isUsableAmount, normalizeRecipeUnit, recipeFoodIds, recipeLinesProblem, type RecipeUnit } from './recipeItems';
+import { amountForLine, amountForQuantity, amountLabel, cleanRecipeLines, expandRecipeRows, isRecipeUnit, isUsableAmount, normalizeRecipeUnit, recipeFoodIds, recipeLinesProblem, type RecipeUnit } from './recipeItems';
 import { buildItemOrders, buildKitchenDays, type KitchenRow } from './kitchenDashboard';
 
 const id = (n: number) => n.toString(16).padStart(24, '0');
@@ -149,5 +149,38 @@ describe('recipeLinesProblem', () => {
     expect(recipeLinesProblem([{ recipeItemId: RAITA, bySize: { '16Oz': 4 } }], true)).toBeNull();
     expect(recipeLinesProblem([{ recipeItemId: RAITA, bySize: {} }], true)).toMatch(/at least one size/);
     expect(recipeLinesProblem([{ recipeItemId: RAITA, bySize: { '16Oz': 4, '12Oz': -3 } }], true)).toMatch(/numbers above 0/);
+  });
+});
+
+describe('how many ordered -> how much (byQty)', () => {
+  const kachori = { recipeItemId: CHUTNEY, byQty: { '1': 2, '2': 2, '3': 4 } };
+  it('uses the table total for the quantity ordered', () => {
+    expect(amountForQuantity(kachori, 1)).toBe(2);
+    expect(amountForQuantity(kachori, 2)).toBe(2);
+    expect(amountForQuantity(kachori, 3)).toBe(4);
+  });
+  it('a skipped quantity uses the row below it, and above the last row the rate per piece carries on', () => {
+    expect(amountForQuantity({ recipeItemId: CHUTNEY, byQty: { '1': 2, '4': 6 } }, 3)).toBe(2);
+    expect(amountForQuantity(kachori, 6)).toBe(8);
+    expect(amountForQuantity({ recipeItemId: CHUTNEY, byQty: { '3': 4 } }, 4)).toBe(5.33);
+    expect(amountForQuantity({ recipeItemId: CHUTNEY, byQty: { '3': 4 } }, 1)).toBe(4);
+    expect(amountForQuantity({ recipeItemId: CHUTNEY, amount: 2 }, 3)).toBeNull();
+  });
+  it('is cleaned and validated', () => {
+    expect(cleanRecipeLines([{ recipeItemId: CHUTNEY, byQty: { '1': 2, '0': 5, x: 3, '2.5': 4, '3': -1, '4': '6' } }])).toEqual([{ recipeItemId: CHUTNEY, byQty: { '1': 2, '4': 6 } }]);
+    expect(cleanRecipeLines([{ recipeItemId: CHUTNEY, byQty: {} }])).toEqual([]);
+    expect(recipeLinesProblem([kachori], false)).toBeNull();
+    expect(recipeLinesProblem([{ recipeItemId: CHUTNEY, byQty: { '1': 0 } }], false)).toMatch(/numbers above 0/);
+  });
+  it('adds one chutney line holding the total for the quantity ordered', () => {
+    const lines = new Map([[BIRYANI, [kachori]]]);
+    const out = (qty: number) => expandRecipeRows([row({ quantity: qty })], lines, recipes).filter((r) => r.recipeOf);
+    expect(out(1).map((r) => [r.name, r.quantity, r.portion])).toEqual([['Mint Chutney', 1, '2Oz']]);
+    expect(out(2).map((r) => [r.quantity, r.portion])).toEqual([[1, '2Oz']]);
+    expect(out(3).map((r) => [r.quantity, r.portion])).toEqual([[1, '4Oz']]);
+  });
+  it('a size with its own amount still wins over the table', () => {
+    const lines = new Map([[BIRYANI, [{ recipeItemId: RAITA, bySize: { '16Oz': 4 }, byQty: { '1': 9 } }]]]);
+    expect(expandRecipeRows([row({ portion: '16Oz', quantity: 2 })], lines, recipes).filter((r) => r.recipeOf).map((r) => [r.quantity, r.portion])).toEqual([[2, '4Oz']]);
   });
 });
