@@ -5,6 +5,7 @@ export function notificationsTarget(slug: string[], method: string): string | nu
   if (slug.length === 1) {
     if (first === 'summary' && method === 'GET') return '/api/admin/push/summary';
     if (first === 'app-users' && method === 'GET') return '/api/admin/push/app-users';
+    if (first === 'app-activity' && method === 'GET') return '/api/admin/push/app-activity';
     if (first === 'templates' && (method === 'GET' || method === 'POST')) return '/api/admin/push/templates';
     if (first === 'send-menu' && method === 'POST') return '/api/admin/push/send-menu';
     if (first === 'app-update' && (method === 'GET' || method === 'PUT' || method === 'POST')) return '/api/admin/push/app-update';
