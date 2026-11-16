@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, InputAdornment, Paper, TextField, Typography } from '@mui/material';
 import { IconRefresh, IconSearch } from '@tabler/icons-react';
+import AppActivitySection from './AppActivitySection';
 import { APP_FILTERS, filterAppCustomers, menuStatus, PERMISSION_LABEL, phoneText, seenText, type AppCounts, type AppCustomer, type AppFilter } from '@/utils/appCustomers';
 
 type Call = (path: string) => Promise<{ ok: boolean; status: number; json: { data?: unknown; error?: string } }>;
@@ -83,6 +84,7 @@ export default function AppCustomersTab({ call }: { call: Call }) {
           <Tile value={counts.allOff} label="Everything off" hint="all three switched off" />
         </Box>
       )}
+      <AppActivitySection call={call} />
       <Typography sx={{ color: '#6B7280', fontSize: 13, mb: 1.5 }}>
         Everyone here has signed in on the app. Older app versions do not report a No, so a customer on one of them only shows once they allow notifications; everyone appears after they update the app.
       </Typography>
