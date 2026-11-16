@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { IconDownload } from '@tabler/icons-react';
 import UsersTable from './UsersTable';
+import AppActivitySection from './AppActivitySection';
 import SearchBar from './SearchBar';
 import { useSearchBox } from '@/hooks/useSearchBox';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
@@ -331,6 +332,8 @@ export default function UsersPage() {
           </Button>
         </Box>
       </Box>
+
+      <AppActivitySection token={token} />
 
       {/* Search, filter and sort */}
       <Box sx={{ marginBottom: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
