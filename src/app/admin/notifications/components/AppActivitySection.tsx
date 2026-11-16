@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, Collapse, Paper, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
-import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { Alert, Box, Button, Collapse, Dialog, DialogContent, DialogTitle, IconButton, Paper, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { IconChevronDown, IconChevronUp, IconX } from '@tabler/icons-react';
 
 interface Activity {
   today: string;
@@ -15,28 +15,60 @@ interface Activity {
   returning7: number | null;
   orders: Array<{ day: string; app: number; all: number; appCustomers: number }>;
   versions: Array<{ version: string; customers: number }>;
+  lists: {
+    have: string[];
+    today: string[];
+    last7: string[];
+    last30: string[];
+    returning7: string[];
+    byDay: Record<string, string[]>;
+    newByDay: Record<string, string[]>;
+  };
+  people: Record<string, { name: string; email: string; phone: string; lastSeenAt: string | null; daysOpened: number }>;
+}
+
+interface Picked {
+  title: string;
+  subtitle?: string;
+  ids: string[];
 }
 
 const shortDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 const weekday = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
 
-function Tile({ value, label, hint }: { value: string | number; label: string; hint?: string }) {
+function Tile({ value, label, hint, onClick }: { value: string | number; label: string; hint?: string; onClick?: () => void }) {
+  const clickable = Boolean(onClick) && value !== '–';
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, minWidth: 0 }}>
+    <Paper
+      variant="outlined"
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={clickable ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onClick?.()) : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      sx={{ p: 1.5, borderRadius: 2, minWidth: 0, cursor: clickable ? 'pointer' : 'default', '&:hover': clickable ? { borderColor: '#B8893B', bgcolor: '#FFFBF5' } : undefined }}
+    >
       <Typography sx={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>{value}</Typography>
       <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{label}</Typography>
       {hint && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{hint}</Typography>}
+      {clickable && <Typography sx={{ fontSize: 11, color: '#B8893B', fontWeight: 700, mt: 0.25 }}>See names</Typography>}
     </Paper>
   );
 }
 
 /** Simple bars (no chart library): one per day, height = value, the number above it. */
-function Bars({ rows, color }: { rows: Array<{ day: string; value: number | null }>; color: string }) {
+function Bars({ rows, color, onPick }: { rows: Array<{ day: string; value: number | null }>; color: string; onPick?: (day: string) => void }) {
   const max = Math.max(1, ...rows.map((r) => r.value ?? 0));
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 130, overflowX: 'auto', pb: 0.5 }}>
       {rows.map((r) => (
-        <Box key={r.day} sx={{ flex: '1 0 0', minWidth: { xs: 17, sm: 22 }, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+        <Box
+          key={r.day}
+          onClick={onPick && r.value ? () => onPick(r.day) : undefined}
+          onKeyDown={onPick && r.value ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onPick(r.day)) : undefined}
+          role={onPick && r.value ? 'button' : undefined}
+          tabIndex={onPick && r.value ? 0 : undefined}
+          aria-label={onPick && r.value ? `${r.value} on ${shortDay(r.day)}: see names` : undefined}
+          sx={{ cursor: onPick && r.value ? 'pointer' : 'default', '&:hover > div:nth-of-type(2)': onPick && r.value ? { filter: 'brightness(0.9)' } : undefined, flex: '1 0 0', minWidth: { xs: 17, sm: 22 }, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: r.value === null ? '#9CA3AF' : '#111827' }}>{r.value === null ? '–' : r.value}</Typography>
           <Box sx={{ width: '100%', maxWidth: 34, borderRadius: '6px 6px 0 0', bgcolor: r.value === null ? '#F3F4F6' : color, height: `${r.value === null ? 4 : Math.max(4, (r.value / max) * 90)}px` }} />
           <Typography sx={{ fontSize: { xs: 9, sm: 10 }, color: '#6B7280', mt: 0.5, lineHeight: 1.1, textAlign: 'center' }}>{weekday(r.day)}<br />{shortDay(r.day)}</Typography>
@@ -54,6 +86,7 @@ export default function AppActivitySection({ call }: { call: Call }) {
   const [data, setData] = useState<Activity | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [picked, setPicked] = useState<Picked | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,11 +121,11 @@ export default function AppActivitySection({ call }: { call: Call }) {
         {data && (
           <Box sx={{ mt: 1.5 }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(5, minmax(0, 1fr))' }, gap: 1.25, mb: 2 }}>
-              <Tile value={data.onApp.customers} label="Have the app" hint={`${data.onApp.installs} phones`} />
-              <Tile value={todayRow?.customers ?? data.active.today} label="Opened today" />
-              <Tile value={data.active.last7} label="Last 7 days" hint={`${pct}% of customers with the app`} />
-              <Tile value={data.active.last30} label="Last 30 days" />
-              <Tile value={data.returning7 ?? '–'} label="Came back (7 days)" hint={data.returning7 === null ? 'Needs 2 days of history' : 'Opened on 2+ days'} />
+              <Tile value={data.onApp.customers} label="Have the app" hint={`${data.onApp.installs} phones`} onClick={() => setPicked({ title: 'Customers with the app', ids: data.lists.have })} />
+              <Tile value={todayRow?.customers ?? data.active.today} label="Opened today" onClick={() => setPicked({ title: 'Opened the app today', ids: data.lists.byDay[data.today] ?? data.lists.today })} />
+              <Tile value={data.active.last7} label="Last 7 days" hint={`${pct}% of customers with the app`} onClick={() => setPicked({ title: 'Opened the app in the last 7 days', ids: data.lists.last7 })} />
+              <Tile value={data.active.last30} label="Last 30 days" onClick={() => setPicked({ title: 'Opened the app in the last 30 days', ids: data.lists.last30 })} />
+              <Tile value={data.returning7 ?? '–'} label="Came back (7 days)" hint={data.returning7 === null ? 'Needs 2 days of history' : 'Opened on 2+ days'} onClick={() => setPicked({ title: 'Came back (opened on 2 or more days in the last 7)', ids: data.lists.returning7 })} />
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', mb: 1 }}>
@@ -103,7 +136,7 @@ export default function AppActivitySection({ call }: { call: Call }) {
                 ))}
               </ToggleButtonGroup>
             </Box>
-            <Bars rows={data.daily.map((d) => ({ day: d.day, value: d.customers }))} color="#B8893B" />
+            <Bars rows={data.daily.map((d) => ({ day: d.day, value: d.customers }))} color="#B8893B" onPick={(day) => setPicked({ title: `Opened the app on ${weekday(day)} ${shortDay(day)}`, ids: data.lists.byDay[day] ?? [] })} />
             <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
               {data.recordingSince ? `Daily counts start on ${shortDay(data.recordingSince)} (when recording began). A dash means no record for that day.` : 'Daily counts start building today: each time a customer opens the app signed in, it is counted once for that day.'}
             </Typography>
@@ -111,7 +144,7 @@ export default function AppActivitySection({ call }: { call: Call }) {
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>New phones signing in</Typography>
-                <Bars rows={data.newInstalls.map((d) => ({ day: d.day, value: d.installs }))} color="#2F7D5B" />
+                <Bars rows={data.newInstalls.map((d) => ({ day: d.day, value: d.installs }))} color="#2F7D5B" onPick={(day) => setPicked({ title: `New phones on ${weekday(day)} ${shortDay(day)}`, subtitle: 'Customers whose phone signed in for the first time that day', ids: data.lists.newByDay[day] ?? [] })} />
               </Box>
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>Paid orders: app vs all</Typography>
@@ -150,6 +183,37 @@ export default function AppActivitySection({ call }: { call: Call }) {
         )}
         {!data && !error && <Typography sx={{ mt: 1.5, fontSize: 13, color: '#6B7280' }}>Loading…</Typography>}
       </Collapse>
+
+      <Dialog open={Boolean(picked)} onClose={() => setPicked(null)} fullWidth maxWidth="sm" scroll="paper">
+        <DialogTitle sx={{ pr: 6, fontWeight: 700, fontSize: 17 }}>
+          {picked?.title}
+          <Typography sx={{ fontSize: 12, color: '#6B7280', fontWeight: 400 }}>
+            {picked ? `${picked.ids.length} customer${picked.ids.length === 1 ? '' : 's'}` : ''}
+            {picked?.subtitle ? ` · ${picked.subtitle}` : ''}
+          </Typography>
+          <IconButton aria-label="Close" onClick={() => setPicked(null)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <IconX size={18} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ px: { xs: 1.5, sm: 2 } }}>
+          {picked && data && picked.ids.length === 0 && <Typography sx={{ color: '#6B7280', fontSize: 14 }}>No customers.</Typography>}
+          {picked && data && [...picked.ids]
+            .sort((a, b) => (data.people[b]?.lastSeenAt ?? '').localeCompare(data.people[a]?.lastSeenAt ?? ''))
+            .map((id) => {
+              const p = data.people[id];
+              return (
+                <Box key={id} sx={{ py: 1, borderBottom: '1px solid #F3F4F6', '&:last-of-type': { borderBottom: 0 } }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: 14, overflowWrap: 'anywhere' }}>{p?.name || 'No name'}</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#6B7280', overflowWrap: 'anywhere' }}>{[p?.phone, p?.email].filter(Boolean).join(' · ') || 'No contact details'}</Typography>
+                  <Typography sx={{ fontSize: 12, color: '#374151' }}>
+                    {p?.lastSeenAt ? `Last opened ${new Date(p.lastSeenAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })} PT` : 'Not opened yet'}
+                    {p && p.daysOpened > 0 ? ` · opened on ${p.daysOpened} of the days shown` : ''}
+                  </Typography>
+                </Box>
+              );
+            })}
+        </DialogContent>
+      </Dialog>
     </Paper>
   );
 }
