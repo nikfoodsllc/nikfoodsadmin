@@ -34,12 +34,12 @@ function Tile({ value, label, hint }: { value: string | number; label: string; h
 function Bars({ rows, color }: { rows: Array<{ day: string; value: number | null }>; color: string }) {
   const max = Math.max(1, ...rows.map((r) => r.value ?? 0));
   return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.5, sm: 1 }, height: 150, overflowX: 'auto', pb: 0.5 }}>
+    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 130, overflowX: 'auto', pb: 0.5 }}>
       {rows.map((r) => (
-        <Box key={r.day} sx={{ flex: '1 0 0', minWidth: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+        <Box key={r.day} sx={{ flex: '1 0 0', minWidth: { xs: 17, sm: 22 }, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: r.value === null ? '#9CA3AF' : '#111827' }}>{r.value === null ? '–' : r.value}</Typography>
           <Box sx={{ width: '100%', maxWidth: 34, borderRadius: '6px 6px 0 0', bgcolor: r.value === null ? '#F3F4F6' : color, height: `${r.value === null ? 4 : Math.max(4, (r.value / max) * 90)}px` }} />
-          <Typography sx={{ fontSize: 10, color: '#6B7280', mt: 0.5, lineHeight: 1.1, textAlign: 'center' }}>{weekday(r.day)}<br />{shortDay(r.day)}</Typography>
+          <Typography sx={{ fontSize: { xs: 9, sm: 10 }, color: '#6B7280', mt: 0.5, lineHeight: 1.1, textAlign: 'center' }}>{weekday(r.day)}<br />{shortDay(r.day)}</Typography>
         </Box>
       ))}
     </Box>
@@ -115,11 +115,11 @@ export default function AppActivitySection({ call }: { call: Call }) {
               </Box>
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>Paid orders: app vs all</Typography>
-                <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <Box component="table" sx={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr>
-                      {['Day', 'In the app', 'All orders', 'App share'].map((h) => (
-                        <Box component="th" key={h} sx={{ textAlign: h === 'Day' ? 'left' : 'right', color: '#6B7280', fontWeight: 600, fontSize: 12, pb: 0.5 }}>{h}</Box>
+                      {['Day', 'App', 'All', 'App %'].map((h) => (
+                        <Box component="th" key={h} sx={{ width: h === 'Day' ? '40%' : '20%', textAlign: h === 'Day' ? 'left' : 'right', color: '#6B7280', fontWeight: 600, fontSize: 12, pb: 0.5 }}>{h}</Box>
                       ))}
                     </tr>
                   </thead>
