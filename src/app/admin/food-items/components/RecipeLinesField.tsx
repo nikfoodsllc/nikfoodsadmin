@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Autocomplete, Box, IconButton, InputAdornment, Link, TextField, Typography } from '@mui/material';
-import { IconTrash } from '@tabler/icons-react';
+import { Autocomplete, Box, Button, IconButton, InputAdornment, Link, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_RECIPE_UNIT, isUsableAmount, MAX_RECIPE_LINES, normalizeRecipeUnit, recipeUnitLabel, type RecipeLine, type RecipeUnit } from '@/utils/recipeItems';
+import { DEFAULT_RECIPE_UNIT, isUsableAmount, MAX_RECIPE_LINES, MAX_RECIPE_QTY, MAX_RECIPE_QTY_ROWS, normalizeRecipeUnit, recipeUnitLabel, type RecipeLine, type RecipeUnit } from '@/utils/recipeItems';
 
 interface RecipeOption {
   id: string;
@@ -19,6 +19,86 @@ interface RecipeLinesFieldProps {
   sizes?: string[];
   disabled?: boolean;
   error?: string;
+}
+
+interface QtyRow {
+  q: string;
+  a: string;
+}
+const rowsOf = (byQty: Record<string, number> | undefined): QtyRow[] =>
+  Object.entries(byQty ?? {})
+    .sort((x, y) => Number(x[0]) - Number(y[0]))
+    .map(([q, a]) => ({ q, a: String(a) }));
+const isWholeQty = (q: string) => /^\d+$/.test(q.trim()) && Number(q) >= 1 && Number(q) <= MAX_RECIPE_QTY;
+
+/**
+ * "How many ordered -> how much" table for an item without sizes (1 kachori gets 2, 2 get 2, 3 get 4). The amount is the TOTAL for that
+ * many, not per piece. Half-typed rows stay in the box; only complete rows are saved.
+ */
+function QuantityTable({ initial, unit, disabled, onRows }: { initial: Record<string, number> | undefined; unit: string; disabled?: boolean; onRows: (byQty: Record<string, number>) => void }) {
+  const [rows, setRows] = useState<QtyRow[]>(() => {
+    const start = rowsOf(initial);
+    return start.length > 0 ? start : [{ q: '1', a: '' }];
+  });
+  const commit = (next: QtyRow[]) => {
+    setRows(next);
+    const out: Record<string, number> = {};
+    for (const r of next) if (isWholeQty(r.q) && isUsableAmount(r.a)) out[String(Number(r.q))] = Number(r.a);
+    onRows(out);
+  };
+  const duplicate = (q: string, i: number) => isWholeQty(q) && rows.some((r, j) => j !== i && isWholeQty(r.q) && Number(r.q) === Number(q));
+  const last = rows.length > 0 && isWholeQty(rows[rows.length - 1].q) && isUsableAmount(rows[rows.length - 1].a) ? rows[rows.length - 1] : null;
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 1 }}>The total that goes with that many of this item (not per piece).</Typography>
+      {rows.map((r, i) => (
+        <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+          <TextField
+            size="small"
+            type="number"
+            label="If ordered"
+            value={r.q}
+            disabled={disabled}
+            error={r.q.trim() !== '' && (!isWholeQty(r.q) || duplicate(r.q, i))}
+            inputProps={{ min: 1, max: MAX_RECIPE_QTY, step: 1, inputMode: 'numeric' }}
+            onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, q: e.target.value } : x)))}
+            sx={{ width: 110 }}
+          />
+          <TextField
+            size="small"
+            type="number"
+            label="Gets"
+            value={r.a}
+            disabled={disabled}
+            error={r.a.trim() !== '' && !isUsableAmount(r.a)}
+            inputProps={{ min: 0, step: 'any', inputMode: 'decimal' }}
+            InputProps={{ endAdornment: <InputAdornment position="end">{unit}</InputAdornment> }}
+            onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, a: e.target.value } : x)))}
+            sx={{ flex: 1, minWidth: 0, maxWidth: 200 }}
+          />
+          <IconButton size="small" aria-label="Remove this row" disabled={disabled || rows.length === 1} onClick={() => commit(rows.filter((_, j) => j !== i))} sx={{ color: '#B91C1C' }}>
+            <IconTrash size={18} />
+          </IconButton>
+        </Box>
+      ))}
+      {rows.length < MAX_RECIPE_QTY_ROWS && (
+        <Button
+          size="small"
+          startIcon={<IconPlus size={16} />}
+          disabled={disabled}
+          onClick={() => {
+            const biggest = rows.reduce((m, r) => (isWholeQty(r.q) ? Math.max(m, Number(r.q)) : m), 0);
+            commit([...rows, { q: String(Math.min(biggest + 1, MAX_RECIPE_QTY)), a: '' }]);
+          }}
+        >
+          Add a quantity
+        </Button>
+      )}
+      <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
+        A quantity you skip uses the row just below it. {last ? `Above ${last.q}, it keeps going at the same rate (${Math.round((Number(last.a) / Number(last.q)) * 100) / 100} ${unit} per piece).` : 'Above the last row, it keeps going at the last row\'s rate per piece.'}
+      </Typography>
+    </Box>
+  );
 }
 
 /**
@@ -63,7 +143,7 @@ export default function RecipeLinesField({ value, onChange, sizes, disabled, err
       <Typography sx={{ fontWeight: 700, fontSize: 14 }}>Goes with (recipe items)</Typography>
       <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 1 }}>
         Extras that come with this item, like raita with biryani. Customers never see them; the Kitchen Dashboard, Kitchen Report and Packing Report count them.
-        {sized ? ' Give the amount for each size, and leave a size empty if nothing goes with it.' : ' Give the amount that goes with one order.'}
+        {sized ? ' Give the amount for each size, and leave a size empty if nothing goes with it.' : ' Give one amount for every order, or a different amount for each quantity ordered (1 kachori gets 2, 3 get 4).'}
       </Typography>
 
       {lines.map((line) => {
@@ -112,7 +192,34 @@ export default function RecipeLinesField({ value, onChange, sizes, disabled, err
               (() => {
                 const key = `${line.recipeItemId}|one`;
                 const text = shown(key, line.amount);
+                const tabled = line.byQty !== undefined;
+                const mode = (
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={tabled ? 'table' : 'same'}
+                    disabled={disabled}
+                    onChange={(_, v) => {
+                      if (v === 'table') update(line.recipeItemId, (l) => ({ recipeItemId: l.recipeItemId, byQty: {} }));
+                      else if (v === 'same') update(line.recipeItemId, (l) => ({ recipeItemId: l.recipeItemId, ...(l.amount !== undefined ? { amount: l.amount } : {}) }));
+                    }}
+                    sx={{ mb: 1, '& .MuiToggleButton-root': { textTransform: 'none', fontSize: 13, px: 1.5 } }}
+                  >
+                    <ToggleButton value="same">Same for every order</ToggleButton>
+                    <ToggleButton value="table">Depends on how many</ToggleButton>
+                  </ToggleButtonGroup>
+                );
+                if (tabled) {
+                  return (
+                    <Box>
+                      {mode}
+                      <QuantityTable initial={line.byQty} unit={unit} disabled={disabled} onRows={(byQty) => update(line.recipeItemId, (l) => ({ recipeItemId: l.recipeItemId, byQty }))} />
+                    </Box>
+                  );
+                }
                 return (
+                  <Box>
+                    {mode}
                   <TextField
                     size="small"
                     type="number"
@@ -131,8 +238,9 @@ export default function RecipeLinesField({ value, onChange, sizes, disabled, err
                         return e.target.value.trim() === '' || !Number.isFinite(n) ? rest : { ...rest, amount: n };
                       });
                     }}
-                    sx={{ width: { xs: '100%', sm: 220 } }}
+                    sx={{ width: { xs: '100%', sm: 220 }, display: 'block' }}
                   />
+                  </Box>
                 );
               })()
             )}

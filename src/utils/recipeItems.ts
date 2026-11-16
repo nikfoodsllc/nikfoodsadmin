@@ -15,6 +15,12 @@ export interface RecipeLine {
   amount?: number;
   /** Size label of the item (as ordered) -> amount of the recipe item, e.g. { '16Oz': 4, '12Oz': 3 } */
   bySize?: Record<string, number>;
+  /**
+   * For an item without sizes: how much goes with the order depending on HOW MANY of the item were ordered, as the TOTAL for that
+   * many (not per piece), e.g. { '1': 2, '2': 2, '3': 4 } = 1 kachori gets 2, 2 get 2, 3 get 4. A quantity nobody listed uses the
+   * nearest smaller row; above the last row the last row's amount per piece carries on (rows 3 -> 4 makes 4 get 5.33).
+   */
+  byQty?: Record<string, number>;
 }
 
 export type RecipeUnit = 'oz' | 'lb' | 'g' | 'kg' | 'pc';
@@ -46,6 +52,8 @@ export function amountLabel(amount: number, unit: RecipeUnit): string {
 
 export const MAX_RECIPE_LINES = 12;
 export const MAX_RECIPE_SIZES = 20;
+export const MAX_RECIPE_QTY_ROWS = 20;
+export const MAX_RECIPE_QTY = 99;
 const ID = /^[0-9a-f]{24}$/i;
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
 
@@ -72,8 +80,16 @@ export function cleanRecipeLines(raw: unknown): RecipeLine[] {
         if (size.trim() && size.length <= 40 && isUsableAmount(value) && toAmount(value) > 0) bySize[size.trim()] = toAmount(value);
       }
     }
-    if (!amount && Object.keys(bySize).length === 0) continue;
-    out.push({ recipeItemId: id, ...(amount ? { amount } : {}), ...(Object.keys(bySize).length > 0 ? { bySize } : {}) });
+    const byQty: Record<string, number> = {};
+    if (e.byQty && typeof e.byQty === 'object' && !Array.isArray(e.byQty)) {
+      for (const [q, value] of Object.entries(e.byQty as Record<string, unknown>)) {
+        if (Object.keys(byQty).length >= MAX_RECIPE_QTY_ROWS) break;
+        const n = Number(q);
+        if (Number.isInteger(n) && n >= 1 && n <= MAX_RECIPE_QTY && isUsableAmount(value) && toAmount(value) > 0) byQty[String(n)] = toAmount(value);
+      }
+    }
+    if (!amount && Object.keys(bySize).length === 0 && Object.keys(byQty).length === 0) continue;
+    out.push({ recipeItemId: id, ...(amount ? { amount } : {}), ...(Object.keys(bySize).length > 0 ? { bySize } : {}), ...(Object.keys(byQty).length > 0 ? { byQty } : {}) });
     if (out.length >= MAX_RECIPE_LINES) break;
   }
   return out;
@@ -86,6 +102,25 @@ export function amountForLine(line: RecipeLine, portion: string | null | undefin
     for (const [label, amount] of Object.entries(line.bySize)) if (norm(label) === size) return amount;
   }
   return line.amount ?? null;
+}
+
+/**
+ * The TOTAL of the recipe item that goes with `quantity` of the item (a table of "how many ordered -> total", see RecipeLine.byQty),
+ * or null when the line has no table. Gaps use the nearest smaller row; below the first row the first row applies; above the last
+ * row the last row's amount per piece carries on.
+ */
+export function amountForQuantity(line: RecipeLine, quantity: number): number | null {
+  const rows = Object.entries(line.byQty ?? {})
+    .map(([q, a]) => [Number(q), a] as const)
+    .filter(([q, a]) => Number.isInteger(q) && q >= 1 && a > 0)
+    .sort((x, y) => x[0] - y[0]);
+  if (rows.length === 0 || !Number.isFinite(quantity) || quantity <= 0) return null;
+  const qty = Math.round(quantity);
+  const last = rows[rows.length - 1];
+  if (qty > last[0]) return Math.round((last[1] / last[0]) * qty * 100) / 100;
+  let found = rows[0][1];
+  for (const [q, a] of rows) if (q <= qty) found = a;
+  return found;
 }
 
 /** The food item ids a list of order lines may have recipes for: plain items and the items picked inside combos. */
@@ -111,9 +146,14 @@ export function expandRecipeRows<T extends KitchenRow>(rows: T[], linesByFoodId:
   const add = (base: T, foodId: string, parentName: string, portion: string | null | undefined, quantity: number) => {
     for (const line of linesByFoodId.get(foodId) ?? []) {
       const item = recipeById.get(line.recipeItemId);
-      const amount = amountForLine(line, portion);
-      if (!item || !amount) continue;
-      extra.push({ ...base, name: item.name, foodId: line.recipeItemId, quantity, portion: amountLabel(amount, normalizeRecipeUnit(item.unit)), spiceLevel: null, isEco: false, sections: null, comboSelections: null, partUnits: null, notes: null, recipeOf: parentName });
+      if (!item) continue;
+      // a size with its own amount wins; otherwise the how-many table (one extra line holding the TOTAL for that many); otherwise one amount per order
+      const sizeAmount = amountForLine({ ...line, amount: undefined }, portion);
+      const tableTotal = sizeAmount === null ? amountForQuantity(line, quantity) : null;
+      const amount = sizeAmount ?? tableTotal ?? line.amount ?? null;
+      if (!amount) continue;
+      const lineQuantity = tableTotal !== null ? 1 : quantity;
+      extra.push({ ...base, name: item.name, foodId: line.recipeItemId, quantity: lineQuantity, portion: amountLabel(amount, normalizeRecipeUnit(item.unit)), spiceLevel: null, isEco: false, sections: null, comboSelections: null, partUnits: null, notes: null, recipeOf: parentName });
     }
   };
   for (const row of rows) {
@@ -137,6 +177,13 @@ export function recipeLinesProblem(lines: RecipeLine[] | null | undefined, sized
       if (values.length === 0) return 'Give every recipe item an amount for at least one size.';
       if (values.some((v) => !isUsableAmount(v))) return 'Amounts are numbers above 0, like 4 or 0.5.';
     } else {
+      const table = Object.entries(line.byQty ?? {}).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '');
+      if (table.length > 0) {
+        if (table.some(([, v]) => !isUsableAmount(v))) return 'Amounts are numbers above 0, like 4 or 0.5.';
+        const qtys = table.map(([q]) => Number(q));
+        if (qtys.some((q) => !Number.isInteger(q) || q < 1 || q > MAX_RECIPE_QTY)) return `How many ordered must be a whole number from 1 to ${MAX_RECIPE_QTY}.`;
+        continue;
+      }
       const v = line.amount;
       if (v === undefined || v === null || String(v).trim() === '') return 'Give every recipe item an amount.';
       if (!isUsableAmount(v)) return 'Amounts are numbers above 0, like 4 or 0.5.';
