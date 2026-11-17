@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, TextField, Typography } from '@mui/material';
-import { IconPhotoPlus, IconTrash } from '@tabler/icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, MenuItem, TextField, Typography } from '@mui/material';
+import { IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_PHOTOS, shortDate, type MenuEmailData } from '@/utils/menuEmail';
+import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_PHOTOS, MAX_MENU_SECTIONS, SECTION_SUBTITLE, shortDate, type MenuEmailData, type MenuSection } from '@/utils/menuEmail';
 
 interface Props {
   token: string;
@@ -23,7 +23,7 @@ const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
 
 /** The "New menu" email form: headline, photos with the dish names, one box per day. The email builds itself from it. */
 /** One day's dishes as chips (tap x to leave one out) and a box to add another. */
-function DishList({ label, text, count, onChange, onEdited }: { label: string; text: string; count: number | null; onChange: (text: string) => void; onEdited: () => void }) {
+function DishList({ label, text, count, fromLabel = 'from the menu', onChange, onEdited }: { label?: string; text: string; count: number | null; fromLabel?: string; onChange: (text: string) => void; onEdited: () => void }) {
   const [adding, setAdding] = useState('');
   const dishes = dishesOf(text);
   const write = (list: string[]) => {
@@ -38,9 +38,9 @@ function DishList({ label, text, count, onChange, onEdited }: { label: string; t
   };
   return (
     <Box sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.25, minWidth: 0 }}>
-      <Typography sx={{ fontWeight: 800, fontSize: 14 }}>{label}</Typography>
+      {label && <Typography sx={{ fontWeight: 800, fontSize: 14 }}>{label}</Typography>}
       <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 0.75 }}>
-        {count === null ? 'Loading the menu…' : dishes.length > 0 ? `${dishes.length} ${count > 0 ? 'from the menu' : 'dishes'}. Tap x to leave one out.` : 'Nothing on the menu for this day yet. Add dishes below, or skip the day.'}
+        {count === null ? 'Loading the menu…' : dishes.length > 0 ? `${dishes.length} ${count > 0 ? fromLabel : 'dishes'}. Tap x to leave one out.` : (fromLabel === 'from the menu' ? 'Nothing on the menu for this day yet. Add dishes below, or skip the day.' : 'No dishes yet. Pick a category above or add dishes below.')}
       </Typography>
       <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
         {dishes.map((d, i) => (
@@ -90,6 +90,48 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
       setCounts((c) => ({ ...c, ...Object.fromEntries(wanted.map((d) => [d.day, 0])) }));
     }
   };
+  // ---- the other boxes (Indian Mithai, Add-On's ...): filled from a flat category, or typed ----
+  const [cats, setCats] = useState<Array<{ id: string; label: string }> | null>(null);
+  const [sectionCounts, setSectionCounts] = useState<Record<number, number>>({});
+  const sectionEdited = useRef<Set<number>>(new Set((data.sections ?? []).map((x, i) => (dishesOf(x.items).length > 0 ? i : -1)).filter((i) => i >= 0)));
+  const setSection = (i: number, patch: Partial<MenuSection>) => onChange({ ...latest.current, sections: (latest.current.sections ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const loadCategory = async (i: number, categoryId: string) => {
+    try {
+      const res = await fetch(`/api/admin/communication-menu?category=${categoryId}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Could not load the category');
+      const items = (json?.data?.items ?? []) as string[];
+      sectionEdited.current.delete(i);
+      onChange({ ...latest.current, sections: (latest.current.sections ?? []).map((x, j) => (j === i ? { ...x, categoryId, items: items.join('\n') } : x)) });
+      setSectionCounts((c) => ({ ...c, [i]: items.length }));
+    } catch (e) {
+      setMenuError(e instanceof Error ? e.message : 'Could not load the category');
+    }
+  };
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/communication-menu?list=categories', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled || !Array.isArray(json?.data?.categories)) return;
+        const list = json.data.categories as Array<{ id: string; label: string }>;
+        setCats(list);
+        // a box still empty and not typed in picks the category with the matching name (Indian Mithai -> Indian Sweets, Add-On's -> Add-Ons)
+        const norm = (t: string) => t.toLowerCase().replace(/[^a-z]/g, '');
+        (latest.current.sections ?? []).forEach((sec, i) => {
+          if (sec.categoryId || dishesOf(sec.items).length > 0 || sectionEdited.current.has(i)) return;
+          const t = norm(sec.title);
+          const hit = list.find((c) => norm(c.label) === t) ?? (t.includes('mithai') ? list.find((c) => /sweet|mithai/.test(norm(c.label))) : undefined);
+          if (hit) void loadCategory(i, hit.id);
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   useEffect(() => {
     void loadMenu(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,6 +222,42 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
           <Typography sx={{ fontSize: 12, color: '#6B7280' }}>Starts over from the day-wise menu and replaces what is in the boxes.</Typography>
         </Box>
         {menuError && <Alert severity="error" sx={{ mt: 1 }}>{menuError}</Alert>}
+      </Box>
+
+      <Box>
+        <Step n={4}>Other boxes (optional)</Step>
+        <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 1 }}>Extra boxes under the days, like Indian Mithai or Add-On&apos;s. Fill one from a menu category, or type your own dishes.</Typography>
+        <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
+          {(data.sections ?? []).map((sec, i) => (
+            <Box key={i} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.25, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                <TextField size="small" label="Box title" value={sec.title} onChange={(e) => setSection(i, { title: e.target.value.slice(0, 40) })} sx={{ flex: 1, minWidth: 0 }} />
+                <IconButton aria-label={`Remove ${sec.title || 'this box'}`} size="small" onClick={() => { onChange({ ...latest.current, sections: (latest.current.sections ?? []).filter((_, j) => j !== i) }); sectionEdited.current.clear(); (latest.current.sections ?? []).forEach((x, j) => { if (j !== i && dishesOf(x.items).length > 0) sectionEdited.current.add(j > i ? j - 1 : j); }); }} sx={{ color: '#B91C1C', mt: 0.5 }}>
+                  <IconTrash size={18} />
+                </IconButton>
+              </Box>
+              <TextField size="small" fullWidth label="Under the title" value={sec.subtitle} onChange={(e) => setSection(i, { subtitle: e.target.value.slice(0, 60) })} sx={{ mt: 1 }} />
+              <TextField select size="small" fullWidth label="Fill from a category" value={sec.categoryId ?? ''} onChange={(e) => (e.target.value ? void loadCategory(i, e.target.value) : setSection(i, { categoryId: undefined }))} disabled={!cats} sx={{ mt: 1, mb: 1 }}>
+                <MenuItem value="">None, I will type the dishes</MenuItem>
+                {(cats ?? []).map((c) => (
+                  <MenuItem key={c.id} value={c.id}>{c.label}</MenuItem>
+                ))}
+              </TextField>
+              <DishList
+                text={sec.items}
+                count={sec.categoryId ? (sectionCounts[i] ?? dishesOf(sec.items).length) : 0}
+                fromLabel={`from ${cats?.find((c) => c.id === sec.categoryId)?.label ?? 'the category'}`}
+                onEdited={() => sectionEdited.current.add(i)}
+                onChange={(text) => setSection(i, { items: text })}
+              />
+            </Box>
+          ))}
+        </Box>
+        {(data.sections ?? []).length < MAX_MENU_SECTIONS && (
+          <Button size="small" startIcon={<IconPlus size={16} />} onClick={() => onChange({ ...latest.current, sections: [...(latest.current.sections ?? []), { title: '', subtitle: SECTION_SUBTITLE, items: '' }] })} sx={{ mt: 1.25, textTransform: 'none', fontWeight: 700 }}>
+            Add a box
+          </Button>
+        )}
       </Box>
     </Box>
   );

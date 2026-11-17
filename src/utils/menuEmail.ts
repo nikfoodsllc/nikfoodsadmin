@@ -15,11 +15,22 @@ export interface MenuDay {
   /** one dish per line */
   dishes: string;
 }
+/** An extra box (Indian Mithai, Add-On's ...): a banded title and subtitle over a list of dishes. */
+export interface MenuSection {
+  title: string;
+  subtitle: string;
+  /** one dish per line */
+  items: string;
+  /** the flat category its dishes were filled from (so it can be filled again) */
+  categoryId?: string;
+}
 export interface MenuEmailData {
   headline: string;
   intro: string;
   photos: MenuPhoto[];
   days: MenuDay[];
+  /** Extra boxes under the days; a box without a title or dishes is left out */
+  sections?: MenuSection[];
   /** The date the menu starts (YYYY-MM-DD, the first day, a Tuesday by default); every day box gets its own date from it */
   weekOf?: string;
 }
@@ -27,6 +38,8 @@ export interface MenuEmailData {
 export const MENU_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
 export const MAX_MENU_PHOTOS = 4;
 export const MAX_MENU_DISHES = 40;
+export const MAX_MENU_SECTIONS = 6;
+export const SECTION_SUBTITLE = "Club with any day's delivery";
 export const MENU_DEFAULT_SUBJECT = "This week's new menu";
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -52,7 +65,7 @@ export function shortDate(date: string): string {
 }
 
 export function emptyMenuEmail(): MenuEmailData {
-  return { weekOf: nextMenuStart(), headline: 'The new menu is here', intro: 'Fresh Indian food, cooked for the days below.', photos: [], days: MENU_DAYS.map((day) => ({ day, dishes: '' })) };
+  return { sections: [{ title: 'Indian Mithai', subtitle: SECTION_SUBTITLE, items: '' }, { title: "Add-On's", subtitle: SECTION_SUBTITLE, items: '' }], weekOf: nextMenuStart(), headline: 'The new menu is here', intro: 'Fresh Indian food, cooked for the days below.', photos: [], days: MENU_DAYS.map((day) => ({ day, dishes: '' })) };
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -80,9 +93,12 @@ export const filledDays = (data: MenuEmailData): Array<{ day: string; dishes: st
   data.days.map((d) => ({ day: String(d.day ?? '').trim(), dishes: dishesOf(d.dishes), date: dateForDay(data.weekOf, String(d.day ?? '')) })).filter((d) => d.day && d.dishes.length > 0);
 
 /** What is still missing before the email makes sense, or null. */
+export const filledSections = (data: MenuEmailData): Array<{ title: string; subtitle: string; items: string[] }> =>
+  (data.sections ?? []).map((x) => ({ title: String(x.title ?? '').trim(), subtitle: String(x.subtitle ?? '').trim(), items: dishesOf(x.items) })).filter((x) => x.title && x.items.length > 0).slice(0, MAX_MENU_SECTIONS);
+
 export function menuEmailProblem(data: MenuEmailData): string | null {
   if (!data.headline.trim()) return 'Write a headline.';
-  if (filledDays(data).length === 0) return 'Put at least one dish in a day box.';
+  if (filledDays(data).length === 0 && filledSections(data).length === 0) return 'Put at least one dish in a day box.';
   return null;
 }
 
@@ -143,34 +159,58 @@ function dayCard(day: string, dishes: string[], date: string): string {
     </table>`;
 }
 
+/** A card for the grid: its HTML, and whether it takes the full width (a long list in two columns). */
+interface GridCard {
+  html: string;
+  wide: boolean;
+}
+
 /**
- * The day cards: a short day sits next to the next short day on a computer (one under the other on a phone); a long day takes the
- * full width with its dishes in two columns; a short day left alone takes the full width too.
+ * Cards on a computer: a short card sits next to the next short card (one under the other on a phone); a long card takes the full
+ * width with its dishes in two columns; a short card left alone takes the full width too.
  */
-function dayGrid(days: Array<{ day: string; dishes: string[]; date: string }>): string {
-  const card = (d: { day: string; dishes: string[]; date: string }) => dayCard(d.day, d.dishes, d.date);
-  const full = (d: { day: string; dishes: string[]; date: string }) => `<tr><td style="padding:0 0 12px;">${card(d)}</td></tr>`;
+function cardGrid(cards: GridCard[]): string {
+  const full = (c: GridCard) => `<tr><td style="padding:0 0 12px;">${c.html}</td></tr>`;
   const rows: string[] = [];
-  let waiting: { day: string; dishes: string[]; date: string } | null = null;
-  for (const d of days) {
-    if (d.dishes.length > WIDE_DAY_DISHES) {
+  let waiting: GridCard | null = null;
+  for (const c of cards) {
+    if (c.wide) {
       if (waiting) rows.push(full(waiting));
       waiting = null;
-      rows.push(full(d));
+      rows.push(full(c));
     } else if (waiting) {
       rows.push(`<tr><td style="padding:0 0 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-        <td class="stack" width="49%" valign="top" style="width:49%;">${card(waiting)}</td>
+        <td class="stack" width="49%" valign="top" style="width:49%;">${waiting.html}</td>
         <td class="gap" width="12" style="width:12px;font-size:1px;line-height:1px;">&nbsp;</td>
-        <td class="stack" width="49%" valign="top" style="width:49%;">${card(d)}</td>
+        <td class="stack" width="49%" valign="top" style="width:49%;">${c.html}</td>
       </tr></table></td></tr>`);
       waiting = null;
     } else {
-      waiting = d;
+      waiting = c;
     }
   }
   if (waiting) rows.push(full(waiting));
   return rows.join('');
 }
+
+const dayGrid = (days: Array<{ day: string; dishes: string[]; date: string }>) => cardGrid(days.map((d) => ({ html: dayCard(d.day, d.dishes, d.date), wide: d.dishes.length > WIDE_DAY_DISHES })));
+
+/** An extra box: a coloured band with the title and subtitle, then the dishes centred (two columns when there are many). */
+function sectionCard(title: string, subtitle: string, items: string[], band: string): string {
+  const wide = items.length > WIDE_DAY_DISHES;
+  const half = Math.ceil(items.length / 2);
+  const rows = wide
+    ? `<tr><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(items.slice(0, half))}</table></td><td class="gap" width="4%" style="width:4%;font-size:1px;line-height:1px;">&nbsp;</td><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(items.slice(half))}</table></td></tr>`
+    : dishRows(items);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
+      <tr><td align="center" bgcolor="${band}" style="background:${band};border-radius:17px 17px 0 0;padding:15px 16px 14px;"><div style="font-family:${SERIF};font-size:23px;line-height:28px;font-weight:700;letter-spacing:0.3px;color:${C.cream};">${oneLine(title)}</div>${subtitle ? `<div style="font-family:${FONT};font-size:12px;line-height:17px;font-weight:600;letter-spacing:0.6px;color:#E9DCC4;padding-top:3px;">${oneLine(subtitle)}</div>` : ''}</td></tr>
+      <tr><td style="padding:14px 20px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
+    </table>`;
+}
+
+const SECTION_BANDS = [C.strip, '#7A5B20'];
+const sectionGrid = (sections: Array<{ title: string; subtitle: string; items: string[] }>) =>
+  cardGrid(sections.map((x, i) => ({ html: sectionCard(x.title, x.subtitle, x.items, SECTION_BANDS[i % SECTION_BANDS.length]), wide: x.items.length > WIDE_DAY_DISHES })));
 
 const MARK = 'nfmenu:';
 const toB64 = (s: string) => (typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(s))) : Buffer.from(s, 'utf8').toString('base64'));
@@ -180,26 +220,30 @@ const fromB64 = (s: string) => (typeof atob === 'function' ? decodeURIComponent(
 export function buildMenuEmailHtml(data: MenuEmailData): string {
   const photos = usablePhotos(data);
   const days = filledDays(data);
+  const sections = filledSections(data);
   const intro = esc(data.intro.trim()).replace(/\r?\n/g, '<br>');
   const html = shell(
     oneLine(data.headline) || 'The new menu',
     oneLine(data.intro) || 'Fresh Indian food, ready to order.',
     `${hero('NEW MENU', oneLine(data.headline), intro)}
 ${photoGrid(photos)}
-  <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 10 : 24}px 32px 4px;background:${C.card};">
+${days.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 10 : 24}px 32px 4px;background:${C.card};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr>
       <td width="22%" height="12" valign="top" style="width:22%;height:12px;border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
       <td align="center" valign="middle" style="padding:0 14px;white-space:nowrap;font-family:${SERIF};font-size:21px;line-height:26px;font-style:italic;color:${C.text};">This week&rsquo;s menu</td>
       <td width="22%" height="12" valign="top" style="width:22%;height:12px;border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
     </tr></table>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dayGrid(days)}</table>
-  </td></tr>
+  </td></tr>` : ''}
+${sections.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${days.length || photos.length ? 4 : 24}px 32px 4px;background:${C.card};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${sectionGrid(sections)}</table>
+  </td></tr>` : ''}
   <tr><td class="px" align="center" bgcolor="${C.card}" style="padding:6px 32px 8px;background:${C.card};">
     <a href="${SITE_URL}" style="display:inline-block;vertical-align:middle;margin:4px 6px;padding:11px 28px;background:${C.brand};border-radius:999px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:800;color:#1A1106;">Order now</a><a href="${APP_STORE_LISTING}" style="display:inline-block;vertical-align:middle;margin:4px 6px;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:block;border:0;width:120px;height:40px;"></a>
   </td></tr>
 ${footer('You are getting this because you signed up for NikFoods updates.', false)}`
   );
-  const state = toB64(JSON.stringify({ weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
+  const state = toB64(JSON.stringify({ sections: data.sections, weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
   return html.replace('</body>', `<!--${MARK}${state}-->\n</body>`);
 }
 
@@ -211,6 +255,7 @@ export function parseMenuEmail(html: string): MenuEmailData | null {
     const raw = JSON.parse(fromB64(m[1])) as Partial<MenuEmailData>;
     const base = emptyMenuEmail();
     return {
+      sections: Array.isArray(raw.sections) ? raw.sections.map((x) => ({ title: String(x?.title ?? ''), subtitle: String(x?.subtitle ?? ''), items: String(x?.items ?? ''), ...(typeof x?.categoryId === 'string' ? { categoryId: x.categoryId } : {}) })).slice(0, MAX_MENU_SECTIONS) : [],
       weekOf: validDate(raw.weekOf) ? raw.weekOf : base.weekOf,
       headline: typeof raw.headline === 'string' ? raw.headline : base.headline,
       intro: typeof raw.intro === 'string' ? raw.intro : base.intro,

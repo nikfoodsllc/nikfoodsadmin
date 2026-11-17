@@ -54,3 +54,46 @@ export function buildDayMenus(dates: string[], mappings: MenuMapping[], categori
   }
   return out;
 }
+
+export interface FlatCategoryOption {
+  id: string;
+  /** "Indian Sweets" or "Food Menu > Mains" for a sub-category */
+  label: string;
+}
+
+/** The categories an extra box can be filled from: flat categories and their sub-categories that customers can see, in menu order. */
+export function flatCategoryOptions(categories: Array<MenuCategory & { listingType?: string }>): FlatCategoryOption[] {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const hiddenCat = (c: MenuCategory) => Boolean(c.isDraft) || (c.parentId ? Boolean(byId.get(c.parentId)?.isDraft) : false);
+  const isFlat = (c: MenuCategory & { listingType?: string }) => (c.parentId ? (byId.get(c.parentId) as { listingType?: string } | undefined)?.listingType : c.listingType) !== 'day-wise';
+  return categories
+    .filter((c) => !hiddenCat(c) && isFlat(c) && (c.name ?? '').trim() !== '')
+    .sort((a, b) => num(a.parentId ? byId.get(a.parentId)?.sequence : a.sequence, 1e6) - num(b.parentId ? byId.get(b.parentId)?.sequence : b.sequence, 1e6) || (a.parentId ? 1 : 0) - (b.parentId ? 1 : 0) || num(a.sequence, 1e6) - num(b.sequence, 1e6))
+    .map((c) => ({ id: c.id, label: c.parentId && byId.get(c.parentId)?.name ? `${byId.get(c.parentId)!.name} > ${c.name}` : String(c.name) }));
+}
+
+/** The items of a flat category (its own, then each sub-category's), as dish names in menu order, without anything customers cannot order. */
+export function buildCategoryItems(rootId: string, mappings: Array<{ categoryId: string; foodItemId: string; sequence?: number }>, categories: MenuCategory[], foods: MenuFood[]): string[] {
+  const cat = new Map(categories.map((c) => [c.id, c]));
+  const root = cat.get(rootId);
+  if (!root || root.isDraft || (root.parentId && cat.get(root.parentId)?.isDraft)) return [];
+  const food = new Map(foods.map((f) => [f.id, f]));
+  const kids = categories.filter((c) => c.parentId === rootId && !c.isDraft).sort((a, b) => num(a.sequence, 1e6) - num(b.sequence, 1e6));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of [rootId, ...kids.map((k) => k.id)]) {
+    const rows = mappings
+      .filter((m) => m.categoryId === id)
+      .map((m) => ({ m, f: food.get(m.foodItemId) }))
+      .filter((r): r is { m: { categoryId: string; foodItemId: string; sequence?: number }; f: MenuFood } => Boolean(r.f) && r.f!.available !== false && !r.f!.isDraft && r.f!.name.trim() !== '')
+      .sort((a, b) => num(a.m.sequence, 1e6) - num(b.m.sequence, 1e6) || a.f.name.localeCompare(b.f.name));
+    for (const r of rows) {
+      const n = r.f.name.replace(/\s+/g, ' ').trim();
+      if (!seen.has(n.toLowerCase())) {
+        seen.add(n.toLowerCase());
+        out.push(n);
+      }
+    }
+  }
+  return out;
+}
