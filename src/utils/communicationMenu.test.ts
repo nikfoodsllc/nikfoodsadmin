@@ -35,6 +35,16 @@ describe('buildDayMenus', () => {
 });
 
 
+describe('only some sub-categories', () => {
+  const cats = [{ id: 'menu', name: 'Food Menu', sequence: 1 }, { id: 'app', name: 'Appetizers', sequence: 1, parentId: 'menu' }, { id: 'main', name: 'Main Course', sequence: 2, parentId: 'menu' }, { id: 'bev', name: 'Beverages', sequence: 3, parentId: 'menu' }, { id: 'par', name: 'Paranthe Wali Gali', sequence: 4, parentId: 'menu' }];
+  const foods = [{ id: 'a', name: 'Samosa' }, { id: 'b', name: 'Dal' }, { id: 'c', name: 'Lassi' }, { id: 'd', name: 'Aloo Paratha' }];
+  const maps = [{ day: 'd', categoryId: 'app', foodItemId: 'a', sequence: 0 }, { day: 'd', categoryId: 'main', foodItemId: 'b', sequence: 0 }, { day: 'd', categoryId: 'bev', foodItemId: 'c', sequence: 0 }, { day: 'd', categoryId: 'par', foodItemId: 'd', sequence: 0 }];
+  it('keeps only the chosen sub-categories (by name, ignoring case and spacing)', () => {
+    expect(buildDayMenus(['d'], maps, cats, foods, ['Appetizers', 'paranthe wali gali', 'MainCourse']).d).toEqual(['Samosa', 'Dal', 'Aloo Paratha']);
+    expect(buildDayMenus(['d'], maps, cats, foods).d).toHaveLength(4);
+  });
+});
+
 describe('flat categories for the extra boxes', () => {
   const cats = [
     { id: 'sw', name: 'Indian Sweets', sequence: 2, listingType: 'flat' },
