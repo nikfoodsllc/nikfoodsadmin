@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildMenuEmailHtml, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
-import { htmlProblem } from './communication';
+import { htmlProblem, previewHtml } from './communication';
+import { EMAIL_TEMPLATES } from './emailTemplates';
 
 const url = (n: number) => `https://res.cloudinary.com/demo/image/upload/v1/menu${n}.jpg`;
 const data = (photos: number): MenuEmailData => ({
@@ -55,5 +56,15 @@ describe('menu email', () => {
     expect(menuEmailProblem(emptyMenuEmail())).toMatch(/dish/);
     expect(menuEmailProblem({ ...data(0), headline: ' ' })).toMatch(/headline/);
     expect(menuEmailProblem(data(0))).toBeNull();
+  });
+  it('every email carries the App Store badge exactly once', () => {
+    const count = (h: string, s: string) => h.split(s).length - 1;
+    const v = { firstName: 'A', orderNumber: '1', date: 'd' };
+    expect(count(buildMenuEmailHtml(data(2)), 'cid:app-store-badge')).toBe(1);
+    for (const tpl of EMAIL_TEMPLATES) expect(count(tpl.html, 'cid:app-store-badge') + count(tpl.html, 'apps.apple.com/app/id') > 0, tpl.id).toBe(true);
+    for (const tpl of EMAIL_TEMPLATES) expect(count(previewHtml(tpl.html, v), 'app-store-badge.png') <= 1, tpl.id).toBe(true);
+    // pasted HTML without a badge gets one in the preview, like the real send; one with its own is not doubled
+    expect(count(previewHtml('<p>Hi</p>', v), 'app-store-badge.png')).toBe(1);
+    expect(count(previewHtml('<html><body><img src="cid:app-store-badge"></body></html>', v), 'app-store-badge.png')).toBe(1);
   });
 });

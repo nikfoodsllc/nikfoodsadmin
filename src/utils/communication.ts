@@ -202,11 +202,15 @@ export const PREVIEW_LOGO_URL = 'https://www.nikfoods.com/images/logo.png';
 /** The App Store badge the emails attach as cid:app-store-badge; the preview loads the same picture from the site. */
 export const PREVIEW_BADGE_URL = 'https://www.nikfoods.com/images/app-store-badge.png';
 
+const BADGE_BLOCK = '<div style="padding:10px 12px 6px;text-align:center;"><a href="https://apps.apple.com/us/app/id6767141830" style="display:inline-block;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:inline-block;border:0;width:120px;height:40px;"></a></div>';
+
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** The page shown in the preview frame: placeholders filled (escaped, like the real send), logo and App Store badge from the site, wrapped when it is a snippet. */
 export function previewHtml(html: string, v: { firstName: string; orderNumber: string; date: string }): string {
-  const filled = html
+  // every email carries the App Store badge: one that has none gets it added at the end, like the real send
+  const withBadge = /cid:app-store-badge|apps\.apple\.com/.test(html) ? html : /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${BADGE_BLOCK}</body>`) : html + BADGE_BLOCK;
+  const filled = withBadge
     .replace(/\{firstName\}/g, esc(v.firstName))
     .replace(/\{orderNumber\}/g, esc(v.orderNumber))
     .replace(/\{date\}/g, v.date)

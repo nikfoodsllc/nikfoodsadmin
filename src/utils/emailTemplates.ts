@@ -29,8 +29,12 @@ export const button = (label: string, href: string) =>
 
 const strip = `<tr><td align="center" bgcolor="${C.strip}" style="padding:16px 32px;background:${C.strip};"><img src="cid:nikfoods-logo" alt="NikFoods" width="150" style="display:block;border:0;width:150px;height:auto;max-width:100%;margin:0 auto;font-family:Arial,sans-serif;font-size:26px;font-weight:800;color:${C.cream};"></td></tr>`;
 
-export const footer = (note: string) =>
-  `<tr><td class="px" bgcolor="${C.card}" style="padding:8px 32px 24px;background:${C.card};"><div style="border-top:1px solid ${C.line};padding-top:14px;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted};text-align:center;">${note}<br>Questions? Write to <a href="mailto:${SUPPORT}" style="color:${C.brandText};font-weight:700;">${SUPPORT}</a>.<br><a href="{unsubscribeUrl}" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a></div></td></tr>`;
+export const APP_STORE_LISTING = 'https://apps.apple.com/us/app/id6767141830';
+/** The "Download on the App Store" badge (the tool attaches the picture as cid:app-store-badge). */
+export const badgeRow = `<tr><td class="px" align="center" bgcolor="${C.card}" style="padding:10px 32px 4px;background:${C.card};"><a href="${APP_STORE_LISTING}" style="display:inline-block;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:inline-block;border:0;width:120px;height:40px;"></a></td></tr>`;
+
+export const footer = (note: string, badge = true) =>
+  `${badge ? badgeRow : ''}<tr><td class="px" bgcolor="${C.card}" style="padding:8px 32px 24px;background:${C.card};"><div style="border-top:1px solid ${C.line};padding-top:14px;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted};text-align:center;">${note}<br>Questions? Write to <a href="mailto:${SUPPORT}" style="color:${C.brandText};font-weight:700;">${SUPPORT}</a>.<br><a href="{unsubscribeUrl}" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a></div></td></tr>`;
 
 export function shell(title: string, preheader: string, rows: string): string {
   return `<!DOCTYPE html>
@@ -102,7 +106,7 @@ const app: EmailTemplate = {
     ${button('Download on the App Store', APP_STORE_URL)}
     <div style="font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted};margin-top:12px;">Free for iPhone. Sign in with the same email you use on nikfoods.com.</div>
   </td></tr>
-${footer('You are getting this because you signed up for NikFoods updates.')}`
+${footer('You are getting this because you signed up for NikFoods updates.', false)}`
   ),
 };
 
