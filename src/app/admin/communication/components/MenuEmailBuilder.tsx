@@ -40,7 +40,7 @@ function DishList({ label, text, count, onChange, onEdited }: { label: string; t
     <Box sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.25, minWidth: 0 }}>
       <Typography sx={{ fontWeight: 800, fontSize: 14 }}>{label}</Typography>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 0.75 }}>
-        {count === null ? 'Loading the menu…' : count > 0 ? `${count} from the menu. Tap x to leave one out.` : dishes.length > 0 ? 'Your own list.' : 'Nothing on the menu for this day yet. Add dishes below, or skip the day.'}
+        {count === null ? 'Loading the menu…' : dishes.length > 0 ? `${dishes.length} ${count > 0 ? 'from the menu' : 'dishes'}. Tap x to leave one out.` : 'Nothing on the menu for this day yet. Add dishes below, or skip the day.'}
       </Typography>
       <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
         {dishes.map((d, i) => (

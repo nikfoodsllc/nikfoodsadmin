@@ -111,13 +111,23 @@ function photoGrid(photos: MenuPhoto[]): string {
 const SERIF = "Georgia,'Times New Roman',Times,serif";
 
 /** One day: the day name in a serif face with its date in small caps, a thin gold rule, then the dishes divided by hairlines. */
-function dayCard(day: string, dishes: string[], date: string): string {
-  const rows = dishes
+/** More dishes than this and the day takes the full width with its dishes in two columns (so a long menu does not make a long email). */
+export const WIDE_DAY_DISHES = 8;
+
+const dishRows = (list: string[]) =>
+  list
     .map(
       (d, i) =>
-        `<tr><td style="padding:${i === 0 ? 2 : 8}px 0 ${i === dishes.length - 1 ? 2 : 8}px;${i === dishes.length - 1 ? '' : `border-bottom:1px solid ${C.rule};`}font-family:${FONT};font-size:15px;line-height:21px;font-weight:600;letter-spacing:0.1px;color:${C.text};">${oneLine(d)}</td></tr>`
+        `<tr><td style="padding:${i === 0 ? 2 : 7}px 0 ${i === list.length - 1 ? 2 : 7}px;${i === list.length - 1 ? '' : `border-bottom:1px solid ${C.rule};`}font-family:${FONT};font-size:15px;line-height:20px;font-weight:600;letter-spacing:0.1px;color:${C.text};">${oneLine(d)}</td></tr>`
     )
     .join('');
+
+function dayCard(day: string, dishes: string[], date: string): string {
+  const wide = dishes.length > WIDE_DAY_DISHES;
+  const half = Math.ceil(dishes.length / 2);
+  const rows = wide
+    ? `<tr><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(dishes.slice(0, half))}</table></td><td class="gap" width="4%" style="width:4%;font-size:1px;line-height:1px;">&nbsp;</td><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(dishes.slice(half))}</table></td></tr>`
+    : dishRows(dishes);
   const dateCell = date ? `<td align="right" valign="bottom" style="font-family:${FONT};font-size:11px;line-height:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${C.brandText};padding-bottom:3px;">${esc(shortDate(date))}</td>` : '';
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:14px;border-collapse:separate;border:1px solid ${C.line};">
       <tr><td height="3" bgcolor="${C.brand}" style="height:3px;line-height:3px;font-size:1px;background:${C.brand};border-radius:14px 14px 0 0;">&nbsp;</td></tr>
@@ -127,23 +137,32 @@ function dayCard(day: string, dishes: string[], date: string): string {
     </table>`;
 }
 
-/** The day cards two to a row on a computer (one under the other on a phone); a last one on its own takes the full width. */
+/**
+ * The day cards: a short day sits next to the next short day on a computer (one under the other on a phone); a long day takes the
+ * full width with its dishes in two columns; a short day left alone takes the full width too.
+ */
 function dayGrid(days: Array<{ day: string; dishes: string[]; date: string }>): string {
   const card = (d: { day: string; dishes: string[]; date: string }) => dayCard(d.day, d.dishes, d.date);
+  const full = (d: { day: string; dishes: string[]; date: string }) => `<tr><td style="padding:0 0 12px;">${card(d)}</td></tr>`;
   const rows: string[] = [];
-  for (let i = 0; i < days.length; i += 2) {
-    const a = days[i];
-    const b = days[i + 1];
-    rows.push(
-      b
-        ? `<tr><td style="padding:0 0 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-        <td class="stack" width="49%" valign="top" style="width:49%;">${card(a)}</td>
+  let waiting: { day: string; dishes: string[]; date: string } | null = null;
+  for (const d of days) {
+    if (d.dishes.length > WIDE_DAY_DISHES) {
+      if (waiting) rows.push(full(waiting));
+      waiting = null;
+      rows.push(full(d));
+    } else if (waiting) {
+      rows.push(`<tr><td style="padding:0 0 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="stack" width="49%" valign="top" style="width:49%;">${card(waiting)}</td>
         <td class="gap" width="12" style="width:12px;font-size:1px;line-height:1px;">&nbsp;</td>
-        <td class="stack" width="49%" valign="top" style="width:49%;">${card(b)}</td>
-      </tr></table></td></tr>`
-        : `<tr><td style="padding:0 0 12px;">${card(a)}</td></tr>`
-    );
+        <td class="stack" width="49%" valign="top" style="width:49%;">${card(d)}</td>
+      </tr></table></td></tr>`);
+      waiting = null;
+    } else {
+      waiting = d;
+    }
   }
+  if (waiting) rows.push(full(waiting));
   return rows.join('');
 }
 
