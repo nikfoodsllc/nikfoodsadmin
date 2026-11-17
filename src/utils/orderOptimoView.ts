@@ -42,6 +42,7 @@ function datesOf(stops: OptimoStopLike[]): string {
 export const OPTIMO_FILTER_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'in', label: 'In OptimoRoute' },
+  { value: 'pending', label: 'Sending…' },
   { value: 'failed', label: 'Failed' },
   { value: 'removed', label: 'Removed' },
   { value: 'none', label: 'Not sent (-)' },
@@ -52,6 +53,8 @@ export function optimoFilterFor(value: string | null | undefined): Record<string
   switch (value) {
     case 'in':
       return { 'optimo.state': 'sent' };
+    case 'pending':
+      return { 'optimo.state': 'pending' };
     case 'failed':
       return { 'optimo.state': 'failed' };
     case 'removed':
@@ -89,6 +92,16 @@ export function orderOptimoView(optimo: OptimoLike | null | undefined): OptimoVi
   }
   if (optimo.state === 'removed' || (stops.length > 0 && stops.every((s) => s.result === 'removed'))) {
     return { label: 'Removed', tone: 'warn', detail: datesOf(stops), title: 'The order was cancelled or fully refunded, so its stop was removed from OptimoRoute' };
+  }
+  // OptimoRoute accepted the stop (or another order is still making the shared one) but it is not showing there yet: not "In OptimoRoute" until it is
+  const waiting = stops.filter((s) => s.result === 'pending' || s.result === 'in_progress');
+  if (waiting.length > 0 || optimo.state === 'pending') {
+    return {
+      label: 'Sending…',
+      tone: 'warn',
+      detail: waiting.length > 0 ? datesOf(waiting) : '',
+      title: 'OptimoRoute has accepted the stop but it is not showing there yet. This changes to In OptimoRoute by itself once it shows (checked every 5 minutes). If it never shows it turns into Failed and is retried.',
+    };
   }
   const kept = stops.filter((s) => s.result === 'kept');
   const there = stops.filter((s) => s.result === 'sent' || s.result === 'adopted' || s.result === 'already');
