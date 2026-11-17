@@ -141,7 +141,7 @@ const dishRows = (list: string[]) =>
 /** A thin gold rule, a small diamond, a thin gold rule. */
 const ornament = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:10px auto 0;"><tr>
         <td valign="middle" style="padding:0;font-size:1px;line-height:1px;"><table role="presentation" width="30" cellpadding="0" cellspacing="0"><tr><td width="30" height="1" bgcolor="${C.brand}" style="width:30px;height:1px;line-height:1px;font-size:1px;padding:0;background:${C.brand};">&nbsp;</td></tr></table></td>
-        <td valign="middle" style="padding:0 9px;font-family:${FONT};font-size:8px;line-height:8px;color:${C.brand};">&#9670;</td>
+        <td valign="middle" style="padding:0 9px;font-family:${FONT};font-size:8px;line-height:8px;color:${C.brand};">◆</td>
         <td valign="middle" style="padding:0;font-size:1px;line-height:1px;"><table role="presentation" width="30" cellpadding="0" cellspacing="0"><tr><td width="30" height="1" bgcolor="${C.brand}" style="width:30px;height:1px;line-height:1px;font-size:1px;padding:0;background:${C.brand};">&nbsp;</td></tr></table></td>
       </tr></table>`;
 
@@ -230,7 +230,7 @@ ${photoGrid(photos)}
 ${days.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 10 : 24}px 32px 4px;background:${C.card};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr>
       <td width="22%" height="12" valign="top" style="width:22%;height:12px;border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
-      <td align="center" valign="middle" style="padding:0 14px;white-space:nowrap;font-family:${SERIF};font-size:21px;line-height:26px;font-style:italic;color:${C.text};">This week&rsquo;s menu</td>
+      <td align="center" valign="middle" style="padding:0 14px;white-space:nowrap;font-family:${SERIF};font-size:21px;line-height:26px;font-style:italic;color:${C.text};">This week’s menu</td>
       <td width="22%" height="12" valign="top" style="width:22%;height:12px;border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
     </tr></table>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dayGrid(days)}</table>
