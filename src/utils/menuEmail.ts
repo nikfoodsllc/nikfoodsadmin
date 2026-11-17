@@ -1,4 +1,4 @@
-import { C, FONT, SITE_URL, button, footer, hero, shell } from './emailTemplates';
+import { APP_STORE_LISTING, C, FONT, SITE_URL, footer, hero, shell } from './emailTemplates';
 import { addDays, pacificToday } from './communication';
 
 /**
@@ -110,30 +110,36 @@ function photoGrid(photos: MenuPhoto[]): string {
 
 const SERIF = "Georgia,'Times New Roman',Times,serif";
 
-/** One day: the day name in a serif face with its date in small caps, a thin gold rule, then the dishes divided by hairlines. */
 /** More dishes than this and the day takes the full width with its dishes in two columns (so a long menu does not make a long email). */
 export const WIDE_DAY_DISHES = 8;
 
+/** The dishes centred, one under the other, with room to breathe (no lines between them). */
 const dishRows = (list: string[]) =>
   list
     .map(
       (d, i) =>
-        `<tr><td style="padding:${i === 0 ? 2 : 7}px 0 ${i === list.length - 1 ? 2 : 7}px;${i === list.length - 1 ? '' : `border-bottom:1px solid ${C.rule};`}font-family:${FONT};font-size:15px;line-height:20px;font-weight:600;letter-spacing:0.1px;color:${C.text};">${oneLine(d)}</td></tr>`
+        `<tr><td align="center" style="padding:${i === 0 ? 0 : 5}px 4px ${i === list.length - 1 ? 0 : 5}px;font-family:${FONT};font-size:15px;line-height:21px;font-weight:600;letter-spacing:0.15px;color:${C.text};">${oneLine(d)}</td></tr>`
     )
     .join('');
 
+/** A thin gold rule, a small diamond, a thin gold rule. */
+const ornament = `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:10px auto 0;"><tr>
+        <td valign="middle" style="padding:0;font-size:1px;line-height:1px;"><table role="presentation" width="30" cellpadding="0" cellspacing="0"><tr><td width="30" height="1" bgcolor="${C.brand}" style="width:30px;height:1px;line-height:1px;font-size:1px;padding:0;background:${C.brand};">&nbsp;</td></tr></table></td>
+        <td valign="middle" style="padding:0 9px;font-family:${FONT};font-size:8px;line-height:8px;color:${C.brand};">&#9670;</td>
+        <td valign="middle" style="padding:0;font-size:1px;line-height:1px;"><table role="presentation" width="30" cellpadding="0" cellspacing="0"><tr><td width="30" height="1" bgcolor="${C.brand}" style="width:30px;height:1px;line-height:1px;font-size:1px;padding:0;background:${C.brand};">&nbsp;</td></tr></table></td>
+      </tr></table>`;
+
+/** One day, like a card on a restaurant menu: its date in small gold capitals, the day in a large serif face, an ornament, then the dishes. */
 function dayCard(day: string, dishes: string[], date: string): string {
   const wide = dishes.length > WIDE_DAY_DISHES;
   const half = Math.ceil(dishes.length / 2);
   const rows = wide
     ? `<tr><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(dishes.slice(0, half))}</table></td><td class="gap" width="4%" style="width:4%;font-size:1px;line-height:1px;">&nbsp;</td><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(dishes.slice(half))}</table></td></tr>`
     : dishRows(dishes);
-  const dateCell = date ? `<td align="right" valign="bottom" style="font-family:${FONT};font-size:11px;line-height:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${C.brandText};padding-bottom:3px;">${esc(shortDate(date))}</td>` : '';
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:14px;border-collapse:separate;border:1px solid ${C.line};">
-      <tr><td height="3" bgcolor="${C.brand}" style="height:3px;line-height:3px;font-size:1px;background:${C.brand};border-radius:14px 14px 0 0;">&nbsp;</td></tr>
-      <tr><td style="padding:14px 18px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="bottom" style="font-family:${SERIF};font-size:22px;line-height:26px;font-weight:700;color:${C.text};">${oneLine(day)}</td>${dateCell}</tr></table></td></tr>
-      <tr><td style="padding:10px 18px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td height="1" bgcolor="${C.brand}" style="height:1px;line-height:1px;font-size:1px;background:${C.brand};">&nbsp;</td></tr></table></td></tr>
-      <tr><td style="padding:8px 18px 14px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
+  const eyebrow = date ? `<div style="font-family:${FONT};font-size:11px;line-height:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:${C.brandText};padding:0 0 6px;">${esc(shortDate(date))}</div>` : '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
+      <tr><td align="center" style="padding:18px 20px 0;">${eyebrow}<div style="font-family:${SERIF};font-size:28px;line-height:32px;font-weight:700;letter-spacing:0.3px;color:${C.text};">${oneLine(day)}</div>${ornament}</td></tr>
+      <tr><td style="padding:12px 20px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
     </table>`;
 }
 
@@ -181,17 +187,17 @@ export function buildMenuEmailHtml(data: MenuEmailData): string {
     `${hero('NEW MENU', oneLine(data.headline), intro)}
 ${photoGrid(photos)}
   <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 10 : 24}px 32px 4px;background:${C.card};">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;"><tr>
-      <td valign="middle" style="border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
-      <td valign="middle" align="center" width="1" style="white-space:nowrap;padding:0 14px;font-family:${SERIF};font-size:20px;line-height:24px;font-style:italic;color:${C.text};">This week&rsquo;s menu</td>
-      <td valign="middle" style="border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr>
+      <td width="22%" height="12" valign="top" style="width:22%;height:12px;border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
+      <td align="center" valign="middle" style="padding:0 14px;white-space:nowrap;font-family:${SERIF};font-size:21px;line-height:26px;font-style:italic;color:${C.text};">This week&rsquo;s menu</td>
+      <td width="22%" height="12" valign="top" style="width:22%;height:12px;border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
     </tr></table>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dayGrid(days)}</table>
   </td></tr>
-  <tr><td class="px" align="center" bgcolor="${C.card}" style="padding:12px 32px 16px;background:${C.card};">
-    ${button('Order now', SITE_URL)}
+  <tr><td class="px" align="center" bgcolor="${C.card}" style="padding:6px 32px 8px;background:${C.card};">
+    <a href="${SITE_URL}" style="display:inline-block;vertical-align:middle;margin:4px 6px;padding:11px 28px;background:${C.brand};border-radius:999px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:800;color:#1A1106;">Order now</a><a href="${APP_STORE_LISTING}" style="display:inline-block;vertical-align:middle;margin:4px 6px;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:block;border:0;width:120px;height:40px;"></a>
   </td></tr>
-${footer('You are getting this because you signed up for NikFoods updates.')}`
+${footer('You are getting this because you signed up for NikFoods updates.', false)}`
   );
   const state = toB64(JSON.stringify({ weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
   return html.replace('</body>', `<!--${MARK}${state}-->\n</body>`);
