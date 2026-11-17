@@ -175,6 +175,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   e('Orders: card payment problems', 'Waiting for 3D Secure', 'Order details, Stripe payment note', "The customer's bank asked for extra verification and the customer has not finished it yet.", 'warn', 'requires action'),
 
   // ---- create order / recent orders
+  e('Create Offline Order and Recent orders', 'Drafts tab', 'Create Order > Drafts', 'An order you start entering is saved here by itself a moment after you stop typing, and when you leave the page. Every admin sees the same drafts: press Continue to carry on (it keeps saving into the same draft) or Delete to throw it away. Creating the order removes its draft. Prices are worked out again when you create it, so check the items first. Orders you are editing from Recent orders are not saved as drafts.', 'info', 'draft saved autosave unfinished'),
   e('Create Offline Order and Recent orders', 'Waiting for payment', 'Recent orders tab', 'Payment-link orders the customer has not paid yet. A paid order leaves this tab by itself within about 30 seconds.', 'warn'),
   e('Create Offline Order and Recent orders', 'Paid', 'Recent orders tab and chip', 'The order is paid. The chip also says how: Paid · Cash, Paid · Zelle, Paid · Credit Card and so on.', 'good'),
   e('Create Offline Order and Recent orders', 'Cancelled', 'Recent orders tab and chip', 'An admin cancelled the order. A cancelled payment-link order has a dead link and no action buttons.', 'bad'),
