@@ -91,3 +91,28 @@ describe('dates in the day boxes', () => {
     expect(parseMenuEmail(h)?.weekOf).toBe('2026-11-17');
   });
 });
+
+describe('long days', () => {
+  const dishes = (n: number) => Array.from({ length: n }, (_, i) => `Dish ${i + 1}`).join('\n');
+  const mk = (counts: number[]) => ({ ...emptyMenuEmail(), photos: [], days: counts.map((n, i) => ({ day: ['Tuesday', 'Wednesday', 'Thursday', 'Friday'][i], dishes: dishes(n) })) });
+  const count = (h: string, s: string) => h.split(s).length - 1;
+  it('a day with many dishes lists them in two columns and takes the full width', () => {
+    const h = buildMenuEmailHtml(mk([20]));
+    expect(count(h, 'Dish ')).toBe(20);
+    expect(count(h, 'width="48%"')).toBe(2);
+  });
+  it('short days pair up; a short day next to a long one stands alone', () => {
+    expect(count(buildMenuEmailHtml(mk([3, 4, 5, 6])), 'width="49%"')).toBe(4);
+    expect(count(buildMenuEmailHtml(mk([3, 20, 4, 5])), 'width="49%"')).toBe(2);
+    expect(count(buildMenuEmailHtml(mk([20, 20, 20, 20])), 'width="49%"')).toBe(0);
+    expect(count(buildMenuEmailHtml(mk([3, 4, 5])), 'width="49%"')).toBe(2);
+  });
+  it('keeps every dish exactly once', () => {
+    const h = buildMenuEmailHtml(mk([9, 3, 16, 1]));
+    expect(count(h, '>Dish 1<')).toBe(4);
+    expect(count(h, '>Dish 2<')).toBe(3);
+    expect(count(h, '>Dish 3<')).toBe(3);
+    expect(count(h, '>Dish 16<')).toBe(1);
+    expect(count(h, '>Dish 9<')).toBe(2);
+  });
+});
