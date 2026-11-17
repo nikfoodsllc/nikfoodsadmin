@@ -30,6 +30,7 @@ import {
   EMAIL_HTML_LIMIT,
   EMAIL_LIMIT,
   htmlProblem,
+  PREVIEW_BADGE_URL,
   previewHtml,
   type EmailFormat,
   SUBJECT_LIMIT,
@@ -598,6 +599,8 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
                   <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
                   <Typography sx={{ fontWeight: 800, fontSize: 16, mt: 0.5 }}>{fillPlaceholders(subject, preview) || 'Subject'}</Typography>
                   <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#54442F', mt: 0.5, wordBreak: 'break-word' }}>{fillPlaceholders(emailBody, preview) || 'Your message'}</Typography>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={PREVIEW_BADGE_URL} alt="Download on the App Store" width={120} height={40} style={{ display: 'block', marginTop: 12 }} />
                 </Paper>
               </>
             ) : (
