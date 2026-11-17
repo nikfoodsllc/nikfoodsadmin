@@ -113,12 +113,9 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
           const groupLines = lines.filter((l) => spiceHeading(l.spice) === spiceHeading(line.spice));
           const redelivered = line.deliveredOn && line.deliveredOn !== line.day;
           // the menu day (when tracing the whole range) and the delivery day (when it differs from the menu day)
-          const when = [
-            day ? null : formatDayShort(line.day),
-            redelivered ? `delivered ${formatDayShort(line.deliveredOn as string)}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ');
+          const menuDay = day ? null : formatDayShort(line.day);
+          const deliveredText = redelivered ? `Delivered ${formatDayShort(line.deliveredOn as string)}` : null;
+          const when = Boolean(menuDay || deliveredText);
           return (
             <Box key={`${line.orderId}-${index}`}>
               {spiceStart && (
@@ -136,6 +133,8 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
                 gap: 1.5,
                 py: 1.25,
                 borderBottom: index === lines.length - 1 ? 'none' : '1px solid #F3F4F6',
+                // an order delivered on another day than it is cooked stands out (amber, like the delivery note on the item cards)
+                ...(redelivered ? { bgcolor: '#FFF7E0', borderLeft: '4px solid #F59E0B', borderRadius: 1, mx: -1, px: 1, borderBottomColor: '#FDE9B0' } : {}),
               }}
             >
               <Box sx={{ minWidth: 0 }}>
@@ -143,7 +142,13 @@ export default function ItemOrdersDialog({ open, onClose, token, range, item, da
                   {line.customerName}
                 </Typography>
                 <Typography sx={{ fontSize: 12.5, color: '#6B7280', userSelect: 'all', wordBreak: 'break-all' }}>{line.orderId}</Typography>
-                {when && <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.25 }}>{when}</Typography>}
+                {when && (
+                  <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.25 }}>
+                    {menuDay}
+                    {menuDay && deliveredText ? ' · ' : ''}
+                    {deliveredText && <Typography component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: '#B45309' }}>{deliveredText}</Typography>}
+                  </Typography>
+                )}
                 {formatOrderedAt(line.orderedAt) && (
                   <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.25 }}>Ordered {formatOrderedAt(line.orderedAt)}</Typography>
                 )}
