@@ -44,6 +44,29 @@ describe('orderOptimoView', () => {
 
 import { OPTIMO_FILTER_OPTIONS, optimoFilterFor } from './orderOptimoView';
 
+describe('Sending (not in OptimoRoute yet)', () => {
+  it('shows Sending… (amber) while a stop is pending or another order is still making it', () => {
+    const v = orderOptimoView({ state: 'pending', stops: [{ date: '2026-11-18', result: 'pending' }] });
+    expect(v.label).toBe('Sending…');
+    expect(v.tone).toBe('warn');
+    expect(v.detail).toBe('Nov 18');
+    expect(orderOptimoView({ state: 'pending', stops: [{ date: '2026-11-18', result: 'in_progress' }] }).label).toBe('Sending…');
+    expect(orderOptimoView({ state: 'pending' }).label).toBe('Sending…');
+  });
+  it('lists only the days still pending when others are already there', () => {
+    const v = orderOptimoView({ state: 'pending', stops: [{ date: '2026-11-18', result: 'sent' }, { date: '2026-11-19', result: 'pending' }] });
+    expect(v.label).toBe('Sending…');
+    expect(v.detail).toBe('Nov 19');
+  });
+  it('failure and removal still win over pending, and sent is In OptimoRoute again', () => {
+    expect(orderOptimoView({ state: 'failed', stops: [{ date: '2026-11-18', result: 'failed' }, { date: '2026-11-19', result: 'pending' }] }).label).toBe('Failed');
+    expect(orderOptimoView({ state: 'sent', stops: [{ date: '2026-11-18', result: 'sent' }] }).label).toBe('In OptimoRoute');
+  });
+  it('has a filter choice for it', () => {
+    expect(optimoFilterFor('pending')).toEqual({ 'optimo.state': 'pending' });
+  });
+});
+
 describe('optimoFilterFor', () => {
   it('maps each choice to the matching database filter', () => {
     expect(optimoFilterFor('in')).toEqual({ 'optimo.state': 'sent' });
