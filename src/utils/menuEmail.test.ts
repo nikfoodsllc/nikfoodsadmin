@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMenuEmailHtml, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
+import { buildMenuEmailHtml, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
 import { htmlProblem, previewHtml } from './communication';
 import { EMAIL_TEMPLATES } from './emailTemplates';
 
@@ -66,5 +66,28 @@ describe('menu email', () => {
     // pasted HTML without a badge gets one in the preview, like the real send; one with its own is not doubled
     expect(count(previewHtml('<p>Hi</p>', v), 'app-store-badge.png')).toBe(1);
     expect(count(previewHtml('<html><body><img src="cid:app-store-badge"></body></html>', v), 'app-store-badge.png')).toBe(1);
+  });
+});
+
+describe('dates in the day boxes', () => {
+  it('works out each day from the start date', () => {
+    expect(dateForDay('2026-11-17', 'Tuesday')).toBe('2026-11-17');
+    expect(dateForDay('2026-11-17', 'Friday')).toBe('2026-11-20');
+    expect(dateForDay('2026-11-18', 'Tuesday')).toBe('2026-11-24');
+    expect(dateForDay('2026-11-17', 'Funday')).toBe('');
+    expect(dateForDay(undefined, 'Tuesday')).toBe('');
+    expect(shortDate('2026-11-17')).toBe('Nov 17');
+  });
+  it('the next menu starts on the next Tuesday (today counts)', () => {
+    expect(nextMenuStart('2026-11-16')).toBe('2026-11-17');
+    expect(nextMenuStart('2026-11-17')).toBe('2026-11-17');
+    expect(nextMenuStart('2026-11-18')).toBe('2026-11-24');
+  });
+  it('shows the dates in the email and keeps them in a saved draft', () => {
+    const d = { ...data(0), weekOf: '2026-11-17' };
+    const h = buildMenuEmailHtml(d);
+    expect(h).toContain('NOV 17'.replace('NOV 17', 'Nov 17'));
+    expect(h).toContain('Nov 20');
+    expect(parseMenuEmail(h)?.weekOf).toBe('2026-11-17');
   });
 });

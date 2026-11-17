@@ -734,6 +734,11 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
             {when === 'later' && (
               <Box sx={{ mb: 1.5 }}>
                 <TextField label="Send at (Pacific time)" type="datetime-local" size="small" value={local} onChange={(e) => setLocal(e.target.value)} InputLabelProps={{ shrink: true }} />
+                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
+                  {[['Tomorrow 9 AM', '09:00'], ['Tomorrow 12 PM', '12:00'], ['Tomorrow 5 PM', '17:00']].map(([label, time]) => (
+                    <Chip key={time} label={label} size="small" variant="outlined" onClick={() => setLocal(`${addDays(pacificToday(), 1)}T${time}`)} sx={{ fontWeight: 600 }} />
+                  ))}
+                </Box>
                 {scheduledIso && text && !textTimeOk(scheduledIso) && <Alert severity="info" sx={{ mt: 1 }}>Texts only go out between 8 AM and 9 PM Pacific. They will wait until 8 AM; the email goes at the time you picked.</Alert>}
               </Box>
             )}

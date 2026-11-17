@@ -1,4 +1,5 @@
 import { C, FONT, SITE_URL, button, footer, hero, shell } from './emailTemplates';
+import { addDays, pacificToday } from './communication';
 
 /**
  * The "New menu" email: Kunal fills a short form (a headline, a line or two, 1 to 4 photos with the dish names, and one box of dishes
@@ -19,6 +20,8 @@ export interface MenuEmailData {
   intro: string;
   photos: MenuPhoto[];
   days: MenuDay[];
+  /** The date the menu starts (YYYY-MM-DD, the first day, a Tuesday by default); every day box gets its own date from it */
+  weekOf?: string;
 }
 
 export const MENU_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
@@ -26,8 +29,30 @@ export const MAX_MENU_PHOTOS = 4;
 export const MAX_MENU_DISHES = 40;
 export const MENU_DEFAULT_SUBJECT = "This week's new menu";
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const weekdayIndex = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
+const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(new Date(`${d}T12:00:00Z`).getTime());
+
+/** The next Tuesday on or after today (Pacific): where a new menu usually starts. */
+export function nextMenuStart(today: string = pacificToday()): string {
+  const diff = (2 - weekdayIndex(today) + 7) % 7;
+  return addDays(today, diff);
+}
+
+/** The date of a day box: the first date on or after `weekOf` that falls on that weekday ('' when the name is not a weekday). */
+export function dateForDay(weekOf: string | undefined, day: string): string {
+  const want = WEEKDAYS.findIndex((w) => w.toLowerCase() === day.trim().toLowerCase());
+  if (want < 0 || !validDate(weekOf)) return '';
+  return addDays(weekOf, (want - weekdayIndex(weekOf) + 7) % 7);
+}
+
+/** "Nov 17" for 2026-11-17. */
+export function shortDate(date: string): string {
+  return validDate(date) ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '';
+}
+
 export function emptyMenuEmail(): MenuEmailData {
-  return { headline: 'The new menu is here', intro: 'Fresh Indian food, cooked for the days below.', photos: [], days: MENU_DAYS.map((day) => ({ day, dishes: '' })) };
+  return { weekOf: nextMenuStart(), headline: 'The new menu is here', intro: 'Fresh Indian food, cooked for the days below.', photos: [], days: MENU_DAYS.map((day) => ({ day, dishes: '' })) };
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -51,8 +76,8 @@ export function menuPhotoUrl(url: string, width: number, height: number): string
 
 const isHttps = (u: string) => /^https:\/\/[^\s"'<>]+$/i.test(u);
 export const usablePhotos = (data: MenuEmailData): MenuPhoto[] => data.photos.filter((p) => isHttps(p.url)).slice(0, MAX_MENU_PHOTOS);
-export const filledDays = (data: MenuEmailData): Array<{ day: string; dishes: string[] }> =>
-  data.days.map((d) => ({ day: String(d.day ?? '').trim(), dishes: dishesOf(d.dishes) })).filter((d) => d.day && d.dishes.length > 0);
+export const filledDays = (data: MenuEmailData): Array<{ day: string; dishes: string[]; date: string }> =>
+  data.days.map((d) => ({ day: String(d.day ?? '').trim(), dishes: dishesOf(d.dishes), date: dateForDay(data.weekOf, String(d.day ?? '')) })).filter((d) => d.day && d.dishes.length > 0);
 
 /** What is still missing before the email makes sense, or null. */
 export function menuEmailProblem(data: MenuEmailData): string | null {
@@ -83,17 +108,43 @@ function photoGrid(photos: MenuPhoto[]): string {
   return `  <tr><td class="px" bgcolor="${C.card}" style="padding:28px 32px 6px;background:${C.card};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`;
 }
 
-function dayCard(day: string, dishes: string[]): string {
+const SERIF = "Georgia,'Times New Roman',Times,serif";
+
+/** One day: the day name in a serif face with its date in small caps, a thin gold rule, then the dishes divided by hairlines. */
+function dayCard(day: string, dishes: string[], date: string): string {
   const rows = dishes
     .map(
       (d, i) =>
-        `<tr><td width="18" valign="top" style="padding:${i === 0 ? 0 : 10}px 0 0;font-family:${FONT};font-size:16px;line-height:23px;color:${C.brand};">&#9679;</td><td style="padding:${i === 0 ? 0 : 10}px 0 0;font-family:${FONT};font-size:16px;line-height:23px;font-weight:700;color:${C.text};">${oneLine(d)}</td></tr>`
+        `<tr><td style="padding:${i === 0 ? 2 : 8}px 0 ${i === dishes.length - 1 ? 2 : 8}px;${i === dishes.length - 1 ? '' : `border-bottom:1px solid ${C.rule};`}font-family:${FONT};font-size:15px;line-height:21px;font-weight:600;letter-spacing:0.1px;color:${C.text};">${oneLine(d)}</td></tr>`
     )
     .join('');
-  return `<tr><td style="padding:0 0 14px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.tile}" style="background:${C.tile};border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
-      <tr><td style="padding:18px 20px 6px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="${C.strip}" style="background:${C.strip};border-radius:999px;padding:6px 14px;font-family:${FONT};font-size:11px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:${C.cream};">${oneLine(day)}</td></tr></table></td></tr>
-      <tr><td style="padding:10px 20px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
-    </table></td></tr>`;
+  const dateCell = date ? `<td align="right" valign="bottom" style="font-family:${FONT};font-size:11px;line-height:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${C.brandText};padding-bottom:3px;">${esc(shortDate(date))}</td>` : '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:14px;border-collapse:separate;border:1px solid ${C.line};">
+      <tr><td height="3" bgcolor="${C.brand}" style="height:3px;line-height:3px;font-size:1px;background:${C.brand};border-radius:14px 14px 0 0;">&nbsp;</td></tr>
+      <tr><td style="padding:14px 18px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td valign="bottom" style="font-family:${SERIF};font-size:22px;line-height:26px;font-weight:700;color:${C.text};">${oneLine(day)}</td>${dateCell}</tr></table></td></tr>
+      <tr><td style="padding:10px 18px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td height="1" bgcolor="${C.brand}" style="height:1px;line-height:1px;font-size:1px;background:${C.brand};">&nbsp;</td></tr></table></td></tr>
+      <tr><td style="padding:8px 18px 14px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
+    </table>`;
+}
+
+/** The day cards two to a row on a computer (one under the other on a phone); a last one on its own takes the full width. */
+function dayGrid(days: Array<{ day: string; dishes: string[]; date: string }>): string {
+  const card = (d: { day: string; dishes: string[]; date: string }) => dayCard(d.day, d.dishes, d.date);
+  const rows: string[] = [];
+  for (let i = 0; i < days.length; i += 2) {
+    const a = days[i];
+    const b = days[i + 1];
+    rows.push(
+      b
+        ? `<tr><td style="padding:0 0 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="stack" width="49%" valign="top" style="width:49%;">${card(a)}</td>
+        <td class="gap" width="12" style="width:12px;font-size:1px;line-height:1px;">&nbsp;</td>
+        <td class="stack" width="49%" valign="top" style="width:49%;">${card(b)}</td>
+      </tr></table></td></tr>`
+        : `<tr><td style="padding:0 0 12px;">${card(a)}</td></tr>`
+    );
+  }
+  return rows.join('');
 }
 
 const MARK = 'nfmenu:';
@@ -110,16 +161,20 @@ export function buildMenuEmailHtml(data: MenuEmailData): string {
     oneLine(data.intro) || 'Fresh Indian food, ready to order.',
     `${hero('NEW MENU', oneLine(data.headline), intro)}
 ${photoGrid(photos)}
-  <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 14 : 30}px 32px 6px;background:${C.card};">
-    <div style="font-family:${FONT};font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:${C.brandText};padding:0 2px 12px;">What we are cooking</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${days.map((d) => dayCard(d.day, d.dishes)).join('')}</table>
+  <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 10 : 24}px 32px 4px;background:${C.card};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;"><tr>
+      <td valign="middle" style="border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
+      <td valign="middle" align="center" width="1" style="white-space:nowrap;padding:0 14px;font-family:${SERIF};font-size:20px;line-height:24px;font-style:italic;color:${C.text};">This week&rsquo;s menu</td>
+      <td valign="middle" style="border-bottom:1px solid ${C.line};font-size:1px;line-height:1px;">&nbsp;</td>
+    </tr></table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dayGrid(days)}</table>
   </td></tr>
   <tr><td class="px" align="center" bgcolor="${C.card}" style="padding:12px 32px 16px;background:${C.card};">
     ${button('Order now', SITE_URL)}
   </td></tr>
 ${footer('You are getting this because you signed up for NikFoods updates.')}`
   );
-  const state = toB64(JSON.stringify({ headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
+  const state = toB64(JSON.stringify({ weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
   return html.replace('</body>', `<!--${MARK}${state}-->\n</body>`);
 }
 
@@ -131,6 +186,7 @@ export function parseMenuEmail(html: string): MenuEmailData | null {
     const raw = JSON.parse(fromB64(m[1])) as Partial<MenuEmailData>;
     const base = emptyMenuEmail();
     return {
+      weekOf: validDate(raw.weekOf) ? raw.weekOf : base.weekOf,
       headline: typeof raw.headline === 'string' ? raw.headline : base.headline,
       intro: typeof raw.intro === 'string' ? raw.intro : base.intro,
       photos: Array.isArray(raw.photos) ? raw.photos.filter((p) => p && typeof p.url === 'string').map((p) => ({ url: p.url, caption: String(p.caption ?? '') })).slice(0, MAX_MENU_PHOTOS) : [],
