@@ -607,7 +607,7 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
               <Box sx={{ mt: 1.5 }}>
                 {menuMode ? (
                   <>
-                    <MenuEmailBuilder data={menuData} onChange={setMenuData} onUploading={setMenuUploading} />
+                    <MenuEmailBuilder token={token} data={menuData} onChange={setMenuData} onUploading={setMenuUploading} />
                     {menuEmailProblem(menuData) && <Typography sx={{ fontSize: 12.5, color: '#B45309', mt: 1 }}>{menuEmailProblem(menuData)}</Typography>}
                     <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 1 }}>Every email gets an Unsubscribe link at the bottom, and the logo is added for you.</Typography>
                   </>
