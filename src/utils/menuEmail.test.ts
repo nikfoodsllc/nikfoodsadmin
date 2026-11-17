@@ -150,3 +150,13 @@ describe('other boxes', () => {
     expect(menuEmailProblem({ ...base([]), days: [] })).toMatch(/dish/);
   });
 });
+
+describe('plain text safety', () => {
+  it('uses real characters, not entities, for the curly apostrophe and the ornament (a text-only mail app shows entities as they are)', () => {
+    const h = buildMenuEmailHtml(data(0));
+    expect(h).toContain('This week’s menu');
+    expect(h).toContain('◆');
+    expect(h).not.toContain('&rsquo;');
+    expect(h).not.toContain('&#9670;');
+  });
+});
