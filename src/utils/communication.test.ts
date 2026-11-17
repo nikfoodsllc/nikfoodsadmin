@@ -114,8 +114,11 @@ describe('custom HTML email', () => {
     expect(out).toContain('Hi &lt;b&gt;x&lt;/b&gt;');
     expect(out.startsWith('<!DOCTYPE html>')).toBe(true);
   });
-  it('keeps a full page as it is', () => {
-    expect(previewHtml('<html><body>x</body></html>', { firstName: 'A', orderNumber: '', date: '' })).toBe('<html><body>x</body></html>');
+  it('keeps a full page as it is, with the App Store badge added at the end', () => {
+    const out = previewHtml('<html><body>x</body></html>', { firstName: 'A', orderNumber: '', date: '' });
+    expect(out.startsWith('<html><body>x')).toBe(true);
+    expect(out.endsWith('</body></html>')).toBe(true);
+    expect(out).toContain('app-store-badge.png');
   });
   it('every ready-made design is clean, uses the logo and only known placeholders', () => {
     for (const t of EMAIL_TEMPLATES) {
