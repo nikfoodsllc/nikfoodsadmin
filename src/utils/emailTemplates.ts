@@ -34,7 +34,7 @@ export const APP_STORE_LISTING = 'https://apps.apple.com/us/app/id6767141830';
 export const badgeRow = `<tr><td class="px" align="center" bgcolor="${C.card}" style="padding:10px 32px 4px;background:${C.card};"><a href="${APP_STORE_LISTING}" style="display:inline-block;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:inline-block;border:0;width:120px;height:40px;"></a></td></tr>`;
 
 export const footer = (note: string, badge = true) =>
-  `${badge ? badgeRow : ''}<tr><td class="px" bgcolor="${C.card}" style="padding:8px 32px 24px;background:${C.card};"><div style="border-top:1px solid ${C.line};padding-top:14px;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted};text-align:center;">${note}<br>Questions? Write to <a href="mailto:${SUPPORT}" style="color:${C.brandText};font-weight:700;">${SUPPORT}</a>.<br><a href="{unsubscribeUrl}" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a></div></td></tr>`;
+  `${badge ? badgeRow : ''}<tr><td class="px" bgcolor="${C.card}" style="padding:4px 32px 16px;background:${C.card};"><div style="border-top:1px solid ${C.line};padding-top:10px;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted};text-align:center;">${note}<br>Questions? Write to <a href="mailto:${SUPPORT}" style="color:${C.brandText};font-weight:700;">${SUPPORT}</a>.<br><a href="{unsubscribeUrl}" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a></div></td></tr>`;
 
 export function shell(title: string, preheader: string, rows: string): string {
   return `<!DOCTYPE html>
