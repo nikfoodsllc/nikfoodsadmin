@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, IconButton, TextField, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, TextField, Typography } from '@mui/material';
 import { IconPhotoPlus, IconTrash } from '@tabler/icons-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { dateForDay, MAX_MENU_PHOTOS, shortDate, type MenuEmailData } from '@/utils/menuEmail';
+import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_PHOTOS, shortDate, type MenuEmailData } from '@/utils/menuEmail';
 
 interface Props {
+  token: string;
   data: MenuEmailData;
   onChange: (next: MenuEmailData) => void;
   /** true while a picture is on its way (so the message is not sent half-ready) */
@@ -21,13 +22,78 @@ const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
 );
 
 /** The "New menu" email form: headline, photos with the dish names, one box per day. The email builds itself from it. */
-export default function MenuEmailBuilder({ data, onChange, onUploading }: Props) {
+/** One day's dishes as chips (tap x to leave one out) and a box to add another. */
+function DishList({ label, text, count, onChange, onEdited }: { label: string; text: string; count: number | null; onChange: (text: string) => void; onEdited: () => void }) {
+  const [adding, setAdding] = useState('');
+  const dishes = dishesOf(text);
+  const write = (list: string[]) => {
+    onEdited();
+    onChange(list.join('\n'));
+  };
+  const add = () => {
+    const d = adding.replace(/\s+/g, ' ').trim();
+    if (!d || dishes.length >= MAX_MENU_DISHES) return;
+    write([...dishes, d]);
+    setAdding('');
+  };
+  return (
+    <Box sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.25, minWidth: 0 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: 14 }}>{label}</Typography>
+      <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 0.75 }}>
+        {count === null ? 'Loading the menu…' : count > 0 ? `${count} from the menu. Tap x to leave one out.` : dishes.length > 0 ? 'Your own list.' : 'Nothing on the menu for this day yet. Add dishes below, or skip the day.'}
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
+        {dishes.map((d, i) => (
+          <Chip key={`${d}-${i}`} label={d} onDelete={() => write(dishes.filter((_, j) => j !== i))} sx={{ maxWidth: '100%', fontWeight: 600, bgcolor: '#FFF1DC', '& .MuiChip-label': { whiteSpace: 'normal', py: 0.5 }, height: 'auto', minHeight: 32 }} />
+        ))}
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <TextField size="small" fullWidth placeholder="Add a dish" value={adding} onChange={(e) => setAdding(e.target.value.slice(0, 80))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
+        <Button size="small" variant="outlined" onClick={add} disabled={!adding.trim()} sx={{ textTransform: 'none', fontWeight: 700 }}>Add</Button>
+      </Box>
+    </Box>
+  );
+}
+
+export default function MenuEmailBuilder({ token, data, onChange, onUploading }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(0);
   const [error, setError] = useState('');
   const latest = useRef(data);
   latest.current = data;
   const set = (patch: Partial<MenuEmailData>) => onChange({ ...latest.current, ...patch });
+
+  // the day boxes start from the day-wise menu of their date; days Kunal has changed himself (or that came with a saved draft) are left alone
+  const edited = useRef<Set<string>>(new Set(data.days.filter((d) => dishesOf(d.dishes).length > 0).map((d) => d.day)));
+  const [counts, setCounts] = useState<Record<string, number | null>>({});
+  const [menuError, setMenuError] = useState('');
+  const fetchSeq = useRef(0);
+  const loadMenu = async (all: boolean) => {
+    const seq = ++fetchSeq.current;
+    const cur = latest.current;
+    const wanted = cur.days.map((d) => ({ day: d.day, date: dateForDay(cur.weekOf, d.day) })).filter((d) => d.date && (all || !edited.current.has(d.day)));
+    if (wanted.length === 0) return;
+    setMenuError('');
+    setCounts((c) => ({ ...c, ...Object.fromEntries(wanted.map((d) => [d.day, null])) }));
+    try {
+      const res = await fetch(`/api/admin/communication-menu?dates=${[...new Set(wanted.map((d) => d.date))].join(',')}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+      const json = await res.json().catch(() => ({}));
+      if (seq !== fetchSeq.current) return;
+      if (!res.ok) throw new Error(json?.error || 'Could not load the menu');
+      const menus = (json?.data?.menus ?? {}) as Record<string, string[]>;
+      if (all) wanted.forEach((d) => edited.current.delete(d.day));
+      onChange({ ...latest.current, days: latest.current.days.map((d) => { const w = wanted.find((x) => x.day === d.day); return w ? { ...d, dishes: (menus[w.date] ?? []).join('\n') } : d; }) });
+      setCounts((c) => ({ ...c, ...Object.fromEntries(wanted.map((d) => [d.day, (menus[d.date] ?? []).length])) }));
+    } catch (e) {
+      if (seq !== fetchSeq.current) return;
+      setMenuError(e instanceof Error ? e.message : 'Could not load the menu');
+      setCounts((c) => ({ ...c, ...Object.fromEntries(wanted.map((d) => [d.day, 0])) }));
+    }
+  };
+  useEffect(() => {
+    void loadMenu(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.weekOf]);
 
   const addFiles = async (files: FileList | null) => {
     const room = MAX_MENU_PHOTOS - latest.current.photos.length;
@@ -96,24 +162,24 @@ export default function MenuEmailBuilder({ data, onChange, onUploading }: Props)
 
       <Box>
         <Step n={3}>What is on each day</Step>
-        <TextField label="Menu starts on" type="date" size="small" value={data.weekOf ?? ''} onChange={(e) => set({ weekOf: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Each day below gets its date from this one." sx={{ mb: 1.5, width: { xs: '100%', sm: 240 } }} />
+        <TextField label="Menu starts on" type="date" size="small" value={data.weekOf ?? ''} onChange={(e) => set({ weekOf: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Each day gets its date from this one, and its dishes from the day-wise menu." sx={{ mb: 1.5, width: { xs: '100%', sm: 240 } }} />
         <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
           {data.days.map((d, i) => (
-            <TextField
+            <DishList
               key={d.day}
               label={dateForDay(data.weekOf, d.day) ? `${d.day} · ${shortDate(dateForDay(data.weekOf, d.day))}` : d.day}
-              size="small"
-              multiline
-              minRows={4}
-              maxRows={12}
-              fullWidth
-              value={d.dishes}
-              placeholder={'Paneer Tikka\nDal Makhani\nJeera Rice'}
-              onChange={(e) => set({ days: data.days.map((x, j) => (j === i ? { ...x, dishes: e.target.value } : x)) })}
-              helperText="One dish per line. Leave empty to skip this day."
+              text={d.dishes}
+              count={counts[d.day] === undefined ? 0 : counts[d.day]}
+              onEdited={() => edited.current.add(d.day)}
+              onChange={(text) => set({ days: latest.current.days.map((x, j) => (j === i ? { ...x, dishes: text } : x)) })}
             />
           ))}
         </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mt: 1.25 }}>
+          <Button size="small" variant="outlined" onClick={() => void loadMenu(true)} sx={{ textTransform: 'none', fontWeight: 700 }}>Fill again from the menu</Button>
+          <Typography sx={{ fontSize: 12, color: '#6B7280' }}>Starts over from the day-wise menu and replaces what is in the boxes.</Typography>
+        </Box>
+        {menuError && <Alert severity="error" sx={{ mt: 1 }}>{menuError}</Alert>}
       </Box>
     </Box>
   );
