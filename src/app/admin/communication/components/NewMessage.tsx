@@ -24,6 +24,8 @@ import {
 import { IconSearch } from '@tabler/icons-react';
 import { EMAIL_TEMPLATES, type EmailTemplate } from '@/utils/emailTemplates';
 import { EMAIL_DESIGN_GUIDE } from '@/utils/emailDesignGuide';
+import MenuEmailBuilder from './MenuEmailBuilder';
+import { buildMenuEmailHtml, emptyMenuEmail, MENU_DEFAULT_SUBJECT, menuEmailProblem, parseMenuEmail, type MenuEmailData } from '@/utils/menuEmail';
 import {
   EMAIL_HTML_LIMIT,
   EMAIL_LIMIT,
@@ -196,6 +198,12 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
   const [subject, setSubject] = useState(init?.subject ?? '');
   const [emailBody, setEmailBody] = useState(init?.emailBody ?? '');
   const [emailFormat, setEmailFormat] = useState<EmailFormat>(init?.emailFormat ?? 'text');
+  // "New menu template": a form that builds the HTML email (the HTML below is made from it); a saved draft made this way opens as the form again
+  const startMenu = useMemo(() => (init?.emailFormat === 'html' ? parseMenuEmail(init.emailBody ?? '') : null), [init]);
+  const [menuMode, setMenuMode] = useState(Boolean(startMenu));
+  const [menuData, setMenuData] = useState<MenuEmailData>(startMenu ?? emptyMenuEmail());
+  const [menuUploading, setMenuUploading] = useState(false);
+  const [pendingMenu, setPendingMenu] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<EmailTemplate | null>(null);
   const [guideCopied, setGuideCopied] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<'phone' | 'computer'>('phone');
@@ -219,7 +227,33 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
     if (!customers) return [];
     return q ? customers.filter((c) => `${c.name} ${c.email ?? ''} ${c.phone ?? ''} ${c.orders.join(' ')}`.toLowerCase().includes(q)) : customers;
   }, [customers, search]);
+  useEffect(() => {
+    if (menuMode) setEmailBody(buildMenuEmailHtml(menuData));
+  }, [menuMode, menuData]);
+  const chooseFormat = (v: 'text' | 'html' | 'menu') => {
+    setPendingMenu(false);
+    if (v === 'text') {
+      setMenuMode(false);
+      setEmailFormat('text');
+    } else if (v === 'html') {
+      setMenuMode(false);
+      setEmailFormat('html');
+    } else if (menuMode) {
+      setEmailFormat('html');
+    } else if (emailBody.trim() && emailFormat === 'html') {
+      setPendingMenu(true);
+    } else {
+      startMenuTemplate();
+    }
+  };
+  const startMenuTemplate = () => {
+    setPendingMenu(false);
+    setEmailFormat('html');
+    setMenuMode(true);
+    setSubject((s) => s.trim() || MENU_DEFAULT_SUBJECT);
+  };
   const applyTemplate = (t: EmailTemplate) => {
+    setMenuMode(false);
     setEmailFormat('html');
     setSubject(t.subject);
     setEmailBody(t.html);
@@ -357,7 +391,8 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
       : '';
 
   const htmlError = email && emailFormat === 'html' ? htmlProblem(emailBody) : null;
-  const messageOk = !htmlError && (email ? subject.trim() && emailBody.trim() : true) && (text ? textBody.trim() : true) && (email || text);
+  const menuProblem = email && menuMode ? (menuUploading ? 'A picture is still uploading.' : menuEmailProblem(menuData)) : null;
+  const messageOk = !htmlError && !menuProblem && (email ? subject.trim() && emailBody.trim() : true) && (text ? textBody.trim() : true) && (email || text);
   const reachOk = (email && reach.email > 0) || (text && reach.text > 0);
   const stale = Boolean(foundFilter) && JSON.stringify(foundFilter) !== JSON.stringify(withExtra);
   const canSend = Boolean(customers) && !stale && messageOk && reachOk && !scheduleProblem && !sending;
@@ -545,10 +580,16 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
           <Box sx={{ mb: 2 }}>
             <TextField label="Email subject" size="small" fullWidth value={subject} onChange={(e) => setSubject(e.target.value.slice(0, SUBJECT_LIMIT))} helperText={`${subject.length}/${SUBJECT_LIMIT}`} />
             <PlaceholderChips allowed={allowedPlaceholders} onPick={(p) => setSubject((s) => withPlaceholder(s, p))} />
-            <ToggleButtonGroup exclusive size="small" value={emailFormat} onChange={(_, v) => v && setEmailFormat(v)} sx={{ mt: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600 } }}>
+            <ToggleButtonGroup exclusive size="small" value={emailFormat === 'text' ? 'text' : menuMode ? 'menu' : 'html'} onChange={(_, v) => v && chooseFormat(v)} sx={{ mt: 1.5, flexWrap: 'wrap', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600 } }}>
               <ToggleButton value="text">Simple text (NikFoods style)</ToggleButton>
+              <ToggleButton value="menu">New menu template</ToggleButton>
               <ToggleButton value="html">My own design (HTML)</ToggleButton>
             </ToggleButtonGroup>
+            {pendingMenu && (
+              <Alert severity="warning" sx={{ mt: 1 }} action={<><Button size="small" color="inherit" onClick={startMenuTemplate} sx={{ textTransform: 'none', fontWeight: 800 }}>Replace</Button><Button size="small" color="inherit" onClick={() => setPendingMenu(false)} sx={{ textTransform: 'none' }}>Keep mine</Button></>}>
+                Replace the HTML in the box with the new menu template?
+              </Alert>
+            )}
             {emailFormat === 'text' ? (
               <>
                 <TextField label="Email message" fullWidth multiline minRows={5} value={emailBody} onChange={(e) => setEmailBody(e.target.value.slice(0, EMAIL_LIMIT))} sx={{ mt: 1.5 }} helperText="A blank line starts a new paragraph." />
@@ -561,6 +602,14 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
               </>
             ) : (
               <Box sx={{ mt: 1.5 }}>
+                {menuMode ? (
+                  <>
+                    <MenuEmailBuilder data={menuData} onChange={setMenuData} onUploading={setMenuUploading} />
+                    {menuEmailProblem(menuData) && <Typography sx={{ fontSize: 12.5, color: '#B45309', mt: 1 }}>{menuEmailProblem(menuData)}</Typography>}
+                    <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 1 }}>Every email gets an Unsubscribe link at the bottom, and the logo is added for you.</Typography>
+                  </>
+                ) : (
+                  <>
                 <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Start from a design</Typography>
                 <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
                   {EMAIL_TEMPLATES.map((t) => (
@@ -612,6 +661,8 @@ export default function NewMessage({ token, adminEmail, onSent, initialDraft = n
                 />
                 <PlaceholderChips allowed={[...allowedPlaceholders, '{unsubscribeUrl}']} onPick={(p) => setEmailBody((s) => withPlaceholder(s, p))} />
                 <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>Every email gets an Unsubscribe link at the bottom. Put <code>{'{unsubscribeUrl}'}</code> in a link to place it yourself; otherwise one is added for you.</Typography>
+                  </>
+                )}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#A85A00', textTransform: 'uppercase' }}>Preview{customers && picked.size > 0 ? ' for the first customer' : ' (sample)'}</Typography>
                   <ToggleButtonGroup exclusive size="small" value={previewWidth} onChange={(_, v) => v && setPreviewWidth(v)} sx={{ '& .MuiToggleButton-root': { textTransform: 'none', py: 0.25, fontSize: 12 } }}>
