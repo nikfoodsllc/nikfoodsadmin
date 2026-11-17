@@ -121,7 +121,8 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
         (latest.current.sections ?? []).forEach((sec, i) => {
           if (sec.categoryId || dishesOf(sec.items).length > 0 || sectionEdited.current.has(i)) return;
           const t = norm(sec.title);
-          const hit = list.find((c) => norm(c.label) === t) ?? (t.includes('mithai') ? list.find((c) => /sweet|mithai/.test(norm(c.label))) : undefined);
+          const last = (label: string) => norm(label.split('>').pop() ?? '');
+          const hit = list.find((c) => norm(c.label) === t) ?? list.find((c) => last(c.label) === t) ?? (t.length > 3 ? list.find((c) => last(c.label).includes(t)) : undefined) ?? (t.includes('mithai') ? list.find((c) => last(c.label).includes('mithai')) : undefined);
           if (hit) void loadCategory(i, hit.id);
         });
       })
