@@ -8,8 +8,8 @@ export const APP_STORE_URL = 'https://apps.apple.com/app/id6767141830';
 export const SITE_URL = 'https://www.nikfoods.com';
 const SUPPORT = 'support@nikfoods.com';
 
-const C = { page: '#F3EBDD', card: '#FFFBF5', line: '#EADBC3', text: '#2B1D0E', body: '#54442F', muted: '#76664F', brand: '#F89C35', brandText: '#A85A00', strip: '#1E1409', cream: '#F6D58E', tile: '#FFF1DC' };
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+export const C = { page: '#F3EBDD', card: '#FFFBF5', line: '#EADBC3', text: '#2B1D0E', body: '#54442F', muted: '#76664F', brand: '#F89C35', brandText: '#A85A00', strip: '#1E1409', cream: '#F6D58E', tile: '#FFF1DC' };
+export const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 const css = `
   body { margin:0; padding:0; -webkit-text-size-adjust:100%; }
@@ -24,15 +24,15 @@ const css = `
     .gap { display:block !important; height:12px !important; }
   }`;
 
-const button = (label: string, href: string) =>
+export const button = (label: string, href: string) =>
   `<table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td bgcolor="${C.brand}" style="background:${C.brand};border-radius:999px;"><a href="${href}" style="display:inline-block;padding:14px 32px;font-family:${FONT};font-size:16px;font-weight:800;color:#1A1106;">${label}</a></td></tr></table>`;
 
 const strip = `<tr><td align="center" bgcolor="${C.strip}" style="padding:16px 32px;background:${C.strip};"><img src="cid:nikfoods-logo" alt="NikFoods" width="150" style="display:block;border:0;width:150px;height:auto;max-width:100%;margin:0 auto;font-family:Arial,sans-serif;font-size:26px;font-weight:800;color:${C.cream};"></td></tr>`;
 
-const footer = (note: string) =>
+export const footer = (note: string) =>
   `<tr><td class="px" bgcolor="${C.card}" style="padding:8px 32px 24px;background:${C.card};"><div style="border-top:1px solid ${C.line};padding-top:14px;font-family:${FONT};font-size:13px;line-height:19px;color:${C.muted};text-align:center;">${note}<br>Questions? Write to <a href="mailto:${SUPPORT}" style="color:${C.brandText};font-weight:700;">${SUPPORT}</a>.<br><a href="{unsubscribeUrl}" style="color:${C.muted};text-decoration:underline;">Unsubscribe</a></div></td></tr>`;
 
-function shell(title: string, preheader: string, rows: string): string {
+export function shell(title: string, preheader: string, rows: string): string {
   return `<!DOCTYPE html>
 <html lang="en" style="color-scheme:light dark;supported-color-schemes:light dark;">
 <head>
@@ -61,7 +61,7 @@ ${rows}
 }
 
 /** The dark hero block: small orange tag, big cream headline, one sentence. */
-const hero = (tag: string, headline: string, sentence: string) =>
+export const hero = (tag: string, headline: string, sentence: string) =>
   `  <tr><td class="px" align="center" bgcolor="${C.strip}" style="padding:10px 40px 38px;background:${C.strip};">
     <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr><td bgcolor="${C.brand}" style="background:${C.brand};border-radius:999px;padding:5px 14px;font-family:${FONT};font-size:11px;font-weight:800;letter-spacing:0.14em;color:#1A1106;">${tag}</td></tr></table>
     <div class="hero" style="font-family:${FONT};font-size:38px;line-height:44px;font-weight:800;color:${C.cream};margin:18px 0 12px;">${headline}</div>
