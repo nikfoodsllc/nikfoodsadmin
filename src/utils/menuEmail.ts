@@ -153,7 +153,7 @@ function dayCard(day: string, dishes: string[], date: string): string {
     ? `<tr><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(dishes.slice(0, half))}</table></td><td class="gap" width="4%" style="width:4%;font-size:1px;line-height:1px;">&nbsp;</td><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(dishes.slice(half))}</table></td></tr>`
     : dishRows(dishes);
   const eyebrow = date ? `<div style="font-family:${FONT};font-size:11px;line-height:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:${C.brandText};padding:0 0 6px;">${esc(shortDate(date))}</div>` : '';
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.card}" style="background:${C.card};border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
       <tr><td align="center" style="padding:18px 20px 0;">${eyebrow}<div style="font-family:${SERIF};font-size:28px;line-height:32px;font-weight:700;letter-spacing:0.3px;color:${C.text};">${oneLine(day)}</div>${ornament}</td></tr>
       <tr><td style="padding:12px 20px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
     </table>`;
@@ -202,7 +202,7 @@ function sectionCard(title: string, subtitle: string, items: string[], band: str
   const rows = wide
     ? `<tr><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(items.slice(0, half))}</table></td><td class="gap" width="4%" style="width:4%;font-size:1px;line-height:1px;">&nbsp;</td><td class="stack" width="48%" valign="top" style="width:48%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${dishRows(items.slice(half))}</table></td></tr>`
     : dishRows(items);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background:#FFFFFF;border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${C.card}" style="background:${C.card};border-radius:18px;border-collapse:separate;border:1px solid ${C.line};">
       <tr><td align="center" bgcolor="${band}" style="background:${band};border-radius:17px 17px 0 0;padding:15px 16px 14px;"><div style="font-family:${SERIF};font-size:23px;line-height:28px;font-weight:700;letter-spacing:0.3px;color:${C.cream};">${oneLine(title)}</div>${subtitle ? `<div style="font-family:${FONT};font-size:12px;line-height:17px;font-weight:600;letter-spacing:0.6px;color:#E9DCC4;padding-top:3px;">${oneLine(subtitle)}</div>` : ''}</td></tr>
       <tr><td style="padding:14px 20px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
     </table>`;
