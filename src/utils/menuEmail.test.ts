@@ -160,3 +160,12 @@ describe('plain text safety', () => {
     expect(h).not.toContain('&#9670;');
   });
 });
+
+describe('dark mode safety', () => {
+  it('has no pure white backgrounds (Apple Mail dark mode darkens white but leaves the dark text as it is)', () => {
+    const d = { ...data(2), sections: [{ title: 'Add-On', subtitle: 'x', items: 'one\ntwo' }] };
+    const h = buildMenuEmailHtml(d);
+    expect(h).not.toMatch(/bgcolor="#fff(fff)?"/i);
+    expect(h).not.toMatch(/background:\s*#fff(fff)?[;"]/i);
+  });
+});
