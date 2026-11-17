@@ -35,6 +35,9 @@ import ItemOptionsDialog from './ItemOptionsDialog';
 import OrderSummary, { type PaymentChoice, type PreviewData } from './OrderSummary';
 import OrderResult, { type CreatedOrder } from './OrderResult';
 import RecentOrders from './RecentOrders';
+import OrderDrafts from './OrderDrafts';
+import { useOrderDraft } from './useOrderDraft';
+import { parseOrderDraft, type OrderDraftContent } from '@/utils/createOrderDraft';
 
 /** An order as the customer site lays it out for this form (Edit, and 'make an offline order' from a failed order) */
 interface FormOrder {
@@ -67,7 +70,7 @@ export default function CreateOrderPage() {
   const wide = useMediaQuery((theme: Theme) => theme.breakpoints.up('lg'));
   const [drawerOpen, setDrawerOpen] = useState(false);
   // the entry form and the list of orders (other customers' details) live on separate tabs so entering an order shows nothing else
-  const [tab, setTab] = useState<'create' | 'orders'>('create');
+  const [tab, setTab] = useState<'create' | 'drafts' | 'orders'>('create');
   const [menuError, setMenuError] = useState('');
   const [date, setDate] = useState('');
 
@@ -129,6 +132,16 @@ export default function CreateOrderPage() {
   const [listVersion, setListVersion] = useState(0);
   // editing an order that was sent: its number (creating replaces it) and any problem loading it
   const [editing, setEditing] = useState<string | null>(null);
+
+  // the order being entered saves itself as a draft (shared with the other admins)
+  const [draftsVersion, setDraftsVersion] = useState(0);
+  const [draftCount, setDraftCount] = useState(0);
+  const bumpDrafts = useCallback(() => setDraftsVersion((v) => v + 1), []);
+  const draftContent: OrderDraftContent = {
+    date, customer, address, lines, tip, tipOther, discount, waiveFee, countNow, payment, paidChoice, paidTyped, note,
+  };
+  const orderDraft = useOrderDraft(token ?? null, draftContent, !editing && !result, bumpDrafts);
+  const [draftNotice, setDraftNotice] = useState('');
   // store credit can be taken off a NEW payment-link order of a customer who has a balance (not when editing, which replaces an order)
   const creditBalance = existing && !editing ? existing.storeCreditBalance ?? 0 : 0;
   // a different customer starts without the credit ticked
@@ -278,6 +291,7 @@ export default function CreateOrderPage() {
     if (r.ok) {
       setResult(r.body.data);
       setListVersion((v) => v + 1);
+      orderDraft.finish();
     }
     else if (r.status === 409 && r.body?.code === 'POSSIBLE_DUPLICATE' && Array.isArray(r.body.duplicates)) {
       // red flag: nothing was saved; the admin decides
@@ -287,6 +301,45 @@ export default function CreateOrderPage() {
       setSubmitError(r.body?.error || 'The order could not be created');
       setErrorOpen(true);
     }
+  };
+
+  // carry on with a saved draft: the form is filled from it and keeps saving into it
+  const openDraft = async (id: string) => {
+    if (!token) return;
+    setEditError('');
+    const res = await fetch(`/api/admin/create-order-drafts/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    const r = { ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) };
+    if (!r.ok) {
+      setEditError(r.status === 404 ? 'That draft was deleted.' : 'Could not open that draft');
+      bumpDrafts();
+      return;
+    }
+    const c = parseOrderDraft(r.body.data.content);
+    reset();
+    setCustomer(c.customer);
+    setAddress(c.address);
+    setLines(c.lines);
+    setDate(c.date || c.lines[0]?.date || '');
+    setTip(c.tip);
+    setTipOther(c.tipOther);
+    setDiscount(c.discount);
+    setWaiveFee(c.waiveFee);
+    feeTouched.current = true;
+    setCountNow(c.countNow);
+    setPayment(c.payment);
+    setPaidChoice(c.paidChoice);
+    setPaidTyped(c.paidTyped);
+    setNote(c.note);
+    orderDraft.adopt(id, r.body.data.updatedAt);
+    setDraftNotice(r.body.data.updatedBy ? `Draft opened (last saved by ${r.body.data.updatedBy}). Check the items and prices, then press Create.` : 'Draft opened. Check the items and prices, then press Create.');
+    setTab('create');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const newOrder = () => {
+    reset();
+    orderDraft.forget();
+    setDraftNotice('');
+    setTab('create');
   };
 
   const reset = () => {
@@ -449,10 +502,17 @@ export default function CreateOrderPage() {
         sx={{ mb: 2, borderBottom: '1px solid #E5E7EB', '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: 15 }, '& .Mui-selected': { color: '#B45309' }, '& .MuiTabs-indicator': { bgcolor: '#F59E0B' } }}
       >
         <Tab value="create" label="Create order" />
+        <Tab value="drafts" label={draftCount > 0 ? `Drafts (${draftCount})` : 'Drafts'} />
         <Tab value="orders" label="Recent orders" />
       </Tabs>
 
       {editError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setEditError('')}>{editError}</Alert>}
+      {onCreate && draftNotice && !result && <Alert severity="info" sx={{ mb: 2 }} onClose={() => setDraftNotice('')}>{draftNotice}</Alert>}
+      {onCreate && !editing && !result && (
+        <Typography sx={{ fontSize: 12.5, color: orderDraft.state.status === 'error' ? '#B45309' : '#6B7280', mb: 1, textAlign: 'right' }} aria-live="polite">
+          {orderDraft.state.status === 'saving' ? 'Saving draft…' : orderDraft.state.status === 'saved' ? `Draft saved${orderDraft.state.at ? ' ' + new Date(orderDraft.state.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) : ''}` : orderDraft.state.status === 'error' ? 'Could not save the draft. Trying again as you type.' : 'Saved as a draft as you enter it'}
+        </Typography>
+      )}
       {onCreate && (<>
       {fromCheckout && !result && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setFromCheckout(null)}>
@@ -502,8 +562,12 @@ export default function CreateOrderPage() {
       )}
       </>)}
 
+      <Box sx={{ display: tab === 'drafts' ? 'block' : 'none' }}>
+        {token && <OrderDrafts token={token} version={draftsVersion} onOpen={(id) => void openDraft(id)} onNew={newOrder} onCount={setDraftCount} />}
+      </Box>
+
       {/* stays mounted (hidden on the create tab) so the list keeps refreshing and a just-created order can be found in it */}
-      <Box sx={{ display: onCreate ? 'none' : 'block' }}>
+      <Box sx={{ display: tab === 'orders' ? 'block' : 'none' }}>
         <RecentOrders token={token} version={listVersion} onChanged={() => setListVersion((v) => v + 1)} onEdit={(id) => void startEdit(id)} onRows={setListRows} />
       </Box>
 
