@@ -8,7 +8,7 @@ export const APP_STORE_URL = 'https://apps.apple.com/app/id6767141830';
 export const SITE_URL = 'https://www.nikfoods.com';
 const SUPPORT = 'support@nikfoods.com';
 
-export const C = { page: '#F3EBDD', card: '#FFFBF5', line: '#EADBC3', text: '#2B1D0E', body: '#54442F', muted: '#76664F', brand: '#F89C35', brandText: '#A85A00', strip: '#1E1409', cream: '#F6D58E', tile: '#FFF1DC' };
+export const C = { page: '#F3EBDD', card: '#FFFBF5', line: '#EADBC3', text: '#2B1D0E', body: '#54442F', muted: '#76664F', brand: '#F89C35', brandText: '#A85A00', strip: '#1E1409', cream: '#F6D58E', tile: '#FFF1DC', rule: '#F1E5D0' };
 export const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 const css = `

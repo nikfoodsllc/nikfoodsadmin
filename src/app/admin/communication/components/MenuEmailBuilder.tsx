@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, IconButton, TextField, Typography } from '@mui/material';
 import { IconPhotoPlus, IconTrash } from '@tabler/icons-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { MAX_MENU_PHOTOS, type MenuEmailData } from '@/utils/menuEmail';
+import { dateForDay, MAX_MENU_PHOTOS, shortDate, type MenuEmailData } from '@/utils/menuEmail';
 
 interface Props {
   data: MenuEmailData;
@@ -96,11 +96,12 @@ export default function MenuEmailBuilder({ data, onChange, onUploading }: Props)
 
       <Box>
         <Step n={3}>What is on each day</Step>
+        <TextField label="Menu starts on" type="date" size="small" value={data.weekOf ?? ''} onChange={(e) => set({ weekOf: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Each day below gets its date from this one." sx={{ mb: 1.5, width: { xs: '100%', sm: 240 } }} />
         <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
           {data.days.map((d, i) => (
             <TextField
               key={d.day}
-              label={d.day}
+              label={dateForDay(data.weekOf, d.day) ? `${d.day} · ${shortDate(dateForDay(data.weekOf, d.day))}` : d.day}
               size="small"
               multiline
               minRows={4}
