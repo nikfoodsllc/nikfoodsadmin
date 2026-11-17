@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { verifyAdminRequest } from '@/lib/adminAuth';
-import { buildCategoryItems, buildDayMenus, flatCategoryOptions, type MenuCategory, type MenuFood, type MenuMapping } from '@/utils/communicationMenu';
+import { buildCategoryItems, buildDayMenus, flatCategoryOptions, MENU_EMAIL_SUBCATEGORIES, type MenuCategory, type MenuFood, type MenuMapping } from '@/utils/communicationMenu';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       categories.push(...(parents.success ? parents.data ?? [] : []).map(toCategory));
     }
     const foods: MenuFood[] = (foodRes.success ? foodRes.data ?? [] : []).map((f) => ({ id: String(f._id), name: String(f.name ?? ''), available: f.available, isDraft: f.isDraft }));
-    return NextResponse.json({ data: { menus: buildDayMenus(dates, mappings, categories, foods) } });
+    return NextResponse.json({ data: { menus: buildDayMenus(dates, mappings, categories, foods, MENU_EMAIL_SUBCATEGORIES) } });
   } catch (error) {
     console.error('[communication-menu] failed', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: 'Could not load the menu' }, { status: 500 });

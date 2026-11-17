@@ -25,7 +25,12 @@ export interface MenuFood {
 
 const num = (n: unknown, fallback: number) => (typeof n === 'number' && Number.isFinite(n) ? n : fallback);
 
-export function buildDayMenus(dates: string[], mappings: MenuMapping[], categories: MenuCategory[], foods: MenuFood[]): Record<string, string[]> {
+/** The sub-categories the New menu email's day boxes fill from (the rest of the day's menu is left out of the email). */
+export const MENU_EMAIL_SUBCATEGORIES = ['Appetizers', 'Paranthe Wali Gali', 'Main Course'];
+const nameKey = (t: string | undefined) => String(t ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+export function buildDayMenus(dates: string[], mappings: MenuMapping[], categories: MenuCategory[], foods: MenuFood[], onlyCategoryNames?: string[]): Record<string, string[]> {
+  const only = onlyCategoryNames ? new Set(onlyCategoryNames.map(nameKey)) : null;
   const cat = new Map(categories.map((c) => [c.id, c]));
   const food = new Map(foods.map((f) => [f.id, f]));
   const hidden = (id: string): boolean => {
@@ -43,7 +48,7 @@ export function buildDayMenus(dates: string[], mappings: MenuMapping[], categori
   const out: Record<string, string[]> = {};
   for (const date of dates) {
     const rows = mappings
-      .filter((m) => m.day === date && !hidden(m.categoryId))
+      .filter((m) => m.day === date && !hidden(m.categoryId) && (!only || only.has(nameKey(cat.get(m.categoryId)?.name))))
       .map((m) => ({ m, f: food.get(m.foodItemId), p: place(m.categoryId) }))
       .filter((r): r is { m: MenuMapping; f: MenuFood; p: [number, number] } => Boolean(r.f) && r.f!.available !== false && !r.f!.isDraft && r.f!.name.trim() !== '')
       .sort((a, b) => a.p[0] - b.p[0] || a.p[1] - b.p[1] || num(a.m.sequence, 1e6) - num(b.m.sequence, 1e6) || a.f.name.localeCompare(b.f.name));
