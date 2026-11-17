@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { db } from '@/lib/db';
 import { verifyAdminRequest } from '@/lib/adminAuth';
-import { buildCategoryItems, buildDayMenus, flatCategoryOptions, MENU_EMAIL_SUBCATEGORIES, type MenuCategory, type MenuFood, type MenuMapping } from '@/utils/communicationMenu';
+import { buildCategoryItems, buildDayMenus, flatCategoryOptions, MENU_EMAIL_SUBCATEGORIES, type ItemSubCategories, type MenuCategory, type MenuFood, type MenuMapping } from '@/utils/communicationMenu';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +71,20 @@ export async function GET(request: NextRequest) {
       categories.push(...(parents.success ? parents.data ?? [] : []).map(toCategory));
     }
     const foods: MenuFood[] = (foodRes.success ? foodRes.data ?? [] : []).map((f) => ({ id: String(f._id), name: String(f.name ?? ''), available: f.available, isDraft: f.isDraft }));
-    return NextResponse.json({ data: { menus: buildDayMenus(dates, mappings, categories, foods, MENU_EMAIL_SUBCATEGORIES) } });
+    // an item's sub-category (Appetizers, Main Course ...) is its own link to that category: read them for the sub-categories under the day's categories
+    const dayCatIds = [...new Set(mappings.map((m) => m.categoryId))];
+    const subRes = dayCatIds.length ? await db.read<CatDoc>('foodcategories', { parentCategoryId: { $in: dayCatIds.map(oid).filter((v): v is ObjectId => Boolean(v)) }, isDraft: { $ne: true } } as never) : { success: true, data: [] as CatDoc[] };
+    const subs = subRes.success ? subRes.data ?? [] : [];
+    const itemSubs: ItemSubCategories = {};
+    if (subs.length && foodIds.length) {
+      const subById = new Map(subs.map((x) => [String(x._id), x]));
+      const links = await db.read<{ categoryId?: unknown; foodItemId?: unknown }>('categoryfoodmapping', { categoryId: { $in: subs.map((x) => x._id) }, foodItemId: { $in: foodIds }, $or: [{ mappingType: 'FLAT' }, { mappingType: { $exists: false } }] } as never);
+      for (const l of links.success ? links.data ?? [] : []) {
+        const sub = subById.get(String(l.categoryId));
+        if (sub && l.foodItemId) (itemSubs[String(l.foodItemId)] ??= []).push({ name: String(sub.name ?? ''), sequence: sub.sequence });
+      }
+    }
+    return NextResponse.json({ data: { menus: buildDayMenus(dates, mappings, categories, foods, { names: MENU_EMAIL_SUBCATEGORIES, itemSubs }) } });
   } catch (error) {
     console.error('[communication-menu] failed', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: 'Could not load the menu' }, { status: 500 });

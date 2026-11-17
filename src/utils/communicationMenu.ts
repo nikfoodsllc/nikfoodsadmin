@@ -29,8 +29,21 @@ const num = (n: unknown, fallback: number) => (typeof n === 'number' && Number.i
 export const MENU_EMAIL_SUBCATEGORIES = ['Appetizers', 'Paranthe Wali Gali', 'Main Course'];
 const nameKey = (t: string | undefined) => String(t ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-export function buildDayMenus(dates: string[], mappings: MenuMapping[], categories: MenuCategory[], foods: MenuFood[], onlyCategoryNames?: string[]): Record<string, string[]> {
-  const only = onlyCategoryNames ? new Set(onlyCategoryNames.map(nameKey)) : null;
+/** Which sub-categories each item is in (an item sits under the day's parent category; its sub-category is a separate link). */
+export type ItemSubCategories = Record<string, Array<{ name: string; sequence?: number }>>;
+
+/**
+ * `only` keeps just the items in the named sub-categories (by name, ignoring case and spacing), listed in the order of those
+ * sub-categories on the menu and then by the item's place in the day.
+ */
+export function buildDayMenus(dates: string[], mappings: MenuMapping[], categories: MenuCategory[], foods: MenuFood[], only?: { names: string[]; itemSubs: ItemSubCategories }): Record<string, string[]> {
+  const wanted = only ? new Set(only.names.map(nameKey)) : null;
+  /** the place of the item's first matching sub-category (null = not in any wanted one) */
+  const subPlace = (foodId: string): number | null => {
+    if (!wanted || !only) return 0;
+    const hits = (only.itemSubs[foodId] ?? []).filter((x) => wanted.has(nameKey(x.name)));
+    return hits.length ? Math.min(...hits.map((h) => num(h.sequence, 1e6))) : null;
+  };
   const cat = new Map(categories.map((c) => [c.id, c]));
   const food = new Map(foods.map((f) => [f.id, f]));
   const hidden = (id: string): boolean => {
@@ -48,10 +61,10 @@ export function buildDayMenus(dates: string[], mappings: MenuMapping[], categori
   const out: Record<string, string[]> = {};
   for (const date of dates) {
     const rows = mappings
-      .filter((m) => m.day === date && !hidden(m.categoryId) && (!only || only.has(nameKey(cat.get(m.categoryId)?.name))))
-      .map((m) => ({ m, f: food.get(m.foodItemId), p: place(m.categoryId) }))
-      .filter((r): r is { m: MenuMapping; f: MenuFood; p: [number, number] } => Boolean(r.f) && r.f!.available !== false && !r.f!.isDraft && r.f!.name.trim() !== '')
-      .sort((a, b) => a.p[0] - b.p[0] || a.p[1] - b.p[1] || num(a.m.sequence, 1e6) - num(b.m.sequence, 1e6) || a.f.name.localeCompare(b.f.name));
+      .filter((m) => m.day === date && !hidden(m.categoryId) && subPlace(m.foodItemId) !== null)
+      .map((m) => ({ m, f: food.get(m.foodItemId), p: place(m.categoryId), sp: subPlace(m.foodItemId) ?? 0 }))
+      .filter((r): r is { m: MenuMapping; f: MenuFood; p: [number, number]; sp: number } => Boolean(r.f) && r.f!.available !== false && !r.f!.isDraft && r.f!.name.trim() !== '')
+      .sort((a, b) => a.p[0] - b.p[0] || a.p[1] - b.p[1] || a.sp - b.sp || num(a.m.sequence, 1e6) - num(b.m.sequence, 1e6) || a.f.name.localeCompare(b.f.name));
     const seen = new Set<string>();
     out[date] = rows
       .map((r) => r.f.name.replace(/\s+/g, ' ').trim())
