@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMenuEmailHtml, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
+import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
 import { htmlProblem, previewHtml } from './communication';
 import { EMAIL_TEMPLATES } from './emailTemplates';
 
@@ -114,5 +114,39 @@ describe('long days', () => {
     expect(count(h, '>Dish 3<')).toBe(3);
     expect(count(h, '>Dish 16<')).toBe(1);
     expect(count(h, '>Dish 9<')).toBe(2);
+  });
+});
+
+describe('other boxes', () => {
+  const count = (h: string, s: string) => h.split(s).length - 1;
+  const base = (sections: MenuEmailData['sections']): MenuEmailData => ({ ...data(0), sections });
+  const only = (sections: MenuEmailData['sections']): MenuEmailData => ({ ...base(sections), days: [] });
+  it('a new form starts with Indian Mithai and Add-On\'s (empty boxes are left out of the email)', () => {
+    const e = emptyMenuEmail();
+    expect(e.sections?.map((x) => x.title)).toEqual(['Indian Mithai', "Add-On's"]);
+    const h = buildMenuEmailHtml(data(0));
+    expect(h).not.toContain('Indian Mithai');
+  });
+  it('shows a box with its title, subtitle and dishes, escaped', () => {
+    const h = buildMenuEmailHtml(base([{ title: "Add-On's <x>", subtitle: "Club with any day's delivery", items: 'Fresh Paneer\nPickles - Mango/Green Chili\n' }]));
+    expect(h).toContain('Add-On&#39;s'.replace('&#39;', "'"));
+    expect(h).toContain('&lt;x&gt;');
+    expect(h).toContain("Club with any day's delivery");
+    expect(count(h, '>Fresh Paneer<')).toBe(1);
+  });
+  it('two short boxes sit side by side; a long one takes the full width in two columns', () => {
+    const two = buildMenuEmailHtml(only([{ title: 'A', subtitle: '', items: 'a1\na2' }, { title: 'B', subtitle: '', items: 'b1' }]));
+    expect(count(two, 'width="49%"')).toBe(2);
+    const long = buildMenuEmailHtml(only([{ title: 'A', subtitle: '', items: Array.from({ length: 12 }, (_, i) => `d${i}`).join('\n') }]));
+    expect(count(long, 'width="48%"')).toBe(2);
+  });
+  it('leaves out boxes without a title or dishes, and a draft keeps its boxes', () => {
+    const d = base([{ title: 'Keep', subtitle: 'x', items: 'one', categoryId: 'abc' }, { title: '', subtitle: '', items: 'two' }, { title: 'Empty', subtitle: '', items: ' ' }]);
+    expect(filledSections(d).map((x) => x.title)).toEqual(['Keep']);
+    expect(parseMenuEmail(buildMenuEmailHtml(d))?.sections).toEqual(d.sections);
+  });
+  it('an email with only boxes is fine; with nothing it is not', () => {
+    expect(menuEmailProblem({ ...base([{ title: 'T', subtitle: '', items: 'x' }]), days: [] })).toBeNull();
+    expect(menuEmailProblem({ ...base([]), days: [] })).toMatch(/dish/);
   });
 });

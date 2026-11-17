@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDayMenus } from './communicationMenu';
+import { buildCategoryItems, buildDayMenus, flatCategoryOptions } from './communicationMenu';
 
 const cats = [
   { id: 'menu', name: 'Food Menu', sequence: 1 },
@@ -31,5 +31,37 @@ describe('buildDayMenus', () => {
   });
   it('gives an empty list for a date with no menu and ignores other dates', () => {
     expect(buildDayMenus(['x'], [m('y', 'app', 'a')], cats, foods)).toEqual({ x: [] });
+  });
+});
+
+
+describe('flat categories for the extra boxes', () => {
+  const cats = [
+    { id: 'sw', name: 'Indian Sweets', sequence: 2, listingType: 'flat' },
+    { id: 'ad', name: "Add-On's", sequence: 3, listingType: 'flat' },
+    { id: 'fm', name: 'Food Menu', sequence: 1, listingType: 'day-wise' },
+    { id: 'fmsub', name: 'Mains', sequence: 1, parentId: 'fm' },
+    { id: 'pk', name: 'Pickles', sequence: 1, parentId: 'ad' },
+    { id: 'off', name: 'Off', sequence: 4, listingType: 'flat', isDraft: true },
+    { id: 'offsub', name: 'Off sub', sequence: 1, parentId: 'off' },
+  ];
+  it('lists flat categories and their sub-categories, not day-wise or switched-off ones', () => {
+    expect(flatCategoryOptions(cats).map((o) => o.label)).toEqual(['Indian Sweets', "Add-On's", "Add-On's > Pickles"]);
+  });
+  const foods = [{ id: 'a', name: 'Motichoor Ladoo' }, { id: 'b', name: 'Fresh Paneer' }, { id: 'c', name: 'Mango Pickle' }, { id: 'd', name: 'Gone', available: false }, { id: 'e', name: 'Draft', isDraft: true }];
+  const maps = [
+    { categoryId: 'sw', foodItemId: 'a', sequence: 0 },
+    { categoryId: 'ad', foodItemId: 'b', sequence: 1 },
+    { categoryId: 'pk', foodItemId: 'c', sequence: 0 },
+    { categoryId: 'ad', foodItemId: 'd', sequence: 2 },
+    { categoryId: 'ad', foodItemId: 'e', sequence: 3 },
+  ];
+  it('gives a category its own items then its sub-categories, without unavailable or draft ones', () => {
+    expect(buildCategoryItems('sw', maps, cats, foods)).toEqual(['Motichoor Ladoo']);
+    expect(buildCategoryItems('ad', maps, cats, foods)).toEqual(['Fresh Paneer', 'Mango Pickle']);
+  });
+  it('gives nothing for a switched-off or unknown category', () => {
+    expect(buildCategoryItems('off', maps, cats, foods)).toEqual([]);
+    expect(buildCategoryItems('nope', maps, cats, foods)).toEqual([]);
   });
 });
