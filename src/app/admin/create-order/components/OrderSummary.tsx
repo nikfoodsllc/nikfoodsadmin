@@ -89,6 +89,17 @@ export default function OrderSummary(props: {
   const methodMissing = props.payment === 'paid' && paidMethodValue(props.paidChoice, props.paidTyped) === null;
   const blocked = props.missing.length > 0 || Boolean(props.previewError) || !preview || methodMissing;
 
+  const minimumUsed = preview?.minOrderValue ?? 25;
+  const underMinimum = (() => {
+    if (preview?.belowMinimum) return preview.belowMinimum;
+    const totals = new Map<string, number>();
+    for (const l of lines) totals.set(l.date, (totals.get(l.date) ?? 0) + l.unitPrice * l.quantity);
+    return [...totals.entries()]
+      .map(([date, total]) => ({ date, total: Math.round(total * 100) / 100 }))
+      .filter((d) => d.total < minimumUsed)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  })();
+
   return (
     <Paper elevation={0} sx={{ p: { xs: 1.5, sm: 2.5 }, border: '1px solid #E5E7EB', borderRadius: 2 }}>
       <Typography sx={{ fontWeight: 800, fontSize: 17, mb: 1 }}>3. Order & payment</Typography>
@@ -193,12 +204,14 @@ export default function OrderSummary(props: {
           <Row label="Tax" value={money(preview.totals.tax)} />
           {preview.totals.tip > 0 && <Row label="Tip" value={money(preview.totals.tip)} />}
           <Row label="Total" value={money(preview.totals.total)} bold />
-          {(preview.belowMinimum?.length ?? 0) > 0 && (
-            <Alert severity="info" sx={{ mt: 1 }}>
-              Under the {money(preview.minOrderValue)} minimum per delivery day: {preview.belowMinimum!.map((d) => `${dayChipLabel(d.date)} (${money(d.total)})`).join(', ')}. That is fine here: each day is delivered on the date you chose.
-            </Alert>
-          )}
         </Box>
+      )}
+
+      {underMinimum.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 1 }}>
+          <strong>Under the {money(minimumUsed)} minimum:</strong> {underMinimum.map((d) => `${dayChipLabel(d.date)} (${money(d.total)})`).join(', ')}.
+          {preview ? '' : ' (Using the standard minimum until the zip code is entered.)'} You can still create the order; check this is intended.
+        </Alert>
       )}
 
       <Divider sx={{ my: 1.5 }} />
