@@ -35,6 +35,7 @@ export const GLOSSARY_SECTIONS = [
   'Communication',
   'Mobile App',
   'Banners',
+  'Dashboard',
   'Kitchen Dashboard',
   'Kitchen Report',
   'Packing Report',
@@ -55,6 +56,17 @@ const e = (
 ): GlossaryEntry => ({ id: `${section}-${term}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'), section, term, where, meaning, tone, keywords });
 
 export const GLOSSARY: GlossaryEntry[] = [
+  // ---- Dashboard (Reporting > Dashboard)
+  e('Dashboard', 'Gross sales', 'Dashboard, Financial', 'The food subtotal of every paid order placed in the period (by the day it was placed, Pacific time). Tip, Platform Fee and tax are not sales. Orders refunded later still count here.'),
+  e('Dashboard', 'Net sales', 'Dashboard, Financial', 'Gross sales minus refunds: Stripe refunds and store credit given back. A refund takes food, fee and tax off in the same share as the order total (a $10 refund on a $50 order takes 20% off each).', undefined, 'refund net'),
+  e('Dashboard', 'This week / month / year so far', 'Dashboard, Financial, top cards', 'Net sales from the start of the week (Saturday), month or year up to today, against the same number of days before: last week to the same weekday, last month to the same day, last year to the same date.', undefined, 'wow mom yoy week over week'),
+  e('Dashboard', 'vs period before / vs last year', 'Dashboard, Financial, Sales', 'The chosen period against the period of the same length right before it, and against the same dates one year earlier. Green = up, red = down; \'No sales to compare\' when there were none then.', undefined, 'comparison trend'),
+  e('Dashboard', 'Kept after Stripe / Lost to Stripe', 'Dashboard, Financial, Platform Fee vs Stripe fee', 'The Platform Fee customers paid minus what Stripe charged us, on card orders that have a Stripe fee recorded (cash, Zelle and orders before Stripe fees were saved are left out). Red bars and the red box show weeks and orders where Stripe took more than the fee.', 'bad', 'negative loss stripe fee'),
+  e('Dashboard', 'Taxable sales / Tax collected', 'Dashboard, Financial, Tax', 'Taxable sales = net sales + Platform Fee, both after refunds. Tax collected = the tax on paid orders after refunds. The monthly table (and CSV) is for filing; the rate should be close to 10.3%.', undefined, 'tax report filing'),
+  e('Dashboard', 'Cooked vs Ready to eat', 'Dashboard, Items', 'Share of item sales (price x quantity, before refunds) by the preparation type set in Food Items. Combos count as cooked. Items with no type are left out of the percentages and mentioned below them.', undefined, 'rte prep type share'),
+  e('Dashboard', 'Best sellers / Compare items', 'Dashboard, Items', 'Best sellers ranks items of the period by sales or quantity. Compare items shows up to 6 items week by week (or month by month); the table compares the latest week with the one before. Items with the same name count as one item.', undefined, 'top items comparison trend'),
+  e('Dashboard', 'Visitors / On the website now', 'Dashboard, Visitors', 'From Google Analytics on the live website (since Nov 10, 2026). \'Last 5 minutes\' is people browsing right now and updates every minute. Visitors = different people in the period, Visits = sessions (one person can visit several times).', undefined, 'active users demographics analytics'),
+  e('Dashboard', 'Driver pay', 'Dashboard, Drivers', 'Per route planned in OptimoRoute: planned route time + 30 minutes, rounded up to the next 15 minutes, x $19 an hour, plus $3 per delivery. Cost per delivery = pay / deliveries; Pay per day = average pay for one day of driving. Uses the PLANNED time, not the time actually driven.', undefined, 'salary driver cost optimoroute'),
   // ---- order status
   e('Orders: order status', 'Pending', 'Orders table, Order Status', 'The order exists but is not confirmed yet. A card order stays Pending until the payment goes through.', 'warn'),
   e('Orders: order status', 'Confirmed', 'Orders table, Order Status', 'The order is accepted (a card order is confirmed once it is paid, a cash or other order when it is entered). Nothing has been started in the kitchen yet.', 'info'),
