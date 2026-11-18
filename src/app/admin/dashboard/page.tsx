@@ -1,6 +1,6 @@
-import Dashboard from '../components/Dashboard';
+import BusinessDashboardPage from './components/BusinessDashboardPage';
 
-/** The old stats dashboard. It is no longer in the menu (the Kitchen Dashboard is the landing page) but still opens here. */
-export default function StatsDashboardPage() {
-  return <Dashboard />;
+/** Reporting > Dashboard: sales, fees, tax, items, visitors and driver pay. The page admins land on. */
+export default function DashboardPage() {
+  return <BusinessDashboardPage />;
 }

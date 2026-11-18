@@ -38,7 +38,7 @@ import { IconMessage2,
   IconDeviceMobile,
   IconUserCheck,
   IconPhoto,
-  IconSpeakerphone, IconSoup, IconListDetails, IconSortDescending } from '@tabler/icons-react';
+  IconSpeakerphone, IconLayoutDashboard, IconSoup, IconListDetails, IconSortDescending } from '@tabler/icons-react';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -51,9 +51,9 @@ interface NavItem {
 }
 
 /**
- * The admin menu: Order (incl. Abandoned Checkout), Marketing (Communication and Banners), Reporting (Kitchen Dashboard first: the page admins land on), Manage Days,
- * Mobile App, Food Catalog, User Administration, Understanding Admin and, last, Delivery Zones. Pages that are no longer in the menu (the old stats Dashboard at
- * /admin/dashboard, Modifiers) still work when opened by their address.
+ * The admin menu: Order (incl. Abandoned Checkout), Marketing (Communication and Banners), Reporting (Dashboard first: the page admins land on), Manage Days,
+ * Mobile App, Food Catalog, User Administration, Understanding Admin and, last, Delivery Zones. Pages that are no longer in the menu (the old stats dashboard at
+ * /admin/stats-dashboard, Modifiers) still work when opened by their address.
  */
 const adminNavItems: NavItem[] = [
   {
@@ -78,6 +78,7 @@ const adminNavItems: NavItem[] = [
     title: 'Reporting',
     icon: IconChartBar,
     children: [
+      { title: 'Dashboard', href: '/admin/dashboard', icon: IconLayoutDashboard },
       { title: 'Kitchen Dashboard', href: '/admin/kitchen-dashboard', icon: IconChefHat },
       { title: 'Kitchen Report', href: '/admin/reports/kitchen', icon: IconToolsKitchen2 },
       { title: 'Packing Report', href: '/admin/reports/packing', icon: IconPackage },
