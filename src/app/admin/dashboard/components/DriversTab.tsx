@@ -69,11 +69,24 @@ export default function DriversTab({ token, range }: { token: string; range: { f
     return () => controller.abort();
   }, [token, range.from, range.to, reload]);
 
-  const current = data?.rates?.current;
+  // today's and planned rates, read on their own so they show even when OptimoRoute cannot be reached
+  const [rates, setRates] = useState<{ current: DriverRates; upcoming: DriverRates[] } | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/admin/business-dashboard/driver-rates', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (body?.data) setRates({ current: body.data.current, upcoming: body.data.upcoming });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [token, reload]);
+
+  const current = rates?.current ?? data?.rates?.current;
   const rule = current
     ? `Pay = planned route time + ${DRIVER_PAY.bufferMinutes} min, rounded up to ${DRIVER_PAY.roundToMinutes} min, × ${money2(current.hourlyRate)}/hour, + ${money2(current.perDelivery)} per delivery`
     : `Pay = planned route time + ${DRIVER_PAY.bufferMinutes} min, rounded up to ${DRIVER_PAY.roundToMinutes} min, × hourly rate, + an amount per delivery`;
-  const next = data?.rates?.upcoming[0];
+  const next = (rates?.upcoming ?? data?.rates?.upcoming)?.[0];
   // the period has days at more than one rate: say so, each day uses its own
   const mixed = (data?.rates?.inRange.length ?? 0) > 1;
 
