@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminRequest } from '@/lib/adminAuth';
 import { loadSales } from '@/lib/server/businessDashboard';
-import { defaultGrouping, itemSeries, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
+import { resolveGrouping, itemSeries, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const problem = validateDashboardRange(range);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
   const groupParam = params.get('group');
-  const grouping: Grouping = groupParam === 'week' || groupParam === 'month' ? groupParam : defaultGrouping(range);
+  const grouping: Grouping = resolveGrouping(groupParam, range);
 
   let names: string[] = [];
   try {

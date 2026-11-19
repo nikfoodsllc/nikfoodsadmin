@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { Box, Paper, Typography } from '@mui/material';
 import { IconArrowDownRight, IconArrowUpRight, IconMinus } from '@tabler/icons-react';
-import { percentChange, type MoneyTotals, type Bucket, type ItemType, shortDay } from '@/utils/businessDashboard';
+import { percentChange, type MoneyTotals, type Bucket, type ItemType, type Grouping, shortDay } from '@/utils/businessDashboard';
 import type { ChartPoint } from './charts';
 
 /** Shapes of the Dashboard API answers */
@@ -17,7 +17,7 @@ export interface QuickBlock {
 export interface DashboardData {
   today: string;
   range: { from: string; to: string };
-  grouping: 'week' | 'month';
+  grouping: Grouping;
   totals: { current: Totals; previous: Totals; lastYear: Totals };
   quick: { week: QuickBlock; month: QuickBlock; year: QuickBlock };
   series: Array<Bucket & MoneyTotals>;
@@ -48,10 +48,19 @@ export const count = (v: number) => new Intl.NumberFormat('en-US').format(Math.r
 export const TYPE_LABEL: Record<ItemType, string> = { cooked: 'Cooked', ready_to_eat: 'Ready to eat', not_set: 'Not set' };
 
 /** Chart points of buckets: 'Nov 14' with 'Nov 14 – Nov 20' in the tooltip */
-export function pointsOf(buckets: Bucket[], grouping: 'week' | 'month'): ChartPoint[] {
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** 'Wed, Nov 18' */
+export function dayWithWeekday(day: string): string {
+  return `${WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()]}, ${shortDay(day)}`;
+}
+
+/** 'day', 'week' or 'month', for sentences like 'Sales each week' */
+export const unitOf = (grouping: Grouping) => grouping;
+
+export function pointsOf(buckets: Bucket[], grouping: Grouping): ChartPoint[] {
   return buckets.map((b) => ({
     label: b.label,
-    detail: grouping === 'week' ? (b.from === b.to ? shortDay(b.from) : `${shortDay(b.from)} – ${shortDay(b.to)}`) : b.label,
+    detail: grouping === 'day' ? dayWithWeekday(b.from) : grouping === 'week' ? (b.from === b.to ? shortDay(b.from) : `${shortDay(b.from)} – ${shortDay(b.to)}`) : b.label,
   }));
 }
 

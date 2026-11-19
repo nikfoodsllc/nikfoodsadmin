@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Box, Button, Paper, Typography } from '@mui/material';
 import { IconAlertTriangle, IconDownload } from '@tabler/icons-react';
 import { BarChart, LineChart, SERIES, TooltipRow } from './charts';
-import { count, Delta, EmptyNote, Kpi, KpiGrid, money, money2, moneyAxis, pointsOf, rangeText, Section, SimpleTable, type DashboardData, type QuickBlock } from './ui';
+import { unitOf, count, Delta, EmptyNote, Kpi, KpiGrid, money, money2, moneyAxis, pointsOf, rangeText, Section, SimpleTable, type DashboardData, type QuickBlock } from './ui';
 import { downloadCSV, escapeCSVValue } from '@/utils/csv';
 
 function QuickCard({ block }: { block: QuickBlock }) {
@@ -29,7 +29,7 @@ export default function FinancialTab({ data }: { data: DashboardData }) {
   const [showLosses, setShowLosses] = useState(false);
   const { current, previous, lastYear } = data.totals;
   const points = pointsOf(data.series, data.grouping);
-  const unit = data.grouping === 'week' ? 'week' : 'month';
+  const unit = unitOf(data.grouping);
   const kept = current.feeOnCard - current.stripeFee;
   const keptSeries = data.series.map((b) => Math.round((b.feeOnCard - b.stripeFee) * 100) / 100);
   const lastYearLabel = `vs last year`;

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import { LineChart, SERIES } from './charts';
 import { count, EmptyNote, Kpi, KpiGrid, pointsOf, rangeText, Section } from './ui';
-import type { Bucket } from '@/utils/businessDashboard';
+import type { Bucket, Grouping } from '@/utils/businessDashboard';
 
 interface VisitorsAnswer {
   connected: boolean;
@@ -16,7 +16,7 @@ interface VisitorsAnswer {
 
 const LIVE_EVERY_MS = 60_000;
 
-export default function VisitorsTab({ token, range, grouping }: { token: string; range: { from: string; to: string }; grouping: 'week' | 'month' }) {
+export default function VisitorsTab({ token, range, grouping }: { token: string; range: { from: string; to: string }; grouping: Grouping }) {
   const [data, setData] = useState<VisitorsAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +74,6 @@ export default function VisitorsTab({ token, range, grouping }: { token: string;
   if (!data) return null;
 
   const series = data.series ?? [];
-  const unit = grouping === 'week' ? 'week' : 'month';
   return (
     <>
       <Section
@@ -106,9 +105,11 @@ export default function VisitorsTab({ token, range, grouping }: { token: string;
                   { name: 'Visits', color: SERIES[2], values: series.map((b) => b.visits) },
                 ]}
               />
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
-                Visitors each {unit} add up the people of each day, so someone who came on two days counts twice there.
-              </Typography>
+              {grouping !== 'day' && (
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
+                  Visitors each {grouping} add up the people of each day, so someone who came on two days counts twice there.
+                </Typography>
+              )}
             </>
           )}
         </Box>

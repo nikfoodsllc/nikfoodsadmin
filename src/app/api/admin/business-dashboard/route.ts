@@ -3,7 +3,7 @@ import { verifyAdminRequest } from '@/lib/adminAuth';
 import { loadSales, preparationLookup } from '@/lib/server/businessDashboard';
 import { pacificToday } from '@/utils/abandonedCheckouts';
 import {
-  defaultGrouping,
+  resolveGrouping,
   itemTotals,
   lastYearRange,
   lossOrders,
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   const problem = validateDashboardRange(range);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
   const groupParam = params.get('group');
-  const grouping: Grouping = groupParam === 'week' || groupParam === 'month' ? groupParam : defaultGrouping(range);
+  const grouping: Grouping = resolveGrouping(groupParam, range);
 
   try {
     const today = pacificToday();
