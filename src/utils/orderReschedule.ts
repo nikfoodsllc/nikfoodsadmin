@@ -5,7 +5,8 @@
  * Dates are 'YYYY-MM-DD' strings.
  */
 export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready'] as const;
-export const MAX_DAYS_AHEAD = 120;
+/** Any day up to a year before or after today can be picked (a guard against typing the wrong year). */
+export const MAX_DAYS_AWAY = 365;
 
 export interface OrderRescheduleLike {
   status?: string | null;
@@ -61,10 +62,10 @@ export function whyNotReschedulable(order: OrderRescheduleLike): string | null {
   return null;
 }
 
-/** The earliest and latest date that may be picked (today to 120 days ahead, Pacific). */
+/** The earliest and latest date that may be picked (a year back to a year ahead, Pacific). */
 export function pickableRange(now: Date = new Date()): { min: string; max: string } {
   const today = pacificToday(now);
-  return { min: today, max: addDays(today, MAX_DAYS_AHEAD) };
+  return { min: addDays(today, -MAX_DAYS_AWAY), max: addDays(today, MAX_DAYS_AWAY) };
 }
 
 export interface MovedGroup {
