@@ -142,9 +142,11 @@ export function bucketKeyOf(day: string, grouping: Grouping): string {
   return grouping === 'day' ? day : grouping === 'week' ? weekStartOf(day) : monthStart(day);
 }
 
-/** Weekly up to about four months, monthly beyond */
+/** Daily up to a month (a single week shows its days), weekly up to about four months, monthly beyond */
 export function defaultGrouping(range: DayRange): Grouping {
-  return daysBetween(range) > 120 ? 'month' : 'week';
+  const days = daysBetween(range);
+  if (days <= 31) return 'day';
+  return days > 120 ? 'month' : 'week';
 }
 
 /** Percent change from `before` to `now`; null when there is nothing to compare with */
