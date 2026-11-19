@@ -28,9 +28,9 @@ describe('dates', () => {
     expect(pacificToday(new Date('2026-10-09T05:00:00Z'))).toBe('2026-10-08');
     expect(pacificToday(new Date('2026-10-09T08:00:00Z'))).toBe('2026-10-09');
   });
-  it('range is today to 120 days ahead', () => {
+  it('range is a year back to a year ahead', () => {
     const r = pickableRange(new Date('2026-10-08T17:00:00Z'));
-    expect(r.min).toBe('2026-10-08'); expect(r.max).toBe(addDays('2026-10-08', 120));
+    expect(r.min).toBe('2025-10-08'); expect(r.max).toBe('2027-10-08');
   });
   it('addDays crosses month and year ends', () => { expect(addDays('2026-12-31', 1)).toBe('2027-01-01'); expect(addDays('2026-10-31', 1)).toBe('2026-11-01'); });
 });

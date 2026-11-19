@@ -224,7 +224,7 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
 
 /**
  * The bar that appears when items are ticked in the order details: one new DELIVERY date for all ticked items. The
- * kitchen day of each item stays. Any date from today works, also one that has already closed for ordering (an admin
+ * kitchen day of each item stays. Any date works, past or future (within a year), also one that has already closed for ordering (an admin
  * decision, so the order cutoff does not apply).
  */
 export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain }: CommonProps & { selected: Set<string>; onClear: () => void; plain?: boolean }) {
@@ -307,7 +307,7 @@ export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain
         </Button>
       </Box>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-        The kitchen day stays. Any date from today works, also one that has closed for orders.
+        The kitchen day stays. Any date works, past or future.
       </Typography>
       {before && (
         <Typography sx={{ fontSize: 12, color: '#B45309', fontWeight: 600, mt: 0.5 }}>
