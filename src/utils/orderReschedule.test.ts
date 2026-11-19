@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addDays, emailEventOf, deliversBeforeKitchen, pacificToday, pickableRange, rescheduledFilterFor, rescheduleView, selectionKey, selectionList, whyNotReschedulable } from './orderReschedule';
+import { addDays, emailEventOf, deliversBeforeKitchen, pacificToday, pickableRange, rescheduledFilterFor, rescheduleView, selectionKey, selectionList, whyNotReschedulable, deliveredDates, picksDeliveredItems } from './orderReschedule';
 
 const item = (name: string, quantity = 1, original?: string) => ({ quantity, originalDeliveryDate: original, food: { name } });
 const order = (over: Record<string, unknown> = {}) => ({
@@ -28,9 +28,9 @@ describe('dates', () => {
     expect(pacificToday(new Date('2026-10-09T05:00:00Z'))).toBe('2026-10-08');
     expect(pacificToday(new Date('2026-10-09T08:00:00Z'))).toBe('2026-10-09');
   });
-  it('range is today to 120 days ahead', () => {
+  it('range is a year back to a year ahead', () => {
     const r = pickableRange(new Date('2026-10-08T17:00:00Z'));
-    expect(r.min).toBe('2026-10-08'); expect(r.max).toBe(addDays('2026-10-08', 120));
+    expect(r.min).toBe('2025-10-08'); expect(r.max).toBe('2027-10-08');
   });
   it('addDays crosses month and year ends', () => { expect(addDays('2026-12-31', 1)).toBe('2027-01-01'); expect(addDays('2026-10-31', 1)).toBe('2026-11-01'); });
 });
@@ -121,5 +121,27 @@ describe('rescheduledFilterFor', () => {
     expect(rescheduledFilterFor('yes')).toEqual({ 'reschedules.0': { $exists: true } });
     expect(rescheduledFilterFor('no')).toEqual({ 'reschedules.0': { $exists: false } });
     for (const v of ['all', '', null, undefined, '$ne', 'YES']) expect(rescheduledFilterFor(v as never)).toBeNull();
+  });
+});
+
+describe('partially delivered orders', () => {
+  const order = {
+    status: 'partially_delivered',
+    paymentStatus: 'paid',
+    optimo: { deliveries: [{ date: '2026-11-18', status: 'delivered' }, { date: '2026-11-20', status: 'pending' }] },
+    items: [
+      { day: 'Wednesday', deliveryDate: '2026-11-18', actualDeliveryDate: '2026-11-18', items: [{ quantity: 1 }] },
+      { day: 'Friday', deliveryDate: '2026-11-20', actualDeliveryDate: '2026-11-20', items: [{ quantity: 1 }] },
+    ],
+  };
+  it('can be moved', () => { expect(whyNotReschedulable(order)).toBeNull(); });
+  it('knows which dates are delivered', () => { expect([...deliveredDates(order)]).toEqual(['2026-11-18']); });
+  it('flags a pick on a delivered day, not one on a day still to come', () => {
+    expect(picksDeliveredItems(order, ['1:0'])).toBe(false);
+    expect(picksDeliveredItems(order, ['0:0', '1:0'])).toBe(true);
+  });
+  it('still refuses delivered and out-for-delivery orders', () => {
+    expect(whyNotReschedulable({ ...order, status: 'delivered' })).not.toBeNull();
+    expect(whyNotReschedulable({ ...order, status: 'out_for_delivery' })).not.toBeNull();
   });
 });

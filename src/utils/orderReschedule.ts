@@ -4,12 +4,15 @@
  * Only the delivery date (actualDeliveryDate) moves; the kitchen day (deliveryDate) stays.
  * Dates are 'YYYY-MM-DD' strings.
  */
-export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready'] as const;
-export const MAX_DAYS_AHEAD = 120;
+export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready', 'partially_delivered'] as const;
+/** Any day up to a year before or after today can be picked (a guard against typing the wrong year). */
+export const MAX_DAYS_AWAY = 365;
 
 export interface OrderRescheduleLike {
   status?: string | null;
   paymentStatus?: string | null;
+  /** per delivery day, how the route went (written by the live site's OptimoRoute step) */
+  optimo?: { deliveries?: Array<{ date?: string | null; status?: string | null }> | null } | null;
   items?: Array<{
     deliveryDate?: unknown;
     actualDeliveryDate?: unknown;
@@ -51,6 +54,21 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days)).toISOString().slice(0, 10);
 }
 
+/** Delivery dates of an order the driver has already completed (their items cannot move). */
+export function deliveredDates(order: OrderRescheduleLike): Set<string> {
+  return new Set((order.optimo?.deliveries ?? []).filter((d) => d?.status === 'delivered' && typeof d.date === 'string').map((d) => d.date as string));
+}
+
+/** True when some picked item sits on a delivery date that has already been delivered. */
+export function picksDeliveredItems(order: OrderRescheduleLike, selected: Iterable<string>): boolean {
+  const done = deliveredDates(order);
+  if (done.size === 0) return false;
+  return selectionList(selected).some(({ line }) => {
+    const l = order.items?.[line];
+    return done.has(dateText(l?.actualDeliveryDate) || dateText(l?.deliveryDate));
+  });
+}
+
 /** Why this order cannot be moved, or null when it can (the same rule the live site applies). */
 export function whyNotReschedulable(order: OrderRescheduleLike): string | null {
   if (order.paymentStatus !== 'paid') return 'Only paid orders can be moved to another date.';
@@ -61,10 +79,10 @@ export function whyNotReschedulable(order: OrderRescheduleLike): string | null {
   return null;
 }
 
-/** The earliest and latest date that may be picked (today to 120 days ahead, Pacific). */
+/** The earliest and latest date that may be picked (a year back to a year ahead, Pacific). */
 export function pickableRange(now: Date = new Date()): { min: string; max: string } {
   const today = pacificToday(now);
-  return { min: today, max: addDays(today, MAX_DAYS_AHEAD) };
+  return { min: addDays(today, -MAX_DAYS_AWAY), max: addDays(today, MAX_DAYS_AWAY) };
 }
 
 export interface MovedGroup {

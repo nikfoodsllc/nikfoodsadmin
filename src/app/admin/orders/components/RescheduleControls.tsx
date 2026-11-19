@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material';
 import { IconCalendarEvent, IconMail, IconMessage } from '@tabler/icons-react';
 import { Order } from '@/types/order';
-import { type EmailEventView, deliversBeforeKitchen, pickableRange, rescheduleView, selectionList, whyNotReschedulable } from '@/utils/orderReschedule';
+import { type EmailEventView, deliversBeforeKitchen, pickableRange, picksDeliveredItems, rescheduleView, selectionList, whyNotReschedulable } from '@/utils/orderReschedule';
 
 /** 'Fri, Oct 9' for '2026-10-09' */
 export function shortDate(date: string): string {
@@ -224,7 +224,7 @@ export function RescheduleBanner({ order, token, onChanged }: CommonProps) {
 
 /**
  * The bar that appears when items are ticked in the order details: one new DELIVERY date for all ticked items. The
- * kitchen day of each item stays. Any date from today works, also one that has already closed for ordering (an admin
+ * kitchen day of each item stays. Any date works, past or future (within a year), also one that has already closed for ordering (an admin
  * decision, so the order cutoff does not apply).
  */
 export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain }: CommonProps & { selected: Set<string>; onClear: () => void; plain?: boolean }) {
@@ -245,6 +245,7 @@ export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain
 
   const range = pickableRange();
   const before = deliversBeforeKitchen(order, selected, value);
+  const deliveredPicked = picksDeliveredItems(order, selected);
 
   const save = async () => {
     setBusy(true);
@@ -299,7 +300,7 @@ export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain
           inputProps={{ min: range.min, max: range.max, 'aria-label': 'New delivery date' }}
           sx={{ bgcolor: '#fff', minWidth: 160 }}
         />
-        <Button variant="contained" size="small" onClick={save} disabled={busy || !value} sx={{ textTransform: 'none', fontWeight: 700 }}>
+        <Button variant="contained" size="small" onClick={save} disabled={busy || !value || deliveredPicked} sx={{ textTransform: 'none', fontWeight: 700 }}>
           {busy ? <CircularProgress size={18} color="inherit" /> : 'Move'}
         </Button>
         <Button size="small" onClick={onClear} disabled={busy} sx={{ textTransform: 'none' }}>
@@ -307,8 +308,13 @@ export function MoveItemsBar({ order, token, selected, onClear, onChanged, plain
         </Button>
       </Box>
       <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
-        The kitchen day stays. Any date from today works, also one that has closed for orders.
+        The kitchen day stays. Any date works, past or future.
       </Typography>
+      {deliveredPicked && (
+        <Typography sx={{ fontSize: 12, color: '#B91C1C', fontWeight: 600, mt: 0.5 }}>
+          Some of these items have already been delivered and cannot be moved. Untick them to move the rest.
+        </Typography>
+      )}
       {before && (
         <Typography sx={{ fontSize: 12, color: '#B45309', fontWeight: 600, mt: 0.5 }}>
           Some of these items would be delivered before their kitchen day, so before they are cooked.
