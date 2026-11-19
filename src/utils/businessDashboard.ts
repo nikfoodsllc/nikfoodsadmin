@@ -13,7 +13,7 @@
  */
 import { addDays, isDayString, weekStartOf } from './kitchenDashboard';
 
-export type Grouping = 'week' | 'month';
+export type Grouping = 'day' | 'week' | 'month';
 export type ItemType = 'cooked' | 'ready_to_eat' | 'not_set';
 
 export interface DayRange {
@@ -109,9 +109,23 @@ export function shortDay(day: string): string {
   return `${MONTHS[Number(day.slice(5, 7)) - 1]} ${Number(day.slice(8, 10))}`;
 }
 
-/** The week (Saturday start) or month a day falls in, clipped to the range */
+/** Daily charts are offered for ranges up to this many days (longer ones would be too crowded to read) */
+export const MAX_DAILY_DAYS = 92;
+
+/** The grouping to use: what was asked when it is allowed, otherwise the default for the range */
+export function resolveGrouping(asked: string | null, range: DayRange): Grouping {
+  if (asked === 'week' || asked === 'month') return asked;
+  if (asked === 'day' && daysBetween(range) <= MAX_DAILY_DAYS) return 'day';
+  return defaultGrouping(range);
+}
+
+/** Each day, or the week (Saturday start) or month a day falls in, clipped to the range */
 export function bucketsFor(range: DayRange, grouping: Grouping): Bucket[] {
   const buckets: Bucket[] = [];
+  if (grouping === 'day') {
+    for (let d = range.from; d <= range.to && buckets.length < MAX_DASHBOARD_DAYS; d = addDays(d, 1)) buckets.push({ key: d, from: d, to: d, label: shortDay(d) });
+    return buckets;
+  }
   let start = grouping === 'week' ? weekStartOf(range.from) : monthStart(range.from);
   while (start <= range.to && buckets.length < 200) {
     const end = grouping === 'week' ? addDays(start, 6) : monthEnd(start);
@@ -125,7 +139,7 @@ export function bucketsFor(range: DayRange, grouping: Grouping): Bucket[] {
 }
 
 export function bucketKeyOf(day: string, grouping: Grouping): string {
-  return grouping === 'week' ? weekStartOf(day) : monthStart(day);
+  return grouping === 'day' ? day : grouping === 'week' ? weekStartOf(day) : monthStart(day);
 }
 
 /** Weekly up to about four months, monthly beyond */

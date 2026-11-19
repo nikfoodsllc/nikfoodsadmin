@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { formatPSTDateISO } from '@/utils/timezone';
 import { addDays, weekStartOf } from '@/utils/kitchenDashboard';
-import { defaultGrouping, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
+import { daysBetween, defaultGrouping, MAX_DAILY_DAYS, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
 import FinancialTab from './FinancialTab';
 import ItemsTab from './ItemsTab';
 import VisitorsTab from './VisitorsTab';
@@ -106,7 +106,9 @@ export default function BusinessDashboardPage() {
   }, [preset, tab, customApplied, restored]);
 
   const range: DayRange | null = preset === 'custom' ? customApplied : presetRange(preset, today);
-  const grouping: Grouping = groupChoice ?? (range ? defaultGrouping(range) : 'week');
+  // Daily only for ranges up to about three months; a remembered Daily choice falls back for longer ones
+  const dailyAllowed = range ? daysBetween(range) <= MAX_DAILY_DAYS : false;
+  const grouping: Grouping = groupChoice && (groupChoice !== 'day' || dailyAllowed) ? groupChoice : range ? defaultGrouping(range) : 'week';
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,7 +171,7 @@ export default function BusinessDashboardPage() {
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>Dashboard</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {range ? `${rangeText(range)} · ${grouping === 'week' ? 'weekly (Sat–Fri)' : 'monthly'}` : 'Pick the dates'}
+            {range ? `${rangeText(range)} · ${grouping === 'day' ? 'daily' : grouping === 'week' ? 'weekly (Sat–Fri)' : 'monthly'}` : 'Pick the dates'}
           </Typography>
         </Box>
         <Tooltip title="Reload">
@@ -209,6 +211,7 @@ export default function BusinessDashboardPage() {
         </Tabs>
         {tab !== 'drivers' && range && (
           <ToggleButtonGroup size="small" exclusive value={grouping} onChange={(_, v) => v && setGroupChoice(v)} sx={{ mb: 0.75 }}>
+            <ToggleButton value="day" disabled={!dailyAllowed} title={dailyAllowed ? undefined : 'Daily is for periods up to 3 months'} sx={{ textTransform: 'none', py: 0.25 }}>Daily</ToggleButton>
             <ToggleButton value="week" sx={{ textTransform: 'none', py: 0.25 }}>Weekly</ToggleButton>
             <ToggleButton value="month" sx={{ textTransform: 'none', py: 0.25 }}>Monthly</ToggleButton>
           </ToggleButtonGroup>
