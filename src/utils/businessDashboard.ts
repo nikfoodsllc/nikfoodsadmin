@@ -432,18 +432,82 @@ export function taxByMonth(orders: SaleOrder[], range: DayRange): Array<{ month:
 // Driver pay
 // ---------------------------------------------------------------------------------------------
 
-/** Pay rule: planned route time + 30 minutes, rounded UP to the next 15 minutes, at $19 an hour, plus $3 for each delivery */
+/** Pay rule: planned route time + 30 minutes, rounded UP to the next 15 minutes, at an hourly rate, plus a fixed amount per delivery */
 export const DRIVER_PAY = { hourlyRate: 19, bufferMinutes: 30, roundToMinutes: 15, perDelivery: 3 } as const;
+
+/**
+ * The dollar amounts of the pay rule from a (Pacific) day on. Admins change them for the future only: every driving day uses the
+ * rates in effect on that day, so a change never alters what past days cost. Saved once for all admins.
+ */
+export interface DriverRates {
+  from: string;
+  hourlyRate: number;
+  perDelivery: number;
+  setAt?: string;
+  setBy?: string;
+}
+
+/** The rates before anyone changed them in the admin ($19 an hour, $3 a delivery) */
+export const DEFAULT_DRIVER_RATES: DriverRates = { from: '2000-01-01', hourlyRate: DRIVER_PAY.hourlyRate, perDelivery: DRIVER_PAY.perDelivery };
+
+export const DRIVER_RATE_LIMITS = { maxHourlyRate: 200, maxPerDelivery: 100, maxDaysAhead: 366 } as const;
+
+/** The saved changes, oldest first, always starting with the default rates */
+export function rateHistory(saved: DriverRates[] | null | undefined): DriverRates[] {
+  const valid = (saved ?? []).filter((r) => r && isDayString(r.from) && Number.isFinite(r.hourlyRate) && Number.isFinite(r.perDelivery));
+  const sorted = [...valid].sort((a, b) => a.from.localeCompare(b.from));
+  return sorted.length > 0 && sorted[0].from <= DEFAULT_DRIVER_RATES.from ? sorted : [DEFAULT_DRIVER_RATES, ...sorted];
+}
+
+/** The rates in effect on a day */
+export function ratesOn(day: string, history: DriverRates[]): DriverRates {
+  let current = DEFAULT_DRIVER_RATES;
+  for (const r of rateHistory(history)) if (r.from <= day) current = r;
+  return current;
+}
+
+const isMoney = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(Math.round(v * 100) - v * 100) < 1e-6;
+
+/** Checks an admin's change: dollars and cents, a start day from today up to a year ahead. Null when fine */
+export function validateRateChange(input: { hourlyRate?: unknown; perDelivery?: unknown; from?: unknown }, today: string): string | null {
+  const { hourlyRate, perDelivery, from } = input;
+  if (!isMoney(hourlyRate) || hourlyRate <= 0 || hourlyRate > DRIVER_RATE_LIMITS.maxHourlyRate) {
+    return `The hourly rate must be more than $0 and at most $${DRIVER_RATE_LIMITS.maxHourlyRate} (dollars and cents).`;
+  }
+  if (!isMoney(perDelivery) || perDelivery < 0 || perDelivery > DRIVER_RATE_LIMITS.maxPerDelivery) {
+    return `The amount per delivery must be $0 to $${DRIVER_RATE_LIMITS.maxPerDelivery} (dollars and cents).`;
+  }
+  if (typeof from !== 'string' || !isDayString(from)) return 'Pick the day the new rates start.';
+  if (from < today) return 'New rates can only start today or later, so past days keep what they cost.';
+  if (daysBetween({ from: today, to: from }) - 1 > DRIVER_RATE_LIMITS.maxDaysAhead) return 'Pick a start day within the next year.';
+  return null;
+}
+
+/** Adds a change; a change already planned on or after its start day is replaced by it */
+export function addRateChange(history: DriverRates[], change: DriverRates): DriverRates[] {
+  return [...rateHistory(history).filter((r) => r.from < change.from), change];
+}
+
+/** Removes a planned change that has not started yet; null when there is no such change (today's or a past one stays) */
+export function removeRateChange(history: DriverRates[], from: string, today: string): DriverRates[] | null {
+  const list = rateHistory(history);
+  if (from <= today || !list.some((r) => r.from === from)) return null;
+  return list.filter((r) => r.from !== from);
+}
 
 export function paidMinutes(plannedMinutes: number): number {
   const minutes = Math.max(0, num(plannedMinutes)) + DRIVER_PAY.bufferMinutes;
   return Math.ceil(minutes / DRIVER_PAY.roundToMinutes) * DRIVER_PAY.roundToMinutes;
 }
 
-export function routePay(plannedMinutes: number, deliveries: number): { paidMinutes: number; hourPay: number; deliveryPay: number; total: number } {
+export function routePay(
+  plannedMinutes: number,
+  deliveries: number,
+  rates: Pick<DriverRates, 'hourlyRate' | 'perDelivery'> = DEFAULT_DRIVER_RATES,
+): { paidMinutes: number; hourPay: number; deliveryPay: number; total: number } {
   const minutes = paidMinutes(plannedMinutes);
-  const hourPay = round2((minutes / 60) * DRIVER_PAY.hourlyRate);
-  const deliveryPay = round2(Math.max(0, num(deliveries)) * DRIVER_PAY.perDelivery);
+  const hourPay = round2((minutes / 60) * rates.hourlyRate);
+  const deliveryPay = round2(Math.max(0, num(deliveries)) * rates.perDelivery);
   return { paidMinutes: minutes, hourPay, deliveryPay, total: round2(hourPay + deliveryPay) };
 }
 
@@ -479,12 +543,12 @@ export interface DriverSummary {
 const driverOf = (r: Pick<DriverRoute, 'driverName' | 'driverSerial'>) => r.driverName.trim() || (r.driverSerial ? `Driver ${r.driverSerial}` : 'Driver');
 
 /** One line per driver (by the name in OptimoRoute) plus 'All drivers'; routes without deliveries are left out */
-export function driverSummaries(routes: DriverRoute[]): { drivers: DriverSummary[]; all: DriverSummary } {
+export function driverSummaries(routes: DriverRoute[], history: DriverRates[] = []): { drivers: DriverSummary[]; all: DriverSummary } {
   const map = new Map<string, { days: Set<string>; deliveries: number; planned: number; paid: number; pay: number }>();
   const all = { days: new Set<string>(), routes: 0, deliveries: 0, planned: 0, paid: 0, pay: 0 };
   for (const r of routes) {
     if (!(r.deliveries > 0)) continue;
-    const pay = routePay(r.plannedMinutes, r.deliveries);
+    const pay = routePay(r.plannedMinutes, r.deliveries, ratesOn(r.date, history));
     const name = driverOf(r);
     const entry = map.get(name) ?? { days: new Set<string>(), deliveries: 0, planned: 0, paid: 0, pay: 0 };
     entry.days.add(r.date);

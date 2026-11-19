@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
 import { count, EmptyNote, money2, rangeText, Section, SimpleTable } from './ui';
-import { DRIVER_PAY, formatMinutes, shortDay, type DriverSummary } from '@/utils/businessDashboard';
+import DriverRatesDialog from './DriverRatesDialog';
+import { DRIVER_PAY, formatMinutes, shortDay, type DriverRates, type DriverSummary } from '@/utils/businessDashboard';
 
 interface DriversAnswer {
   available: boolean;
@@ -13,7 +14,8 @@ interface DriversAnswer {
   shortened?: boolean;
   drivers?: DriverSummary[];
   all?: DriverSummary;
-  routes?: Array<{ date: string; driverName: string; driverSerial: string; plannedMinutes: number; deliveries: number; paidMinutes: number; total: number }>;
+  rates?: { current: DriverRates; inRange: DriverRates[]; upcoming: DriverRates[] };
+  routes?: Array<{ date: string; driverName: string; driverSerial: string; plannedMinutes: number; deliveries: number; paidMinutes: number; total: number; hourlyRate: number; perDelivery: number }>;
 }
 
 function DriverCard({ d, highlight }: { d: DriverSummary; highlight?: boolean }) {
@@ -45,6 +47,8 @@ export default function DriversTab({ token, range }: { token: string; range: { f
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [ratesOpen, setRatesOpen] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -63,12 +67,57 @@ export default function DriversTab({ token, range }: { token: string; range: { f
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [token, range.from, range.to]);
+  }, [token, range.from, range.to, reload]);
 
-  const rule = `Pay = planned route time + ${DRIVER_PAY.bufferMinutes} min, rounded up to ${DRIVER_PAY.roundToMinutes} min, × $${DRIVER_PAY.hourlyRate}/hour, + $${DRIVER_PAY.perDelivery} per delivery`;
+  // today's and planned rates, read on their own so they show even when OptimoRoute cannot be reached
+  const [rates, setRates] = useState<{ current: DriverRates; upcoming: DriverRates[] } | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/admin/business-dashboard/driver-rates', { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (body?.data) setRates({ current: body.data.current, upcoming: body.data.upcoming });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [token, reload]);
+
+  const current = rates?.current ?? data?.rates?.current;
+  const rule = current
+    ? `Pay = planned route time + ${DRIVER_PAY.bufferMinutes} min, rounded up to ${DRIVER_PAY.roundToMinutes} min, × ${money2(current.hourlyRate)}/hour, + ${money2(current.perDelivery)} per delivery`
+    : `Pay = planned route time + ${DRIVER_PAY.bufferMinutes} min, rounded up to ${DRIVER_PAY.roundToMinutes} min, × hourly rate, + an amount per delivery`;
+  const next = (rates?.upcoming ?? data?.rates?.upcoming)?.[0];
+  // the period has days at more than one rate: say so, each day uses its own
+  const mixed = (data?.rates?.inRange.length ?? 0) > 1;
 
   return (
-    <Section title="Driver pay" subtitle={rule}>
+    <Section
+      title="Driver pay"
+      subtitle={
+        <>
+          {rule}
+          {next && (
+            <Box component="span" sx={{ display: 'block', color: '#9a5b00' }}>
+              From {shortDay(next.from)}: {money2(next.hourlyRate)}/hour + {money2(next.perDelivery)} per delivery
+            </Box>
+          )}
+        </>
+      }
+      action={
+        <Button size="small" variant="outlined" onClick={() => setRatesOpen(true)} sx={{ flexShrink: 0 }}>
+          Change rates
+        </Button>
+      }
+    >
+      <DriverRatesDialog token={token} open={ratesOpen} onClose={() => setRatesOpen(false)} onSaved={() => setReload((n) => n + 1)} />
+      {mixed && data?.rates && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          The rates changed during this period, so each day is paid at the rates of that day:{' '}
+          {data.rates.inRange
+            .map((r, i, list) => `${money2(r.hourlyRate)}/hour + ${money2(r.perDelivery)} ${i === 0 ? `before ${shortDay(list[1].from)}` : `from ${shortDay(r.from)}`}`)
+            .join(' · ')}
+        </Alert>
+      )}
       {loading && !data ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress size={28} /></Box>
       ) : error ? (

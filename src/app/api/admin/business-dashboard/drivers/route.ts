@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminHeader } from '@/lib/livesiteForward';
-import { driverSummaries, routePay, validateDashboardRange, type DayRange, type DriverRoute } from '@/utils/businessDashboard';
+import { loadDriverRates } from '@/lib/server/driverRates';
+import { pacificToday } from '@/utils/abandonedCheckouts';
+import { driverSummaries, ratesOn, routePay, validateDashboardRange, type DayRange, type DriverRoute } from '@/utils/businessDashboard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -35,15 +37,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: { available: false, error: body?.error || 'Could not read the routes from OptimoRoute.' } });
     }
     const routes = (body.data?.routes ?? []).filter((r) => r.deliveries > 0);
+    const history = await loadDriverRates();
+    const today = pacificToday();
+    // rate changes that apply to a day inside this period (the first one may start before it)
+    const ratesInRange = history.filter((r, i) => r.from <= range.to && (history[i + 1]?.from ?? '9999-12-31') > from);
     return NextResponse.json({
       data: {
         available: true,
         from,
         to: range.to,
         shortened: from !== range.from,
-        ...driverSummaries(routes),
+        ...driverSummaries(routes, history),
+        rates: { current: ratesOn(today, history), inRange: ratesInRange, upcoming: history.filter((r) => r.from > today) },
         routes: routes
-          .map((r) => ({ ...r, ...routePay(r.plannedMinutes, r.deliveries) }))
+          .map((r) => {
+            const rates = ratesOn(r.date, history); // each day at the rates in effect on that day
+            return { ...r, hourlyRate: rates.hourlyRate, perDelivery: rates.perDelivery, ...routePay(r.plannedMinutes, r.deliveries, rates) };
+          })
           .sort((a, b) => b.date.localeCompare(a.date) || a.driverName.localeCompare(b.driverName)),
       },
     });
