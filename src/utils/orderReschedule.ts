@@ -4,13 +4,15 @@
  * Only the delivery date (actualDeliveryDate) moves; the kitchen day (deliveryDate) stays.
  * Dates are 'YYYY-MM-DD' strings.
  */
-export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready'] as const;
+export const RESCHEDULABLE_STATUSES = ['confirmed', 'preparing', 'ready', 'partially_delivered'] as const;
 /** Any day up to a year before or after today can be picked (a guard against typing the wrong year). */
 export const MAX_DAYS_AWAY = 365;
 
 export interface OrderRescheduleLike {
   status?: string | null;
   paymentStatus?: string | null;
+  /** per delivery day, how the route went (written by the live site's OptimoRoute step) */
+  optimo?: { deliveries?: Array<{ date?: string | null; status?: string | null }> | null } | null;
   items?: Array<{
     deliveryDate?: unknown;
     actualDeliveryDate?: unknown;
@@ -50,6 +52,21 @@ export function addDays(date: string, days: number): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!m) return '';
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days)).toISOString().slice(0, 10);
+}
+
+/** Delivery dates of an order the driver has already completed (their items cannot move). */
+export function deliveredDates(order: OrderRescheduleLike): Set<string> {
+  return new Set((order.optimo?.deliveries ?? []).filter((d) => d?.status === 'delivered' && typeof d.date === 'string').map((d) => d.date as string));
+}
+
+/** True when some picked item sits on a delivery date that has already been delivered. */
+export function picksDeliveredItems(order: OrderRescheduleLike, selected: Iterable<string>): boolean {
+  const done = deliveredDates(order);
+  if (done.size === 0) return false;
+  return selectionList(selected).some(({ line }) => {
+    const l = order.items?.[line];
+    return done.has(dateText(l?.actualDeliveryDate) || dateText(l?.deliveryDate));
+  });
 }
 
 /** Why this order cannot be moved, or null when it can (the same rule the live site applies). */
