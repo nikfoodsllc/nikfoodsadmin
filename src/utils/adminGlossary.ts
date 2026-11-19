@@ -57,6 +57,7 @@ const e = (
 
 export const GLOSSARY: GlossaryEntry[] = [
   // ---- Dashboard (Reporting > Dashboard)
+  e('Dashboard', 'Daily / Weekly / Monthly', 'Dashboard, next to the tabs', 'How the charts group the period: by day, by week (Saturday to Friday) or by month. A period up to a month starts on Daily, up to about four months on Weekly, longer on Monthly. Daily can be picked for periods up to 3 months.', undefined, 'grouping chart day week month'),
   e('Dashboard', 'Gross sales', 'Dashboard, Financial', 'The food subtotal of every paid order placed in the period (by the day it was placed, Pacific time). Tip, Platform Fee and tax are not sales. Orders refunded later still count here.'),
   e('Dashboard', 'Net sales', 'Dashboard, Financial', 'Gross sales minus refunds: Stripe refunds and store credit given back. A refund takes food, fee and tax off in the same share as the order total (a $10 refund on a $50 order takes 20% off each).', undefined, 'refund net'),
   e('Dashboard', 'This week / month / year so far', 'Dashboard, Financial, top cards', 'Net sales from the start of the week (Saturday), month or year up to today, against the same number of days before: last week to the same weekday, last month to the same day, last year to the same date.', undefined, 'wow mom yoy week over week'),

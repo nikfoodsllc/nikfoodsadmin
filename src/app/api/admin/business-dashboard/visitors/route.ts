@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminRequest } from '@/lib/adminAuth';
 import { activeNow, analyticsConfigured, visitorsFor } from '@/lib/googleAnalytics';
-import { bucketKeyOf, bucketsFor, defaultGrouping, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
+import { bucketKeyOf, bucketsFor, resolveGrouping, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const problem = validateDashboardRange(range);
     if (problem) return NextResponse.json({ error: problem }, { status: 400 });
     const groupParam = params.get('group');
-    const grouping: Grouping = groupParam === 'week' || groupParam === 'month' ? groupParam : defaultGrouping(range);
+    const grouping: Grouping = resolveGrouping(groupParam, range);
 
     const [now, period] = await Promise.all([activeNow(), visitorsFor(range.from, range.to)]);
     const buckets = bucketsFor(range, grouping).map((b) => ({ ...b, visitors: 0, visits: 0 }));

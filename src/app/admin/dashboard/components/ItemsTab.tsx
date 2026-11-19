@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Autocomplete, Box, Chip, CircularProgress, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { LineChart, MUTED, SERIES, ShareBars } from './charts';
-import { count, EmptyNote, money, money2, moneyAxis, pointsOf, Section, SimpleTable, TYPE_LABEL, type DashboardData } from './ui';
+import { unitOf, count, EmptyNote, money, money2, moneyAxis, pointsOf, Section, SimpleTable, TYPE_LABEL, type DashboardData } from './ui';
 import { percentChange, typeShare, type Bucket, type ItemType } from '@/utils/businessDashboard';
 
 const COOKED = SERIES[0];
@@ -56,7 +56,7 @@ interface ItemSeriesAnswer {
 
 export default function ItemsTab({ data, token }: { data: DashboardData; token: string }) {
   const points = pointsOf(data.types, data.grouping);
-  const unit = data.grouping === 'week' ? 'week' : 'month';
+  const unit = unitOf(data.grouping);
   const totals = data.types.reduce((s, b) => ({ cooked: s.cooked + b.cooked, readyToEat: s.readyToEat + b.readyToEat, notSet: s.notSet + b.notSet }), { cooked: 0, readyToEat: 0, notSet: 0 });
 
   const [topBy, setTopBy] = useState<'revenue' | 'quantity'>('revenue');
@@ -229,7 +229,7 @@ export default function ItemsTab({ data, token }: { data: DashboardData; token: 
                     </Box>,
                     <strong key="t">{fmtCell(values.reduce((s, v) => s + v, 0))}</strong>,
                     fmtCell(last),
-                    <Box key="c" component="span" title={`${unit === 'week' ? 'Week' : 'Month'} before: ${fmtCell(before)}`} sx={{ color: change === null || change === 0 ? 'text.secondary' : change > 0 ? '#1f7a3a' : '#b42318', fontWeight: 600 }}>
+                    <Box key="c" component="span" title={`${unit[0].toUpperCase()}${unit.slice(1)} before: ${fmtCell(before)}`} sx={{ color: change === null || change === 0 ? 'text.secondary' : change > 0 ? '#1f7a3a' : '#b42318', fontWeight: 600 }}>
                       {change === null ? '–' : `${change > 0 ? '+' : ''}${change}%`}
                     </Box>,
                   ];
