@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addRateChange,
   bucketsFor,
+  DEFAULT_DRIVER_RATES,
   defaultGrouping,
+  ratesOn,
+  removeRateChange,
+  validateRateChange,
   driverSummaries,
   itemSeries,
   itemTotals,
@@ -202,5 +207,48 @@ describe('driver pay', () => {
     expect(all.days).toBe(3);
     expect(all.pay).toBe(504.5);
     expect(all.costPerDelivery).toBe(7.21);
+  });
+
+  const raise = { from: '2026-12-01', hourlyRate: 20, perDelivery: 3.5, setAt: '2026-11-18T10:00:00Z', setBy: 'A' };
+
+  it('uses the default rates until an admin changes them, then the rates of each day', () => {
+    expect(ratesOn('2026-11-18', [])).toEqual(DEFAULT_DRIVER_RATES);
+    expect(ratesOn('2026-11-30', [raise]).hourlyRate).toBe(19);
+    expect(ratesOn('2026-12-01', [raise]).hourlyRate).toBe(20);
+    expect(routePay(300, 25, ratesOn('2026-12-02', [raise]))).toEqual({ paidMinutes: 330, hourPay: 110, deliveryPay: 87.5, total: 197.5 });
+    const { all } = driverSummaries(
+      [
+        { date: '2026-11-30', driverName: 'S', driverSerial: '001', plannedMinutes: 300, deliveries: 25 },
+        { date: '2026-12-01', driverName: 'S', driverSerial: '001', plannedMinutes: 300, deliveries: 25 },
+      ],
+      [raise],
+    );
+    expect(all.pay).toBe(179.5 + 197.5);
+  });
+
+  it('accepts changes from today on only, in dollars and cents', () => {
+    const today = '2026-11-18';
+    expect(validateRateChange({ hourlyRate: 20, perDelivery: 3.5, from: today }, today)).toBeNull();
+    expect(validateRateChange({ hourlyRate: 20, perDelivery: 0, from: '2026-12-01' }, today)).toBeNull();
+    expect(validateRateChange({ hourlyRate: 20, perDelivery: 3, from: '2026-11-17' }, today)).toMatch(/today or later/);
+    expect(validateRateChange({ hourlyRate: 0, perDelivery: 3, from: today }, today)).toMatch(/hourly/);
+    expect(validateRateChange({ hourlyRate: 19.999, perDelivery: 3, from: today }, today)).toMatch(/hourly/);
+    expect(validateRateChange({ hourlyRate: '20', perDelivery: 3, from: today }, today)).toMatch(/hourly/);
+    expect(validateRateChange({ hourlyRate: 20, perDelivery: -1, from: today }, today)).toMatch(/per delivery/);
+    expect(validateRateChange({ hourlyRate: 20, perDelivery: 3, from: '2026-02-30' }, today)).toMatch(/Pick the day/);
+    expect(validateRateChange({ hourlyRate: 20, perDelivery: 3, from: '2028-01-01' }, today)).toMatch(/next year/);
+  });
+
+  it('replaces a planned change on or after the new start day and cancels only future ones', () => {
+    const later = { ...raise, from: '2027-01-01', hourlyRate: 21 };
+    const history = addRateChange([raise, later], { ...raise, from: '2026-12-15', hourlyRate: 22 });
+    expect(history.map((r) => [r.from, r.hourlyRate])).toEqual([
+      ['2000-01-01', 19],
+      ['2026-12-01', 20],
+      ['2026-12-15', 22],
+    ]);
+    expect(removeRateChange(history, '2026-12-15', '2026-11-18')?.map((r) => r.from)).toEqual(['2000-01-01', '2026-12-01']);
+    expect(removeRateChange(history, '2026-12-01', '2026-12-05')).toBeNull(); // already started
+    expect(removeRateChange(history, '2026-12-20', '2026-11-18')).toBeNull(); // no such change
   });
 });
