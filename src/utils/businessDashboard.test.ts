@@ -60,7 +60,9 @@ describe('dates', () => {
     expect(days.map((b) => [b.key, b.label])).toEqual([['2026-11-16', 'Nov 16'], ['2026-11-17', 'Nov 17'], ['2026-11-18', 'Nov 18']]);
     expect(resolveGrouping('day', { from: '2026-10-01', to: '2026-11-18' })).toBe('day');
     expect(resolveGrouping('day', { from: '2026-01-01', to: '2026-11-18' })).toBe('month');
-    expect(resolveGrouping('junk', { from: '2026-11-01', to: '2026-11-18' })).toBe('week');
+    expect(resolveGrouping('junk', { from: '2026-11-01', to: '2026-11-18' })).toBe('day');
+    expect(resolveGrouping(null, { from: '2026-11-14', to: '2026-11-18' })).toBe('day');
+    expect(resolveGrouping(null, { from: '2026-09-01', to: '2026-11-18' })).toBe('week');
     const orders = [order({ day: '2026-11-16' }), order({ day: '2026-11-18', subtotal: 10 })];
     expect(moneySeries(orders, { from: '2026-11-16', to: '2026-11-18' }, 'day').map((b) => b.gross)).toEqual([40, 0, 10]);
   });
