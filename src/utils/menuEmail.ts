@@ -23,6 +23,8 @@ export interface MenuSection {
   items: string;
   /** the flat category its dishes were filled from (so it can be filled again) */
   categoryId?: string;
+  /** the saved box it came from or was saved as (saved boxes start every new menu email) */
+  savedId?: string;
 }
 export interface MenuEmailData {
   headline: string;
@@ -255,7 +257,7 @@ export function parseMenuEmail(html: string): MenuEmailData | null {
     const raw = JSON.parse(fromB64(m[1])) as Partial<MenuEmailData>;
     const base = emptyMenuEmail();
     return {
-      sections: Array.isArray(raw.sections) ? raw.sections.map((x) => ({ title: String(x?.title ?? ''), subtitle: String(x?.subtitle ?? ''), items: String(x?.items ?? ''), ...(typeof x?.categoryId === 'string' ? { categoryId: x.categoryId } : {}) })).slice(0, MAX_MENU_SECTIONS) : [],
+      sections: Array.isArray(raw.sections) ? raw.sections.map((x) => ({ title: String(x?.title ?? ''), subtitle: String(x?.subtitle ?? ''), items: String(x?.items ?? ''), ...(typeof x?.categoryId === 'string' ? { categoryId: x.categoryId } : {}), ...(typeof x?.savedId === 'string' ? { savedId: x.savedId } : {}) })).slice(0, MAX_MENU_SECTIONS) : [],
       weekOf: validDate(raw.weekOf) ? raw.weekOf : base.weekOf,
       headline: typeof raw.headline === 'string' ? raw.headline : base.headline,
       intro: typeof raw.intro === 'string' ? raw.intro : base.intro,
@@ -265,4 +267,49 @@ export function parseMenuEmail(html: string): MenuEmailData | null {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Saved boxes: extra boxes that stay the same for months (shared by every admin), so a new menu email starts with them filled in
+// ---------------------------------------------------------------------------------------------
+
+export interface SavedMenuBox {
+  id: string;
+  title: string;
+  subtitle: string;
+  items: string;
+  categoryId?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export const MAX_SAVED_BOXES = MAX_MENU_SECTIONS;
+
+/** A box as it is saved: title, subtitle and dishes cleaned (one per line), or the problem to show */
+export function cleanSavedBox(raw: unknown): { box: Omit<SavedMenuBox, 'id' | 'updatedAt' | 'updatedBy'> } | { error: string } {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const title = String(r.title ?? '').trim().slice(0, 40);
+  if (!title) return { error: 'Give the box a title first.' };
+  const subtitle = String(r.subtitle ?? '').trim().slice(0, 60);
+  const dishes = dishesOf(String(r.items ?? '')).map((d) => d.slice(0, 80)).slice(0, MAX_MENU_DISHES);
+  if (dishes.length === 0) return { error: 'Add at least one dish to the box first.' };
+  const categoryId = typeof r.categoryId === 'string' && /^[0-9a-f]{24}$/i.test(r.categoryId) ? r.categoryId : undefined;
+  return { box: { title, subtitle, items: dishes.join('\n'), ...(categoryId ? { categoryId } : {}) } };
+}
+
+/** Whether a box in the email still matches its saved copy (same title, subtitle and dishes) */
+export function sameAsSaved(section: MenuSection, saved: SavedMenuBox | undefined): boolean {
+  if (!saved) return false;
+  return section.title.trim() === saved.title && section.subtitle.trim() === saved.subtitle && dishesOf(section.items).join('\n') === dishesOf(saved.items).join('\n');
+}
+
+/** A new menu email's boxes: the saved ones when there are any, otherwise the starting boxes */
+export function startingSections(saved: SavedMenuBox[]): MenuSection[] {
+  if (saved.length === 0) return emptyMenuEmail().sections ?? [];
+  return saved.slice(0, MAX_MENU_SECTIONS).map((b) => ({ title: b.title, subtitle: b.subtitle, items: b.items, savedId: b.id, ...(b.categoryId ? { categoryId: b.categoryId } : {}) }));
+}
+
+/** True for an email whose boxes nobody has touched yet (no dishes, none from a saved box): it may take the saved boxes */
+export function sectionsUntouched(sections: MenuSection[] | undefined): boolean {
+  return (sections ?? []).every((x) => !x.savedId && dishesOf(x.items).length === 0);
 }
