@@ -111,7 +111,24 @@ describe('expandRecipeRows', () => {
   });
   it('lists the item ids that may have recipes', () => {
     const combo = row({ foodId: id(7), sections: [{ _id: 's1', selectedItems: [{ _id: 'o1', item: { _id: BIRYANI, name: 'Veg Biryani' } }] }], comboSelections: { s1: ['o1'] } });
-    expect(recipeFoodIds([combo, row({ foodId: RAITA }), row({ foodId: null })]).sort()).toEqual([BIRYANI, RAITA].sort());
+    expect(recipeFoodIds([combo, row({ foodId: RAITA }), row({ foodId: null })]).sort()).toEqual([BIRYANI, RAITA, id(7)].sort());
+  });
+  it("adds a combo's own recipe items once per combo, on top of its parts' ones", () => {
+    const COMBO = id(7);
+    const withCombo = new Map([...lines, [COMBO, cleanRecipeLines([{ recipeItemId: CHUTNEY, amount: 2 }])]]);
+    const combo = row({
+      name: 'Biryani Combo',
+      foodId: COMBO,
+      quantity: 3,
+      portion: null,
+      sections: [{ _id: 's1', selectedItems: [{ _id: 'o1', portion: '12Oz', quantity: 1, item: { _id: BIRYANI, name: 'Veg Biryani' } }] }],
+      comboSelections: { s1: ['o1'] },
+    });
+    const out = expandRecipeRows([combo], withCombo, recipes);
+    const chutney = out.filter((r) => r.recipeOf === 'Biryani Combo');
+    expect(chutney).toHaveLength(1);
+    expect(chutney[0]).toMatchObject({ name: 'Mint Chutney', quantity: 3, portion: '2Oz', sections: null, comboSelections: null });
+    expect(out.find((r) => r.recipeOf === 'Veg Biryani')).toMatchObject({ name: 'Raita', quantity: 3 });
   });
 });
 
