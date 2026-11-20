@@ -46,11 +46,7 @@ export function buildDayMenus(dates: string[], mappings: MenuMapping[], categori
   };
   const cat = new Map(categories.map((c) => [c.id, c]));
   const food = new Map(foods.map((f) => [f.id, f]));
-  const hidden = (id: string): boolean => {
-    const c = cat.get(id);
-    if (!c) return false;
-    return Boolean(c.isDraft) || (c.parentId ? Boolean(cat.get(c.parentId)?.isDraft) : false);
-  };
+  // a category switched to Unavailable still counts: the menu is often hidden until this email announces it
   // the place of a category in the menu: its top-level category first, then itself
   const place = (id: string): [number, number] => {
     const c = cat.get(id);
@@ -61,7 +57,7 @@ export function buildDayMenus(dates: string[], mappings: MenuMapping[], categori
   const out: Record<string, string[]> = {};
   for (const date of dates) {
     const rows = mappings
-      .filter((m) => m.day === date && !hidden(m.categoryId) && subPlace(m.foodItemId) !== null)
+      .filter((m) => m.day === date && subPlace(m.foodItemId) !== null)
       .map((m) => ({ m, f: food.get(m.foodItemId), p: place(m.categoryId), sp: subPlace(m.foodItemId) ?? 0 }))
       .filter((r): r is { m: MenuMapping; f: MenuFood; p: [number, number]; sp: number } => Boolean(r.f) && r.f!.available !== false && !r.f!.isDraft && r.f!.name.trim() !== '')
       .sort((a, b) => a.p[0] - b.p[0] || a.p[1] - b.p[1] || a.sp - b.sp || num(a.m.sequence, 1e6) - num(b.m.sequence, 1e6) || a.f.name.localeCompare(b.f.name));
@@ -79,24 +75,23 @@ export interface FlatCategoryOption {
   label: string;
 }
 
-/** The categories an extra box can be filled from: flat categories and their sub-categories that customers can see, in menu order. */
+/** The categories an extra box can be filled from: flat categories and their sub-categories (Unavailable ones too), in menu order. */
 export function flatCategoryOptions(categories: Array<MenuCategory & { listingType?: string }>): FlatCategoryOption[] {
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const hiddenCat = (c: MenuCategory) => Boolean(c.isDraft) || (c.parentId ? Boolean(byId.get(c.parentId)?.isDraft) : false);
   const isFlat = (c: MenuCategory & { listingType?: string }) => (c.parentId ? (byId.get(c.parentId) as { listingType?: string } | undefined)?.listingType : c.listingType) !== 'day-wise';
   return categories
-    .filter((c) => !hiddenCat(c) && isFlat(c) && (c.name ?? '').trim() !== '')
+    .filter((c) => isFlat(c) && (c.name ?? '').trim() !== '')
     .sort((a, b) => num(a.parentId ? byId.get(a.parentId)?.sequence : a.sequence, 1e6) - num(b.parentId ? byId.get(b.parentId)?.sequence : b.sequence, 1e6) || (a.parentId ? 1 : 0) - (b.parentId ? 1 : 0) || num(a.sequence, 1e6) - num(b.sequence, 1e6))
     .map((c) => ({ id: c.id, label: c.parentId && byId.get(c.parentId)?.name ? `${byId.get(c.parentId)!.name} > ${c.name}` : String(c.name) }));
 }
 
-/** The items of a flat category (its own, then each sub-category's), as dish names in menu order, without anything customers cannot order. */
+/** The items of a flat category (its own, then each sub-category's), as dish names in menu order. A category set to Unavailable still counts; dishes switched off themselves do not. */
 export function buildCategoryItems(rootId: string, mappings: Array<{ categoryId: string; foodItemId: string; sequence?: number }>, categories: MenuCategory[], foods: MenuFood[]): string[] {
   const cat = new Map(categories.map((c) => [c.id, c]));
   const root = cat.get(rootId);
-  if (!root || root.isDraft || (root.parentId && cat.get(root.parentId)?.isDraft)) return [];
+  if (!root) return [];
   const food = new Map(foods.map((f) => [f.id, f]));
-  const kids = categories.filter((c) => c.parentId === rootId && !c.isDraft).sort((a, b) => num(a.sequence, 1e6) - num(b.sequence, 1e6));
+  const kids = categories.filter((c) => c.parentId === rootId).sort((a, b) => num(a.sequence, 1e6) - num(b.sequence, 1e6));
   const seen = new Set<string>();
   const out: string[] = [];
   for (const id of [rootId, ...kids.map((k) => k.id)]) {
