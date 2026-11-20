@@ -25,9 +25,13 @@ describe('buildDayMenus', () => {
     expect(out['2026-11-17']).toEqual(['Samosa', 'Paneer Tikka', 'Dal Makhani']);
     expect(out['2026-11-18']).toEqual(['Paneer Tikka']);
   });
-  it('leaves out unavailable, draft and hidden-category items, and repeats', () => {
-    const out = buildDayMenus(['d'], [m('d', 'app', 'd'), m('d', 'app', 'e'), m('d', 'old', 'f'), m('d', 'oldsub', 'f'), m('d', 'app', 'b'), m('d', 'main', 'g')], cats, foods);
+  it('leaves out dishes switched off themselves and repeats', () => {
+    const out = buildDayMenus(['d'], [m('d', 'app', 'd'), m('d', 'app', 'e'), m('d', 'app', 'b'), m('d', 'main', 'g')], cats, foods);
     expect(out.d).toEqual(['Dal Makhani']);
+  });
+  it('keeps dishes in a category set to Unavailable (the menu is often hidden until the email goes out)', () => {
+    const out = buildDayMenus(['d'], [m('d', 'old', 'f'), m('d', 'oldsub', 'a')], cats, foods);
+    expect(out.d).toEqual(['Hidden Dish', 'Samosa']);
   });
   it('gives an empty list for a date with no menu and ignores other dates', () => {
     expect(buildDayMenus(['x'], [m('y', 'app', 'a')], cats, foods)).toEqual({ x: [] });
@@ -71,8 +75,8 @@ describe('flat categories for the extra boxes', () => {
     { id: 'off', name: 'Off', sequence: 4, listingType: 'flat', isDraft: true },
     { id: 'offsub', name: 'Off sub', sequence: 1, parentId: 'off' },
   ];
-  it('lists flat categories and their sub-categories, not day-wise or switched-off ones', () => {
-    expect(flatCategoryOptions(cats).map((o) => o.label)).toEqual(['Indian Sweets', "Add-On's", "Add-On's > Pickles"]);
+  it('lists flat categories and their sub-categories (Unavailable ones too), not day-wise ones', () => {
+    expect(flatCategoryOptions(cats).map((o) => o.label)).toEqual(['Indian Sweets', "Add-On's", "Add-On's > Pickles", 'Off', 'Off > Off sub']);
   });
   const foods = [{ id: 'a', name: 'Motichoor Ladoo' }, { id: 'b', name: 'Fresh Paneer' }, { id: 'c', name: 'Mango Pickle' }, { id: 'd', name: 'Gone', available: false }, { id: 'e', name: 'Draft', isDraft: true }];
   const maps = [
@@ -86,8 +90,8 @@ describe('flat categories for the extra boxes', () => {
     expect(buildCategoryItems('sw', maps, cats, foods)).toEqual(['Motichoor Ladoo']);
     expect(buildCategoryItems('ad', maps, cats, foods)).toEqual(['Fresh Paneer', 'Mango Pickle']);
   });
-  it('gives nothing for a switched-off or unknown category', () => {
-    expect(buildCategoryItems('off', maps, cats, foods)).toEqual([]);
+  it('fills from a category set to Unavailable, and gives nothing for an unknown one', () => {
+    expect(buildCategoryItems('off', [...maps, { categoryId: 'offsub', foodItemId: 'a', sequence: 0 }], cats, foods)).toEqual(['Motichoor Ladoo']);
     expect(buildCategoryItems('nope', maps, cats, foods)).toEqual([]);
   });
 });
