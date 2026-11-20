@@ -39,11 +39,14 @@ function Change({ row }: { row: CompareRow }) {
   return (
     <Box component="span" sx={{ color: good ? '#1f7a3a' : '#b42318', fontWeight: 600, whiteSpace: 'nowrap' }}>
       <Icon size={13} style={{ verticalAlign: '-2px' }} />
-      {diffText}
+      {/* a phone shows only the percent (the amount when there is no percent), so the column fits */}
+      <Box component="span" sx={{ display: row.change !== null ? { xs: 'none', sm: 'inline' } : 'inline' }}>{diffText}</Box>
       {row.change !== null && (
-        <Box component="span" sx={{ fontWeight: 500 }}>
-          {' '}({row.change > 0 ? '+' : ''}
-          {row.change}%)
+        <Box component="span" sx={{ fontWeight: { xs: 600, sm: 500 } }}>
+          <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}> (</Box>
+          {row.change > 0 ? '+' : ''}
+          {row.change}%
+          <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>)</Box>
         </Box>
       )}
     </Box>
@@ -65,7 +68,8 @@ export default function CompareSection({ data, controls }: { data: DashboardData
     label: nowPoints[i]?.label ?? beforePoints[i]?.label ?? '',
     detail: [nowPoints[i]?.detail ?? nowPoints[i]?.label, beforePoints[i]?.detail ?? beforePoints[i]?.label].filter(Boolean).join(' vs '),
   }));
-  const valuesOf = (series: DashboardData['series'] | undefined) => Array.from({ length }, (_, i) => (series?.[i] ? series[i][metric] : 0));
+  // each line only as long as its own period, so a shorter period ends instead of dropping to 0
+  const valuesOf = (series: DashboardData['series'] | undefined) => (series ?? []).map((b) => b[metric]);
   const format = metric === 'orders' ? (v: number) => count(v) : moneyAxis;
 
   const choose = (mode: CompareMode | null) => mode && controls.setMode(mode);
