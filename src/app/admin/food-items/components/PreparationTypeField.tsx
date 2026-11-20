@@ -14,7 +14,7 @@ interface PreparationTypeFieldProps {
 }
 
 /**
- * Cooked / Ready to eat, for the edit dialogs: two tick boxes on one line (only one can be ticked; neither = not set yet).
+ * Cooked / Ready to eat, for the edit dialogs: two tick boxes on one line (only one can be ticked).
  * This is the master data the Food Items column and the kitchen reports read.
  */
 export default function PreparationTypeField({ value, onChange, disabled, required, error }: PreparationTypeFieldProps) {
@@ -26,8 +26,8 @@ export default function PreparationTypeField({ value, onChange, disabled, requir
           size="small"
           checked={current === type}
           disabled={disabled}
-          // ticking the ticked one again clears it (back to not set yet)
-          onChange={(e) => onChange(e.target.checked ? type : null)}
+          // one of the two is always kept: unticking the ticked one does nothing (Prep Type N/A is only for combos)
+          onChange={(e) => { if (e.target.checked) onChange(type); }}
           sx={{ '&.Mui-checked': { color } }}
         />
       }

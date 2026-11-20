@@ -34,7 +34,7 @@ function verifyAuth(request: NextRequest) {
  * PATCH /api/admin/food-items/preparation-type
  * Body: { ids: string[], preparationType: 'cooked' | 'ready_to_eat' | null }
  *
- * Sets how a whole batch of food items is prepared (null puts them back to "not set yet").
+ * Sets how a whole batch of food items is prepared (null = Prep Type N/A, applied to combos only).
  * Only the preparationType field (and updatedAt) is touched. The customer menu does not use this
  * field, so the home menu cache is left alone.
  */
@@ -70,9 +70,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const objectIds = [...new Set(ids as string[])].map((id) => new ObjectId(id));
+    // combos have no preparation type (the kitchen reports split them into their parts), so setting a type skips them;
+    // clearing (Prep Type N/A) only ever reaches combos: every other item stays Cooked or Ready to eat
+    const combos = preparationType === null ? [] : await db.read<{ _id: ObjectId }>('fooditems', { _id: { $in: objectIds }, itemType: 'combo' } as never, { projection: { _id: 1 } } as never);
+    const skippedCombos = Array.isArray(combos) ? combos.length : 0;
     const result = await db.update(
       'fooditems',
-      { _id: { $in: objectIds } },
+      preparationType === null ? { _id: { $in: objectIds }, itemType: 'combo' } : { _id: { $in: objectIds }, itemType: { $ne: 'combo' } },
       preparationType === null
         ? { $unset: { preparationType: '' }, $set: { updatedAt: new Date() } }
         : { $set: { preparationType, updatedAt: new Date() } }
@@ -82,7 +86,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { requested: objectIds.length, modified: result.modifiedCount ?? 0, preparationType },
+      data: { requested: objectIds.length, modified: result.modifiedCount ?? 0, skippedCombos, preparationType },
       message: 'Food items updated successfully',
     });
   } catch (error) {

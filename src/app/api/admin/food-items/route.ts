@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { ecoChargeError, ECO_CHARGE_REQUIRED } from '@/utils/ecoContainer';
 import { jwtHandler } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { deleteUnusedPhotos, deleteRemovedPhotos, imageFields, incomingImages } from '@/lib/itemImageStore';
@@ -336,6 +337,9 @@ const foodItemSchema = z.object({
   {
     message: 'Price is required for simple and combo items',
   }
+).refine(
+  (data: { isEcoFriendlyContainer?: boolean; ecoContainerCharge?: number }) => ecoChargeError(data.isEcoFriendlyContainer, data.ecoContainerCharge) === null,
+  { message: ECO_CHARGE_REQUIRED, path: ['ecoContainerCharge'] }
 );
 
 interface ComboItem {
@@ -827,7 +831,7 @@ export async function POST(request: NextRequest) {
       hasSpiceLevel: data.hasSpiceLevel,
       spiceLevel: data.spiceLevel || [],
       ...(data.itemType === 'combo' && data.hasSpiceLevel && data.spiceMode ? { spiceMode: data.spiceMode } : {}),
-      ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
+      ...(data.itemType !== 'combo' && isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
       // a new item is on the Stickers sheet unless it was created with Sticker = No
       sticker: isStickerFlag(data.sticker) ? data.sticker : 'yes',
       chefsPick: data.chefsPick === true,
@@ -838,7 +842,7 @@ export async function POST(request: NextRequest) {
       // an item with no sticker has no split sticker either
       ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
       ...(data.itemType === 'simple' && cleanUnitQuantity(data.unitQuantity) > 1 ? { unitQuantity: cleanUnitQuantity(data.unitQuantity) } : {}),
-      ...(data.itemType !== 'combo' && cleanRecipeLines(data.recipeLines).length > 0 ? { recipeLines: cleanRecipeLines(data.recipeLines) } : {}),
+      ...(cleanRecipeLines(data.recipeLines).length > 0 ? { recipeLines: cleanRecipeLines(data.recipeLines) } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1017,6 +1021,11 @@ export async function PUT(request: NextRequest) {
 
     const existingItem = existingResult.data;
    const data = validationResult.data;
+
+   // an item that is not a combo cannot be put back to no preparation type (Prep Type N/A is only for combos)
+   if (data.itemType !== 'combo' && data.preparationType === null) {
+     return NextResponse.json({ error: 'Preparation type is required (Cooked or Ready to eat)' }, { status: 400 });
+   }
    await rememberHeatingInstruction(data.heatingInstructions);
     const stockProblem = stockUnitProblem(data, Array.isArray(data.portions) && data.portions.length > 0);
     if (stockProblem) return NextResponse.json({ error: stockProblem }, { status: 400 });
@@ -1061,7 +1070,7 @@ const updateData: Partial<FoodItem> = {
   hasSpiceLevel: data.hasSpiceLevel,
   spiceLevel: data.spiceLevel || [],
   ...(data.itemType === 'combo' && data.hasSpiceLevel && data.spiceMode ? { spiceMode: data.spiceMode } : {}),
-  ...(isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
+  ...(data.itemType !== 'combo' && isPreparationType(data.preparationType) ? { preparationType: data.preparationType } : {}),
   ...(isStickerFlag(data.sticker) ? { sticker: data.sticker } : {}),
   ...(typeof data.chefsPick === 'boolean' ? { chefsPick: data.chefsPick } : {}),
   ...(cleanHeatingInstruction(data.heatingInstructions) ? { heatingInstructions: cleanHeatingInstruction(data.heatingInstructions) as string } : {}),
@@ -1072,7 +1081,7 @@ const updateData: Partial<FoodItem> = {
   // an item with no sticker has no split sticker either; otherwise the Split Sticker choice is saved as sent
   ...(data.sticker === 'no' ? { splitSticker: 'no' } : isStickerFlag(data.splitSticker) ? { splitSticker: data.splitSticker } : {}),
   ...(data.itemType === 'simple' && cleanUnitQuantity(data.unitQuantity) > 1 ? { unitQuantity: cleanUnitQuantity(data.unitQuantity) } : {}),
-  ...(data.itemType !== 'combo' && cleanRecipeLines(data.recipeLines).length > 0 ? { recipeLines: cleanRecipeLines(data.recipeLines) } : {}),
+  ...(cleanRecipeLines(data.recipeLines).length > 0 ? { recipeLines: cleanRecipeLines(data.recipeLines) } : {}),
   updatedAt: new Date(),
 };
 
@@ -1160,7 +1169,7 @@ const updateData: Partial<FoodItem> = {
     // Update food item
     // preparationType / sticker: sent as null means "back to not set yet"; left out means "leave as it is"
     const unset: Record<string, ''> = {};
-    if (data.preparationType === null) unset.preparationType = '';
+    if (data.preparationType === null || data.itemType === 'combo') unset.preparationType = ''; // a combo is always Prep Type N/A
     if (data.sticker === null) unset.sticker = '';
     // an empty or null heating instruction clears it; left out leaves it as it is
     if (data.heatingInstructions !== undefined && cleanHeatingInstruction(data.heatingInstructions) === null) unset.heatingInstructions = '';
@@ -1168,7 +1177,7 @@ const updateData: Partial<FoodItem> = {
     if (data.itemType === 'combo' && (data.hasSpiceLevel === false || data.spiceMode === null)) unset.spiceMode = '';
     if (data.splitSticker === null && data.sticker !== 'no') unset.splitSticker = '';
     // recipe lines: an empty list (or any combo) takes them all off; left out leaves them as they are
-    if (data.itemType === 'combo' || (data.recipeLines !== undefined && data.recipeLines !== null && cleanRecipeLines(data.recipeLines).length === 0)) unset.recipeLines = '';
+    if (data.recipeLines !== undefined && data.recipeLines !== null && cleanRecipeLines(data.recipeLines).length === 0) unset.recipeLines = '';
     // quantity per order (simple items only): sent as null or 1 (or on any other item type) goes back to one per order; left out leaves it as it is
     if (data.itemType !== 'simple' || (data.unitQuantity !== undefined && cleanUnitQuantity(data.unitQuantity) === 1)) unset.unitQuantity = '';
     const updateResult = await db.updateOne<FoodItem>(

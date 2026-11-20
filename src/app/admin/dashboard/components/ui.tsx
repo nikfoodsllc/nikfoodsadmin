@@ -45,7 +45,7 @@ export function moneyAxis(v: number): string {
 }
 export const count = (v: number) => new Intl.NumberFormat('en-US').format(Math.round(v));
 
-export const TYPE_LABEL: Record<ItemType, string> = { cooked: 'Cooked', ready_to_eat: 'Ready to eat', not_set: 'Not set' };
+export const TYPE_LABEL: Record<ItemType, string> = { cooked: 'Cooked', ready_to_eat: 'Ready to eat', not_set: 'Prep Type N/A' };
 
 /** Chart points of buckets: 'Nov 14' with 'Nov 14 – Nov 20' in the tooltip */
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
