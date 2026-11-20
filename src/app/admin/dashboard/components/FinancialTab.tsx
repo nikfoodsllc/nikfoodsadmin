@@ -6,6 +6,7 @@ import { IconAlertTriangle, IconDownload } from '@tabler/icons-react';
 import { BarChart, LineChart, SERIES, TooltipRow } from './charts';
 import { unitOf, count, Delta, EmptyNote, Kpi, KpiGrid, money, money2, moneyAxis, pointsOf, rangeText, Section, SimpleTable, type DashboardData, type QuickBlock } from './ui';
 import { downloadCSV, escapeCSVValue } from '@/utils/csv';
+import CompareSection, { type CompareControls } from './CompareSection';
 
 function QuickCard({ block }: { block: QuickBlock }) {
   return (
@@ -25,7 +26,7 @@ function downloadCsv(name: string, rows: Array<Array<string | number>>) {
   downloadCSV('\uFEFF' + rows.map((r) => r.map((c) => escapeCSVValue(c)).join(',')).join('\r\n'), name);
 }
 
-export default function FinancialTab({ data }: { data: DashboardData }) {
+export default function FinancialTab({ data, compare }: { data: DashboardData; compare: CompareControls }) {
   const [showLosses, setShowLosses] = useState(false);
   const { current, previous, lastYear } = data.totals;
   const points = pointsOf(data.series, data.grouping);
@@ -41,6 +42,8 @@ export default function FinancialTab({ data }: { data: DashboardData }) {
         <QuickCard block={data.quick.month} />
         <QuickCard block={data.quick.year} />
       </Box>
+
+      <CompareSection data={data} controls={compare} />
 
       <Section title="Sales" subtitle={`${rangeText(data.range)} · by the day the order was placed`}>
         <KpiGrid>

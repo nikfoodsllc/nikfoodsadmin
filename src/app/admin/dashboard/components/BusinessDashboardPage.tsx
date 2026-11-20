@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLatestRequest } from '@/hooks/useLatestRequest';
 import { formatPSTDateISO } from '@/utils/timezone';
 import { addDays, weekStartOf } from '@/utils/kitchenDashboard';
-import { daysBetween, defaultGrouping, MAX_DAILY_DAYS, validateDashboardRange, type DayRange, type Grouping } from '@/utils/businessDashboard';
+import { compareRangeFor, daysBetween, defaultGrouping, isCompareMode, MAX_DAILY_DAYS, previousRange, validateDashboardRange, type CompareMode, type DayRange, type Grouping } from '@/utils/businessDashboard';
 import FinancialTab from './FinancialTab';
 import ItemsTab from './ItemsTab';
 import VisitorsTab from './VisitorsTab';
@@ -62,7 +62,7 @@ function presetRange(preset: Exclude<Preset, 'custom'>, today: string): DayRange
   }
 }
 
-function readSaved(): { preset?: Preset; tab?: TabId; custom?: DayRange } {
+function readSaved(): { preset?: Preset; tab?: TabId; custom?: DayRange; compareMode?: CompareMode; compareCustom?: DayRange } {
   try {
     return JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
   } catch {
@@ -82,6 +82,11 @@ export default function BusinessDashboardPage() {
   const [customError, setCustomError] = useState<string | null>(null);
   const [groupChoice, setGroupChoice] = useState<Grouping | null>(null);
   const [restored, setRestored] = useState(false);
+  // what the Financial tab compares the period with
+  const [compareMode, setCompareMode] = useState<CompareMode>('previous');
+  const [compareDraft, setCompareDraft] = useState<DayRange>({ from: '', to: '' });
+  const [compareApplied, setCompareApplied] = useState<DayRange | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
 
   // the period and tab chosen last time, in this browser
   useEffect(() => {
@@ -94,20 +99,26 @@ export default function BusinessDashboardPage() {
     } else if (saved.preset && saved.preset !== 'custom' && PRESETS.some((p) => p.id === saved.preset)) {
       setPreset(saved.preset);
     }
+    if (isCompareMode(saved.compareMode)) setCompareMode(saved.compareMode);
+    if (saved.compareCustom && !validateDashboardRange(saved.compareCustom)) {
+      setCompareApplied(saved.compareCustom);
+      setCompareDraft(saved.compareCustom);
+    }
     setRestored(true);
   }, []);
   useEffect(() => {
     if (!restored) return;
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({ preset, tab, custom: customApplied ?? undefined }));
+      localStorage.setItem(STORE_KEY, JSON.stringify({ preset, tab, custom: customApplied ?? undefined, compareMode, compareCustom: compareApplied ?? undefined }));
     } catch {
       // private window: the choice is simply not remembered
     }
-  }, [preset, tab, customApplied, restored]);
+  }, [preset, tab, customApplied, compareMode, compareApplied, restored]);
 
   const range: DayRange | null = preset === 'custom' ? customApplied : presetRange(preset, today);
   // Daily only for ranges up to about three months; a remembered Daily choice falls back for longer ones
   const dailyAllowed = range ? daysBetween(range) <= MAX_DAILY_DAYS : false;
+  const compareRange: DayRange | null = range ? compareRangeFor(compareMode, range, compareApplied) : null;
   const grouping: Grouping = groupChoice && (groupChoice !== 'day' || dailyAllowed) ? groupChoice : range ? defaultGrouping(range) : 'week';
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -126,6 +137,10 @@ export default function BusinessDashboardPage() {
     setError(null);
     try {
       const params = new URLSearchParams({ from: range.from, to: range.to, group: grouping });
+      if (compareRange) {
+        params.set('compareFrom', compareRange.from);
+        params.set('compareTo', compareRange.to);
+      }
       const response = await fetch(`/api/admin/business-dashboard?${params}`, { headers: { Authorization: `Bearer ${token}` }, signal: request.signal });
       const body = await response.json();
       if (!request.isCurrent()) return;
@@ -138,7 +153,7 @@ export default function BusinessDashboardPage() {
       if (request.isCurrent()) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, range?.from, range?.to, grouping, restored, beginRequest]);
+  }, [token, range?.from, range?.to, compareRange?.from, compareRange?.to, grouping, restored, beginRequest]);
 
   useEffect(() => {
     load();
@@ -151,6 +166,18 @@ export default function BusinessDashboardPage() {
       setCustomApplied(customDraft);
       setGroupChoice(null);
     }
+  };
+
+  const chooseCompare = (mode: CompareMode) => {
+    setCompareMode(mode);
+    setCompareError(null);
+    // start the date boxes on the prior period, so there is something sensible to edit
+    if (mode === 'custom' && !compareApplied && range) setCompareDraft(previousRange(range));
+  };
+  const applyCompare = () => {
+    const problem = validateDashboardRange(compareDraft);
+    setCompareError(problem);
+    if (!problem) setCompareApplied(compareDraft);
   };
 
   const choosePreset = (id: Preset) => {
@@ -233,7 +260,7 @@ export default function BusinessDashboardPage() {
           </Box>
         ) : (
           <Box sx={{ opacity: loading ? 0.55 : 1, transition: 'opacity 150ms', pointerEvents: loading ? 'none' : undefined }}>
-            {tab === 'financial' ? <FinancialTab data={data} /> : <ItemsTab data={data} token={token} />}
+            {tab === 'financial' ? <FinancialTab data={data} compare={{ mode: compareMode, setMode: chooseCompare, draft: compareDraft, setDraft: setCompareDraft, apply: applyCompare, error: compareError, today }} /> : <ItemsTab data={data} token={token} />}
           </Box>
         )
       ) : tab === 'visitors' ? (

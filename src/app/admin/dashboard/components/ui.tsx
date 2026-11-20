@@ -18,9 +18,10 @@ export interface DashboardData {
   today: string;
   range: { from: string; to: string };
   grouping: Grouping;
-  totals: { current: Totals; previous: Totals; lastYear: Totals };
+  totals: { current: Totals; previous: Totals; lastYear: Totals; compare?: Totals };
   quick: { week: QuickBlock; month: QuickBlock; year: QuickBlock };
   series: Array<Bucket & MoneyTotals>;
+  compareSeries?: Array<Bucket & MoneyTotals>;
   types: Array<Bucket & { cooked: number; readyToEat: number; notSet: number }>;
   losses: Array<{ orderId: string; day: string; fee: number; stripeFee: number; loss: number }>;
   taxMonths: Array<{ month: string; label: string; net: number; feeNet: number; taxable: number; taxNet: number; orders: number }>;
