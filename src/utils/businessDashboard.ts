@@ -578,3 +578,50 @@ export function driverSummaries(routes: DriverRoute[], history: DriverRates[] = 
   // 'All drivers': per driver-day, so the average day is one driver's day, not the whole team's
   return { drivers, all: summary('All drivers', all.routes, all) };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Compare periods (Financial tab)
+// ---------------------------------------------------------------------------------------------
+
+/** What the chosen period is compared with: the same length right before it, the same dates a year earlier, or any dates */
+export type CompareMode = 'previous' | 'lastYear' | 'custom';
+
+export function isCompareMode(value: unknown): value is CompareMode {
+  return value === 'previous' || value === 'lastYear' || value === 'custom';
+}
+
+/** The period to compare with, or null when custom dates are not picked yet */
+export function compareRangeFor(mode: CompareMode, range: DayRange, custom: DayRange | null | undefined): DayRange | null {
+  if (mode === 'previous') return previousRange(range);
+  if (mode === 'lastYear') return lastYearRange(range);
+  return custom && !validateDashboardRange(custom) ? custom : null;
+}
+
+/** One row of the comparison table: the two amounts, the difference and the percent change (null when the compared amount is 0) */
+export interface CompareRow {
+  key: string;
+  label: string;
+  now: number;
+  before: number;
+  diff: number;
+  change: number | null;
+  /** true when a drop is the good direction (refunds, Stripe fees) */
+  lowerIsBetter?: boolean;
+  kind: 'money' | 'count';
+}
+
+export function compareRows(now: MoneyTotals, before: MoneyTotals): CompareRow[] {
+  const kept = (t: MoneyTotals) => round2(t.feeOnCard - t.stripeFee);
+  const rows: Array<Omit<CompareRow, 'diff' | 'change'>> = [
+    { key: 'gross', label: 'Gross sales', now: now.gross, before: before.gross, kind: 'money' },
+    { key: 'net', label: 'Net sales', now: now.net, before: before.net, kind: 'money' },
+    { key: 'orders', label: 'Orders', now: now.orders, before: before.orders, kind: 'count' },
+    { key: 'averageOrder', label: 'Average order', now: now.averageOrder, before: before.averageOrder, kind: 'money' },
+    { key: 'refunds', label: 'Refunds', now: now.refunds, before: before.refunds, kind: 'money', lowerIsBetter: true },
+    { key: 'feeNet', label: 'Platform Fee', now: now.feeNet, before: before.feeNet, kind: 'money' },
+    { key: 'stripeFee', label: 'Stripe fees', now: now.stripeFee, before: before.stripeFee, kind: 'money', lowerIsBetter: true },
+    { key: 'kept', label: 'Kept after Stripe', now: kept(now), before: kept(before), kind: 'money' },
+    { key: 'taxNet', label: 'Tax collected', now: now.taxNet, before: before.taxNet, kind: 'money' },
+  ];
+  return rows.map((r) => ({ ...r, diff: round2(r.now - r.before), change: percentChange(r.now, r.before) }));
+}
