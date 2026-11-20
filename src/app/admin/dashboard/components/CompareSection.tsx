@@ -102,8 +102,15 @@ export default function CompareSection({ data, controls }: { data: DashboardData
         <>
           <SimpleTable
             head={['', 'This period', 'Compared', 'Change']}
+            // a phone hides the Compared column and shows that amount small under the label, so Change fits on screen
+            phoneHide={[2]}
             rows={compareRows(now, before).map((r) => [
-              <Box key="l" component="span" sx={{ fontWeight: 600 }}>{r.label}</Box>,
+              <Box key="l" component="span" sx={{ display: 'block' }}>
+                <Box component="span" sx={{ fontWeight: 600 }}>{r.label}</Box>
+                <Box component="span" sx={{ display: { xs: 'block', sm: 'none' }, color: 'text.secondary', fontSize: 11.5 }}>
+                  was {r.kind === 'count' ? count(r.before) : money2(r.before)}
+                </Box>
+              </Box>,
               r.kind === 'count' ? count(r.now) : money2(r.now),
               <Box key="b" component="span" sx={{ color: 'text.secondary' }}>{r.kind === 'count' ? count(r.before) : money2(r.before)}</Box>,
               <Change key="c" row={r} />,
