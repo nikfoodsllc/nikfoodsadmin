@@ -3,6 +3,8 @@ import { verifyAdminRequest } from '@/lib/adminAuth';
 import { loadSales, preparationLookup } from '@/lib/server/businessDashboard';
 import { pacificToday } from '@/utils/abandonedCheckouts';
 import {
+  channelSeries,
+  channelTotals,
   resolveGrouping,
   itemTotals,
   lastYearRange,
@@ -87,6 +89,13 @@ export async function GET(request: NextRequest) {
         quick: { week: pair(quick.week), month: pair(quick.month), year: pair(quick.year) },
         series: moneySeries(money.orders, range, grouping),
         ...(compare ? { compareSeries: moneySeries(money.orders, compare, grouping) } : {}),
+        // where the orders came from: website, iPhone app, offline (entered by an admin)
+        channels: {
+          current: channelTotals(money.orders, range),
+          previous: channelTotals(money.orders, previous),
+          ...(compare ? { compare: channelTotals(money.orders, compare) } : {}),
+        },
+        channelSeries: channelSeries(money.orders, range, grouping),
         types: typeSeries(current.lines, range, grouping, typeOf),
         losses: lossOrders(money.orders, range),
         taxMonths: taxByMonth(money.orders, range),

@@ -173,6 +173,10 @@ export interface SaleOrder {
   refundedAmount?: number;
   creditsIssued?: Array<{ amount?: number }>;
   stripeFee?: number;
+  /** 'mobile' = placed in the iPhone app; missing or 'web' = the website */
+  channel?: string;
+  /** 'admin' = entered by an admin (Create Order: payment link, cash, Zelle ...) */
+  source?: string;
 }
 
 export interface OrderMoney {
@@ -610,12 +614,15 @@ export interface CompareRow {
   kind: 'money' | 'count';
 }
 
-export function compareRows(now: MoneyTotals, before: MoneyTotals): CompareRow[] {
+export function compareRows(now: MoneyTotals, before: MoneyTotals, channels?: { now: Record<string, { orders: number }>; before: Record<string, { orders: number }> }): CompareRow[] {
   const kept = (t: MoneyTotals) => round2(t.feeOnCard - t.stripeFee);
   const rows: Array<Omit<CompareRow, 'diff' | 'change'>> = [
     { key: 'gross', label: 'Gross sales', now: now.gross, before: before.gross, kind: 'money' },
     { key: 'net', label: 'Net sales', now: now.net, before: before.net, kind: 'money' },
     { key: 'orders', label: 'Orders', now: now.orders, before: before.orders, kind: 'count' },
+    ...(channels
+      ? (['website', 'app', 'offline'] as const).map((c) => ({ key: `orders_${c}`, label: `  ${({ website: 'Website', app: 'Mobile app', offline: 'Offline' } as const)[c]} orders`, now: channels.now[c]?.orders ?? 0, before: channels.before[c]?.orders ?? 0, kind: 'count' as const }))
+      : []),
     { key: 'averageOrder', label: 'Average order', now: now.averageOrder, before: before.averageOrder, kind: 'money' },
     { key: 'refunds', label: 'Refunds', now: now.refunds, before: before.refunds, kind: 'money', lowerIsBetter: true },
     { key: 'feeNet', label: 'Platform Fee', now: now.feeNet, before: before.feeNet, kind: 'money' },
@@ -624,4 +631,64 @@ export function compareRows(now: MoneyTotals, before: MoneyTotals): CompareRow[]
     { key: 'taxNet', label: 'Tax collected', now: now.taxNet, before: before.taxNet, kind: 'money' },
   ];
   return rows.map((r) => ({ ...r, diff: round2(r.now - r.before), change: percentChange(r.now, r.before) }));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Where orders come from: the website, the iPhone app, or offline (entered by an admin)
+// ---------------------------------------------------------------------------------------------
+
+export type Channel = 'website' | 'app' | 'offline';
+export const CHANNELS: Channel[] = ['website', 'app', 'offline'];
+export const CHANNEL_LABEL: Record<Channel, string> = { website: 'Website', app: 'Mobile app', offline: 'Offline' };
+
+/** An admin-entered order is Offline (even when paid through a link); otherwise the app or the website (older orders have no channel = website) */
+export function channelOf(order: Pick<SaleOrder, 'channel' | 'source'>): Channel {
+  if (order.source === 'admin') return 'offline';
+  return order.channel === 'mobile' ? 'app' : 'website';
+}
+
+export interface ChannelTotals {
+  orders: number;
+  gross: number;
+  net: number;
+  /** share of all orders in the period, 0..100 (one decimal) */
+  share: number;
+}
+
+export function channelTotals(orders: SaleOrder[], range: DayRange): Record<Channel, ChannelTotals> {
+  const out = Object.fromEntries(CHANNELS.map((c) => [c, { orders: 0, gross: 0, net: 0, share: 0 }])) as Record<Channel, ChannelTotals>;
+  let all = 0;
+  for (const order of orders) {
+    if (!isSale(order) || !inRange(order.day, range)) continue;
+    const t = out[channelOf(order)];
+    const money = orderMoney(order);
+    t.orders += 1;
+    t.gross += money.gross;
+    t.net += money.net;
+    all += 1;
+  }
+  for (const c of CHANNELS) {
+    out[c].gross = round2(out[c].gross);
+    out[c].net = round2(out[c].net);
+    out[c].share = all > 0 ? Math.round((out[c].orders / all) * 1000) / 10 : 0;
+  }
+  return out;
+}
+
+export interface ChannelBucket extends Bucket {
+  website: number;
+  app: number;
+  offline: number;
+}
+
+/** Orders per channel in each day / week / month of the range */
+export function channelSeries(orders: SaleOrder[], range: DayRange, grouping: Grouping): ChannelBucket[] {
+  const buckets = bucketsFor(range, grouping);
+  const sums = new Map(buckets.map((b) => [b.key, { website: 0, app: 0, offline: 0 }]));
+  for (const order of orders) {
+    if (!isSale(order) || !inRange(order.day, range)) continue;
+    const t = sums.get(bucketKeyOf(order.day, grouping));
+    if (t) t[channelOf(order)] += 1;
+  }
+  return buckets.map((b) => ({ ...b, ...(sums.get(b.key) ?? { website: 0, app: 0, offline: 0 }) }));
 }
