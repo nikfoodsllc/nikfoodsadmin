@@ -31,6 +31,8 @@ import AllergensField from './AllergensField';
 import ToggleRow from './ToggleRow';
 import InstructionsField from './InstructionsField';
 import StockField from './StockField';
+import RecipeLinesField from './RecipeLinesField';
+import { recipeLinesProblem, type RecipeLine } from '@/utils/recipeItems';
 import { PreparationType } from '@/utils/preparationType';
 import { IconX } from '@tabler/icons-react';
 import ItemPhotos from './ItemPhotos';
@@ -45,6 +47,7 @@ import {
   ZeroPricedItemInfo,
 } from '../utils/priceUtils';
 import PriceField from './PriceField';
+import { ecoChargeError } from '@/utils/ecoContainer';
 
 interface AllFoodItem {
   _id: string;
@@ -96,6 +99,7 @@ interface ComboFoodItem {
   allergens?: string[]; // keys from utils/allergens.ts; none ticked = no allergens
   allowInstructions?: boolean; // true = customers get a Special instructions box for this item
   stockThreshold?: number | null; // order limit (inventory); null / missing = no limit
+  recipeLines?: RecipeLine[] | null; // hidden recipe items that go with ONE combo (on top of what the picked items bring); missing = none
   stockUnit?: 'units' | 'lb' | 'oz';
   stockResetMode?: 'manual' | 'daily';
   stockResetTime?: string | null;
@@ -247,7 +251,15 @@ export default function ComboFoodItemDialog({
       newErrors.subCategory = 'At least one sub category is required';
     }
 
+    const ecoError = ecoChargeError(formData.isEcoFriendlyContainer, formData.ecoContainerCharge);
+    if (ecoError) newErrors.ecoContainerCharge = ecoError;
+
+    const recipeError = recipeLinesProblem(formData.recipeLines, false);
+    if (recipeError) newErrors.recipe = recipeError;
+
     setErrors(newErrors);
+    // bring the first problem into view (on a phone it is often below the fold)
+    if (Object.keys(newErrors).length > 0) requestAnimationFrame(() => document.querySelector('[role="dialog"] .Mui-error, [role="dialog"] [aria-invalid="true"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     return Object.keys(newErrors).length === 0;
   };
 
@@ -482,6 +494,7 @@ export default function ComboFoodItemDialog({
           <InstructionsField value={formData.allowInstructions} onChange={(value) => setFormData((prev) => ({ ...prev, allowInstructions: value }))} disabled={loading} />
 
           <StockField itemId={formData._id} hasSizes={false} value={formData} onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))} disabled={loading} />
+          <RecipeLinesField value={formData.recipeLines} onChange={(lines) => setFormData((prev) => ({ ...prev, recipeLines: lines }))} disabled={loading} error={errors.recipe} />
           <Typography variant="caption" sx={{ color: '#6B7280', display: 'block' }}>
             Prep Type and Sticker are set on each item inside the combo, not here.
           </Typography>
@@ -605,6 +618,9 @@ export default function ComboFoodItemDialog({
               label="Eco Container Charge"
               value={formData.ecoContainerCharge}
               onValueChange={(v) => handleChange('ecoContainerCharge', v)}
+              required
+              error={!!errors.ecoContainerCharge}
+              helperText={errors.ecoContainerCharge}
               disabled={loading}
               fullWidth
               sx={{

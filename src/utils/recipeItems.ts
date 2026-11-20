@@ -128,9 +128,9 @@ export function recipeFoodIds(rows: Array<Pick<KitchenRow, 'foodId' | 'sections'
   const ids = new Set<string>();
   for (const row of rows) {
     const parts = comboParts(row);
-    if (parts.length > 0) {
-      for (const part of parts) if (part.id && ID.test(part.id)) ids.add(part.id);
-    } else if (row.foodId && ID.test(row.foodId)) ids.add(row.foodId);
+    for (const part of parts) if (part.id && ID.test(part.id)) ids.add(part.id);
+    // the item itself; for a combo this is the combo's own "goes with" list, on top of its parts'
+    if (row.foodId && ID.test(row.foodId)) ids.add(row.foodId);
   }
   return [...ids];
 }
@@ -159,9 +159,9 @@ export function expandRecipeRows<T extends KitchenRow>(rows: T[], linesByFoodId:
   for (const row of rows) {
     if (!Number.isFinite(row.quantity) || row.quantity <= 0) continue;
     const parts = comboParts(row);
-    if (parts.length > 0) {
-      for (const part of parts) if (part.id) add(row, part.id, part.name, part.portion, row.quantity * part.quantity);
-    } else if (row.foodId) add(row, row.foodId, String(row.name ?? '').trim(), row.portion, row.quantity);
+    for (const part of parts) if (part.id) add(row, part.id, part.name, part.portion, row.quantity * part.quantity);
+    // the item's own recipe items; for a combo these come once per combo, on top of what its picked items bring
+    if (row.foodId) add(row, row.foodId, String(row.name ?? '').trim(), row.portion, row.quantity);
   }
   return extra.length > 0 ? [...rows, ...extra] : rows;
 }

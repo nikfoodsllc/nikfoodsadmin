@@ -514,7 +514,11 @@ export default function FoodItemsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to update items');
       const label = preparationType === 'cooked' ? 'Cooked' : preparationType === 'ready_to_eat' ? 'Ready to eat' : 'Prep Type N/A';
-      showSnackbar(`${selectedIds.size} ${selectedIds.size === 1 ? 'item' : 'items'} set to ${label}`);
+      const skipped = Number(data.data?.skippedCombos) || 0;
+      const changed = selectedIds.size - skipped;
+      const skippedText = skipped > 0 ? `${skipped} ${skipped === 1 ? 'combo' : 'combos'} skipped (combos have no prep type)` : '';
+      if (changed > 0) showSnackbar(`${changed} ${changed === 1 ? 'item' : 'items'} set to ${label}${skippedText ? `; ${skippedText}` : ''}`);
+      else showSnackbar(`Nothing changed: ${skippedText}`, 'error');
       setSelectedIds(new Set());
       setBulkField(null);
       await fetchItems();
@@ -1014,9 +1018,6 @@ export default function FoodItemsPage() {
               </Button>
               <Button size="small" variant="contained" disabled={bulkLoading} onClick={() => applyPreparationType('ready_to_eat')} sx={{ textTransform: 'none', backgroundColor: '#047857', '&:hover': { backgroundColor: '#065F46' } }}>
                 Ready to eat
-              </Button>
-              <Button size="small" variant="outlined" disabled={bulkLoading} onClick={() => applyPreparationType(null)} sx={{ textTransform: 'none' }}>
-                Clear (Prep Type N/A)
               </Button>
             </Box>
           )}

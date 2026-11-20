@@ -42,6 +42,7 @@ import PortionManager from './PortionManager';
 import SubCategorySelect from './SubCategorySelect';
 import { mergeCategoryIdsForSave, resolveSubCategoryIds, SubCategoryOption } from '../utils/subCategoryUtils';
 import PriceField from './PriceField';
+import { ecoChargeError } from '@/utils/ecoContainer';
 
 interface PortionsFoodItem {
   _id?: string;
@@ -203,8 +204,8 @@ export default function PortionsFoodItemDialog({
       newErrors.name = 'Name is required';
     }
 
-    // a NEW item must say how it is prepared (existing items may stay not set)
-    const preparationError = preparationTypeError(!item?._id, formData.preparationType);
+    // every item that is not a combo is Cooked or Ready to eat (Prep Type N/A is only for combos)
+    const preparationError = preparationTypeError(true, formData.preparationType);
     if (preparationError) newErrors.preparationType = preparationError;
 
     if (!formData.portions || formData.portions.length === 0) {
@@ -224,7 +225,12 @@ export default function PortionsFoodItemDialog({
     const recipeError = recipeLinesProblem(formData.recipeLines, true);
     if (recipeError) newErrors.recipe = recipeError;
 
+    const ecoError = ecoChargeError(formData.isEcoFriendlyContainer, formData.ecoContainerCharge);
+    if (ecoError) newErrors.ecoContainerCharge = ecoError;
+
     setErrors(newErrors);
+    // bring the first problem into view (on a phone it is often below the fold)
+    if (Object.keys(newErrors).length > 0) requestAnimationFrame(() => document.querySelector('[role="dialog"] .Mui-error, [role="dialog"] [aria-invalid="true"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     return Object.keys(newErrors).length === 0;
   };
 
@@ -388,7 +394,7 @@ export default function PortionsFoodItemDialog({
 
           <ToggleRow label="Vegetarian" caption="Off means non-vegetarian." checked={formData.veg} onChange={(on) => handleChange('veg', on)} disabled={loading} />
 
-          {/* Preparation Type: Cooked / Ready to eat (required for a new item; existing items may stay not set) */}
+          {/* Preparation Type: Cooked / Ready to eat (required; Prep Type N/A is only for combos) */}
           <PreparationTypeField
             value={formData.preparationType}
             onChange={(value) => {
@@ -402,7 +408,7 @@ export default function PortionsFoodItemDialog({
               }
             }}
             disabled={loading}
-            required={!item?._id}
+            required
             error={errors.preparationType}
           />
 
@@ -477,6 +483,9 @@ export default function PortionsFoodItemDialog({
               label="Eco Container Charge"
               value={formData.ecoContainerCharge}
               onValueChange={(v) => handleChange('ecoContainerCharge', v)}
+              required
+              error={!!errors.ecoContainerCharge}
+              helperText={errors.ecoContainerCharge}
               disabled={loading}
               fullWidth
               sx={{

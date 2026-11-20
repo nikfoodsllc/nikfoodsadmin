@@ -6,7 +6,8 @@ const verifyToken = vi.fn();
 vi.mock('@/lib/jwt', () => ({ jwtHandler: { verifyToken: (t: string) => verifyToken(t) } }));
 
 const update = vi.fn();
-vi.mock('@/lib/db', () => ({ db: { update: (...a: unknown[]) => update(...a) } }));
+const read = vi.fn();
+vi.mock('@/lib/db', () => ({ db: { update: (...a: unknown[]) => update(...a), read: (...a: unknown[]) => read(...a) } }));
 
 import { PATCH } from './route';
 
@@ -33,6 +34,7 @@ beforeEach(() => {
         : { success: false, error: 'Invalid token' }
   );
   update.mockResolvedValue({ success: true, modifiedCount: 2 });
+  read.mockResolvedValue({ success: true, data: [] });
 });
 
 describe('authentication', () => {
@@ -77,11 +79,12 @@ describe('updating', () => {
     const [collection, filter, change] = update.mock.calls[0];
     expect(collection).toBe('fooditems');
     expect(filter._id.$in.map(String)).toEqual([A, B]);
+    expect(filter.itemType).toEqual({ $ne: 'combo' });
     expect(Object.keys(change)).toEqual(['$set']);
     expect(change.$set.preparationType).toBe('ready_to_eat');
     expect(Object.keys(change.$set).sort()).toEqual(['preparationType', 'updatedAt']);
     const json = await res.json();
-    expect(json.data).toEqual({ requested: 2, modified: 2, preparationType: 'ready_to_eat' });
+    expect(json.data).toEqual({ requested: 2, modified: 2, skippedCombos: 0, preparationType: 'ready_to_eat' });
   });
 
   it('ignores duplicate ids', async () => {
@@ -95,6 +98,15 @@ describe('updating', () => {
     const change = update.mock.calls[0][2];
     expect(change.$unset).toEqual({ preparationType: '' });
     expect(change.$set).not.toHaveProperty('preparationType');
+    expect(update.mock.calls[0][1].itemType).toBe('combo'); // clearing only ever reaches combos
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('skips combos when setting a type and says how many', async () => {
+    read.mockResolvedValue({ success: true, data: [{ _id: B }] });
+    const res = await PATCH(req({ body: { ids: [A, B], preparationType: 'cooked' } }));
+    expect(read.mock.calls[0][1]).toMatchObject({ itemType: 'combo' });
+    expect((await res.json()).data.skippedCombos).toBe(1);
   });
 
   it('reports a database failure as 500', async () => {
