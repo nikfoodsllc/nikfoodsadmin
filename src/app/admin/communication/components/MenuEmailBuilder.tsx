@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, MenuItem, TextField, Typography } from '@mui/material';
-import { IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconCheck, IconDeviceFloppy, IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_PHOTOS, MAX_MENU_SECTIONS, SECTION_SUBTITLE, shortDate, type MenuEmailData, type MenuSection } from '@/utils/menuEmail';
+import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_PHOTOS, MAX_MENU_SECTIONS, sameAsSaved, SECTION_SUBTITLE, sectionsUntouched, shortDate, startingSections, type MenuEmailData, type MenuSection, type SavedMenuBox } from '@/utils/menuEmail';
 
 interface Props {
   token: string;
@@ -51,6 +51,32 @@ function DishList({ label, text, count, fromLabel = 'from the menu', onChange, o
         <TextField size="small" fullWidth placeholder="Add a dish" value={adding} onChange={(e) => setAdding(e.target.value.slice(0, 80))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
         <Button size="small" variant="outlined" onClick={add} disabled={!adding.trim()} sx={{ textTransform: 'none', fontWeight: 700 }}>Add</Button>
       </Box>
+    </Box>
+  );
+}
+
+/** Under a box: Save box / Saved / Save changes, and Unsave for a saved one. */
+function SavedBoxControls({ section, saved, loaded, busy, message, onSave, onUnsave }: { section: MenuSection; saved?: SavedMenuBox; loaded: boolean; busy: boolean; message: { text: string; error?: boolean } | null; onSave: () => void; onUnsave: () => void }) {
+  const isSaved = Boolean(section.savedId && saved);
+  const unchanged = isSaved && sameAsSaved(section, saved);
+  const canSave = section.title.trim() !== '' && dishesOf(section.items).length > 0;
+  return (
+    <Box sx={{ mt: 1.25 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        {unchanged ? (
+          <Chip size="small" icon={<IconCheck size={14} />} label="Saved for every new email" sx={{ bgcolor: '#ECFDF3', color: '#05603A', fontWeight: 600, '& .MuiChip-icon': { color: '#05603A' } }} />
+        ) : (
+          <Button size="small" variant="outlined" startIcon={busy ? <CircularProgress size={14} /> : <IconDeviceFloppy size={16} />} disabled={!loaded || busy || !canSave} onClick={onSave} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {isSaved ? 'Save changes' : 'Save box'}
+          </Button>
+        )}
+        {isSaved && (
+          <Button size="small" disabled={busy} onClick={onUnsave} sx={{ textTransform: 'none', color: '#6B7280' }}>
+            Unsave
+          </Button>
+        )}
+      </Box>
+      {message && <Typography sx={{ fontSize: 12, mt: 0.5, color: message.error ? '#B91C1C' : '#05603A' }}>{message.text}</Typography>}
     </Box>
   );
 }
@@ -108,10 +134,72 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
       setMenuError(e instanceof Error ? e.message : 'Could not load the category');
     }
   };
+  // ---- saved boxes (shared by every admin): a new email starts with them, so Kunal does not type them every week ----
+  const [saved, setSaved] = useState<SavedMenuBox[] | null>(null);
+  const [boxBusy, setBoxBusy] = useState<number | null>(null);
+  const [boxMsg, setBoxMsg] = useState<{ i: number; text: string; error?: boolean } | null>(null);
+  const saveBox = async (i: number) => {
+    const sec = (latest.current.sections ?? [])[i];
+    if (!sec) return;
+    setBoxBusy(i);
+    setBoxMsg(null);
+    try {
+      const res = await fetch('/api/admin/communication-saved-boxes', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sec.savedId, title: sec.title, subtitle: sec.subtitle, items: sec.items, categoryId: sec.categoryId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Could not save the box');
+      const box = json.data.box as SavedMenuBox;
+      setSaved((list) => [...(list ?? []).filter((b) => b.id !== box.id), box]);
+      setSection(i, { savedId: box.id });
+      setBoxMsg({ i, text: 'Saved. Every new menu email starts with this box.' });
+    } catch (e) {
+      setBoxMsg({ i, text: e instanceof Error ? e.message : 'Could not save the box', error: true });
+    } finally {
+      setBoxBusy(null);
+    }
+  };
+  const unsaveBox = async (i: number) => {
+    const sec = (latest.current.sections ?? [])[i];
+    if (!sec?.savedId) return;
+    setBoxBusy(i);
+    setBoxMsg(null);
+    try {
+      const res = await fetch(`/api/admin/communication-saved-boxes?id=${sec.savedId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Could not unsave the box');
+      setSaved((list) => (list ?? []).filter((b) => b.id !== sec.savedId));
+      setSection(i, { savedId: undefined });
+      setBoxMsg({ i, text: 'Unsaved. It stays in this email but new emails will not have it.' });
+    } catch (e) {
+      setBoxMsg({ i, text: e instanceof Error ? e.message : 'Could not unsave the box', error: true });
+    } finally {
+      setBoxBusy(null);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/admin/communication-menu?list=categories', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+    const auth = { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' as const };
+    const savedBoxes = fetch('/api/admin/communication-saved-boxes', auth)
       .then((r) => (r.ok ? r.json() : null))
+      .then((json) => (Array.isArray(json?.data?.boxes) ? (json.data.boxes as SavedMenuBox[]) : []))
+      .catch(() => [] as SavedMenuBox[]);
+    // the saved boxes go in first (only into an email nobody has touched), then empty boxes may pick a matching category
+    savedBoxes
+      .then((boxes) => {
+        if (cancelled) return null;
+        setSaved(boxes);
+        if (boxes.length > 0 && sectionsUntouched(latest.current.sections)) {
+          const sections = startingSections(boxes);
+          sectionEdited.current = new Set(sections.map((_, i) => i));
+          onChange({ ...latest.current, sections });
+        }
+        return fetch('/api/admin/communication-menu?list=categories', auth);
+      })
+      .then((r) => (r && r.ok ? r.json() : null))
       .then((json) => {
         if (cancelled || !Array.isArray(json?.data?.categories)) return;
         const list = json.data.categories as Array<{ id: string; label: string }>;
@@ -227,7 +315,7 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
 
       <Box>
         <Step n={4}>Other boxes (optional)</Step>
-        <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 1 }}>Extra boxes under the days, like Indian Mithai or Add-On&apos;s. Fill one from a menu category, or type your own dishes.</Typography>
+        <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 1 }}>Extra boxes under the days, like Indian Mithai or Add-On&apos;s. Fill one from a menu category, or type your own dishes. Save a box that stays the same and every new menu email starts with it.</Typography>
         <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
           {(data.sections ?? []).map((sec, i) => (
             <Box key={i} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.25, minWidth: 0 }}>
@@ -250,6 +338,15 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
                 fromLabel={`from ${cats?.find((c) => c.id === sec.categoryId)?.label ?? 'the category'}`}
                 onEdited={() => sectionEdited.current.add(i)}
                 onChange={(text) => setSection(i, { items: text })}
+              />
+              <SavedBoxControls
+                section={sec}
+                saved={saved?.find((b) => b.id === sec.savedId)}
+                loaded={saved !== null}
+                busy={boxBusy === i}
+                message={boxMsg?.i === i ? boxMsg : null}
+                onSave={() => void saveBox(i)}
+                onUnsave={() => void unsaveBox(i)}
               />
             </Box>
           ))}
