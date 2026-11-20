@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, sortBlocks, sortDayItems, sortStickers, type SortChoice, type StickerLookup, type TypeLookup } from './kitchenReport';
+import { blockTotal, buildKitchenReport, filterBlocksBySearch, filterStickersBySearch, sortBlocks, sortDayItems, sortStickers, stickerDayOf, type SortChoice, type StickerLookup, type TypeLookup } from './kitchenReport';
 import type { KitchenRow } from './kitchenDashboard';
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
@@ -257,5 +257,21 @@ describe('heating / storage instruction on stickers', () => {
   it('is found by the sticker search', () => {
     const r = buildKitchenReport([row({ name: 'Pickle' }), row({ orderId: 'ORD-2', name: 'Achar' })], byName, stickerYes, () => null, heat);
     expect(filterStickersBySearch(r.stickers, 'shake well').map((s) => s.item)).toEqual(['Pickle']);
+  });
+});
+
+describe('stickerDayOf', () => {
+  it('keeps a day-wise item on its kitchen day when it goes out the same day or later', () => {
+    expect(stickerDayOf({ day: '2026-11-20', deliveredOn: '2026-11-20' }, true)).toBe('2026-11-20');
+    expect(stickerDayOf({ day: '2026-11-17', deliveredOn: '2026-11-20' }, true)).toBe('2026-11-17');
+    expect(stickerDayOf({ day: '2026-11-20', deliveredOn: null }, true)).toBe('2026-11-20');
+  });
+  it('puts an item delivered EARLIER than its kitchen day on the delivery day, day-wise or not', () => {
+    expect(stickerDayOf({ day: '2026-11-20', deliveredOn: '2026-11-17' }, true)).toBe('2026-11-17');
+    expect(stickerDayOf({ day: '2026-11-20', deliveredOn: '2026-11-17' }, false)).toBe('2026-11-17');
+  });
+  it('lets other items follow their delivery date', () => {
+    expect(stickerDayOf({ day: '2026-11-17', deliveredOn: '2026-11-20' }, false)).toBe('2026-11-20');
+    expect(stickerDayOf({ day: '2026-11-17' }, false)).toBe('2026-11-17');
   });
 });

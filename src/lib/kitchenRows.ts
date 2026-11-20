@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { CREDIT_ADJUST_STAGE } from '@/lib/creditAdjust';
+import { stickerDayOf } from '@/utils/kitchenReport';
 import { COUNTED_ORDER_CLAUSES, NOT_MANUALLY_DELIVERED } from '@/lib/countedOrders';
 import { db } from '@/lib/db';
 import { pacificDayOf, toDayString, type DayRange, type KitchenRow } from '@/utils/kitchenDashboard';
@@ -234,10 +235,8 @@ export async function fetchStickerRows(range: DayRange): Promise<KitchenRow[]> {
     }
   }
   const inRange = (day: string | null | undefined) => !!day && day >= range.startDate && day <= range.endDate;
-  return rows.filter((r) => {
-    const isDayWise = !!r.foodId && dayWise.has(`${r.foodId}|${r.day}`);
-    return isDayWise ? inRange(r.day) : inRange(r.deliveredOn || r.day);
-  });
+  // day-wise items stay on their kitchen day, others follow delivery; anything delivered before its kitchen day follows delivery
+  return rows.filter((r) => inRange(stickerDayOf(r, !!r.foodId && dayWise.has(`${r.foodId}|${r.day}`))));
 }
 
 /**
