@@ -178,7 +178,8 @@ export function LineChart({ points, series, format, height = 220 }: { points: Ch
         ticks={ticks}
         format={format}
         height={height}
-        tooltip={(i) => series.map((s) => <TooltipRow key={s.name} color={s.color} name={s.name} value={format(s.values[i] ?? 0)} />)}
+        // a series shorter than the others (a shorter compared period) simply ends: no row past its last point
+        tooltip={(i) => series.filter((s) => s.values[i] !== undefined).map((s) => <TooltipRow key={s.name} color={s.color} name={s.name} value={format(s.values[i])} />)}
       >
         {({ x, y }) =>
           series.map((s) => (
