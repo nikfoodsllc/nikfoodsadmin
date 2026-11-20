@@ -229,6 +229,8 @@ export default function PortionsFoodItemDialog({
     if (ecoError) newErrors.ecoContainerCharge = ecoError;
 
     setErrors(newErrors);
+    // bring the first problem into view (on a phone it is often below the fold)
+    if (Object.keys(newErrors).length > 0) requestAnimationFrame(() => document.querySelector('[role="dialog"] .Mui-error, [role="dialog"] [aria-invalid="true"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     return Object.keys(newErrors).length === 0;
   };
 
