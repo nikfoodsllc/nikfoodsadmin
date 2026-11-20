@@ -7,6 +7,7 @@ import { BarChart, LineChart, SERIES, TooltipRow } from './charts';
 import { unitOf, count, Delta, EmptyNote, Kpi, KpiGrid, money, money2, moneyAxis, pointsOf, rangeText, Section, SimpleTable, type DashboardData, type QuickBlock } from './ui';
 import { downloadCSV, escapeCSVValue } from '@/utils/csv';
 import CompareSection, { type CompareControls } from './CompareSection';
+import ChannelSection from './ChannelSection';
 
 function QuickCard({ block }: { block: QuickBlock }) {
   return (
@@ -78,6 +79,8 @@ export default function FinancialTab({ data, compare }: { data: DashboardData; c
           )}
         </Box>
       </Section>
+
+      <ChannelSection data={data} />
 
       <Section
         title="Platform Fee vs Stripe fee"

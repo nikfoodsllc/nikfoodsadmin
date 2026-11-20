@@ -35,3 +35,12 @@ describe('compareRows', () => {
     expect(rows.stripeFee.lowerIsBetter).toBe(true);
   });
 });
+
+describe('compareRows with channels', () => {
+  it('adds Website / Mobile app / Offline order rows right after Orders', () => {
+    const t = { ...emptyTotals(), orders: 10 };
+    const rows = compareRows(t, t, { now: { website: { orders: 6 }, app: { orders: 3 }, offline: { orders: 1 } }, before: { website: { orders: 4 }, app: { orders: 0 }, offline: { orders: 2 } } });
+    expect(rows.map((r) => r.key).slice(2, 6)).toEqual(['orders', 'orders_website', 'orders_app', 'orders_offline']);
+    expect(rows.find((r) => r.key === 'orders_app')).toMatchObject({ now: 3, before: 0, diff: 3, change: null, kind: 'count' });
+  });
+});

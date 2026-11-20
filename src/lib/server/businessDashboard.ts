@@ -23,12 +23,14 @@ interface RawOrder {
   refundedAmount?: number;
   creditsIssued?: Array<{ amount?: number }>;
   stripeFee?: number;
+  channel?: string;
+  source?: string;
   items?: Array<{ items?: Array<{ food?: { _id?: unknown; name?: string; hasCombo?: boolean }; quantity?: number; price?: number }> }>;
 }
 
 const MONEY_FIELDS = {
   orderId: 1, createdAt: 1, subtotal: 1, platformFee: 1, deliveryFee: 1, taxes: 1, tip: 1, totalPaid: 1, paymentStatus: 1, refundedAmount: 1,
-  'creditsIssued.amount': 1, stripeFee: 1,
+  'creditsIssued.amount': 1, stripeFee: 1, channel: 1, source: 1,
 } as const;
 
 /** Paid orders (paid, or refunded later) placed within the Pacific days of the span; with their item lines when asked */
@@ -60,6 +62,8 @@ export async function loadSales(span: DayRange, withItems: boolean): Promise<{ o
       refundedAmount: raw.refundedAmount,
       creditsIssued: raw.creditsIssued,
       stripeFee: raw.stripeFee,
+      channel: raw.channel,
+      source: raw.source,
     });
     if (!withItems) continue;
     for (const orderDay of raw.items ?? []) {
