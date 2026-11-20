@@ -72,8 +72,8 @@ export async function PATCH(request: NextRequest) {
     const objectIds = [...new Set(ids as string[])].map((id) => new ObjectId(id));
     // combos have no preparation type (the kitchen reports split them into their parts), so setting a type skips them;
     // clearing (Prep Type N/A) only ever reaches combos: every other item stays Cooked or Ready to eat
-    const combos = preparationType === null ? [] : await db.read<{ _id: ObjectId }>('fooditems', { _id: { $in: objectIds }, itemType: 'combo' } as never, { projection: { _id: 1 } } as never);
-    const skippedCombos = Array.isArray(combos) ? combos.length : 0;
+    const combos = preparationType === null ? { success: true, data: [] } : await db.read<{ _id: ObjectId }>('fooditems', { _id: { $in: objectIds }, itemType: 'combo' } as never, { projection: { _id: 1 } } as never);
+    const skippedCombos = combos.success ? combos.data?.length ?? 0 : 0;
     const result = await db.update(
       'fooditems',
       preparationType === null ? { _id: { $in: objectIds }, itemType: 'combo' } : { _id: { $in: objectIds }, itemType: { $ne: 'combo' } },
