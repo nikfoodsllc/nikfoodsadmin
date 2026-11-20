@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import { LineChart, SERIES } from './charts';
 import { count, EmptyNote, Kpi, KpiGrid, pointsOf, rangeText, Section } from './ui';
 import type { Bucket, Grouping } from '@/utils/businessDashboard';
+import AppActivitySection from '@/app/admin/notifications/components/AppActivitySection';
 
 interface VisitorsAnswer {
   connected: boolean;
@@ -16,7 +17,26 @@ interface VisitorsAnswer {
 
 const LIVE_EVERY_MS = 60_000;
 
+/** Website visitors (Google Analytics) on top, then the iPhone app: who has it, who opened it, new phones, app orders and versions. */
 export default function VisitorsTab({ token, range, grouping }: { token: string; range: { from: string; to: string }; grouping: Grouping }) {
+  // the same App activity as Notifications > App customers, read through the notifications API
+  const appCall = useCallback(
+    async (path: string) => {
+      const response = await fetch(`/api/admin/notifications/${path}`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await response.json().catch(() => ({}));
+      return { ok: response.ok && json.success !== false, status: response.status, json };
+    },
+    [token]
+  );
+  return (
+    <>
+      <WebsiteVisitors token={token} range={range} grouping={grouping} />
+      <AppActivitySection call={appCall} />
+    </>
+  );
+}
+
+function WebsiteVisitors({ token, range, grouping }: { token: string; range: { from: string; to: string }; grouping: Grouping }) {
   const [data, setData] = useState<VisitorsAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,11 +86,11 @@ export default function VisitorsTab({ token, range, grouping }: { token: string;
   }, [data, token]);
 
   if (loading && !data) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress size={28} /></Box>;
-  if (error) return <Alert severity="error">{error}</Alert>;
+  if (error) return <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>;
   if (data && !data.connected) {
-    return <Alert severity="info">Google Analytics is not connected to the admin yet, so visitor numbers cannot be shown.</Alert>;
+    return <Alert severity="info" sx={{ mb: 2 }}>Google Analytics is not connected to the admin yet, so website visitor numbers cannot be shown.</Alert>;
   }
-  if (data?.error) return <Alert severity="warning">{data.error}</Alert>;
+  if (data?.error) return <Alert severity="warning" sx={{ mb: 2 }}>{data.error}</Alert>;
   if (!data) return null;
 
   const series = data.series ?? [];

@@ -104,9 +104,9 @@ export default function CompareSection({ data, controls }: { data: DashboardData
             head={['', 'This period', 'Compared', 'Change']}
             // a phone hides the Compared column and shows that amount small under the label, so Change fits on screen
             phoneHide={[2]}
-            rows={compareRows(now, before).map((r) => [
+            rows={compareRows(now, before, data.channels.compare ? { now: data.channels.current, before: data.channels.compare } : undefined).map((r) => [
               <Box key="l" component="span" sx={{ display: 'block' }}>
-                <Box component="span" sx={{ fontWeight: 600 }}>{r.label}</Box>
+                <Box component="span" sx={{ fontWeight: r.key.startsWith('orders_') ? 500 : 600, pl: r.key.startsWith('orders_') ? 1.5 : 0, color: r.key.startsWith('orders_') ? 'text.secondary' : undefined }}>{r.label.trim()}</Box>
                 <Box component="span" sx={{ display: { xs: 'block', sm: 'none' }, color: 'text.secondary', fontSize: 11.5 }}>
                   was {r.kind === 'count' ? count(r.before) : money2(r.before)}
                 </Box>

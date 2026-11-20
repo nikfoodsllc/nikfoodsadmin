@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { Box, Paper, Typography } from '@mui/material';
 import { IconArrowDownRight, IconArrowUpRight, IconMinus } from '@tabler/icons-react';
-import { percentChange, type MoneyTotals, type Bucket, type ItemType, type Grouping, shortDay } from '@/utils/businessDashboard';
+import { percentChange, type MoneyTotals, type Bucket, type ItemType, type Grouping, shortDay, type Channel, type ChannelTotals, type ChannelBucket } from '@/utils/businessDashboard';
 import type { ChartPoint } from './charts';
 
 /** Shapes of the Dashboard API answers */
@@ -22,6 +22,8 @@ export interface DashboardData {
   quick: { week: QuickBlock; month: QuickBlock; year: QuickBlock };
   series: Array<Bucket & MoneyTotals>;
   compareSeries?: Array<Bucket & MoneyTotals>;
+  channels: { current: Record<Channel, ChannelTotals>; previous: Record<Channel, ChannelTotals>; compare?: Record<Channel, ChannelTotals> };
+  channelSeries: ChannelBucket[];
   types: Array<Bucket & { cooked: number; readyToEat: number; notSet: number }>;
   losses: Array<{ orderId: string; day: string; fee: number; stripeFee: number; loss: number }>;
   taxMonths: Array<{ month: string; label: string; net: number; feeNet: number; taxable: number; taxNet: number; orders: number }>;
