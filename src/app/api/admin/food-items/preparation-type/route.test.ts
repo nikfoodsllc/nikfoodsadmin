@@ -34,7 +34,7 @@ beforeEach(() => {
         : { success: false, error: 'Invalid token' }
   );
   update.mockResolvedValue({ success: true, modifiedCount: 2 });
-  read.mockResolvedValue([]);
+  read.mockResolvedValue({ success: true, data: [] });
 });
 
 describe('authentication', () => {
@@ -103,7 +103,7 @@ describe('updating', () => {
   });
 
   it('skips combos when setting a type and says how many', async () => {
-    read.mockResolvedValue([{ _id: B }]);
+    read.mockResolvedValue({ success: true, data: [{ _id: B }] });
     const res = await PATCH(req({ body: { ids: [A, B], preparationType: 'cooked' } }));
     expect(read.mock.calls[0][1]).toMatchObject({ itemType: 'combo' });
     expect((await res.json()).data.skippedCombos).toBe(1);
