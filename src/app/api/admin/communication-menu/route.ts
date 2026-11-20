@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     const foods: MenuFood[] = (foodRes.success ? foodRes.data ?? [] : []).map((f) => ({ id: String(f._id), name: String(f.name ?? ''), available: f.available, isDraft: f.isDraft }));
     // an item's sub-category (Appetizers, Main Course ...) is its own link to that category: read them for the sub-categories under the day's categories
     const dayCatIds = [...new Set(mappings.map((m) => m.categoryId))];
-    const subRes = dayCatIds.length ? await db.read<CatDoc>('foodcategories', { parentCategoryId: { $in: dayCatIds.map(oid).filter((v): v is ObjectId => Boolean(v)) }, isDraft: { $ne: true } } as never) : { success: true, data: [] as CatDoc[] };
+    const subRes = dayCatIds.length ? await db.read<CatDoc>('foodcategories', { parentCategoryId: { $in: dayCatIds.map(oid).filter((v): v is ObjectId => Boolean(v)) } } as never) : { success: true, data: [] as CatDoc[] };
     const subs = subRes.success ? subRes.data ?? [] : [];
     const itemSubs: ItemSubCategories = {};
     if (subs.length && foodIds.length) {
