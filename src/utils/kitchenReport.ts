@@ -398,3 +398,14 @@ export function sortDayItems<T extends { name: string; quantity: number }>(list:
   if (sort.key !== 'item' && sort.key !== 'qty') return list;
   return [...list].sort((a, b) => applyDir(sort.key === 'qty' ? a.quantity - b.quantity : byText(a.name, b.name), sort.dir) || byText(a.name, b.name));
 }
+
+/**
+ * The day a sticker line belongs to. A day-wise menu item is packed on its kitchen (menu) day, even when it goes out later
+ * (cart clubbing, or moved later); everything else follows its delivery date. An item delivered EARLIER than its kitchen day
+ * (an admin moved it) is gone by then, so it always follows its delivery date and never shows on the later day's report.
+ */
+export function stickerDayOf(row: { day: string; deliveredOn?: string | null }, isDayWise: boolean): string {
+  const delivered = row.deliveredOn || row.day;
+  if (delivered < row.day) return delivered;
+  return isDayWise ? row.day : delivered;
+}

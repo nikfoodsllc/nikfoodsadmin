@@ -22,7 +22,10 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * GET /api/admin/business-dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD&group=week|month
+ * GET /api/admin/business-dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD&group=week|month[&compareFrom=YYYY-MM-DD&compareTo=YYYY-MM-DD]
+ *
+ * compareFrom/compareTo (optional, both or neither): any period to compare with; its totals come back as totals.compare and its
+ * buckets (same grouping) as compareSeries.
  *
  * The money side of the Reporting > Dashboard: gross and net sales against the period before and the year before, this
  * week/month/year so far, Cooked vs Ready to eat, Platform Fee vs Stripe fee (with the orders where we lost money), tax and the
@@ -36,6 +39,14 @@ export async function GET(request: NextRequest) {
   const range: DayRange = { from: params.get('from') ?? '', to: params.get('to') ?? '' };
   const problem = validateDashboardRange(range);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  const compareFrom = params.get('compareFrom');
+  const compareTo = params.get('compareTo');
+  let compare: DayRange | null = null;
+  if (compareFrom !== null || compareTo !== null) {
+    compare = { from: compareFrom ?? '', to: compareTo ?? '' };
+    const compareProblem = validateDashboardRange(compare);
+    if (compareProblem) return NextResponse.json({ error: `Compare period: ${compareProblem}` }, { status: 400 });
+  }
   const groupParam = params.get('group');
   const grouping: Grouping = resolveGrouping(groupParam, range);
 
@@ -44,7 +55,7 @@ export async function GET(request: NextRequest) {
     const previous = previousRange(range);
     const lastYear = lastYearRange(range);
     const quick = quickPairs(today);
-    const allRanges = [range, previous, lastYear, quick.week.current, quick.week.previous, quick.month.current, quick.month.previous, quick.year.current, quick.year.previous];
+    const allRanges = [range, previous, lastYear, quick.week.current, quick.week.previous, quick.month.current, quick.month.previous, quick.year.current, quick.year.previous, ...(compare ? [compare] : [])];
     const span: DayRange = {
       from: allRanges.reduce((min, r) => (r.from < min ? r.from : min), range.from),
       to: allRanges.reduce((max, r) => (r.to > max ? r.to : max), range.to),
@@ -71,9 +82,11 @@ export async function GET(request: NextRequest) {
           current: { range, ...totalsFor(money.orders, range) },
           previous: { range: previous, ...totalsFor(money.orders, previous) },
           lastYear: { range: lastYear, ...totalsFor(money.orders, lastYear) },
+          ...(compare ? { compare: { range: compare, ...totalsFor(money.orders, compare) } } : {}),
         },
         quick: { week: pair(quick.week), month: pair(quick.month), year: pair(quick.year) },
         series: moneySeries(money.orders, range, grouping),
+        ...(compare ? { compareSeries: moneySeries(money.orders, compare, grouping) } : {}),
         types: typeSeries(current.lines, range, grouping, typeOf),
         losses: lossOrders(money.orders, range),
         taxMonths: taxByMonth(money.orders, range),
