@@ -31,6 +31,8 @@ function useReorder<T>(list: T[], onMove: (next: T[]) => void) {
   const [dragging, setDragging] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const focusAfterMove = useRef<number | null>(null);
+  // a key press that has not been drawn yet: the next press builds on it, so quick presses never use old positions
+  const pendingKey = useRef<{ list: T[]; index: number } | null>(null);
   const current = useRef({ list, onMove });
   current.current = { list, onMove };
   const startDrag = (e: React.PointerEvent, index: number) => {
@@ -61,13 +63,17 @@ function useReorder<T>(list: T[], onMove: (next: T[]) => void) {
     const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : 0;
     if (!step) return;
     e.preventDefault();
-    const to = index + step;
-    if (to < 0 || to >= list.length) return;
+    const base = pendingKey.current ?? { list, index };
+    const to = base.index + step;
+    if (to < 0 || to >= base.list.length) return;
+    const next = moveItem(base.list, base.index, to);
+    pendingKey.current = { list: next, index: to };
     focusAfterMove.current = to;
-    onMove(moveItem(list, index, to));
+    onMove(next);
   };
   // after a keyboard move, keep the focus on the moved item's grip
   useEffect(() => {
+    pendingKey.current = null;
     if (focusAfterMove.current === null) return;
     const grip = listRef.current?.querySelector(`[data-reorder-index="${focusAfterMove.current}"] [data-grip]`) as HTMLElement | null;
     focusAfterMove.current = null;
