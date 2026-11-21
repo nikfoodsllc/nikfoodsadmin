@@ -5,6 +5,7 @@ import { moveItem } from '@/utils/categoryReorder';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, MenuItem, TextField, Typography } from '@mui/material';
 import { IconCheck, IconDeviceFloppy, IconGripVertical, IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import MenuPromos from './MenuPromos';
 import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_TAG, MENU_DEFAULT_TAG, MAX_MENU_PHOTOS, MAX_MENU_SECTIONS, sameAsSaved, SECTION_SUBTITLE, sectionsUntouched, shortDate, startingSections, type MenuEmailData, type MenuSection, type SavedMenuBox } from '@/utils/menuEmail';
 
 interface Props {
@@ -461,6 +462,12 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
             Add a box
           </Button>
         )}
+      </Box>
+
+      <Box>
+        <Step n={5}>Promotions (optional)</Step>
+        <Typography sx={{ fontSize: 12.5, color: '#6B7280', mb: 1 }}>Blocks under the boxes with a line of text, a picture and a link, like Niksweets and Bite Theory. An empty block, or one switched off, is left out.</Typography>
+        <MenuPromos token={token} promos={data.promos ?? []} onChange={(promos) => onChange({ ...latest.current, promos })} onUploading={onUploading} />
       </Box>
     </Box>
   );
