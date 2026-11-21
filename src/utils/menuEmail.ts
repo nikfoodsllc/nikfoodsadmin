@@ -47,7 +47,7 @@ export interface MenuPromo {
   text: string;
   imageUrl: string;
   linkUrl: string;
-  /** the words that are the link, at the end of the text (www.niksweets.com); empty = the link's address */
+  /** the words on the button (Shop sweets); empty = Visit <address> */
   linkText: string;
   /** false = left out of this email */
   on: boolean;
@@ -175,30 +175,50 @@ const gapCell = `<td width="12" style="width:12px;font-size:1px;line-height:1px;
 const rowOf = (cells: string, bottom = 14) => `<tr><td style="padding:0 0 ${bottom}px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${cells}</tr></table></td></tr>`;
 
 /** The photos, arranged by how many there are: 1 wide; 2 side by side; 3 one wide and two; 4 in a 2 x 2 grid. */
-/** A promo picture: as wide as the email, never cropped (Cloudinary pictures are resized and compressed) */
+/** A promo picture: fitted inside a white square (shown at up to 180 x 180), never cropped or stretched (Cloudinary pictures are resized and compressed) */
 function promoImageUrl(url: string): string {
   const m = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
   if (!m || /^(?:[a-z]{1,3}_[^/]*,?)+\//.test(m[2])) return url;
-  return `${m[1]}c_limit,w_1040,q_auto,f_jpg/${m[2]}`;
+  return `${m[1]}c_pad,b_white,w_360,h_360,q_auto,f_jpg/${m[2]}`;
+}
+
+/** The words on a promo's button: the typed link words, or "Visit <address>" */
+export function promoButtonText(p: Pick<MenuPromo, 'linkText' | 'linkUrl'>): string {
+  const href = promoLink(p.linkUrl);
+  if (!href) return '';
+  return p.linkText.trim() || `Visit ${href.replace(/^https:\/\//, '').replace(/\/$/, '')}`;
+}
+
+/** One promotion as a card: picture on the left (on top on a phone), the name, the text and a button */
+function promoCard(p: MenuPromo): string {
+  const href = promoLink(p.linkUrl);
+  const text = p.text.trim() ? esc(p.text.trim()).replace(/\r?\n/g, '<br>') : '';
+  const btn = href
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 0;"><tr><td bgcolor="${C.strip}" style="background:${C.strip};border-radius:999px;"><a href="${esc(href)}" style="display:inline-block;padding:10px 20px;font-family:${FONT};font-size:14px;line-height:18px;font-weight:800;color:${C.cream};">${esc(promoButtonText(p))}&nbsp;&rarr;</a></td></tr></table>`
+    : '';
+  const words = `<div style="font-family:${FONT};font-size:11px;line-height:14px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:${C.brandText};">${oneLine(p.name)}</div>
+          ${text ? `<div style="font-family:${FONT};font-size:15px;line-height:23px;color:${C.body};padding-top:8px;">${text}</div>` : ''}${btn}`;
+  const img = isHttpsUrl(p.imageUrl)
+    ? `<img src="${esc(promoImageUrl(p.imageUrl))}" alt="${oneLine(p.name) || 'NikFoods'}" width="180" style="display:block;margin:0 auto;width:100%;max-width:180px;height:auto;border:0;border-radius:12px;">`
+    : '';
+  const pic = img && href ? `<a href="${esc(href)}" style="display:block;">${img}</a>` : img;
+  const body = pic
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="stack" width="180" valign="middle" align="center" style="width:180px;padding:0;">${pic}</td>
+        <td class="gap" width="22" style="width:22px;font-size:1px;line-height:1px;">&nbsp;</td>
+        <td class="stack" valign="middle" style="padding:0;">${words}</td>
+      </tr></table>`
+    : words;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.line};border-radius:18px;border-collapse:separate;background:#FFFFFF;">
+      <tr><td height="4" bgcolor="${C.brand}" style="height:4px;background:${C.brand};border-radius:18px 18px 0 0;font-size:1px;line-height:1px;">&nbsp;</td></tr>
+      <tr><td bgcolor="#FFFFFF" style="padding:18px 20px 20px;background:#FFFFFF;border-radius:0 0 18px 18px;">${body}</td></tr>
+    </table>`;
 }
 
 function promoBlocks(promos: MenuPromo[]): string {
   if (promos.length === 0) return '';
-  const blocks = promos.map((p, i) => {
-    const href = promoLink(p.linkUrl);
-    const lines = p.text.trim() ? esc(p.text.trim()).split(/\r?\n/) : [];
-    if (href) {
-      const words = esc(p.linkText.trim() || href.replace(/^https:\/\//, '').replace(/\/$/, ''));
-      const a = `<a href="${esc(href)}" style="color:#1D4ED8;text-decoration:underline;">${words}</a>`;
-      if (lines.length) lines[lines.length - 1] = `${lines[lines.length - 1]} ${a}`;
-      else lines.push(a);
-    }
-    const text = lines.length ? `<div style="font-family:${FONT};font-size:16px;line-height:24px;color:${C.text};padding:0 0 14px;">${lines.join('<br>')}</div>` : '';
-    const img = isHttpsUrl(p.imageUrl) ? `<img src="${esc(promoImageUrl(p.imageUrl))}" alt="${oneLine(p.name) || 'NikFoods'}" width="520" style="display:block;margin:0 auto;width:100%;max-width:520px;height:auto;border:0;border-radius:12px;">` : '';
-    const pic = img && href ? `<a href="${esc(href)}" style="display:block;">${img}</a>` : img;
-    return `<tr><td align="center" style="padding:${i === 0 ? 8 : 26}px 0 0;${i > 0 ? `border-top:1px solid ${C.line};` : ''}">${text}${pic}</td></tr>`;
-  });
-  return `  <tr><td class="px" bgcolor="${C.card}" style="padding:18px 32px 10px;background:${C.card};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${blocks.join('')}</table></td></tr>`;
+  const cards = promos.map((p, i) => `<tr><td style="padding:${i === 0 ? 0 : 14}px 0 0;">${promoCard(p)}</td></tr>`).join('');
+  return `  <tr><td class="px" bgcolor="${C.card}" style="padding:14px 32px 14px;background:${C.card};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cards}</table></td></tr>`;
 }
 
 function photoGrid(photos: MenuPhoto[]): string {

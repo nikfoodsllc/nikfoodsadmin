@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, menuTagOf, parseMenuEmail, promoLink, usablePromos, emptyPromos, usablePhotos, type MenuEmailData } from './menuEmail';
+import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, menuTagOf, parseMenuEmail, promoLink, promoButtonText, usablePromos, emptyPromos, usablePhotos, type MenuEmailData } from './menuEmail';
 import { htmlProblem, previewHtml } from './communication';
 import { EMAIL_TEMPLATES } from './emailTemplates';
 
@@ -202,16 +202,19 @@ describe('menu email promotions', () => {
     expect(usablePromos(emptyMenuEmail())).toEqual([]);
     expect(usablePromos({ promos: [promo(), promo({ name: 'Bite Theory', on: false })] }).map((p) => p.name)).toEqual(['Niksweets']);
   });
-  it('puts the text, the link at the end and a clickable picture in the email', () => {
+  it('shows each promotion as a card: small picture, name, text and a button', () => {
     const html = buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi', promos: [promo(), promo({ name: 'Bite Theory', text: 'Burgers <b>', imageUrl: '', linkUrl: 'bitetheory.com', linkText: 'Order Bite Theory' })] });
-    expect(html).toContain('Indian Sweets store <a href="https://www.niksweets.com/"');
-    expect(html).toContain('>www.niksweets.com</a>');
-    expect(html).toContain('c_limit,w_1040,q_auto,f_jpg/v1/niks.png');
+    expect(html).toContain('c_pad,b_white,w_360,h_360,q_auto,f_jpg/v1/niks.png');
+    expect(html).toContain('max-width:180px');
     expect(html).toMatch(/<a href="https:\/\/www\.niksweets\.com\/" style="display:block;"><img/);
-    expect(html).toContain('Burgers &lt;b&gt; <a href="https://bitetheory.com/"');
-    expect(html).toContain('>Order Bite Theory</a>');
+    expect(html).toContain('>Visit www.niksweets.com&nbsp;&rarr;</a>');
+    expect(html).toContain('Indian Sweets store</div>');
+    expect(html).toContain('Burgers &lt;b&gt;</div>');
+    expect(html).toContain('>Order Bite Theory&nbsp;&rarr;</a>');
+    expect(html).toContain('>Niksweets</div>');
     expect(html.indexOf('Gift Packing')).toBeLessThan(html.indexOf('Order now'));
     expect(buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi' })).not.toContain('Gift Packing');
+    expect(promoButtonText({ linkUrl: '', linkText: 'x' })).toBe('');
   });
   it('keeps promotions in a saved draft; older drafts get the two empty blocks', () => {
     const back = parseMenuEmail(buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi', promos: [promo({ on: false })] }));
