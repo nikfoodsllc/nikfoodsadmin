@@ -73,6 +73,9 @@ function useReorder<T>(list: T[], onMove: (next: T[]) => void) {
   };
   // after a keyboard move, keep the focus on the moved item's grip
   useEffect(() => {
+    // wait until the screen shows the last key press before moving the focus
+    const pk = pendingKey.current;
+    if (pk && (pk.list.length !== list.length || pk.list.some((x, k) => x !== list[k]))) return;
     pendingKey.current = null;
     if (focusAfterMove.current === null) return;
     const grip = listRef.current?.querySelector(`[data-reorder-index="${focusAfterMove.current}"] [data-grip]`) as HTMLElement | null;
