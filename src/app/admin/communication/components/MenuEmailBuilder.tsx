@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { moveItem } from '@/utils/categoryReorder';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, MenuItem, TextField, Typography } from '@mui/material';
-import { IconCheck, IconDeviceFloppy, IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconCheck, IconDeviceFloppy, IconGripVertical, IconPhotoPlus, IconPlus, IconTrash } from '@tabler/icons-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_PHOTOS, MAX_MENU_SECTIONS, sameAsSaved, SECTION_SUBTITLE, sectionsUntouched, shortDate, startingSections, type MenuEmailData, type MenuSection, type SavedMenuBox } from '@/utils/menuEmail';
+import { dateForDay, dishesOf, MAX_MENU_DISHES, MAX_MENU_TAG, MENU_DEFAULT_TAG, MAX_MENU_PHOTOS, MAX_MENU_SECTIONS, sameAsSaved, SECTION_SUBTITLE, sectionsUntouched, shortDate, startingSections, type MenuEmailData, type MenuSection, type SavedMenuBox } from '@/utils/menuEmail';
 
 interface Props {
   token: string;
@@ -21,6 +22,70 @@ const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
   </Box>
 );
 
+/**
+ * Drag-to-reorder for a list shown as chips or cards: press the grip and the item follows the pointer over the
+ * others (mouse, finger or pen); arrow keys on a focused grip move it one place. Items carry data-reorder-index,
+ * grips carry data-grip.
+ */
+function useReorder<T>(list: T[], onMove: (next: T[]) => void) {
+  const [dragging, setDragging] = useState<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const focusAfterMove = useRef<number | null>(null);
+  const current = useRef({ list, onMove });
+  current.current = { list, onMove };
+  const startDrag = (e: React.PointerEvent, index: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    let from = index;
+    setDragging(from);
+    const move = (ev: PointerEvent) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-reorder-index]') as HTMLElement | null;
+      if (!el || !listRef.current?.contains(el)) return;
+      const to = Number(el.dataset.reorderIndex);
+      if (!Number.isInteger(to) || to === from) return;
+      current.current.onMove(moveItem(current.current.list, from, to));
+      from = to;
+      setDragging(to);
+    };
+    const end = () => {
+      setDragging(null);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  };
+  const keyMove = (e: React.KeyboardEvent, index: number) => {
+    const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const to = index + step;
+    if (to < 0 || to >= list.length) return;
+    focusAfterMove.current = to;
+    onMove(moveItem(list, index, to));
+  };
+  // after a keyboard move, keep the focus on the moved item's grip
+  useEffect(() => {
+    if (focusAfterMove.current === null) return;
+    const grip = listRef.current?.querySelector(`[data-reorder-index="${focusAfterMove.current}"] [data-grip]`) as HTMLElement | null;
+    focusAfterMove.current = null;
+    grip?.focus();
+  });
+  const gripProps = (index: number, name: string) => ({
+    'data-grip': true,
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': `Move ${name}. Use the arrow keys or drag.`,
+    onPointerDown: (e: React.PointerEvent) => startDrag(e, index),
+    onKeyDown: (e: React.KeyboardEvent) => keyMove(e, index),
+  });
+  return { listRef, dragging, gripProps };
+}
+
+const gripSx = (dragging: boolean) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', p: '4px', borderRadius: 1, cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none', color: '#9A6B2F', flexShrink: 0, '&:focus-visible': { outline: '2px solid #F59E0B' } });
+
 /** The "New menu" email form: headline, photos with the dish names, one box per day. The email builds itself from it. */
 /** One day's dishes as chips (tap x to leave one out) and a box to add another. */
 function DishList({ label, text, count, fromLabel = 'from the menu', onChange, onEdited }: { label?: string; text: string; count: number | null; fromLabel?: string; onChange: (text: string) => void; onEdited: () => void }) {
@@ -36,15 +101,34 @@ function DishList({ label, text, count, fromLabel = 'from the menu', onChange, o
     write([...dishes, d]);
     setAdding('');
   };
+  // keys that stay with a dish while it moves (the same name twice gets #1, #2)
+  const seen = new Map<string, number>();
+  const keys = dishes.map((d) => {
+    const n = (seen.get(d) ?? 0) + 1;
+    seen.set(d, n);
+    return `${d}#${n}`;
+  });
+  const { listRef, dragging, gripProps } = useReorder(dishes, write);
   return (
     <Box sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1.25, minWidth: 0 }}>
       {label && <Typography sx={{ fontWeight: 800, fontSize: 14 }}>{label}</Typography>}
       <Typography sx={{ fontSize: 12, color: '#6B7280', mb: 0.75 }}>
-        {count === null ? 'Loading the menu…' : dishes.length > 0 ? `${dishes.length} ${count > 0 ? fromLabel : 'dishes'}. Tap x to leave one out.` : (fromLabel === 'from the menu' ? 'Nothing on the menu for this day yet. Add dishes below, or skip the day.' : 'No dishes yet. Pick a category above or add dishes below.')}
+        {count === null ? 'Loading the menu…' : dishes.length > 0 ? `${dishes.length} ${count > 0 ? fromLabel : 'dishes'}. ${dishes.length > 1 ? 'Drag to change the order. ' : ''}Tap x to leave one out.` : (fromLabel === 'from the menu' ? 'Nothing on the menu for this day yet. Add dishes below, or skip the day.' : 'No dishes yet. Pick a category above or add dishes below.')}
       </Typography>
-      <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
+      <Box ref={listRef} sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1 }}>
         {dishes.map((d, i) => (
-          <Chip key={`${d}-${i}`} label={d} onDelete={() => write(dishes.filter((_, j) => j !== i))} sx={{ maxWidth: '100%', fontWeight: 600, bgcolor: '#FFF1DC', '& .MuiChip-label': { whiteSpace: 'normal', py: 0.5 }, height: 'auto', minHeight: 32 }} />
+          <Chip
+            key={keys[i]}
+            data-reorder-index={i}
+            label={d}
+            onDelete={() => write(dishes.filter((_, j) => j !== i))}
+            icon={dishes.length > 1 ? (
+              <Box component="span" {...gripProps(i, d)} sx={{ ...gripSx(dragging !== null), ml: '4px !important', mr: '-4px !important' }}>
+                <IconGripVertical size={16} />
+              </Box>
+            ) : undefined}
+            sx={{ maxWidth: '100%', fontWeight: 600, bgcolor: dragging === i ? '#FDE2B8' : '#FFF1DC', boxShadow: dragging === i ? '0 0 0 2px #F59E0B' : 'none', userSelect: 'none', transition: 'background-color 120ms, box-shadow 120ms', '& .MuiChip-label': { whiteSpace: 'normal', py: 0.5 }, height: 'auto', minHeight: 32 }}
+          />
         ))}
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
@@ -88,6 +172,7 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
   const latest = useRef(data);
   latest.current = data;
   const set = (patch: Partial<MenuEmailData>) => onChange({ ...latest.current, ...patch });
+  const photoDrag = useReorder(data.photos, (photos) => set({ photos }));
 
   // the day boxes start from the day-wise menu of their date; days Kunal has changed himself (or that came with a saved draft) are left alone
   const edited = useRef<Set<string>>(new Set(data.days.filter((d) => dishesOf(d.dishes).length > 0).map((d) => d.day)));
@@ -258,17 +343,28 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
     <Box sx={{ mt: 1.5, display: 'grid', gap: 2.5 }}>
       <Box>
         <Step n={1}>Headline</Step>
+        <TextField label="Tag above the headline" size="small" value={data.tag ?? ''} placeholder={MENU_DEFAULT_TAG} onChange={(e) => set({ tag: e.target.value.slice(0, MAX_MENU_TAG) })} helperText={`Shown in capitals. Empty = ${MENU_DEFAULT_TAG}.`} inputProps={{ style: { textTransform: 'uppercase' } }} InputLabelProps={{ shrink: true }} sx={{ mb: 1.25, width: { xs: '100%', sm: 260 } }} />
         <TextField label="Headline" size="small" fullWidth value={data.headline} onChange={(e) => set({ headline: e.target.value.slice(0, 80) })} />
         <TextField label="A line or two (optional)" size="small" fullWidth multiline minRows={2} value={data.intro} onChange={(e) => set({ intro: e.target.value.slice(0, 300) })} sx={{ mt: 1.25 }} />
       </Box>
 
       <Box>
         <Step n={2}>Photos (up to {MAX_MENU_PHOTOS})</Step>
-        <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+        <Box ref={photoDrag.listRef} sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
           {data.photos.map((p, i) => (
-            <Box key={p.url} sx={{ border: '1px solid #E5E7EB', borderRadius: 2, p: 1, display: 'flex', gap: 1.25, alignItems: 'center', minWidth: 0 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt={p.caption || `Photo ${i + 1}`} style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+            <Box key={p.url} data-reorder-index={i} sx={{ border: '1px solid', borderColor: photoDrag.dragging === i ? '#F59E0B' : '#E5E7EB', boxShadow: photoDrag.dragging === i ? '0 0 0 1px #F59E0B' : 'none', bgcolor: photoDrag.dragging === i ? '#FFFBF5' : 'transparent', borderRadius: 2, p: 1, display: 'flex', gap: 1, alignItems: 'center', minWidth: 0, userSelect: photoDrag.dragging === null ? 'auto' : 'none' }}>
+              {data.photos.length > 1 && (
+                <Box component="span" {...photoDrag.gripProps(i, p.caption || `photo ${i + 1}`)} sx={{ ...gripSx(photoDrag.dragging !== null), alignSelf: 'stretch', px: '2px' }}>
+                  <IconGripVertical size={18} />
+                </Box>
+              )}
+              <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt={p.caption || `Photo ${i + 1}`} draggable={false} style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+                {data.photos.length > 1 && (
+                  <Box sx={{ position: 'absolute', top: 4, left: 4, minWidth: 20, height: 20, px: 0.5, borderRadius: 10, bgcolor: 'rgba(31,23,18,0.85)', color: '#FDE9C9', fontSize: 11.5, fontWeight: 800, display: 'grid', placeItems: 'center' }}>{i + 1}</Box>
+                )}
+              </Box>
               <TextField size="small" label="Dish name" value={p.caption} onChange={(e) => set({ photos: data.photos.map((x, j) => (j === i ? { ...x, caption: e.target.value.slice(0, 60) } : x)) })} sx={{ flex: 1, minWidth: 0 }} />
               <IconButton aria-label={`Remove photo ${i + 1}`} size="small" onClick={() => set({ photos: data.photos.filter((_, j) => j !== i) })} sx={{ color: '#B91C1C' }}>
                 <IconTrash size={18} />
@@ -287,7 +383,7 @@ export default function MenuEmailBuilder({ token, data, onChange, onUploading }:
           </Button>
         )}
         <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
-        <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.75 }}>They line up by themselves: 1 is wide, 2 sit side by side, 3 and 4 make a neat grid. Pictures are cut to the same shape for you.</Typography>
+        <Typography sx={{ fontSize: 12.5, color: '#6B7280', mt: 0.75 }}>Drag a photo by its grip to change the order. They line up by themselves: 1 is wide, 2 sit side by side, 3 and 4 make a neat grid. Pictures are cut to the same shape for you.</Typography>
         {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
       </Box>
 

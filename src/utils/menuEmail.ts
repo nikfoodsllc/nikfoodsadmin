@@ -27,6 +27,8 @@ export interface MenuSection {
   savedId?: string;
 }
 export interface MenuEmailData {
+  /** The small pill above the headline (shown in capitals); empty = NEW MENU */
+  tag?: string;
   headline: string;
   intro: string;
   photos: MenuPhoto[];
@@ -42,6 +44,10 @@ export const MAX_MENU_PHOTOS = 4;
 export const MAX_MENU_DISHES = 40;
 export const MAX_MENU_SECTIONS = 6;
 export const SECTION_SUBTITLE = "Club with any day's delivery";
+export const MENU_DEFAULT_TAG = 'NEW MENU';
+export const MAX_MENU_TAG = 24;
+/** The pill text as it goes in the email: one line, capitals, NEW MENU when empty. */
+export const menuTagOf = (data: Pick<MenuEmailData, 'tag'>) => String(data.tag ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_MENU_TAG).toUpperCase() || MENU_DEFAULT_TAG;
 export const MENU_DEFAULT_SUBJECT = "This week's new menu";
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -227,7 +233,7 @@ export function buildMenuEmailHtml(data: MenuEmailData): string {
   const html = shell(
     oneLine(data.headline) || 'The new menu',
     oneLine(data.intro) || 'Fresh Indian food, ready to order.',
-    `${hero('NEW MENU', oneLine(data.headline), intro)}
+    `${hero(esc(menuTagOf(data)), oneLine(data.headline), intro)}
 ${photoGrid(photos)}
 ${days.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${photos.length ? 10 : 24}px 32px 4px;background:${C.card};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr>
@@ -245,7 +251,7 @@ ${sections.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${d
   </td></tr>
 ${footer('You are getting this because you signed up for NikFoods updates.', false)}`
   );
-  const state = toB64(JSON.stringify({ sections: data.sections, weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
+  const state = toB64(JSON.stringify({ tag: data.tag, sections: data.sections, weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
   return html.replace('</body>', `<!--${MARK}${state}-->\n</body>`);
 }
 
@@ -259,6 +265,7 @@ export function parseMenuEmail(html: string): MenuEmailData | null {
     return {
       sections: Array.isArray(raw.sections) ? raw.sections.map((x) => ({ title: String(x?.title ?? ''), subtitle: String(x?.subtitle ?? ''), items: String(x?.items ?? ''), ...(typeof x?.categoryId === 'string' ? { categoryId: x.categoryId } : {}), ...(typeof x?.savedId === 'string' ? { savedId: x.savedId } : {}) })).slice(0, MAX_MENU_SECTIONS) : [],
       weekOf: validDate(raw.weekOf) ? raw.weekOf : base.weekOf,
+      ...(typeof raw.tag === 'string' && raw.tag.trim() ? { tag: raw.tag.slice(0, MAX_MENU_TAG) } : {}),
       headline: typeof raw.headline === 'string' ? raw.headline : base.headline,
       intro: typeof raw.intro === 'string' ? raw.intro : base.intro,
       photos: Array.isArray(raw.photos) ? raw.photos.filter((p) => p && typeof p.url === 'string').map((p) => ({ url: p.url, caption: String(p.caption ?? '') })).slice(0, MAX_MENU_PHOTOS) : [],
