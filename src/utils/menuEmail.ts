@@ -206,7 +206,7 @@ function promoCard(p: MenuPromo): string {
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         <td class="stack" width="180" valign="middle" align="center" style="width:180px;padding:0;">${pic}</td>
         <td class="gap" width="22" style="width:22px;font-size:1px;line-height:1px;">&nbsp;</td>
-        <td class="stack" valign="middle" style="padding:0;">${words}</td>
+        <td class="stack center-sm" valign="middle" style="padding:0;">${words}</td>
       </tr></table>`
     : words;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.line};border-radius:18px;border-collapse:separate;background:#FFFFFF;">

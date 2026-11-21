@@ -22,6 +22,8 @@ const css = `
     .outer { padding:0 !important; }
     .stack { display:block !important; width:100% !important; }
     .gap { display:block !important; height:12px !important; }
+    .center-sm { text-align:center !important; }
+    .center-sm table { margin-left:auto !important; margin-right:auto !important; }
   }`;
 
 export const button = (label: string, href: string) =>
