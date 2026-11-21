@@ -196,8 +196,8 @@ function promoCard(p: MenuPromo): string {
   const btn = href
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:14px 0 0;"><tr><td bgcolor="${C.strip}" style="background:${C.strip};border-radius:999px;"><a href="${esc(href)}" style="display:inline-block;padding:10px 20px;font-family:${FONT};font-size:14px;line-height:18px;font-weight:800;color:${C.cream};">${esc(promoButtonText(p))}&nbsp;&rarr;</a></td></tr></table>`
     : '';
-  const words = `<div style="font-family:${FONT};font-size:11px;line-height:14px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:${C.brandText};">${oneLine(p.name)}</div>
-          ${text ? `<div style="font-family:${FONT};font-size:15px;line-height:23px;color:${C.body};padding-top:8px;">${text}</div>` : ''}${btn}`;
+  const words = `<div style="font-family:${FONT};font-size:22px;line-height:28px;font-weight:800;letter-spacing:-0.01em;color:${C.text};">${oneLine(p.name)}</div>
+          ${text ? `<div style="font-family:${FONT};font-size:15px;line-height:23px;color:${C.body};padding-top:6px;">${text}</div>` : ''}${btn}`;
   const img = isHttpsUrl(p.imageUrl)
     ? `<img src="${esc(promoImageUrl(p.imageUrl))}" alt="${oneLine(p.name) || 'NikFoods'}" width="180" style="display:block;margin:0 auto;width:100%;max-width:180px;height:auto;border:0;border-radius:12px;">`
     : '';
