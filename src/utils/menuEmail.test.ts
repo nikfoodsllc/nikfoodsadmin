@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, menuTagOf, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
+import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, menuTagOf, parseMenuEmail, promoLink, usablePromos, emptyPromos, usablePhotos, type MenuEmailData } from './menuEmail';
 import { htmlProblem, previewHtml } from './communication';
 import { EMAIL_TEMPLATES } from './emailTemplates';
 
@@ -185,5 +185,38 @@ describe('menu email tag', () => {
     expect(back?.tag).toBe('Holiday menu');
     expect(back?.photos.map((p) => p.caption)).toEqual(['B', 'A']);
     expect(parseMenuEmail(buildMenuEmailHtml({ ...data, tag: undefined }))?.tag).toBeUndefined();
+  });
+});
+
+describe('menu email promotions', () => {
+  const promo = (over = {}) => ({ name: 'Niksweets', text: 'Check us out for Gift Packing and Festive Sweets.\nIndian Sweets store', imageUrl: 'https://res.cloudinary.com/demo/image/upload/v1/niks.png', linkUrl: 'www.niksweets.com', linkText: '', on: true, ...over });
+  it('cleans links', () => {
+    expect(promoLink('www.niksweets.com')).toBe('https://www.niksweets.com/');
+    expect(promoLink('http://bitetheory.com/menu')).toBe('https://bitetheory.com/menu');
+    expect(promoLink('javascript:alert(1)')).toBe('');
+    expect(promoLink('not a link')).toBe('');
+    expect(promoLink('')).toBe('');
+  });
+  it('starts with Niksweets and Bite Theory, leaves empty or switched-off ones out', () => {
+    expect(emptyMenuEmail().promos?.map((p) => p.name)).toEqual(['Niksweets', 'Bite Theory']);
+    expect(usablePromos(emptyMenuEmail())).toEqual([]);
+    expect(usablePromos({ promos: [promo(), promo({ name: 'Bite Theory', on: false })] }).map((p) => p.name)).toEqual(['Niksweets']);
+  });
+  it('puts the text, the link at the end and a clickable picture in the email', () => {
+    const html = buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi', promos: [promo(), promo({ name: 'Bite Theory', text: 'Burgers <b>', imageUrl: '', linkUrl: 'bitetheory.com', linkText: 'Order Bite Theory' })] });
+    expect(html).toContain('Indian Sweets store <a href="https://www.niksweets.com/"');
+    expect(html).toContain('>www.niksweets.com</a>');
+    expect(html).toContain('c_limit,w_1040,q_auto,f_jpg/v1/niks.png');
+    expect(html).toMatch(/<a href="https:\/\/www\.niksweets\.com\/" style="display:block;"><img/);
+    expect(html).toContain('Burgers &lt;b&gt; <a href="https://bitetheory.com/"');
+    expect(html).toContain('>Order Bite Theory</a>');
+    expect(html.indexOf('Gift Packing')).toBeLessThan(html.indexOf('Order now'));
+    expect(buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi' })).not.toContain('Gift Packing');
+  });
+  it('keeps promotions in a saved draft; older drafts get the two empty blocks', () => {
+    const back = parseMenuEmail(buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi', promos: [promo({ on: false })] }));
+    expect(back?.promos).toEqual([promo({ on: false })]);
+    const old = parseMenuEmail(buildMenuEmailHtml({ ...emptyMenuEmail(), headline: 'Hi', promos: undefined }));
+    expect(old?.promos).toEqual(emptyPromos());
   });
 });

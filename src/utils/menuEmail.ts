@@ -37,7 +37,62 @@ export interface MenuEmailData {
   sections?: MenuSection[];
   /** The date the menu starts (YYYY-MM-DD, the first day, a Tuesday by default); every day box gets its own date from it */
   weekOf?: string;
+  /** Promotion blocks under the boxes (Niksweets, Bite Theory): text, a picture and a link; an empty or switched-off one is left out */
+  promos?: MenuPromo[];
 }
+
+export interface MenuPromo {
+  /** who it is for (Niksweets, Bite Theory): shown only in the form */
+  name: string;
+  text: string;
+  imageUrl: string;
+  linkUrl: string;
+  /** the words that are the link, at the end of the text (www.niksweets.com); empty = the link's address */
+  linkText: string;
+  /** false = left out of this email */
+  on: boolean;
+}
+
+export const MENU_PROMO_NAMES = ['Niksweets', 'Bite Theory'] as const;
+export const MAX_MENU_PROMOS = 4;
+export const MAX_PROMO_TEXT = 300;
+export const emptyPromos = (): MenuPromo[] => MENU_PROMO_NAMES.map((name) => ({ name, text: '', imageUrl: '', linkUrl: '', linkText: '', on: true }));
+
+/** A typed web address as a safe https link (www.niksweets.com -> https://www.niksweets.com), or '' when it is not one */
+export function promoLink(raw: string): string {
+  let u = String(raw ?? '').trim();
+  if (!u) return '';
+  if (/^http:\/\//i.test(u)) u = `https://${u.slice(7)}`;
+  if (!/^https:\/\//i.test(u)) u = `https://${u}`;
+  try {
+    const url = new URL(u);
+    if (url.protocol !== 'https:' || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(url.hostname)) return '';
+    return /^https:\/\/[^\s"'<>]+$/i.test(url.href) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+/** The promo blocks that go in the email */
+export const usablePromos = (data: Pick<MenuEmailData, 'promos'>): MenuPromo[] =>
+  (data.promos ?? []).filter((p) => p.on !== false && (p.text.trim() !== '' || isHttpsUrl(p.imageUrl))).slice(0, MAX_MENU_PROMOS);
+const isHttpsUrl = (u: string) => /^https:\/\/[^\s"'<>]+$/i.test(String(u ?? ''));
+
+/** A promo cleaned for saving or reading back */
+export function cleanPromo(raw: unknown): MenuPromo {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    name: String(r.name ?? '').trim().slice(0, 40),
+    text: String(r.text ?? '').slice(0, MAX_PROMO_TEXT),
+    imageUrl: isHttpsUrl(String(r.imageUrl ?? '')) ? String(r.imageUrl) : '',
+    linkUrl: String(r.linkUrl ?? '').trim().slice(0, 200),
+    linkText: String(r.linkText ?? '').trim().slice(0, 60),
+    on: r.on !== false,
+  };
+}
+
+/** True when nobody has typed in the promos yet (so the saved ones may fill them) */
+export const promosUntouched = (promos: MenuPromo[] | undefined) => (promos ?? []).every((p) => !p.text.trim() && !p.imageUrl && !p.linkUrl.trim() && !p.linkText.trim());
 
 export const MENU_DAYS = ['Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
 export const MAX_MENU_PHOTOS = 4;
@@ -73,7 +128,7 @@ export function shortDate(date: string): string {
 }
 
 export function emptyMenuEmail(): MenuEmailData {
-  return { sections: [{ title: 'Indian Mithai', subtitle: SECTION_SUBTITLE, items: '' }, { title: "Add-On's", subtitle: SECTION_SUBTITLE, items: '' }], weekOf: nextMenuStart(), headline: 'The new menu is here', intro: 'Fresh Indian food, cooked for the days below.', photos: [], days: MENU_DAYS.map((day) => ({ day, dishes: '' })) };
+  return { sections: [{ title: 'Indian Mithai', subtitle: SECTION_SUBTITLE, items: '' }, { title: "Add-On's", subtitle: SECTION_SUBTITLE, items: '' }], weekOf: nextMenuStart(), headline: 'The new menu is here', intro: 'Fresh Indian food, cooked for the days below.', photos: [], days: MENU_DAYS.map((day) => ({ day, dishes: '' })), promos: emptyPromos() };
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -120,6 +175,32 @@ const gapCell = `<td width="12" style="width:12px;font-size:1px;line-height:1px;
 const rowOf = (cells: string, bottom = 14) => `<tr><td style="padding:0 0 ${bottom}px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${cells}</tr></table></td></tr>`;
 
 /** The photos, arranged by how many there are: 1 wide; 2 side by side; 3 one wide and two; 4 in a 2 x 2 grid. */
+/** A promo picture: as wide as the email, never cropped (Cloudinary pictures are resized and compressed) */
+function promoImageUrl(url: string): string {
+  const m = url.match(/^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/);
+  if (!m || /^(?:[a-z]{1,3}_[^/]*,?)+\//.test(m[2])) return url;
+  return `${m[1]}c_limit,w_1040,q_auto,f_jpg/${m[2]}`;
+}
+
+function promoBlocks(promos: MenuPromo[]): string {
+  if (promos.length === 0) return '';
+  const blocks = promos.map((p, i) => {
+    const href = promoLink(p.linkUrl);
+    const lines = p.text.trim() ? esc(p.text.trim()).split(/\r?\n/) : [];
+    if (href) {
+      const words = esc(p.linkText.trim() || href.replace(/^https:\/\//, '').replace(/\/$/, ''));
+      const a = `<a href="${esc(href)}" style="color:#1D4ED8;text-decoration:underline;">${words}</a>`;
+      if (lines.length) lines[lines.length - 1] = `${lines[lines.length - 1]} ${a}`;
+      else lines.push(a);
+    }
+    const text = lines.length ? `<div style="font-family:${FONT};font-size:16px;line-height:24px;color:${C.text};padding:0 0 14px;">${lines.join('<br>')}</div>` : '';
+    const img = isHttpsUrl(p.imageUrl) ? `<img src="${esc(promoImageUrl(p.imageUrl))}" alt="${oneLine(p.name) || 'NikFoods'}" width="520" style="display:block;margin:0 auto;width:100%;max-width:520px;height:auto;border:0;border-radius:12px;">` : '';
+    const pic = img && href ? `<a href="${esc(href)}" style="display:block;">${img}</a>` : img;
+    return `<tr><td align="center" style="padding:${i === 0 ? 8 : 26}px 0 0;${i > 0 ? `border-top:1px solid ${C.line};` : ''}">${text}${pic}</td></tr>`;
+  });
+  return `  <tr><td class="px" bgcolor="${C.card}" style="padding:18px 32px 10px;background:${C.card};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${blocks.join('')}</table></td></tr>`;
+}
+
 function photoGrid(photos: MenuPhoto[]): string {
   if (photos.length === 0) return '';
   const wide = (p: MenuPhoto) => rowOf(photo(p, 1152, 648, '100%'));
@@ -246,12 +327,13 @@ ${days.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${photo
 ${sections.length ? `  <tr><td class="px" bgcolor="${C.card}" style="padding:${days.length || photos.length ? 4 : 24}px 32px 4px;background:${C.card};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${sectionGrid(sections)}</table>
   </td></tr>` : ''}
+${promoBlocks(usablePromos(data))}
   <tr><td class="px" align="center" bgcolor="${C.card}" style="padding:6px 32px 8px;background:${C.card};">
     <a href="${SITE_URL}" style="display:inline-block;vertical-align:middle;margin:4px 6px;padding:11px 28px;background:${C.brand};border-radius:999px;font-family:${FONT};font-size:16px;line-height:20px;font-weight:800;color:#1A1106;">Order now</a><a href="${APP_STORE_LISTING}" style="display:inline-block;vertical-align:middle;margin:4px 6px;"><img src="cid:app-store-badge" alt="Download on the App Store" width="120" height="40" style="display:block;border:0;width:120px;height:40px;"></a>
   </td></tr>
 ${footer('You are getting this because you signed up for NikFoods updates.', false)}`
   );
-  const state = toB64(JSON.stringify({ tag: data.tag, sections: data.sections, weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
+  const state = toB64(JSON.stringify({ promos: data.promos, tag: data.tag, sections: data.sections, weekOf: data.weekOf, headline: data.headline, intro: data.intro, photos: data.photos, days: data.days }));
   return html.replace('</body>', `<!--${MARK}${state}-->\n</body>`);
 }
 
@@ -265,6 +347,7 @@ export function parseMenuEmail(html: string): MenuEmailData | null {
     return {
       sections: Array.isArray(raw.sections) ? raw.sections.map((x) => ({ title: String(x?.title ?? ''), subtitle: String(x?.subtitle ?? ''), items: String(x?.items ?? ''), ...(typeof x?.categoryId === 'string' ? { categoryId: x.categoryId } : {}), ...(typeof x?.savedId === 'string' ? { savedId: x.savedId } : {}) })).slice(0, MAX_MENU_SECTIONS) : [],
       weekOf: validDate(raw.weekOf) ? raw.weekOf : base.weekOf,
+      promos: Array.isArray(raw.promos) ? raw.promos.slice(0, MAX_MENU_PROMOS).map(cleanPromo) : emptyPromos(),
       ...(typeof raw.tag === 'string' && raw.tag.trim() ? { tag: raw.tag.slice(0, MAX_MENU_TAG) } : {}),
       headline: typeof raw.headline === 'string' ? raw.headline : base.headline,
       intro: typeof raw.intro === 'string' ? raw.intro : base.intro,
