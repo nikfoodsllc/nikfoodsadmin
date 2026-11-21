@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
+import { buildMenuEmailHtml, filledSections, dateForDay, nextMenuStart, shortDate, dishesOf, emptyMenuEmail, menuEmailProblem, menuPhotoUrl, menuTagOf, parseMenuEmail, usablePhotos, type MenuEmailData } from './menuEmail';
 import { htmlProblem, previewHtml } from './communication';
 import { EMAIL_TEMPLATES } from './emailTemplates';
 
@@ -167,5 +167,23 @@ describe('dark mode safety', () => {
     const h = buildMenuEmailHtml(d);
     expect(h).not.toMatch(/bgcolor="#fff(fff)?"/i);
     expect(h).not.toMatch(/background:\s*#fff(fff)?[;"]/i);
+  });
+});
+
+describe('menu email tag', () => {
+  it('defaults to NEW MENU and shows a typed tag in capitals', () => {
+    const base = emptyMenuEmail();
+    expect(menuTagOf(base)).toBe('NEW MENU');
+    expect(menuTagOf({ tag: '   ' })).toBe('NEW MENU');
+    expect(menuTagOf({ tag: ' diwali  special ' })).toBe('DIWALI SPECIAL');
+    expect(buildMenuEmailHtml({ ...base, headline: 'Hi', tag: 'Diwali <b>' })).toContain('>DIWALI &lt;B&gt;</td>');
+    expect(buildMenuEmailHtml({ ...base, headline: 'Hi' })).toContain('>NEW MENU</td>');
+  });
+  it('keeps the tag and the photo order in a saved draft', () => {
+    const data = { ...emptyMenuEmail(), headline: 'Hi', tag: 'Holiday menu', photos: [{ url: 'https://x/b.jpg', caption: 'B' }, { url: 'https://x/a.jpg', caption: 'A' }] };
+    const back = parseMenuEmail(buildMenuEmailHtml(data));
+    expect(back?.tag).toBe('Holiday menu');
+    expect(back?.photos.map((p) => p.caption)).toEqual(['B', 'A']);
+    expect(parseMenuEmail(buildMenuEmailHtml({ ...data, tag: undefined }))?.tag).toBeUndefined();
   });
 });
