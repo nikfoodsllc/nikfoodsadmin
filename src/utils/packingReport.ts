@@ -57,6 +57,8 @@ export interface PackLine {
   isEco: boolean;
   /** The customer's special instructions for this item, when they wrote any */
   note?: string | null;
+  /** An admin's internal note on this item, when one was added */
+  adminNote?: string | null;
   /** A combo's picks, one line per section ("Veg Curry of the Day: Kale Chane (12Oz)"); empty for a plain item */
   choices: string[];
   /** The menu day it was picked for, when that is not the delivery date (cart clubbing or a moved date) */
@@ -128,6 +130,7 @@ export function toLine(row: PackingRow, date: string): PackLine {
     spice: clean(row.spiceLevel) || null,
     isEco: Boolean(row.isEco),
     note: clean(row.notes) || null,
+    adminNote: clean(row.adminNote) || null,
     // a recipe item (raita with biryani) says what it goes with
     choices: row.recipeOf ? [`Goes with ${clean(row.recipeOf)}`] : choices,
     pickedFor: row.day && row.day !== date ? row.day : null,

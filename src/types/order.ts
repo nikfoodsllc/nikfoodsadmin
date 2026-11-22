@@ -165,6 +165,8 @@ export interface OrderDayItem {
   ecoContainerCharge?: number;
   comboSelections?: Record<string, string[]>; // { sectionId: itemId[] }
   notes?: string;
+  /** An admin's internal note for the kitchen and packing reports (never shown to the customer) */
+  adminNote?: string;
 }
 
 export interface OrderDay {

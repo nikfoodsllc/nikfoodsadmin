@@ -12,6 +12,8 @@ export interface PackerItem {
   spice: string;
   eco: boolean;
   notes: string;
+  /** An admin's internal note on the item ('' when none) */
+  adminNote: string;
   /** What was picked inside a combo, one line per section */
   choices: string[];
 }
@@ -59,6 +61,7 @@ export const PACKER_ORDER_PROJECTION = {
   'items.items.isEcoFriendlyContainer': 1,
   'items.items.comboSelections': 1,
   'items.items.notes': 1,
+  'items.items.adminNote': 1,
   'items.items.food.name': 1,
   'items.items.food.sections._id': 1,
   'items.items.food.sections.title': 1,
@@ -87,6 +90,7 @@ export function toPackerOrder(order: any): PackerOrder {
         spice: text(item?.spiceLevel),
         eco: item?.isEcoFriendlyContainer === true,
         notes: text(item?.notes),
+        adminNote: text(item?.adminNote),
         choices: comboChoiceLines(row),
       };
     });

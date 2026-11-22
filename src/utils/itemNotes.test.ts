@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyItemNote, canEditItemNotes, cleanItemNote, ITEM_NOTE_MAX } from './itemNotes';
+import { ADMIN_NOTE_MAX, applyAdminNote, applyItemNote, canEditItemNotes, cleanAdminNote, cleanItemNote, ITEM_NOTE_MAX } from './itemNotes';
 
 const days = () => [
   { deliveryDate: '2026-11-24', items: [{ food: { _id: 'a', name: 'Dal' }, notes: 'less salt' }, { food: { _id: 'b', name: 'Rice' } }, { food: { _id: 'a', name: 'Dal' } }] },
@@ -49,5 +49,23 @@ describe('item instructions', () => {
     expect(applyItemNote(days(), 0, 9, 'x').ok).toBe(false);
     expect(applyItemNote(days(), 0.5, 0, 'x').ok).toBe(false);
     expect(applyItemNote(days(), 0, 0, ' less  salt ')).toEqual({ ok: false, error: 'Nothing changed.' });
+  });
+});
+
+describe('admin note', () => {
+  const sample = () => [{ items: [{ food: { name: 'Dal' } }, { food: { name: 'Dal' }, adminNote: 'old' }] }];
+  it('sets only the chosen line, any item', () => {
+    const input = sample();
+    const r = applyAdminNote(input, 0, 0, '  pack   separately ');
+    expect(r.ok && r.days[0].items.map((l) => l.adminNote)).toEqual(['pack separately', 'old']);
+    expect(input[0].items[0]).not.toHaveProperty('adminNote');
+  });
+  it('removes, refuses unchanged and unknown lines, caps the length', () => {
+    const r = applyAdminNote(sample(), 0, 1, '');
+    expect(r.ok && r.days[0].items[1]).not.toHaveProperty('adminNote');
+    expect(r.ok && r.from).toBe('old');
+    expect(applyAdminNote(sample(), 0, 1, 'old')).toEqual({ ok: false, error: 'Nothing changed.' });
+    expect(applyAdminNote(sample(), 1, 0, 'x').ok).toBe(false);
+    expect(cleanAdminNote('y'.repeat(300))).toHaveLength(ADMIN_NOTE_MAX);
   });
 });

@@ -20,6 +20,7 @@ import HeldList from './HeldList';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
 import InstructionsNote from '@/components/common/InstructionsNote';
+import AdminItemNote from '@/components/common/AdminItemNote';
 
 type TabId = 'routes' | 'totals' | 'held';
 type Preset = 'today' | 'tomorrow' | 'other';
@@ -68,6 +69,7 @@ function LineRow({ line }: { line: PackLine }) {
           <Typography key={c} sx={{ fontSize: 12, color: '#4B5563', wordBreak: 'break-word' }}>{c}</Typography>
         ))}
         <InstructionsNote text={line.note} />
+        <AdminItemNote text={line.adminNote} />
         {line.pickedFor && (
           <Typography sx={{ fontSize: 12, color: '#B45309' }}>{line.madeEarlier ? `Made ${formatDayShort(line.pickedFor)} · from the fridge` : `Picked for ${formatDayShort(line.pickedFor)}`}</Typography>
         )}

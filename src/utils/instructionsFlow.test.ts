@@ -54,3 +54,33 @@ describe('special instructions travel to the kitchen and packing screens', () =>
     expect(all.map((l) => l.note)).toContain(NOTE);
   });
 });
+
+describe('an admin note travels to the kitchen and packing reports, never the sticker', () => {
+  const ADMIN = 'Pack in a separate bag';
+  it('Kitchen Dashboard, Kitchen Report lines and sheets; not on stickers', () => {
+    expect(buildItemOrders([row({ adminNote: ADMIN })], 'Rajma')[0].adminNote).toBe(ADMIN);
+    const report = buildKitchenReport([row({ notes: NOTE, adminNote: ADMIN }), row({ orderId: 'ORD-2', customerName: 'Ben', adminNote: ADMIN })], cooked, stickersYes);
+    const lines = report.cooked[0].lines;
+    expect(lines.every((l) => l.adminNote === ADMIN)).toBe(true);
+    expect(report.stickers.every((s) => !('adminNote' in s) || !s.adminNote)).toBe(true);
+    const sheets = buildReportSheets({ cooked: report.cooked, notSet: [], stickers: report.stickers });
+    const prep = sheets.find((s) => s.key === 'prep')!;
+    const i = prep.columnKeys!.indexOf('instructions');
+    const cells = prep.rows.filter((r) => r.kind === 'data').map((r) => r.cells[i]);
+    expect(cells).toContain(`${NOTE}\nAdmin note: ${ADMIN}`);
+    expect(cells).toContain(`Admin note: ${ADMIN}`);
+    const st = sheets.find((s) => s.key === 'stickers')!;
+    expect(JSON.stringify(st.rows)).not.toContain(ADMIN);
+  });
+  it('an admin note alone turns the Instructions column on', () => {
+    const report = buildKitchenReport([row({ adminNote: ADMIN })], cooked, stickersYes);
+    const sheets = buildReportSheets({ cooked: report.cooked, notSet: [], stickers: report.stickers });
+    expect(sheets.find((s) => s.key === 'prep')!.columnKeys).toContain('instructions');
+    expect(sheets.find((s) => s.key === 'stickers')!.columnKeys).not.toContain('instructions');
+  });
+  it('the Packing Report line carries it', () => {
+    const packingRow: PackingRow = { ...row({ adminNote: ADMIN }), street: '1 A St' };
+    expect(toLine(packingRow, '2026-10-13').adminNote).toBe(ADMIN);
+    expect(toLine({ ...packingRow, adminNote: null }, '2026-10-13').adminNote).toBeNull();
+  });
+});
