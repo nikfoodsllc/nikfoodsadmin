@@ -97,7 +97,7 @@ function OrderMixBars({ rows }: { rows: Array<{ day: string; app: number; all: n
       <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 140, overflowX: 'auto', pb: 0.5 }}>
         {rows.map((r) => {
           const web = Math.max(0, r.all - r.app);
-          const total = 100;
+          const total = 80;
           const appH = r.all ? (r.app / max) * total : 0;
           const webH = r.all ? (web / max) * total : 0;
           const label = `${weekday(r.day)} ${shortDay(r.day)}: ${r.app} app, ${web} website${r.all ? ` (${Math.round((r.app / r.all) * 100)}% app)` : ''}`;
