@@ -92,7 +92,7 @@ export default function ItemNoteEditor({ orderId, token, line, item, name, notes
           onClick={start}
           startIcon={notes ? <IconPencil size={13} /> : <IconPlus size={13} />}
           aria-label={notes ? `Edit ${t.aria} for ${name}` : `Add ${t.aria} for ${name}`}
-          sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12, minWidth: 0, py: 0, px: 0.75, color: t.color, '& .MuiButton-startIcon': { mr: 0.4 } }}
+          sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12, minWidth: 0, py: 0, px: 0.75, whiteSpace: 'nowrap', color: t.color, '& .MuiButton-startIcon': { mr: 0.4 } }}
         >
           {notes ? 'Edit' : t.add}
         </Button>
