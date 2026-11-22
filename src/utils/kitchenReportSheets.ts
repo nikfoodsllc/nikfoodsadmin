@@ -10,9 +10,6 @@ import { formatDayShort } from './kitchenDashboard';
 import { sheetAmounts, stickerQtyText, type PrepBlock, type StickerLine } from './kitchenReport';
 import type { ColumnDef } from './columnPreferences';
 
-/** The Instructions cell: what the customer wrote, then an admin's internal note on its own line. */
-export const noteCell = (line?: { note?: string | null; adminNote?: string | null } | null): string =>
-  [line?.note ?? '', line?.adminNote ? `Admin note: ${line.adminNote}` : ''].filter(Boolean).join('\n');
 
 export type RowTone = 'red' | 'white' | 'eco';
 
@@ -69,7 +66,8 @@ export const PREP_COLUMNS: ColumnDef[] = [
   col('kitchenDate', 'Kitchen date', 17),
   col('deliveryDate', 'Delivery date', 17),
   col('combo', 'With combo', 24),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
+  col('adminNote', 'Admin note', 30),
 ];
 export const STICKER_COLUMNS: ColumnDef[] = [
   col('deliveryDate', 'Delivery date', 17),
@@ -81,7 +79,7 @@ export const STICKER_COLUMNS: ColumnDef[] = [
   col('eco', 'Eco', 8),
   col('heating', 'Heating/Storage', 36),
   col('combo', 'With combo', 24),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
   col('order', 'Order', 24),
   col('kitchenDate', 'Kitchen date', 17),
 ];
@@ -123,7 +121,8 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
           date(line.day),
           date(line.deliveryDate),
           [line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '', line.movedFrom ? `Moved from ${dateCellText(line.movedFrom)}` : ''].filter(Boolean).join(' · '),
-          noteCell(line),
+          line.note ?? '',
+          line.adminNote ?? '',
         ],
       });
     });
@@ -132,7 +131,7 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
 
 /** A sheet of boxes (one per item): the Kitchen Prep sheet (cooked items) and the Ready to Eat sheet (the rest, with the items that have no type yet at the end). */
 function boxSheet(key: SheetKey, name: string, main: PrepBlock[], notSet: PrepBlock[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: [0, 1, 2, 3, 4, 5, 6, 7, 8], rightCells: [3, 4] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: PREP_HEADER, box: { top: true, bottom: false }, boldCells: PREP_HEADER.map((_, i) => i), rightCells: [3, 4] }];
   prepRows(main, rows, true);
   if (notSet.length > 0) {
     if (main.length > 0) rows.push({ kind: 'blank', cells: [] });
@@ -153,7 +152,7 @@ export function readyToEatSheet(readyToEat: PrepBlock[], notSet: PrepBlock[]): S
 }
 
 export function stickersSheet(stickers: StickerLine[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'Heating/Storage', 'With combo', 'Instructions', 'Order', 'Kitchen date'] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'Heating/Storage', 'With combo', 'Special instructions', 'Order', 'Kitchen date'] }];
   stickers.forEach((s, i) => {
     rows.push({
       kind: 'data',
@@ -167,10 +166,13 @@ export function stickersSheet(stickers: StickerLine[]): SheetModel {
 export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[] }): SheetModel[] {
   const sheets = [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers)];
   // the Instructions column is only there when somebody wrote instructions on that sheet (otherwise the sheets look exactly as before)
-  const hasNotes = (blocks: PrepBlock[]) => blocks.some((b) => b.lines.some((l) => Boolean(l.note || l.adminNote)));
+  const hasNotes = (blocks: PrepBlock[]) => blocks.some((b) => b.lines.some((l) => Boolean(l.note)));
+  const hasAdminNotes = (blocks: PrepBlock[]) => blocks.some((b) => b.lines.some((l) => Boolean(l.adminNote)));
   const hidden: Partial<Record<SheetKey, string[]>> = {};
-  if (!hasNotes(input.cooked)) hidden.prep = ['instructions'];
-  if (!hasNotes([...(input.readyToEat ?? []), ...input.notSet])) hidden.ready = ['instructions'];
+  const readyBlocks = [...(input.readyToEat ?? []), ...input.notSet];
+  // the Admin note column likewise only appears when an admin wrote a note on something on that sheet
+  hidden.prep = [...(hasNotes(input.cooked) ? [] : ['instructions']), ...(hasAdminNotes(input.cooked) ? [] : ['adminNote'])];
+  hidden.ready = [...(hasNotes(readyBlocks) ? [] : ['instructions']), ...(hasAdminNotes(readyBlocks) ? [] : ['adminNote'])];
   if (!input.stickers.some((s) => Boolean(s.note))) hidden.stickers = ['instructions'];
   return applyColumnChoice(sheets, hidden);
 }

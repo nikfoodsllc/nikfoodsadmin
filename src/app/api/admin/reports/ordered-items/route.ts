@@ -124,6 +124,7 @@ export async function GET(request: NextRequest) {
           quantity: '$items.items.quantity',
           spiceLevel: { $ifNull: ['$items.items.spiceLevel', ''] },
           notes: { $ifNull: ['$items.items.notes', ''] },
+          adminNote: { $ifNull: ['$items.items.adminNote', ''] },
           itemPrice: '$items.items.price',
           ecoContainer: { $ifNull: ['$items.items.isEcoFriendlyContainer', false] },
           ecoContainerAvailable: { $ifNull: ['$items.items.food.isEcoFriendlyContainer', false] },
@@ -256,6 +257,7 @@ export async function GET(request: NextRequest) {
                 quantity: item.quantity,
                 spiceLevel: item.spiceLevel,
                 notes: item.notes,
+                adminNote: item.adminNote,
                 itemPrice: item.itemPrice, // Use the combo item price
                 ecoContainer: item.ecoContainer,
                 ecoContainerAvailable: item.ecoContainerAvailable,

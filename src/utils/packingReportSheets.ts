@@ -4,7 +4,7 @@
  * Excel and PDF writers draw them.
  */
 import type { ColumnDef } from './columnPreferences';
-import { applyColumnChoice, noteCell, rowTone, type SheetKey, type SheetModel, type SheetRow } from './kitchenReportSheets';
+import { applyColumnChoice, rowTone, type SheetKey, type SheetModel, type SheetRow } from './kitchenReportSheets';
 import type { PackLine, PackStop, PackingReport } from './packingReport';
 import { heldReasonText, type HeldReport } from './packingHeld';
 
@@ -22,7 +22,8 @@ export const PACKING_COLUMNS: ColumnDef[] = [
   col('spice', 'Spice', 14),
   col('eco', 'Eco', 10),
   col('picks', 'Combo picks', 28),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
+  col('adminNote', 'Admin note', 30),
   col('pickedFor', 'Picked for', 12),
 ];
 
@@ -64,7 +65,8 @@ function stopRows(route: string | number, stop: PackStop): SheetRow[] {
       line?.spice ?? '',
       line?.isEco ? 'ECO' : '',
       line ? line.choices.join('\n') : '',
-      noteCell(line),
+      line?.note ?? '',
+      line?.adminNote ?? '',
       line?.pickedFor ? dayLabel(line.pickedFor) : '',
     ],
   }));
@@ -132,7 +134,8 @@ const HELD_COLUMNS: ColumnDef[] = [
   col('spice', 'Spice', 14),
   col('eco', 'Eco', 10),
   col('picks', 'Combo picks', 28),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
+  col('adminNote', 'Admin note', 30),
   col('goesOut', 'Goes out', 14),
   col('why', 'Why', 30),
 ];
@@ -152,7 +155,7 @@ export function heldSheet(held: HeldReport): SheetModel {
         tone: rowTone(i, line.isEco),
         box: { top: i === 0, bottom: i === c.lines.length - 1 },
         rightCells: [qty],
-        cells: [c.customerName, line.orderId, line.name, line.portion ?? '', line.quantity, line.spice ?? '', line.isEco ? 'ECO' : '', line.choices.join('\n'), noteCell(line), dayLabel(line.goesOutOn), heldReasonText(line.reason) + (c.alsoToday ? ' (also delivering today)' : '')],
+        cells: [c.customerName, line.orderId, line.name, line.portion ?? '', line.quantity, line.spice ?? '', line.isEco ? 'ECO' : '', line.choices.join('\n'), line.note ?? '', line.adminNote ?? '', dayLabel(line.goesOutOn), heldReasonText(line.reason) + (c.alsoToday ? ' (also delivering today)' : '')],
       });
     });
   });
@@ -165,10 +168,13 @@ export function buildPackingSheets(report: PackingReport): SheetModel[] {
   // a day with nothing at all still gets one (empty) packing sheet, so the file is never without one
   const sheets = [...(routes.length > 0 ? routes : [stopsSheet('Packing List', 'Nothing to deliver on this date', '-', [])]), packTotalsSheet(report), ...held];
   // the Instructions column is only there when a customer wrote instructions on something being packed
-  const noteOn = (lines: Array<{ note?: string | null; adminNote?: string | null }>) => lines.some((l) => Boolean(l.note || l.adminNote));
+  const noteOn = (lines: Array<{ note?: string | null }>) => lines.some((l) => Boolean(l.note));
+  const adminOn = (lines: Array<{ adminNote?: string | null }>) => lines.some((l) => Boolean(l.adminNote));
   const packLines = [...report.routes.flatMap((r) => r.stops), ...report.unrouted].flatMap((s) => s.lines);
+  const heldLines = (report.held?.customers ?? []).flatMap((c) => c.lines);
   const hidden: Partial<Record<SheetKey, string[]>> = {};
-  if (!noteOn(packLines)) hidden.packing = ['instructions'];
-  if (!noteOn((report.held?.customers ?? []).flatMap((c) => c.lines))) hidden.packHeld = ['instructions'];
+  // the Admin note column likewise only appears when an admin wrote a note on something on that sheet
+  hidden.packing = [...(noteOn(packLines) ? [] : ['instructions']), ...(adminOn(packLines) ? [] : ['adminNote'])];
+  hidden.packHeld = [...(noteOn(heldLines) ? [] : ['instructions']), ...(adminOn(heldLines) ? [] : ['adminNote'])];
   return applyColumnChoice(sheets, hidden);
 }

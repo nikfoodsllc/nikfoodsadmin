@@ -15,7 +15,7 @@ const TONE: Record<TranscriptKind, { dot: string; label: string }> = {
   route: { dot: '#475569', label: 'OptimoRoute' },
   delivery: { dot: '#16A34A', label: 'Delivery' },
   cancel: { dot: '#DC2626', label: 'Cancelled' },
-  note: { dot: '#B8893B', label: 'Instructions' },
+  note: { dot: '#B8893B', label: 'Notes' },
 };
 
 const SHOWN = 6;

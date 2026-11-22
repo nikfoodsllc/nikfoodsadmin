@@ -61,7 +61,7 @@ describe('packingRouteSheets (one sheet per route)', () => {
   });
   it('an item picked for another menu day says which', () => {
     const pickle = all.find((r) => r.kind === 'data' && r.cells[5] === 'Pickle')!;
-    expect(String(pickle.cells[12])).toContain('Oct 7');
+    expect(String(pickle.cells[PACKING_COLUMNS.findIndex((c) => c.key === 'pickedFor')])).toContain('Oct 7');
   });
   it('a stop with nothing to pack still has a row, so it is not forgotten', () => {
     const empty = all.find((r) => r.kind === 'data' && r.cells[3] === 'Empty Stop')!;
