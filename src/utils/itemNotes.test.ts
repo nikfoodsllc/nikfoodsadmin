@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest';
+import { applyItemNote, canEditItemNotes, cleanItemNote, ITEM_NOTE_MAX } from './itemNotes';
+
+const days = () => [
+  { deliveryDate: '2026-11-24', items: [{ food: { _id: 'a', name: 'Dal' }, notes: 'less salt' }, { food: { _id: 'b', name: 'Rice' } }, { food: { _id: 'a', name: 'Dal' } }] },
+  { deliveryDate: '2026-11-25', items: [{ food: { _id: 'a', name: 'Dal' }, notes: 'keep' }] },
+];
+
+describe('item instructions', () => {
+  it('cleans text to one short line', () => {
+    expect(cleanItemNote('  no\n onion   please ')).toBe('no onion please');
+    expect(cleanItemNote('x'.repeat(60))).toHaveLength(ITEM_NOTE_MAX);
+    expect(cleanItemNote(undefined)).toBe('');
+    expect(cleanItemNote(5)).toBe('');
+  });
+
+  it('only open orders can be edited', () => {
+    for (const s of ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery']) expect(canEditItemNotes(s)).toBe(true);
+    for (const s of ['delivered', 'cancelled', undefined, '']) expect(canEditItemNotes(s)).toBe(false);
+  });
+
+  it('sets the text on every line of that food on that day only', () => {
+    const input = days();
+    const r = applyItemNote(input, 0, 1, 'extra soft');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.days[0].items[1].notes).toBe('extra soft');
+    expect(r.days[0].items[0].notes).toBe('less salt');
+    expect(r.days[1].items[0].notes).toBe('keep');
+    expect(input[0].items[1]).not.toHaveProperty('notes'); // input untouched
+
+    const r2 = applyItemNote(input, 0, 2, 'no salt');
+    expect(r2.ok && r2.days[0].items.map((l) => l.notes)).toEqual(['no salt', undefined, 'no salt']);
+    expect(r2.ok && r2.lines).toBe(2);
+    expect(r2.ok && r2.from).toBe('');
+  });
+
+  it('empty text removes the instructions', () => {
+    const r = applyItemNote(days(), 0, 0, '   ');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.days[0].items[0]).not.toHaveProperty('notes');
+    expect(r.from).toBe('less salt');
+    expect(r.to).toBe('');
+  });
+
+  it('refuses unknown lines and unchanged text', () => {
+    expect(applyItemNote(days(), 5, 0, 'x').ok).toBe(false);
+    expect(applyItemNote(days(), 0, 9, 'x').ok).toBe(false);
+    expect(applyItemNote(days(), 0.5, 0, 'x').ok).toBe(false);
+    expect(applyItemNote(days(), 0, 0, ' less  salt ')).toEqual({ ok: false, error: 'Nothing changed.' });
+  });
+});

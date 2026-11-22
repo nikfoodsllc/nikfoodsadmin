@@ -44,4 +44,21 @@ describe('buildOrderTranscript', () => {
     expect(adminIdsIn(order)).toEqual(['64b7f0c2a1b2c3d4e5f60001']);
     expect(dayLabel('2026-10-22')).toBe('Thu, Oct 22');
   });
+  it('lists special instruction changes', () => {
+    const events = buildOrderTranscript({
+      noteChanges: [
+        { at: '2026-11-20T10:00:00Z', by: { id: 'a1', name: 'Kunal' }, name: 'Dal', deliveryDate: '2026-11-24', from: '', to: 'no salt' },
+        { at: '2026-11-20T11:00:00Z', by: 'b2', name: 'Dal', deliveryDate: '2026-11-24', from: 'no salt', to: 'less salt' },
+        { at: '2026-11-20T12:00:00Z', name: 'Dal', from: 'less salt', to: '' },
+      ],
+    }, { b2: 'Shrey' });
+    expect(events.map((e) => e.text)).toEqual([
+      'Special instructions removed: Dal',
+      'Special instructions changed: Dal (Tue, Nov 24)',
+      'Special instructions added: Dal (Tue, Nov 24)',
+    ]);
+    expect(events[1]).toMatchObject({ kind: 'note', details: ['Before: no salt', 'Now: less salt'], by: 'Shrey' });
+    expect(events[2].by).toBe('Kunal');
+    expect(adminIdsIn({ noteChanges: [{ at: null, by: '0123456789abcdef01234567' }] })).toEqual(['0123456789abcdef01234567']);
+  });
 });
