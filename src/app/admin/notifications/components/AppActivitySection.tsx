@@ -97,7 +97,7 @@ function OrderMixBars({ rows }: { rows: Array<{ day: string; app: number; all: n
       <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 165, overflowX: 'auto', pb: 0.5 }}>
         {rows.map((r) => {
           const web = Math.max(0, r.all - r.app);
-          const total = 80;
+          const total = 100;
           const appH = r.all ? (r.app / max) * total : 0;
           const webH = r.all ? (web / max) * total : 0;
           const label = `${weekday(r.day)} ${shortDay(r.day)}: ${r.app} app, ${web} website${r.all ? ` (${Math.round((r.app / r.all) * 100)}% app)` : ''}`;
@@ -108,7 +108,7 @@ function OrderMixBars({ rows }: { rows: Array<{ day: string; app: number; all: n
                 {web > 0 && <Box sx={{ height: `${Math.max(3, webH)}px`, bgcolor: WEB_COLOR, borderRadius: '6px 6px 0 0' }} />}
                 {r.app > 0 && (
                   <Box sx={{ height: `${Math.max(3, appH)}px`, bgcolor: APP_COLOR, borderRadius: web ? 0 : '6px 6px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {appH >= 14 && <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{r.app}</Typography>}
+                    {appH >= 12 && <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{r.app}</Typography>}
                   </Box>
                 )}
                 {!r.all && <Box sx={{ height: 4, bgcolor: '#F3F4F6', borderRadius: '6px 6px 0 0' }} />}
