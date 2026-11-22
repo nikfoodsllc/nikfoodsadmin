@@ -94,7 +94,7 @@ function OrderMixBars({ rows }: { rows: Array<{ day: string; app: number; all: n
           </Box>
         ))}
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 140, overflowX: 'auto', pb: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 165, overflowX: 'auto', pb: 0.5 }}>
         {rows.map((r) => {
           const web = Math.max(0, r.all - r.app);
           const total = 80;
