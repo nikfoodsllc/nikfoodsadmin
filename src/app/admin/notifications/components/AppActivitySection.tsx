@@ -78,6 +78,50 @@ function Bars({ rows, color, onPick }: { rows: Array<{ day: string; value: numbe
   );
 }
 
+const APP_COLOR = '#2F7D5B';
+const WEB_COLOR = '#D9CBB0';
+
+/** Paid orders per day as stacked bars: app at the bottom, website on top, the day's total above. */
+function OrderMixBars({ rows }: { rows: Array<{ day: string; app: number; all: number }> }) {
+  const max = Math.max(1, ...rows.map((r) => r.all));
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 0.75, fontSize: 12, color: '#374151' }}>
+        {[['App', APP_COLOR], ['Website', WEB_COLOR]].map(([label, color]) => (
+          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: color }} />
+            {label}
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.25, sm: 1 }, height: 140, overflowX: 'auto', pb: 0.5 }}>
+        {rows.map((r) => {
+          const web = Math.max(0, r.all - r.app);
+          const total = 100;
+          const appH = r.all ? (r.app / max) * total : 0;
+          const webH = r.all ? (web / max) * total : 0;
+          const label = `${weekday(r.day)} ${shortDay(r.day)}: ${r.app} app, ${web} website${r.all ? ` (${Math.round((r.app / r.all) * 100)}% app)` : ''}`;
+          return (
+            <Box key={r.day} title={label} aria-label={label} role="img" sx={{ flex: '1 0 0', minWidth: { xs: 17, sm: 22 }, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: r.all ? '#111827' : '#9CA3AF' }}>{r.all || '–'}</Typography>
+              <Box sx={{ width: '100%', maxWidth: 34, display: 'flex', flexDirection: 'column', gap: web && r.app ? '2px' : 0 }}>
+                {web > 0 && <Box sx={{ height: `${Math.max(3, webH)}px`, bgcolor: WEB_COLOR, borderRadius: '6px 6px 0 0' }} />}
+                {r.app > 0 && (
+                  <Box sx={{ height: `${Math.max(3, appH)}px`, bgcolor: APP_COLOR, borderRadius: web ? 0 : '6px 6px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {appH >= 14 && <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{r.app}</Typography>}
+                  </Box>
+                )}
+                {!r.all && <Box sx={{ height: 4, bgcolor: '#F3F4F6', borderRadius: '6px 6px 0 0' }} />}
+              </Box>
+              <Typography sx={{ fontSize: { xs: 9, sm: 10 }, color: '#6B7280', mt: 0.5, lineHeight: 1.1, textAlign: 'center' }}>{weekday(r.day)}<br />{shortDay(r.day)}</Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
 type Call = (path: string) => Promise<{ ok: boolean; status: number; json: { data?: unknown; error?: string } }>;
 
 export default function AppActivitySection({ call }: { call: Call }) {
@@ -148,6 +192,8 @@ export default function AppActivitySection({ call }: { call: Call }) {
               </Box>
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>Paid orders: app vs all</Typography>
+                <OrderMixBars rows={data.orders} />
+                <Box sx={{ mt: 1.5 }} />
                 <Box component="table" sx={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr>
