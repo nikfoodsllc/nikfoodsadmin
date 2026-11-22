@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Button, Collapse, Dialog, DialogContent, DialogTitle, IconButton, Paper, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { IconChevronDown, IconChevronUp, IconX } from '@tabler/icons-react';
+import { DrillArrow, DrillLabel, TapBarsHint } from '@/components/common/DrillHint';
 
 interface Activity {
   today: string;
@@ -45,12 +46,13 @@ function Tile({ value, label, hint, onClick }: { value: string | number; label: 
       onKeyDown={clickable ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onClick?.()) : undefined}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
-      sx={{ p: 1.5, borderRadius: 2, minWidth: 0, cursor: clickable ? 'pointer' : 'default', '&:hover': clickable ? { borderColor: '#B8893B', bgcolor: '#FFFBF5' } : undefined }}
+      sx={{ position: 'relative', p: 1.5, pr: clickable ? 4 : 1.5, borderRadius: 2, minWidth: 0, cursor: clickable ? 'pointer' : 'default', '&:hover': clickable ? { borderColor: '#B8893B', bgcolor: '#FFFBF5' } : undefined }}
     >
+      {clickable && <DrillArrow />}
       <Typography sx={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1 }}>{value}</Typography>
       <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{label}</Typography>
       {hint && <Typography sx={{ fontSize: 12, color: '#6B7280' }}>{hint}</Typography>}
-      {clickable && <Typography sx={{ fontSize: 11, color: '#B8893B', fontWeight: 700, mt: 0.25 }}>See names</Typography>}
+      {clickable && <DrillLabel />}
     </Paper>
   );
 }
@@ -180,6 +182,7 @@ export default function AppActivitySection({ call }: { call: Call }) {
                 ))}
               </ToggleButtonGroup>
             </Box>
+            <TapBarsHint />
             <Bars rows={data.daily.map((d) => ({ day: d.day, value: d.customers }))} color="#B8893B" onPick={(day) => setPicked({ title: `Opened the app on ${weekday(day)} ${shortDay(day)}`, ids: data.lists.byDay[day] ?? [] })} />
             <Typography sx={{ fontSize: 12, color: '#6B7280', mt: 0.5 }}>
               {data.recordingSince ? `Daily counts start on ${shortDay(data.recordingSince)} (when recording began). A dash means no record for that day.` : 'Daily counts start building today: each time a customer opens the app signed in, it is counted once for that day.'}
@@ -187,7 +190,8 @@ export default function AppActivitySection({ call }: { call: Call }) {
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
               <Box>
-                <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>New phones signing in</Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 0.5 }}>New phones signing in</Typography>
+                <TapBarsHint />
                 <Bars rows={data.newInstalls.map((d) => ({ day: d.day, value: d.installs }))} color="#2F7D5B" onPick={(day) => setPicked({ title: `New phones on ${weekday(day)} ${shortDay(day)}`, subtitle: 'Customers whose phone signed in for the first time that day', ids: data.lists.newByDay[day] ?? [] })} />
               </Box>
               <Box>

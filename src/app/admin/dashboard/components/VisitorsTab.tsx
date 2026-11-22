@@ -5,6 +5,7 @@ import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import { LineChart, SERIES } from './charts';
 import { count, EmptyNote, Kpi, KpiGrid, pointsOf, rangeText, Section } from './ui';
 import type { Bucket, Grouping } from '@/utils/businessDashboard';
+import CustomerSplitSection from './CustomerSplitSection';
 import AppActivitySection from '@/app/admin/notifications/components/AppActivitySection';
 
 interface VisitorsAnswer {
@@ -31,6 +32,7 @@ export default function VisitorsTab({ token, range, grouping }: { token: string;
   return (
     <>
       <WebsiteVisitors token={token} range={range} grouping={grouping} />
+      <CustomerSplitSection token={token} range={range} grouping={grouping} />
       <AppActivitySection call={appCall} />
     </>
   );
