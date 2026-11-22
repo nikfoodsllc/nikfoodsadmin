@@ -82,9 +82,9 @@ export default function CustomerSplitSection({ token, range, grouping }: { token
             <Box component="span" sx={{ color: '#6B7280', whiteSpace: 'nowrap' }}>({pct(data.newOrders, data.orders)}% : {100 - pct(data.newOrders, data.orders)}%)</Box>.
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' }, gap: 1.25, mb: 2 }}>
-            <Tile value={count(data.orders)} label="Orders" hint={`${count(data.newCustomers + data.existingCustomers)} customers`} onClick={() => pick('All paid orders', data.lines)} />
-            <Tile value={count(data.newOrders)} label="New customers" color={NEW_COLOR} hint={`${pct(data.newOrders, data.orders)}% of orders · ${count(data.newCustomers)} people`} onClick={newLines.length ? () => pick('Orders from new customers', newLines) : undefined} />
-            <Tile value={count(data.existingOrders)} label="Existing customers" color={EXISTING_COLOR} hint={`${pct(data.existingOrders, data.orders)}% of orders · ${count(data.existingCustomers)} people`} onClick={oldLines.length ? () => pick('Orders from existing customers', oldLines) : undefined} />
+            <Tile value={count(data.orders)} label="Orders" hint={`${count(data.customers)} customers`} onClick={() => pick('All paid orders', data.lines)} />
+            <Tile value={count(data.newOrders)} label="New customers" color={NEW_COLOR} hint={`${pct(data.newOrders, data.orders)}% of orders · first order ever`} onClick={newLines.length ? () => pick('Orders from new customers', newLines) : undefined} />
+            <Tile value={count(data.existingOrders)} label="Existing customers" color={EXISTING_COLOR} hint={`${pct(data.existingOrders, data.orders)}% of orders · from ${count(data.existingCustomers)} ${data.existingCustomers === 1 ? 'person' : 'people'}`} onClick={oldLines.length ? () => pick('Orders from existing customers', oldLines) : undefined} />
           </Box>
 
           <TapBarsHint text={`Tap a bar to see that ${grouping}'s orders`} />
