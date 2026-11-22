@@ -62,3 +62,38 @@ export function applyItemNote<L extends NoteLine, D extends NoteDay<L>>(days: D[
   });
   return { ok: true, days: next, foodId, name: target.food?.name ?? 'Item', from, to, lines };
 }
+
+/** An admin's internal note on one order item: for the kitchen and packing team, never shown to the customer. Any item can have one. */
+export const ADMIN_NOTE_MAX = 200;
+
+export function cleanAdminNote(text: unknown): string {
+  if (typeof text !== 'string') return '';
+  return text.replace(/\s+/g, ' ').trim().slice(0, ADMIN_NOTE_MAX).trim();
+}
+
+export type ApplyAdminNoteResult<D> = { ok: true; days: D[]; name: string; from: string; to: string } | { ok: false; error: string };
+
+/** Sets (empty text removes) the admin note of exactly the item at days[line].items[item]. Returns a new array. */
+export function applyAdminNote<L extends { food?: { name?: string }; adminNote?: string }, D extends { items: L[] }>(days: D[], line: number, item: number, text: unknown): ApplyAdminNoteResult<D> {
+  const day = Number.isInteger(line) ? days[line] : undefined;
+  const target = day && Number.isInteger(item) ? day.items[item] : undefined;
+  if (!day || !target) return { ok: false, error: 'That item is not on this order.' };
+  const to = cleanAdminNote(text);
+  const from = target.adminNote ?? '';
+  if (to === from) return { ok: false, error: 'Nothing changed.' };
+  const next = days.map((d, i) =>
+    i !== line
+      ? d
+      : {
+          ...d,
+          items: d.items.map((l, j) => {
+            if (j !== item) return l;
+            const copy = { ...l };
+            if (to) copy.adminNote = to;
+            else delete copy.adminNote;
+            return copy;
+          }),
+        },
+  );
+  return { ok: true, days: next, name: target.food?.name ?? 'Item', from, to };
+}

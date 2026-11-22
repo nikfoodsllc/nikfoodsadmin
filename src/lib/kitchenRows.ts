@@ -66,6 +66,7 @@ export async function fetchKitchenRows(range: DayRange, options: { report?: bool
         sections: '$items.items.food.sections',
         comboSelections: '$items.items.comboSelections',
         notes: '$items.items.notes',
+        adminNote: '$items.items.adminNote',
       },
     },
   ];
@@ -101,6 +102,7 @@ function mapRows(data: Array<Record<string, unknown>>, movedFrom?: boolean): Kit
       comboSelections: raw.comboSelections && typeof raw.comboSelections === 'object' ? raw.comboSelections : null,
       customerName: typeof raw.customerName === 'string' ? raw.customerName : null,
       notes: typeof raw.notes === 'string' && raw.notes.trim() ? raw.notes.trim() : null,
+      adminNote: typeof raw.adminNote === 'string' && raw.adminNote.trim() ? raw.adminNote.trim() : null,
       deliveredOn: toDayString(raw.deliveredOn),
       orderStatus: typeof raw.orderStatus === 'string' ? raw.orderStatus : null,
       orderedOn: pacificDayOf(raw.orderedAt),
@@ -150,6 +152,7 @@ export async function fetchMovedKitchenRows(range: DayRange, options: { earlierO
         sections: '$items.items.food.sections',
         comboSelections: '$items.items.comboSelections',
         notes: '$items.items.notes',
+        adminNote: '$items.items.adminNote',
       },
     },
   ];
@@ -215,6 +218,7 @@ export async function fetchStickerRows(range: DayRange): Promise<KitchenRow[]> {
         sections: '$items.items.food.sections',
         comboSelections: '$items.items.comboSelections',
         notes: '$items.items.notes',
+        adminNote: '$items.items.adminNote',
       },
     },
   ];

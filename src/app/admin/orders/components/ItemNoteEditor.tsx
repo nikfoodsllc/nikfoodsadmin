@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material';
 import { IconPencil, IconPlus } from '@tabler/icons-react';
-import { ITEM_NOTE_MAX, cleanItemNote } from '@/utils/itemNotes';
+import { ADMIN_NOTE_MAX, ITEM_NOTE_MAX, cleanAdminNote, cleanItemNote } from '@/utils/itemNotes';
 
 /** Which items of an order take special instructions (their food item has the switch on) and whether the order is still open. */
 export function useItemNoteRules(orderId: string | undefined, token: string | null, open: boolean) {
@@ -30,13 +30,21 @@ interface Props {
   item: number;
   name: string;
   notes?: string;
-  /** the item takes instructions and the order is not delivered or cancelled */
+  /** the item takes instructions (or, for an admin note, any item) and the order is not delivered or cancelled */
   canEdit: boolean;
   onChanged: () => Promise<void> | void;
+  /** 'admin': the internal admin note (kitchen and packing only) instead of the customer's special instructions */
+  kind?: 'instructions' | 'admin';
 }
 
-/** The item's special instructions in the order details, with Add / Edit for items that take them. */
-export default function ItemNoteEditor({ orderId, token, line, item, name, notes, canEdit, onChanged }: Props) {
+const TEXT = {
+  instructions: { label: 'Instructions', title: 'Special instructions', add: 'Add instructions', aria: 'special instructions', max: ITEM_NOTE_MAX, clean: cleanItemNote, color: '#B8893B', hint: 'Shown to the kitchen, on the packing sticker and to the customer.', placeholder: 'For example: No onion' },
+  admin: { label: 'Admin note', title: 'Admin note', add: 'Add admin note', aria: 'the admin note', max: ADMIN_NOTE_MAX, clean: cleanAdminNote, color: '#0369A1', hint: 'For the kitchen and packing team only. Shown in the kitchen and packing reports, never to the customer.', placeholder: 'For example: Pack in a separate bag' },
+} as const;
+
+/** The item's special instructions (or admin note) in the order details, with Add / Edit. */
+export default function ItemNoteEditor({ orderId, token, line, item, name, notes, canEdit, onChanged, kind = 'instructions' }: Props) {
+  const t = TEXT[kind];
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(notes ?? '');
   const [busy, setBusy] = useState(false);
@@ -51,7 +59,7 @@ export default function ItemNoteEditor({ orderId, token, line, item, name, notes
       const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/item-notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ line, item, notes: value }),
+        body: JSON.stringify({ ...(kind === 'admin' ? { kind: 'admin' } : {}), line, item, notes: value }),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || json.success === false) throw new Error(json.error || 'Something went wrong. Please try again.');
@@ -64,7 +72,7 @@ export default function ItemNoteEditor({ orderId, token, line, item, name, notes
     }
   };
 
-  const unchanged = cleanItemNote(text) === (notes ?? '');
+  const unchanged = t.clean(text) === (notes ?? '');
   const start = () => {
     setText(notes ?? '');
     setError('');
@@ -74,8 +82,8 @@ export default function ItemNoteEditor({ orderId, token, line, item, name, notes
   return (
     <Box sx={{ ml: 1.75, mt: 0.5, display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 0.5 }}>
       {notes && (
-        <Typography variant="caption" sx={{ color: '#6B7280', fontStyle: 'italic', overflowWrap: 'anywhere' }}>
-          Instructions: {notes}
+        <Typography variant="caption" sx={kind === 'admin' ? { color: '#075985', fontWeight: 600, overflowWrap: 'anywhere' } : { color: '#6B7280', fontStyle: 'italic', overflowWrap: 'anywhere' }}>
+          {t.label}: {notes}
         </Typography>
       )}
       {canEdit && (
@@ -83,30 +91,30 @@ export default function ItemNoteEditor({ orderId, token, line, item, name, notes
           size="small"
           onClick={start}
           startIcon={notes ? <IconPencil size={13} /> : <IconPlus size={13} />}
-          aria-label={notes ? `Edit special instructions for ${name}` : `Add special instructions for ${name}`}
-          sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12, minWidth: 0, py: 0, px: 0.75, color: '#B8893B', '& .MuiButton-startIcon': { mr: 0.4 } }}
+          aria-label={notes ? `Edit ${t.aria} for ${name}` : `Add ${t.aria} for ${name}`}
+          sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12, minWidth: 0, py: 0, px: 0.75, color: t.color, '& .MuiButton-startIcon': { mr: 0.4 } }}
         >
-          {notes ? 'Edit' : 'Add instructions'}
+          {notes ? 'Edit' : t.add}
         </Button>
       )}
       <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 700, pb: 0.5 }}>Special instructions</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, pb: 0.5 }}>{t.title}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ color: '#6B7280', mb: 1.5 }}>
-            {name}. Shown to the kitchen, on the packing sticker and to the customer.
+            {name}. {t.hint}
           </Typography>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="Instructions"
-            placeholder="For example: No onion"
+            label={t.label}
+            placeholder={t.placeholder}
             value={text}
-            onChange={(e) => setText(e.target.value.slice(0, ITEM_NOTE_MAX))}
+            onChange={(e) => setText(e.target.value.slice(0, t.max))}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !busy && !unchanged) void save(text);
             }}
-            helperText={`${text.length}/${ITEM_NOTE_MAX}`}
+            helperText={`${text.length}/${t.max}`}
             FormHelperTextProps={{ sx: { textAlign: 'right', mr: 0 } }}
             disabled={busy}
           />

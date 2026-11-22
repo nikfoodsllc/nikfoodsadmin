@@ -44,6 +44,7 @@ import ReportColumnsDialog from './ReportColumnsDialog';
 import { useReloadWhenStale } from '@/hooks/useReloadWhenStale';
 import { updatedAtText } from '@/utils/dataFreshness';
 import InstructionsNote from '@/components/common/InstructionsNote';
+import AdminItemNote from '@/components/common/AdminItemNote';
 
 type Preset = 'today' | 'tomorrow' | 'thisWeek' | 'custom';
 type TabId = 'prep' | 'ready' | 'stickers' | 'days';
@@ -115,6 +116,7 @@ function LineRow({ line, showKitchenDay }: { line: PrepLine; showKitchenDay: boo
           </Box>
         )}
         <InstructionsNote text={line.note} />
+        <AdminItemNote text={line.adminNote} />
         {line.viaCombo && (
           <Typography sx={{ fontSize: 12.5, color: '#4B5563', mt: 0.4 }}>
             From {line.viaCombo}

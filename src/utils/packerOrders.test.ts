@@ -16,7 +16,7 @@ const order = {
     {
       day: 'Wednesday', deliveryDate: '2026-10-14', actualDeliveryDate: '2026-10-15', dayTotal: 40,
       items: [
-        { quantity: 2, price: 20, spiceLevel: 'Medium Spice', selectedPortion: '12Oz', isEcoFriendlyContainer: true, ecoContainerCharge: 0.75, notes: 'extra onion', food: { _id: 'f1', name: 'Rajma', price: 18, description: 'long text', image: 'x.png' } },
+        { quantity: 2, price: 20, spiceLevel: 'Medium Spice', selectedPortion: '12Oz', isEcoFriendlyContainer: true, ecoContainerCharge: 0.75, notes: 'extra onion', adminNote: 'double bag', food: { _id: 'f1', name: 'Rajma', price: 18, description: 'long text', image: 'x.png' } },
         {
           quantity: 1, price: 25,
           comboSelections: { s1: ['o1'] },
@@ -34,7 +34,7 @@ describe('toPackerOrder', () => {
     expect(view).toMatchObject({ orderId: 'ORD-1', status: 'confirmed', customerName: 'Asha Rao', phone: '2065550100', apartment: '4B', gateCode: '1234', instruction: 'Leave at door' });
     expect(view.days).toHaveLength(1);
     expect(view.days[0]).toMatchObject({ menuDate: '2026-10-14', deliveryDate: '2026-10-15' });
-    expect(view.days[0].items[0]).toEqual({ name: 'Rajma', quantity: 2, portion: '12Oz', spice: 'Medium Spice', eco: true, notes: 'extra onion', choices: [] });
+    expect(view.days[0].items[0]).toEqual({ name: 'Rajma', quantity: 2, portion: '12Oz', spice: 'Medium Spice', eco: true, notes: 'extra onion', adminNote: 'double bag', choices: [] });
     expect(view.days[0].items[1].choices).toEqual(['Staple: Chapati × 4']);
   });
 

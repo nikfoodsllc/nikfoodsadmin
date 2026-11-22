@@ -538,6 +538,18 @@ export default function OrderDetailsDialog({
                               canEdit={Boolean(token && noteRules?.editable && item.food._id && noteRules.allowed.has(String(item.food._id)))}
                               onChanged={async () => { await onOrderChanged?.(); }}
                             />
+                            {/* Admin note: internal, for the kitchen and packing reports; any item */}
+                            <ItemNoteEditor
+                              kind="admin"
+                              orderId={order.orderId}
+                              token={token}
+                              line={dayIndex}
+                              item={itemIndex}
+                              name={item.food.name}
+                              notes={item.adminNote}
+                              canEdit={Boolean(token && noteRules?.editable)}
+                              onChanged={async () => { await onOrderChanged?.(); }}
+                            />
                           </TableCell>
                           <TableCell align="center">{item.quantity}</TableCell>
                           <TableCell align="right">{safeFormatCurrency(item.price)}</TableCell>

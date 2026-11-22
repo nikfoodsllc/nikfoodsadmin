@@ -10,6 +10,10 @@ import { formatDayShort } from './kitchenDashboard';
 import { sheetAmounts, stickerQtyText, type PrepBlock, type StickerLine } from './kitchenReport';
 import type { ColumnDef } from './columnPreferences';
 
+/** The Instructions cell: what the customer wrote, then an admin's internal note on its own line. */
+export const noteCell = (line?: { note?: string | null; adminNote?: string | null } | null): string =>
+  [line?.note ?? '', line?.adminNote ? `Admin note: ${line.adminNote}` : ''].filter(Boolean).join('\n');
+
 export type RowTone = 'red' | 'white' | 'eco';
 
 /** The colour of the n-th row (counting from 0) of a block: red, white, red ...; an ECO row is always green. */
@@ -119,7 +123,7 @@ function prepRows(blocks: PrepBlock[], rows: SheetRow[], firstBlockJoinsHeader: 
           date(line.day),
           date(line.deliveryDate),
           [line.viaCombo ? `${line.viaCombo}${line.viaSpice ? ` (${line.viaSpice})` : ''}` : '', line.movedFrom ? `Moved from ${dateCellText(line.movedFrom)}` : ''].filter(Boolean).join(' · '),
-          line.note ?? '',
+          noteCell(line),
         ],
       });
     });
@@ -163,7 +167,7 @@ export function stickersSheet(stickers: StickerLine[]): SheetModel {
 export function buildReportSheets(input: { cooked: PrepBlock[]; readyToEat?: PrepBlock[]; notSet: PrepBlock[]; stickers: StickerLine[] }): SheetModel[] {
   const sheets = [prepSheet(input.cooked), readyToEatSheet(input.readyToEat ?? [], input.notSet), stickersSheet(input.stickers)];
   // the Instructions column is only there when somebody wrote instructions on that sheet (otherwise the sheets look exactly as before)
-  const hasNotes = (blocks: PrepBlock[]) => blocks.some((b) => b.lines.some((l) => Boolean(l.note)));
+  const hasNotes = (blocks: PrepBlock[]) => blocks.some((b) => b.lines.some((l) => Boolean(l.note || l.adminNote)));
   const hidden: Partial<Record<SheetKey, string[]>> = {};
   if (!hasNotes(input.cooked)) hidden.prep = ['instructions'];
   if (!hasNotes([...(input.readyToEat ?? []), ...input.notSet])) hidden.ready = ['instructions'];

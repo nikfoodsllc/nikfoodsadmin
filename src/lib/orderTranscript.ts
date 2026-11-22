@@ -55,7 +55,7 @@ export interface TranscriptOrder {
   }> | null;
   stripeRefunds?: Array<{ amount?: number; at?: string; reason?: string; note?: string }> | null;
   optimo?: { state?: string; at?: When; stops?: Array<{ date?: string }> } | null;
-  noteChanges?: Array<{ at: When; by?: Who; name?: string; deliveryDate?: string; from?: string; to?: string }> | null;
+  noteChanges?: Array<{ at: When; by?: Who; admin?: boolean; name?: string; deliveryDate?: string; from?: string; to?: string }> | null;
 }
 
 const iso = (v: When): string | null => {
@@ -193,7 +193,7 @@ export function buildOrderTranscript(order: TranscriptOrder, names: Record<strin
     const item = `${n.name ?? 'Item'}${n.deliveryDate ? ` (${dayLabel(n.deliveryDate)})` : ''}`;
     add(n.at, {
       kind: 'note',
-      text: n.to ? (n.from ? `Special instructions changed: ${item}` : `Special instructions added: ${item}`) : `Special instructions removed: ${item}`,
+      text: `${n.admin ? 'Admin note' : 'Special instructions'} ${n.to ? (n.from ? 'changed' : 'added') : 'removed'}: ${item}`,
       details: [...(n.from ? [`Before: ${n.from}`] : []), ...(n.to ? [`Now: ${n.to}`] : [])],
       by: who(n.by, names),
     });

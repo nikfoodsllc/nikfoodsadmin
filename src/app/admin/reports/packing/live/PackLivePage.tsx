@@ -27,6 +27,7 @@ import {
   type PackingRun,
 } from '@/utils/packingProgress';
 import InstructionsNote from '@/components/common/InstructionsNote';
+import AdminItemNote from '@/components/common/AdminItemNote';
 
 type Preset = 'today' | 'tomorrow' | 'other';
 
@@ -580,6 +581,7 @@ export default function PackLivePage() {
                                   </Typography>
                                 ))}
                                 <InstructionsNote text={line.note} large />
+                                <AdminItemNote text={line.adminNote} large />
                                 <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                   {line.portion && <Chip size="small" label={line.portion} sx={{ height: 26, fontSize: 14 }} />}
                                   {line.spice && <Chip size="small" label={shortSpiceLabel(line.spice)} sx={{ height: 26, fontSize: 14, ...SPICE_CHIP }} />}
