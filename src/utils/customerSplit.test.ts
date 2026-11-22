@@ -26,9 +26,10 @@ describe('splitNewExisting', () => {
     expect(split.newOrders).toBe(1);
     expect(split.existingOrders).toBe(3);
   });
-  it('a new customer who ordered again stays new, not also existing', () => {
+  it('people: a new customer who ordered again also counts among repeat people, once in the total', () => {
     expect(split.newCustomers).toBe(1);
-    expect(split.existingCustomers).toBe(1);
+    expect(split.existingCustomers).toBe(2);
+    expect(split.customers).toBe(2);
   });
   it('splits each day', () => {
     expect(split.series.map((b) => [b.key, b.newOrders, b.existingOrders])).toEqual([

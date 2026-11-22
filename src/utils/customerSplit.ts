@@ -25,8 +25,12 @@ export interface CustomerSplit {
   orders: number;
   newOrders: number;
   existingOrders: number;
+  /** people whose first order ever is in the period */
   newCustomers: number;
+  /** people with at least one repeat order in the period (a new customer who ordered again counts here too) */
   existingCustomers: number;
+  /** different people in the period */
+  customers: number;
   series: Array<Bucket & { newOrders: number; existingOrders: number }>;
   lines: SplitLine[];
 }
@@ -56,8 +60,7 @@ export function splitNewExisting(orders: SplitOrder[], firstOrderOf: Map<string,
     if (i !== undefined) series[i][isNew ? 'newOrders' : 'existingOrders'] += 1;
     lines.push({ orderId: o.orderId, day: o.day, name: o.name, total: o.total, isNew });
   }
-  // someone whose first order is inside the range and who ordered again is a new customer, not also an existing one
-  for (const k of newPeople) existingPeople.delete(k);
+  const everyone = new Set([...newPeople, ...existingPeople]);
   lines.sort((a, b) => (a.day === b.day ? a.orderId.localeCompare(b.orderId) : b.day.localeCompare(a.day)));
   return {
     orders: orders.length,
@@ -65,6 +68,7 @@ export function splitNewExisting(orders: SplitOrder[], firstOrderOf: Map<string,
     existingOrders: orders.length - newOrders,
     newCustomers: newPeople.size,
     existingCustomers: existingPeople.size,
+    customers: everyone.size,
     series,
     lines,
   };
