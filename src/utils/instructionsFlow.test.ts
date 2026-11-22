@@ -3,6 +3,7 @@ import { buildKitchenReport, type StickerLookup, type TypeLookup } from './kitch
 import { buildItemOrders, type KitchenRow } from './kitchenDashboard';
 import { buildPackingReport, toLine, type PackingRow } from './packingReport';
 import { buildReportSheets } from './kitchenReportSheets';
+import { buildPackingSheets } from './packingReportSheets';
 
 const row = (over: Partial<KitchenRow>): KitchenRow => ({ orderId: 'ORD-1', day: '2026-10-13', name: 'Rajma', quantity: 1, customerName: 'Asha', orderedOn: '2026-10-06', ...over });
 const cooked: TypeLookup = () => 'cooked';
@@ -66,17 +67,35 @@ describe('an admin note travels to the kitchen and packing reports, never the st
     const sheets = buildReportSheets({ cooked: report.cooked, notSet: [], stickers: report.stickers });
     const prep = sheets.find((s) => s.key === 'prep')!;
     const i = prep.columnKeys!.indexOf('instructions');
-    const cells = prep.rows.filter((r) => r.kind === 'data').map((r) => r.cells[i]);
-    expect(cells).toContain(`${NOTE}\nAdmin note: ${ADMIN}`);
-    expect(cells).toContain(`Admin note: ${ADMIN}`);
+    const ia = prep.columnKeys!.indexOf('adminNote');
+    expect(prep.rows[0].cells[ia]).toBe('Admin note');
+    const data = prep.rows.filter((r) => r.kind === 'data');
+    expect(data.map((r) => r.cells[ia])).toEqual([ADMIN, ADMIN]);
+    expect(data.map((r) => r.cells[i])).toContain(NOTE);
+    expect(data.map((r) => r.cells[i])).not.toContain(ADMIN);
     const st = sheets.find((s) => s.key === 'stickers')!;
     expect(JSON.stringify(st.rows)).not.toContain(ADMIN);
   });
-  it('an admin note alone turns the Instructions column on', () => {
+  it('an admin note alone turns on only the Admin note column; none anywhere hides it', () => {
     const report = buildKitchenReport([row({ adminNote: ADMIN })], cooked, stickersYes);
     const sheets = buildReportSheets({ cooked: report.cooked, notSet: [], stickers: report.stickers });
-    expect(sheets.find((s) => s.key === 'prep')!.columnKeys).toContain('instructions');
-    expect(sheets.find((s) => s.key === 'stickers')!.columnKeys).not.toContain('instructions');
+    const prep = sheets.find((s) => s.key === 'prep')!;
+    expect(prep.columnKeys).toContain('adminNote');
+    expect(prep.columnKeys).not.toContain('instructions');
+    expect(sheets.find((s) => s.key === 'stickers')!.columnKeys).not.toContain('adminNote');
+    const none = buildReportSheets({ ...buildKitchenReport([row({})], cooked, stickersYes) });
+    for (const sheet of none) expect(sheet.columnKeys).not.toContain('adminNote');
+  });
+  it('the packing Excel/PDF gets its own Admin note column', () => {
+    const packingRow: PackingRow = { ...row({ adminNote: ADMIN }), street: '1 A St' };
+    const sheets = buildPackingSheets(buildPackingReport('2026-10-13', [packingRow], [], []));
+    const pack = sheets.find((s) => s.key === 'packing')!;
+    const ia = pack.columnKeys!.indexOf('adminNote');
+    expect(ia).toBeGreaterThan(-1);
+    expect(pack.rows.filter((r) => r.kind === 'data').map((r) => r.cells[ia])).toContain(ADMIN);
+    expect(pack.columnKeys).not.toContain('instructions');
+    const plain = buildPackingSheets(buildPackingReport('2026-10-13', [{ ...packingRow, adminNote: null }], [], []));
+    expect(plain.find((s) => s.key === 'packing')!.columnKeys).not.toContain('adminNote');
   });
   it('the Packing Report line carries it', () => {
     const packingRow: PackingRow = { ...row({ adminNote: ADMIN }), street: '1 A St' };

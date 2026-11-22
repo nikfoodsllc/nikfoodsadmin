@@ -302,7 +302,7 @@ export default function DeliveryReportPage() {
           row.push(item.selectedPortion || (item.food.portions?.[item.portions || 0]) || '');
           row.push(item.isEcoFriendlyContainer ? 'Yes' : 'No');
           row.push(item.ecoContainerCharge ? formatCurrency(item.ecoContainerCharge) : '');
-          row.push(item.notes || '');
+          row.push([item.notes, item.adminNote ? `Admin note: ${item.adminNote}` : ''].filter(Boolean).join(' | '));
 
           // Format combo selections
           if (item.comboSelections && item.food.sections) {
@@ -550,6 +550,13 @@ export default function DeliveryReportPage() {
                   <Box sx={{ ml: 3.25, mt: 0.5 }}>
                     <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px', fontStyle: 'italic' }}>
                       Instructions: {item.notes}
+                    </Typography>
+                  </Box>
+                )}
+                {item.adminNote && (
+                  <Box sx={{ ml: 3.25, mt: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: '#075985', fontSize: '12px', fontWeight: 600 }}>
+                      Admin note: {item.adminNote}
                     </Typography>
                   </Box>
                 )}
