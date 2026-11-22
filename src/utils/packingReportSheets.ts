@@ -22,7 +22,7 @@ export const PACKING_COLUMNS: ColumnDef[] = [
   col('spice', 'Spice', 14),
   col('eco', 'Eco', 10),
   col('picks', 'Combo picks', 28),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
   col('adminNote', 'Admin note', 30),
   col('pickedFor', 'Picked for', 12),
 ];
@@ -134,7 +134,7 @@ const HELD_COLUMNS: ColumnDef[] = [
   col('spice', 'Spice', 14),
   col('eco', 'Eco', 10),
   col('picks', 'Combo picks', 28),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
   col('adminNote', 'Admin note', 30),
   col('goesOut', 'Goes out', 14),
   col('why', 'Why', 30),

@@ -66,7 +66,7 @@ export const PREP_COLUMNS: ColumnDef[] = [
   col('kitchenDate', 'Kitchen date', 17),
   col('deliveryDate', 'Delivery date', 17),
   col('combo', 'With combo', 24),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
   col('adminNote', 'Admin note', 30),
 ];
 export const STICKER_COLUMNS: ColumnDef[] = [
@@ -79,7 +79,7 @@ export const STICKER_COLUMNS: ColumnDef[] = [
   col('eco', 'Eco', 8),
   col('heating', 'Heating/Storage', 36),
   col('combo', 'With combo', 24),
-  col('instructions', 'Instructions', 30),
+  col('instructions', 'Special instructions', 30),
   col('order', 'Order', 24),
   col('kitchenDate', 'Kitchen date', 17),
 ];
@@ -152,7 +152,7 @@ export function readyToEatSheet(readyToEat: PrepBlock[], notSet: PrepBlock[]): S
 }
 
 export function stickersSheet(stickers: StickerLine[]): SheetModel {
-  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'Heating/Storage', 'With combo', 'Instructions', 'Order', 'Kitchen date'] }];
+  const rows: SheetRow[] = [{ kind: 'header', cells: ['Delivery date', 'Item', 'Customer Name', 'Size', 'Qty', 'Spice', 'Eco', 'Heating/Storage', 'With combo', 'Special instructions', 'Order', 'Kitchen date'] }];
   stickers.forEach((s, i) => {
     rows.push({
       kind: 'data',

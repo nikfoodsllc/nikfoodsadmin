@@ -357,7 +357,7 @@ export default function OrderedItemsReportPage() {
       'Eco Container Price',
       'Sub Total',
       'Total Ordered Qty',
-      'Instructions',
+      'Special instructions',
       'Admin note',
     ];
 
@@ -835,7 +835,7 @@ export default function OrderedItemsReportPage() {
                     >
                       Spice Level{renderSortIcon('spiceLevel')}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>Instructions</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>Special instructions</TableCell>
                     <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>Admin note</TableCell>
                     <TableCell 
                       onClick={() => handleSort('itemPrice')}

@@ -29,7 +29,7 @@ describe('special instructions travel to the kitchen and packing screens', () =>
     expect(prep.rows.filter((r) => r.kind === 'data').map((r) => r.cells[iPrep])).toContain(NOTE);
     const st = sheets.find((s) => s.key === 'stickers')!;
     const iSt = st.columnKeys!.indexOf('instructions');
-    expect(st.rows[0].cells[iSt]).toBe('Instructions');
+    expect(st.rows[0].cells[iSt]).toBe('Special instructions');
     expect(st.rows.filter((r) => r.kind === 'data').map((r) => r.cells[iSt])).toContain(NOTE);
   });
   it('with no instructions anywhere the sheets look exactly as before (no Instructions column)', () => {
