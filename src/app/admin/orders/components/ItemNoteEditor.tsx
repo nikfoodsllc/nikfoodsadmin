@@ -38,7 +38,7 @@ interface Props {
 }
 
 const TEXT = {
-  instructions: { label: 'Instructions', title: 'Special instructions', add: 'Add instructions', aria: 'special instructions', max: ITEM_NOTE_MAX, clean: cleanItemNote, color: '#B8893B', hint: 'Shown to the kitchen, on the packing sticker and to the customer.', placeholder: 'For example: No onion' },
+  instructions: { label: 'Special instructions', title: 'Special instructions', add: 'Add special instructions', aria: 'special instructions', max: ITEM_NOTE_MAX, clean: cleanItemNote, color: '#B8893B', hint: 'Shown to the kitchen, on the packing sticker and to the customer.', placeholder: 'For example: No onion' },
   admin: { label: 'Admin note', title: 'Admin note', add: 'Add admin note', aria: 'the admin note', max: ADMIN_NOTE_MAX, clean: cleanAdminNote, color: '#0369A1', hint: 'For the kitchen and packing team only. Shown in the kitchen and packing reports, never to the customer.', placeholder: 'For example: Pack in a separate bag' },
 } as const;
 
