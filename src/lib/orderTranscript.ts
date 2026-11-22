@@ -3,7 +3,7 @@
  * (payment, emails, delivery date moves, store credit, refunds, status changes, OptimoRoute, delivery). Each event has a time,
  * a short sentence, who did it (an admin's name, the customer or the system) and a kind for the colour. Newest first.
  */
-export type TranscriptKind = 'order' | 'payment' | 'email' | 'date' | 'credit' | 'refund' | 'status' | 'route' | 'delivery' | 'cancel';
+export type TranscriptKind = 'order' | 'payment' | 'email' | 'date' | 'credit' | 'refund' | 'status' | 'route' | 'delivery' | 'cancel' | 'note';
 
 export interface TranscriptEvent {
   at: string; // ISO
@@ -55,6 +55,7 @@ export interface TranscriptOrder {
   }> | null;
   stripeRefunds?: Array<{ amount?: number; at?: string; reason?: string; note?: string }> | null;
   optimo?: { state?: string; at?: When; stops?: Array<{ date?: string }> } | null;
+  noteChanges?: Array<{ at: When; by?: Who; admin?: boolean; name?: string; deliveryDate?: string; from?: string; to?: string }> | null;
 }
 
 const iso = (v: When): string | null => {
@@ -103,6 +104,7 @@ export function adminIdsIn(order: TranscriptOrder): string[] {
   for (const s of order.statusHistory ?? []) fromWho(s.by);
   for (const r of order.reschedules ?? []) fromWho(r.by);
   fromWho(order.rescheduleEmail?.by);
+  for (const n of order.noteChanges ?? []) fromWho(n.by);
   return [...ids].filter(isObjectId);
 }
 
@@ -187,6 +189,16 @@ export function buildOrderTranscript(order: TranscriptOrder, names: Record<strin
   }
   if (refunds.length === 0 && (order.refundedAmount ?? 0) > 0) add(order.refundedAt, { kind: 'refund', text: `Refunded in Stripe: ${money(order.refundedAmount ?? 0)}`, by: 'Stripe' });
 
+  for (const n of order.noteChanges ?? []) {
+    const item = `${n.name ?? 'Item'}${n.deliveryDate ? ` (${dayLabel(n.deliveryDate)})` : ''}`;
+    add(n.at, {
+      kind: 'note',
+      text: `${n.admin ? 'Admin note' : 'Special instructions'} ${n.to ? (n.from ? 'changed' : 'added') : 'removed'}: ${item}`,
+      details: [...(n.from ? [`Before: ${n.from}`] : []), ...(n.to ? [`Now: ${n.to}`] : [])],
+      by: who(n.by, names),
+    });
+  }
+
   const history = order.statusHistory ?? [];
   for (const s of history) {
     add(s.at, {
@@ -211,6 +223,6 @@ export function buildOrderTranscript(order: TranscriptOrder, names: Record<strin
   if (order.deliveredAt) add(order.deliveredAt, { kind: 'delivery', text: 'Order delivered', by: order.deliveredBy === 'optimoroute' ? 'OptimoRoute' : who(order.deliveredBy, names) });
 
   // newest first; events at the same moment keep the order they happen in (placed, paid, then the rest)
-  const rank: Record<TranscriptKind, number> = { order: 0, payment: 1, email: 2, date: 3, credit: 3, refund: 3, route: 3, status: 4, delivery: 5, cancel: 5 };
+  const rank: Record<TranscriptKind, number> = { order: 0, payment: 1, email: 2, date: 3, credit: 3, refund: 3, route: 3, note: 3, status: 4, delivery: 5, cancel: 5 };
   return events.sort((a, b) => b.at.localeCompare(a.at) || rank[b.kind] - rank[a.kind]);
 }

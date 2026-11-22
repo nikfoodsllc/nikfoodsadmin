@@ -46,6 +46,7 @@ import CountControls from './CountControls';
 import { ItemActionsBar } from './CreditControls';
 import AddressEditor from './AddressEditor';
 import OrderTranscript from './OrderTranscript';
+import ItemNoteEditor, { useItemNoteRules } from './ItemNoteEditor';
 import { creditLeft, whyNotCreditable } from '@/utils/storeCredit';
 import { selectionKey, whyNotReschedulable } from '@/utils/orderReschedule';
 import { comboQuantityText } from '@/utils/comboQuantity';
@@ -83,6 +84,8 @@ export default function OrderDetailsDialog({
   const [expandedCombos, setExpandedCombos] = useState<Set<string>>(new Set());
   // items ticked to get a new delivery date (keys 'line:item')
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // which items take special instructions (read once per opened order)
+  const noteRules = useItemNoteRules(order?.orderId, token, open);
   useEffect(() => {
     setSelected(new Set());
   }, [order?.orderId, order?.updatedAt]);
@@ -524,14 +527,29 @@ export default function OrderDetailsDialog({
                               </Box>
                             )}
 
-                            {/* Customer notes */}
-                            {item.notes && (
-                              <Box sx={{ ml: 1.75, mt: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: '#6B7280', fontStyle: 'italic' }}>
-                                  Instructions: {item.notes}
-                                </Typography>
-                              </Box>
-                            )}
+                            {/* Special instructions: shown, and editable for items that take them */}
+                            <ItemNoteEditor
+                              orderId={order.orderId}
+                              token={token}
+                              line={dayIndex}
+                              item={itemIndex}
+                              name={item.food.name}
+                              notes={item.notes}
+                              canEdit={Boolean(token && noteRules?.editable && item.food._id && noteRules.allowed.has(String(item.food._id)))}
+                              onChanged={async () => { await onOrderChanged?.(); }}
+                            />
+                            {/* Admin note: internal, for the kitchen and packing reports; any item */}
+                            <ItemNoteEditor
+                              kind="admin"
+                              orderId={order.orderId}
+                              token={token}
+                              line={dayIndex}
+                              item={itemIndex}
+                              name={item.food.name}
+                              notes={item.adminNote}
+                              canEdit={Boolean(token && noteRules?.editable)}
+                              onChanged={async () => { await onOrderChanged?.(); }}
+                            />
                           </TableCell>
                           <TableCell align="center">{item.quantity}</TableCell>
                           <TableCell align="right">{safeFormatCurrency(item.price)}</TableCell>

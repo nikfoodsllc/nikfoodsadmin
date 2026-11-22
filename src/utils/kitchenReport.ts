@@ -49,6 +49,8 @@ export interface PrepLine {
   isEco: boolean;
   /** The customer's special instructions for this item, when they wrote any */
   note?: string | null;
+  /** An admin's internal note on this item (kitchen only; never printed on the customer's sticker) */
+  adminNote?: string | null;
   /** Set when the item is a chosen part of a combo: the combo's name and the spice level of that combo */
   viaCombo: string | null;
   viaSpice: string | null;
@@ -140,6 +142,7 @@ function atomsOf(rows: KitchenRow[]): Atom[] {
       deliveryDate: row.deliveredOn || row.day,
       movedFrom: row.movedFrom && row.movedFrom !== row.day ? row.movedFrom : null,
       note: clean(row.notes) || null,
+      adminNote: clean(row.adminNote) || null,
     };
     const parts = comboParts(row);
     if (parts.length > 0) {

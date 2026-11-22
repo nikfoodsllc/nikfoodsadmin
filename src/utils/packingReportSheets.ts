@@ -4,7 +4,7 @@
  * Excel and PDF writers draw them.
  */
 import type { ColumnDef } from './columnPreferences';
-import { applyColumnChoice, rowTone, type SheetKey, type SheetModel, type SheetRow } from './kitchenReportSheets';
+import { applyColumnChoice, noteCell, rowTone, type SheetKey, type SheetModel, type SheetRow } from './kitchenReportSheets';
 import type { PackLine, PackStop, PackingReport } from './packingReport';
 import { heldReasonText, type HeldReport } from './packingHeld';
 
@@ -64,7 +64,7 @@ function stopRows(route: string | number, stop: PackStop): SheetRow[] {
       line?.spice ?? '',
       line?.isEco ? 'ECO' : '',
       line ? line.choices.join('\n') : '',
-      line?.note ?? '',
+      noteCell(line),
       line?.pickedFor ? dayLabel(line.pickedFor) : '',
     ],
   }));
@@ -152,7 +152,7 @@ export function heldSheet(held: HeldReport): SheetModel {
         tone: rowTone(i, line.isEco),
         box: { top: i === 0, bottom: i === c.lines.length - 1 },
         rightCells: [qty],
-        cells: [c.customerName, line.orderId, line.name, line.portion ?? '', line.quantity, line.spice ?? '', line.isEco ? 'ECO' : '', line.choices.join('\n'), line.note ?? '', dayLabel(line.goesOutOn), heldReasonText(line.reason) + (c.alsoToday ? ' (also delivering today)' : '')],
+        cells: [c.customerName, line.orderId, line.name, line.portion ?? '', line.quantity, line.spice ?? '', line.isEco ? 'ECO' : '', line.choices.join('\n'), noteCell(line), dayLabel(line.goesOutOn), heldReasonText(line.reason) + (c.alsoToday ? ' (also delivering today)' : '')],
       });
     });
   });
@@ -165,7 +165,7 @@ export function buildPackingSheets(report: PackingReport): SheetModel[] {
   // a day with nothing at all still gets one (empty) packing sheet, so the file is never without one
   const sheets = [...(routes.length > 0 ? routes : [stopsSheet('Packing List', 'Nothing to deliver on this date', '-', [])]), packTotalsSheet(report), ...held];
   // the Instructions column is only there when a customer wrote instructions on something being packed
-  const noteOn = (lines: Array<{ note?: string | null }>) => lines.some((l) => Boolean(l.note));
+  const noteOn = (lines: Array<{ note?: string | null; adminNote?: string | null }>) => lines.some((l) => Boolean(l.note || l.adminNote));
   const packLines = [...report.routes.flatMap((r) => r.stops), ...report.unrouted].flatMap((s) => s.lines);
   const hidden: Partial<Record<SheetKey, string[]>> = {};
   if (!noteOn(packLines)) hidden.packing = ['instructions'];
