@@ -100,7 +100,7 @@ export default function MenuPromos({ token, promos, onChange, onUploading }: Pro
               <TextField size="small" fullWidth multiline minRows={2} label="Text" value={p.text} onChange={(e) => setOne(i, { text: e.target.value.slice(0, MAX_PROMO_TEXT) })} sx={{ mt: 1 }} />
               <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, mt: 1 }}>
                 <TextField size="small" label="Link" placeholder="www.niksweets.com" value={p.linkUrl} onChange={(e) => setOne(i, { linkUrl: e.target.value.slice(0, 200) })} error={badLink} helperText={badLink ? 'Not a web address' : ' '} />
-                <TextField size="small" label="Button words" placeholder={promoButtonText({ linkUrl: p.linkUrl || 'www.niksweets.com', linkText: '' })} value={p.linkText} onChange={(e) => setOne(i, { linkText: e.target.value.slice(0, 40) })} helperText="On the button that opens the link" InputLabelProps={{ shrink: true }} />
+                <TextField size="small" label="UI button label" placeholder={promoButtonText({ linkUrl: p.linkUrl || 'www.niksweets.com', linkText: '' })} value={p.linkText} onChange={(e) => setOne(i, { linkText: e.target.value.slice(0, 40) })} helperText="On the button that opens the link" InputLabelProps={{ shrink: true }} />
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mt: 0.5 }}>
                 {p.imageUrl ? (
