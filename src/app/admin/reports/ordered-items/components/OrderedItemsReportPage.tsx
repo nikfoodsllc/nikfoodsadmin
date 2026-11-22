@@ -48,6 +48,8 @@ interface OrderedItem {
   spiceLevel: string;
   /** what the customer wrote in the item's Special instructions box */
   notes?: string;
+  /** an admin's internal note on the item (Orders > order details) */
+  adminNote?: string;
   itemPrice: number;
   ecoContainer: boolean;
   ecoContainerAvailable: boolean;
@@ -356,6 +358,7 @@ export default function OrderedItemsReportPage() {
       'Sub Total',
       'Total Ordered Qty',
       'Instructions',
+      'Admin note',
     ];
 
     // Convert items to CSV rows
@@ -376,6 +379,7 @@ export default function OrderedItemsReportPage() {
         formatCurrency(calculateItemTotalPrice(item)),
         calculateTotalOrderedQty(item.portionQuantity, item.quantity, item.partQuantity).toString(),
         item.notes ?? '',
+        item.adminNote ?? '',
       ];
 
       return row.map(cell => {
@@ -832,6 +836,7 @@ export default function OrderedItemsReportPage() {
                       Spice Level{renderSortIcon('spiceLevel')}
                     </TableCell>
                     <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>Instructions</TableCell>
+                    <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>Admin note</TableCell>
                     <TableCell 
                       onClick={() => handleSort('itemPrice')}
                       sx={{ 
@@ -956,6 +961,9 @@ export default function OrderedItemsReportPage() {
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: item.notes ? '#92400E' : '#9CA3AF', fontWeight: item.notes ? 600 : 400, minWidth: 160, wordBreak: 'break-word' }}>
                         {item.notes || '-'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '13px', color: item.adminNote ? '#075985' : '#9CA3AF', fontWeight: item.adminNote ? 600 : 400, minWidth: 160, wordBreak: 'break-word' }}>
+                        {item.adminNote || '-'}
                       </TableCell>
                       <TableCell sx={{ fontSize: '13px', color: '#374151', fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {formatCurrency(item.itemPrice)}
