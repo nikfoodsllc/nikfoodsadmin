@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { invalidateLivesiteHomeMenuCacheAndWait } from '@/lib/invalidateHomeMenuCache';
 import { stockOf, type StockDoc } from '@/lib/stockCounts';
 import { readStockLog, writeStockLog } from '@/lib/stockLog';
+import { soldOutNowLimit } from '@/utils/soldOutNow';
 import { cleanResetMode, cleanResetTime, cleanStockUnit, cleanThreshold, nextDailyBoundary } from '@/utils/stockRules';
 
 export const dynamic = 'force-dynamic';
@@ -61,12 +62,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST { id }: reset the count of an item to 0 now (the units already ordered stop counting). The reset is written in the item's log. */
+/**
+ * POST { id }: reset the count of an item to 0 now (the units already ordered stop counting).
+ * POST { id, action: 'sold_out_now' }: lower the limit to what has been ordered, so the item is sold out at once (the count keeps going).
+ * Both are written in the item's log.
+ */
 export async function POST(request: NextRequest) {
   const auth = verifyAuth(request);
   if (!auth.success) return NextResponse.json({ error: auth.error }, { status: 401 });
   try {
-    const body = (await request.json().catch(() => ({}))) as { id?: unknown };
+    const body = (await request.json().catch(() => ({}))) as { id?: unknown; action?: unknown };
     const id = typeof body.id === 'string' ? body.id : '';
     const doc = await readItem(id);
     if (!doc) return NextResponse.json({ error: 'Food item not found' }, { status: 404 });
@@ -74,6 +79,18 @@ export async function POST(request: NextRequest) {
     if (cleanThreshold(doc.stockThreshold, unit) === null) return NextResponse.json({ error: 'This item has no order limit' }, { status: 409 });
     const before = (await stockOf([doc])).get(String(doc._id));
     const now = new Date();
+    const asWord = (n: number | null | undefined) => (n === null || n === undefined ? '' : unit === 'units' ? String(n) : `${n} ${unit}`);
+    if (body.action === 'sold_out_now') {
+      if (before?.soldOut) return NextResponse.json({ error: 'This item is already sold out' }, { status: 409 });
+      const next = soldOutNowLimit(before?.orderedBase ?? 0, unit);
+      if (next === null) return NextResponse.json({ error: 'Nothing has been ordered yet, so the limit cannot go lower. Switch the item off instead.' }, { status: 409 });
+      const saved = await db.update('fooditems', { _id: new ObjectId(id) }, { $set: { stockThreshold: next, updatedAt: now } } as never);
+      if (!saved.success) return NextResponse.json({ error: 'Could not mark it sold out' }, { status: 500 });
+      await writeStockLog({ foodItemId: id, kind: 'sold_out_now', from: asWord(before?.limit), to: asWord(next), byId: auth.userId, byName: auth.name });
+      const notified = await invalidateLivesiteHomeMenuCacheAndWait();
+      const after = await readItem(id);
+      return NextResponse.json({ data: { ...(after ? await describe(after) : {}), livesiteNotified: notified, log: await readStockLog(id) } });
+    }
     const updated = await db.update('fooditems', { _id: new ObjectId(id) }, { $set: { stockResetAt: now, updatedAt: now } } as never);
     if (!updated.success) return NextResponse.json({ error: 'Could not reset the count' }, { status: 500 });
     const asText = (n: number | null | undefined) => (n === null || n === undefined ? undefined : unit === 'units' ? String(n) : `${n} ${unit}`);

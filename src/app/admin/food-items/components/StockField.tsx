@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, LinearProgress, Radio, RadioGroup, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
-import { IconChevronDown, IconRefresh } from '@tabler/icons-react';
+import { IconBan, IconChevronDown, IconRefresh } from '@tabler/icons-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { stockLogText, type StockLogLine } from '@/utils/stockLogText';
 import type { StockUnit } from '@/utils/stockRules';
@@ -44,6 +44,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
   const { token } = useAuth();
   const [live, setLive] = useState<Live | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [soldOutOpen, setSoldOutOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const limit = value.stockThreshold ?? null;
@@ -78,6 +79,24 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
     } else {
       const j = await r?.json().catch(() => null);
       setError(j?.error || 'Could not reset the count');
+    }
+  };
+
+  // lowers the limit to what has been ordered, so the item is sold out at once (saved straight away, like Reset count)
+  const soldOutNow = async () => {
+    if (!itemId) return;
+    setBusy(true);
+    setError('');
+    const r = await fetch('/api/admin/food-items/stock', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: itemId, action: 'sold_out_now' }) }).catch(() => null);
+    setBusy(false);
+    setSoldOutOpen(false);
+    const j = await r?.json().catch(() => null);
+    if (r && r.ok && j?.data) {
+      setLive(j.data as Live);
+      // keep the form in step, so pressing Save afterwards does not put the old limit back
+      if (typeof j.data.limit === 'number') onChange({ stockThreshold: j.data.limit });
+    } else {
+      setError(j?.error || 'Could not mark it sold out');
     }
   };
 
@@ -195,9 +214,16 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
             Counting since {when(live!.since)}
             {live!.mode === 'daily' && live!.nextReset ? ` · next automatic reset ${when(live!.nextReset)}` : ' · manual reset only'}
           </Typography>
-          <Button size="small" variant="outlined" startIcon={busy ? <CircularProgress size={14} /> : <IconRefresh size={16} />} disabled={busy || disabled} onClick={() => setConfirmOpen(true)} sx={{ mt: 1, textTransform: 'none', fontWeight: 600 }}>
-            Reset count
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+            <Button size="small" variant="outlined" startIcon={busy ? <CircularProgress size={14} /> : <IconRefresh size={16} />} disabled={busy || disabled} onClick={() => setConfirmOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+              Reset count
+            </Button>
+            {!live!.soldOut && (
+              <Button size="small" variant="outlined" color="error" startIcon={<IconBan size={16} />} disabled={busy || disabled} onClick={() => setSoldOutOpen(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                Sold out now
+              </Button>
+            )}
+          </Box>
           {error && <Typography sx={{ color: '#B91C1C', fontSize: 13, mt: 0.5 }}>{error}</Typography>}
           {(live!.log?.length ?? 0) > 0 && (
             <Box sx={{ mt: 1.5 }}>
@@ -225,6 +251,20 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
           <Button onClick={() => setConfirmOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
           <Button variant="contained" disabled={busy} onClick={reset} sx={{ textTransform: 'none', fontWeight: 700 }}>
             {busy ? 'Resetting…' : 'Reset count'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={soldOutOpen} onClose={() => !busy && setSoldOutOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Mark sold out now?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            The limit goes down from {live?.limit ?? limit}{suf} to the {live?.ordered ?? 0}{suf} already ordered. The item shows Sold out on the website and in the app straight away, and nobody can order more, even from a cart. Orders already placed stay. To sell more later, raise the limit.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSoldOutOpen(false)} disabled={busy} sx={{ textTransform: 'none' }}>Cancel</Button>
+          <Button variant="contained" color="error" disabled={busy} onClick={soldOutNow} sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {busy ? 'Saving…' : 'Sold out now'}
           </Button>
         </DialogActions>
       </Dialog>
