@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST { id }: reset the count of an item to 0 now (the units already ordered stop counting).
- * POST { id, action: 'sold_out_now' }: lower the limit to what has been ordered, so the item is sold out at once (the count keeps going).
+ * POST { id, action: 'sold_out_now' }: lower the limit to what has been ordered (0 if nothing was), so the item is sold out at once (the count keeps going).
  * Both are written in the item's log.
  */
 export async function POST(request: NextRequest) {
@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
     if (body.action === 'sold_out_now') {
       if (before?.soldOut) return NextResponse.json({ error: 'This item is already sold out' }, { status: 409 });
       const next = soldOutNowLimit(before?.orderedBase ?? 0, unit);
-      if (next === null) return NextResponse.json({ error: 'Nothing has been ordered yet, so the limit cannot go lower. Switch the item off instead.' }, { status: 409 });
       const saved = await db.update('fooditems', { _id: new ObjectId(id) }, { $set: { stockThreshold: next, updatedAt: now } } as never);
       if (!saved.success) return NextResponse.json({ error: 'Could not mark it sold out' }, { status: 500 });
       await writeStockLog({ foodItemId: id, kind: 'sold_out_now', from: asWord(before?.limit), to: asWord(next), byId: auth.userId, byName: auth.name });

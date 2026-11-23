@@ -2,10 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { cleanResetTime, cleanStockUnit, cleanThreshold, formatAmount, lastDailyBoundary, limitInBase, lineAmounts, lineUnits, nextDailyBoundary, pacificWallToDate, perUnitAmount, portionOunces, stockSince, stockState, unitsThatFit } from './stockRules';
 
 describe('limit and state', () => {
-  it('only a whole number of at least 1 is a limit', () => {
+  it('only a whole number of at least 0 is a limit (blank = no limit)', () => {
     expect(cleanThreshold(50)).toBe(50);
     expect(cleanThreshold('12')).toBe(12);
-    for (const v of [0, -3, 2.5, '', '  ', 'abc', null, undefined, 1e9]) expect(cleanThreshold(v)).toBeNull();
+    for (const v of [-3, 2.5, '', '  ', 'abc', null, undefined, 1e9]) expect(cleanThreshold(v)).toBeNull();
+  });
+  it('a limit of 0 is Out of stock straight away and sells none (all units)', () => {
+    expect(cleanThreshold(0)).toBe(0);
+    expect(cleanThreshold('0')).toBe(0);
+    expect(cleanThreshold(0, 'lb')).toBe(0);
+    expect(cleanThreshold(0, 'oz')).toBe(0);
+    expect(stockState(0, 0)).toMatchObject({ limit: 0, remaining: 0, soldOut: true });
+    expect(stockState(0, 0, 'lb')).toMatchObject({ limit: 0, remaining: 0, soldOut: true });
+    expect(stockState('', 0)).toMatchObject({ limit: null, soldOut: false });
   });
   it('remaining and sold out', () => {
     expect(stockState(10, 4)).toMatchObject({ limit: 10, ordered: 4, remaining: 6, soldOut: false });
