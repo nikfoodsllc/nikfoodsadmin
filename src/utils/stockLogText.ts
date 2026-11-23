@@ -24,6 +24,8 @@ export function stockLogText(row: StockLogLine): string {
       return `Low-stock alert changed from ${row.from} to ${row.to}`;
     case 'reset_mode_changed':
       return `Reset changed from ${row.from} to ${row.to}`;
+    case 'sold_out_now':
+      return `Marked sold out now: limit lowered from ${row.from} to ${row.to}`;
     case 'reset':
       return row.limit ? `Count reset (${row.orderedText ?? row.ordered ?? 0} of ${row.limitText ?? row.limit} had been ordered)` : `Count reset (${row.orderedText ?? row.ordered ?? 0} had been ordered)`;
     default:
