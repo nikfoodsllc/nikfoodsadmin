@@ -7,7 +7,9 @@ describe('stock settings of a new item', () => {
   it('nothing when no limit is given', () => {
     expect(stockFieldsForCreate({}, now)).toEqual({});
     expect(stockFieldsForCreate({ stockThreshold: null }, now)).toEqual({});
-    expect(stockFieldsForCreate({ stockThreshold: 0 }, now)).toEqual({});
+  });
+  it('a limit of 0 is a real limit (Out of stock, sells none)', () => {
+    expect(stockFieldsForCreate({ stockThreshold: 0 }, now)).toEqual({ stockThreshold: 0, stockUnit: 'units', stockResetAt: now, stockResetMode: 'manual' });
   });
   it('a limit starts the count now', () => {
     expect(stockFieldsForCreate({ stockThreshold: 50 }, now)).toEqual({ stockThreshold: 50, stockUnit: 'units', stockResetAt: now, stockResetMode: 'manual' });

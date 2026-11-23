@@ -16,17 +16,17 @@ export type StockUnit = 'units' | 'lb' | 'oz';
 export const cleanStockUnit = (value: unknown): StockUnit => (value === 'lb' || value === 'oz' ? value : 'units');
 
 /**
- * A usable limit: whole units or whole ounces (at least 1), or pounds (at least 0.25, up to 2 decimals). Anything else (blank, 0,
- * text) means "no limit".
+ * A usable limit: whole units or whole ounces (at least 1), or pounds (at least 0.25, up to 2 decimals), or 0. A limit of 0 shows the
+ * item as Out of stock and sells none (for example to show a product before it is sold). Anything else (blank, text) means "no limit".
  */
 export function cleanThreshold(value: unknown, unit: StockUnit = 'units'): number | null {
   const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (typeof n !== 'number' || !Number.isFinite(n) || n > 100000) return null;
   if (unit === 'lb') {
     const rounded = Math.round(n * 100) / 100;
-    return rounded >= 0.25 ? rounded : null;
+    return rounded >= 0.25 || n === 0 ? (n === 0 ? 0 : rounded) : null;
   }
-  return Number.isInteger(n) && n >= 1 ? n : null;
+  return Number.isInteger(n) && n >= 0 ? n : null;
 }
 
 /** What the counts are kept in: units, or ounces for a limit in pounds or ounces. */

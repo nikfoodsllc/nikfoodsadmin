@@ -265,7 +265,7 @@ const foodItemSchema = z.object({
   // Special instructions box for customers: true = on; left out on update = leave as it is (a new item starts with it off)
   allowInstructions: z.boolean().optional(),
   // Order limit (inventory): a whole number of units, null = no limit; left out on update = leave as it is
-  stockThreshold: z.number().min(0.25).max(100000).nullable().optional(),
+  stockThreshold: z.number().min(0).max(100000).refine((n) => n === 0 || n >= 0.25, 'The order limit must be 0 or more').nullable().optional(),
   // what the limit is counted in: units, pounds or ounces (pounds and ounces need an item with sizes)
   stockUnit: z.enum(['units', 'lb', 'oz']).optional(),
   stockResetMode: z.enum(['manual', 'daily']).optional(),
@@ -606,7 +606,7 @@ export async function GET(request: NextRequest) {
     const wantedLevel = stockLevelParam(searchParams);
     let stockLevelIds: ObjectId[] | null = null;
     if (wantedLevel) {
-      const limited = await db.read<FoodItem>('fooditems', { stockThreshold: { $gt: 0 } });
+      const limited = await db.read<FoodItem>('fooditems', { stockThreshold: { $gte: 0 } });
       const docs = (limited.success && limited.data ? limited.data : []) as unknown as StockDoc[];
       const levels = await stockOf(docs);
       stockLevelIds = docs.filter((d) => levels.get(String(d._id))?.level === wantedLevel).map((d) => new ObjectId(String(d._id)));

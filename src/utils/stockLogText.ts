@@ -27,7 +27,7 @@ export function stockLogText(row: StockLogLine): string {
     case 'sold_out_now':
       return `Marked sold out now: limit lowered from ${row.from} to ${row.to}`;
     case 'reset':
-      return row.limit ? `Count reset (${row.orderedText ?? row.ordered ?? 0} of ${row.limitText ?? row.limit} had been ordered)` : `Count reset (${row.orderedText ?? row.ordered ?? 0} had been ordered)`;
+      return row.limit !== null && row.limit !== undefined ? `Count reset (${row.orderedText ?? row.ordered ?? 0} of ${row.limitText ?? row.limit} had been ordered)` : `Count reset (${row.orderedText ?? row.ordered ?? 0} had been ordered)`;
     default:
       return 'Changed';
   }
