@@ -16,10 +16,12 @@ describe('soldOutNowLimit', () => {
     expect(soldOutNowLimit(70.5, 'oz')).toBe(70);
     expect(stockState(70, 70.5, 'oz').soldOut).toBe(true);
   });
-  it('nothing (or too little) ordered: cannot be a limit', () => {
-    expect(soldOutNowLimit(0, 'units')).toBeNull();
-    expect(soldOutNowLimit(3, 'lb')).toBeNull(); // 0.18 lb is under the 0.25 lb minimum
-    expect(soldOutNowLimit(0.5, 'oz')).toBeNull();
-    expect(soldOutNowLimit(Number.NaN, 'units')).toBeNull();
+  it('nothing (or too little) ordered: the limit becomes 0, which is sold out', () => {
+    expect(soldOutNowLimit(0, 'units')).toBe(0);
+    expect(soldOutNowLimit(3, 'lb')).toBe(0); // 0.18 lb is under the 0.25 lb minimum
+    expect(soldOutNowLimit(0.5, 'oz')).toBe(0);
+    expect(soldOutNowLimit(Number.NaN, 'units')).toBe(0);
+    expect(stockState(0, 0, 'units').soldOut).toBe(true);
+    expect(stockState(0, 3, 'lb').soldOut).toBe(true);
   });
 });

@@ -51,8 +51,8 @@ describe('foodItemListFilters', () => {
     expect(f('splitSticker=maybe')).toEqual({});
   });
   it("chefs pick: yes is marked, no is anything not marked yes", () => {
-    expect(f('stock=has')).toEqual({ stockThreshold: { $gt: 0 } });
-    expect(f('stock=none')).toEqual({ $nor: [{ stockThreshold: { $gt: 0 } }] });
+    expect(f('stock=has')).toEqual({ stockThreshold: { $gte: 0 } });
+    expect(f('stock=none')).toEqual({ $nor: [{ stockThreshold: { $gte: 0 } }] });
     expect(f('stock=low')).toEqual({});
     expect(f('stock=junk')).toEqual({});
     expect(f('chefsPick=yes')).toEqual({ chefsPick: true });

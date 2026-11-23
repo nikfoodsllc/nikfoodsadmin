@@ -101,7 +101,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
   };
 
   const hasLive = Boolean(live && live.limit !== null && live.ordered !== undefined);
-  const pct = hasLive && live!.limit ? Math.min(100, Math.round(((live!.ordered ?? 0) / live!.limit) * 100)) : 0;
+  const pct = hasLive && live!.limit ? Math.min(100, Math.round(((live!.ordered ?? 0) / live!.limit) * 100)) : hasLive && live!.limit === 0 ? 100 : 0;
   const suf = suffix(live?.unit);
   const alertPct = value.stockAlertPercent && value.stockAlertPercent >= 1 && value.stockAlertPercent <= 99 ? value.stockAlertPercent : 10;
   const alertLeft = limit !== null ? Math.round(limit * alertPct) / 100 : 0;
@@ -114,7 +114,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
           Order limit
         </Typography>
         <Typography variant="caption" sx={{ color: '#6B7280', mr: 1 }}>
-          {limit === null ? 'No limit' : `${limit}${unit === 'lb' ? ' lb' : unit === 'oz' ? ' oz' : ' units'}`}
+          {limit === null ? 'No limit' : limit === 0 ? '0 (Out of stock)' : `${limit}${unit === 'lb' ? ' lb' : unit === 'oz' ? ' oz' : ' units'}`}
         </Typography>
       </AccordionSummary>
       <AccordionDetails sx={{ p: 1.5, pt: 0.5 }}>
@@ -147,14 +147,15 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
         onChange={(e) => {
           const raw = e.target.value.trim();
           const n = Number(raw);
-          const ok = raw !== '' && Number.isFinite(n) && (unit === 'lb' ? n >= 0.25 : Number.isInteger(n) && n >= 1);
+          // 0 is a real limit: the item shows Out of stock and sells none (blank = no limit)
+          const ok = raw !== '' && Number.isFinite(n) && (n === 0 || (unit === 'lb' ? n >= 0.25 : Number.isInteger(n) && n >= 1));
           onChange({ stockThreshold: ok ? Math.min(n, 100000) : null });
         }}
-        slotProps={{ htmlInput: { min: unit === 'lb' ? 0.25 : 1, step: unit === 'lb' ? 0.25 : 1, inputMode: 'decimal', 'aria-label': 'Order limit' } }}
-        helperText={hasSizes ? 'Empty = no limit. At the limit the item shows Out of stock. Pounds and ounces use each serving size.' : 'Empty = no limit. At the limit the item shows Out of stock.'}
+        slotProps={{ htmlInput: { min: 0, step: unit === 'lb' ? 0.25 : 1, inputMode: 'decimal', 'aria-label': 'Order limit' } }}
+        helperText={`Empty = no limit. 0 = shows Out of stock and sells none. At the limit the item shows Out of stock.${hasSizes ? ' Pounds and ounces use each serving size.' : ''}`}
       />
 
-      {limit !== null && (
+      {limit !== null && limit > 0 && (
         <TextField
           fullWidth
           size="small"
@@ -258,7 +259,7 @@ export default function StockField({ itemId, value, onChange, disabled, hasSizes
         <DialogTitle>Mark sold out now?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            The limit goes down from {live?.limit ?? limit}{suf} to the {live?.ordered ?? 0}{suf} already ordered. The item shows Sold out on the website and in the app straight away, and nobody can order more, even from a cart. Orders already placed stay. To sell more later, raise the limit.
+            The limit goes down from {live?.limit ?? limit}{suf} to {live?.ordered ? `the ${live.ordered}${suf} already ordered` : `0 (nothing has been ordered yet)`}. The item shows Sold out on the website and in the app straight away, and nobody can order more, even from a cart. Orders already placed stay. To sell more later, raise the limit.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

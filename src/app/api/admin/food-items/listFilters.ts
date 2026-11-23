@@ -46,8 +46,8 @@ export function foodItemListFilters(params: URLSearchParams): Record<string, unk
   else if (allowInstructions === 'no') filter.allowInstructions = { $ne: true };
   // stock=none|has are plain filters; ok|low|out depend on the live count, so the list route works them out (stockLevelParam)
   const stock = params.get('stock');
-  if (stock === 'has') filter.stockThreshold = { $gt: 0 };
-  else if (stock === 'none') filter.$nor = [{ stockThreshold: { $gt: 0 } }];
+  if (stock === 'has') filter.stockThreshold = { $gte: 0 };
+  else if (stock === 'none') filter.$nor = [{ stockThreshold: { $gte: 0 } }];
   // allergen=milk (contains it) | none (contains no allergen: the field is missing or empty)
   const allergen = params.get('allergen');
   if (isAllergenKey(allergen)) filter.allergens = allergen;
