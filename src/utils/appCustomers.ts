@@ -51,6 +51,30 @@ export const APP_FILTERS: Array<{ key: AppFilter; label: string }> = [
   { key: 'allOff', label: 'Everything off' },
 ];
 
+/** Which app a phone runs: 'android', otherwise the iPhone app (phones from before Android sent 'ios' or nothing). */
+export const phonePlatform = (p: Pick<AppPhone, 'platform'>): 'ios' | 'android' => (p.platform === 'android' ? 'android' : 'ios');
+
+/** The apps a customer uses, iPhone first (a customer can have both). */
+export function platformsOf(c: Pick<AppCustomer, 'phones'>): Array<'ios' | 'android'> {
+  const set = new Set(c.phones.map(phonePlatform));
+  return (['ios', 'android'] as const).filter((p) => set.has(p));
+}
+
+export type PlatformFilter = 'all' | 'ios' | 'android';
+export const PLATFORM_FILTERS: Array<{ key: PlatformFilter; label: string }> = [
+  { key: 'all', label: 'iPhone + Android' },
+  { key: 'ios', label: 'iPhone' },
+  { key: 'android', label: 'Android' },
+];
+export const PLATFORM_LABEL: Record<'ios' | 'android', string> = { ios: 'iPhone', android: 'Android' };
+
+/** How many customers use each app (a customer with both counts in both). */
+export function platformCounts(list: Array<Pick<AppCustomer, 'phones'>>): Record<'ios' | 'android', number> {
+  const out = { ios: 0, android: 0 };
+  for (const c of list) for (const p of platformsOf(c)) out[p] += 1;
+  return out;
+}
+
 /** Will a menu alert reach this customer? Only the app's own menu switch decides (the menu alerts email list is not needed). */
 export const getsMenuAlerts = (c: AppCustomer): boolean => c.menuSwitch;
 
@@ -62,10 +86,11 @@ export function menuStatus(c: AppCustomer): { label: 'On' | 'Off'; on: boolean }
 const digits = (text: string) => text.replace(/\D/g, '');
 
 /** Keeps the customers matching the search (name, email, phone number, phone model) and the chosen filter. */
-export function filterAppCustomers(list: AppCustomer[], search: string, filter: AppFilter): AppCustomer[] {
+export function filterAppCustomers(list: AppCustomer[], search: string, filter: AppFilter, platform: PlatformFilter = 'all'): AppCustomer[] {
   const q = search.trim().toLowerCase();
   const qDigits = digits(q);
   return list.filter((c) => {
+    if (platform !== 'all' && !platformsOf(c).includes(platform)) return false;
     // the switch filters only mean something for customers who allowed notifications on the phone
     if (filter === 'allowed' && c.permission !== 'allowed') return false;
     if (filter === 'denied' && c.permission !== 'denied') return false;
