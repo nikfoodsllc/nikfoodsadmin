@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterAppCustomers, getsMenuAlerts, menuStatus, phoneText, seenText, type AppCustomer } from './appCustomers';
+import { filterAppCustomers, getsMenuAlerts, menuStatus, phoneText, seenText, type AppCustomer, platformCounts, platformsOf } from './appCustomers';
 
 const c = (over: Partial<AppCustomer>): AppCustomer => ({ permission: 'allowed', userId: 'x', name: 'Amy Rao', email: 'amy@example.com', phone: '2065550101', phones: [{ permission: 'allowed', platform: 'ios', deviceName: "Amy's iPhone", appVersion: '1.0.1', lastSeenAt: null, firstSeenAt: null }], lastSeenAt: null, orders: true, menuSwitch: true, menuSubscribed: true, reminders: false, ...over });
 
@@ -63,5 +63,28 @@ describe('text helpers', () => {
     expect(seenText(null)).toBe('–');
     expect(seenText('nonsense')).toBe('–');
     expect(seenText('2026-10-21T17:32:00.000Z')).toBe('Oct 21, 10:32 AM');
+  });
+});
+
+describe('iPhone and Android', () => {
+  const phone = (platform: string) => ({ permission: 'allowed' as const, platform, deviceName: '', appVersion: '1.0.8', lastSeenAt: null, firstSeenAt: null });
+  const base = { userId: 'u', name: 'A', email: 'a@x.com', phone: '', lastSeenAt: null, permission: 'allowed' as const, orders: true, menuSwitch: true, menuSubscribed: false, reminders: false };
+  const ios = { ...base, userId: 'i', phones: [phone('ios')] };
+  const android = { ...base, userId: 'a', phones: [phone('android')] };
+  const both = { ...base, userId: 'b', phones: [phone('android'), phone('')] };
+  it('tells the apps apart (no platform = iPhone)', () => {
+    expect(platformsOf(ios)).toEqual(['ios']);
+    expect(platformsOf(android)).toEqual(['android']);
+    expect(platformsOf(both)).toEqual(['ios', 'android']);
+    expect(platformCounts([ios, android, both])).toEqual({ ios: 2, android: 2 });
+  });
+  it('filters by app', () => {
+    expect(filterAppCustomers([ios, android, both], '', 'all', 'android').map((c) => c.userId)).toEqual(['a', 'b']);
+    expect(filterAppCustomers([ios, android, both], '', 'all', 'ios').map((c) => c.userId)).toEqual(['i', 'b']);
+    expect(filterAppCustomers([ios, android, both], '', 'all').length).toBe(3);
+  });
+  it('names Android phones by model and says Android', () => {
+    expect(phoneText({ ...phone('android'), deviceName: 'Pixel 7' })).toContain('Pixel 7 (Android)');
+    expect(phoneText({ ...phone('android'), deviceName: '' })).toContain('Android phone');
   });
 });
