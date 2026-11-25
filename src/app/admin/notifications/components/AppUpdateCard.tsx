@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Paper, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { IconDeviceMobileUp } from '@tabler/icons-react';
 
 type Call = (path: string, method?: string, payload?: unknown) => Promise<{ ok: boolean; status: number; json: Record<string, any> }>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -13,15 +13,23 @@ interface UpdateInfo {
   allPhones: number;
   title: string;
   body: string;
+  /** the same for the Android app (Google Play); missing on an older server */
+  android?: Omit<UpdateInfo, 'android'>;
 }
 
+type Store = 'ios' | 'android';
+const STORE_NAME: Record<Store, string> = { ios: 'the App Store', android: 'Google Play' };
+
 /**
- * "App update": the admin says which app version is the newest on the App Store. Phones on an older version get
+ * "App update": the admin says which app version is the newest on the App Store (iPhone) or Google Play (Android); each app has its
+ * own version and its own notification. Phones on an older version get
  * (1) an "Update available" bar inside the app (versions that have it), and (2) this notification when the admin presses Send.
  * Tapping the notification opens the App Store (versions that have it). Older versions just open the app.
  */
 export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode?: string; onSent?: () => void }) {
-  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [store, setStore] = useState<Store>('ios');
+  const [all, setAll] = useState<UpdateInfo | null>(null);
+  const info: Omit<UpdateInfo, 'android'> | null = store === 'android' ? all?.android ?? null : all;
   const [version, setVersion] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -32,14 +40,16 @@ export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode
 
   const load = useCallback(async () => {
     const r = await call('app-update');
-    if (r.ok) {
-      const d = r.json.data as UpdateInfo;
-      setInfo(d);
-      setVersion((v) => v || d.latestVersion);
-      setTitle((t) => t || d.title);
-      setBody((b) => b || d.body);
-    }
+    if (r.ok) setAll(r.json.data as UpdateInfo);
   }, [call]);
+
+  // the boxes show the chosen app's saved version and standard text
+  useEffect(() => {
+    setVersion(info?.latestVersion ?? '');
+    setTitle(info?.title ?? '');
+    setBody(info?.body ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, all]);
 
   useEffect(() => {
     void load();
@@ -50,7 +60,7 @@ export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode
 
   const save = async () => {
     setBusy(true);
-    const r = await call('app-update', 'PUT', { latestVersion: version });
+    const r = await call('app-update', 'PUT', { latestVersion: version, platform: store });
     setBusy(false);
     if (r.ok) {
       setMessage({ severity: 'success', text: version.trim() ? `Saved. Phones on an older version than ${version.trim()} now see "Update available".` : 'Cleared. The app no longer shows "Update available".' });
@@ -60,7 +70,7 @@ export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode
 
   const send = async (again: boolean) => {
     setBusy(true);
-    const r = await call('app-update', 'POST', { title, body, ...(again ? { confirmAgain: true } : {}) });
+    const r = await call('app-update', 'POST', { title, body, platform: store, ...(again ? { confirmAgain: true } : {}) });
     setBusy(false);
     setConfirm(false);
     if (r.ok) {
@@ -83,13 +93,18 @@ export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode
         <IconDeviceMobileUp size={20} /> App update
       </Typography>
       <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
-        Type the newest app version that is on the App Store. Phones on an older version get an &quot;Update available&quot; bar in the app, and you can also send them a notification that opens the App Store. Customers on very old versions (before this feature) only see the notification, and tapping it opens the app.
+        Type the newest app version that is on {STORE_NAME[store]}. Phones on an older version get an &quot;Update available&quot; bar in the app, and you can also send them a notification that opens {STORE_NAME[store]}. Customers on very old iPhone versions (before this feature) only see the notification, and tapping it opens the app.
       </Typography>
+
+      <ToggleButtonGroup exclusive size="small" value={store} onChange={(_, v: Store | null) => v && setStore(v)} sx={{ mb: 1.5, '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 2 } }} aria-label="Which app">
+        <ToggleButton value="ios">iPhone app</ToggleButton>
+        <ToggleButton value="android" disabled={!all?.android}>Android app</ToggleButton>
+      </ToggleButtonGroup>
 
       {message && <Alert severity={message.severity} onClose={() => setMessage(null)} sx={{ mb: 1.5 }}>{message.text}</Alert>}
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'flex-start', mb: 1 }}>
-        <TextField label="Newest version on the App Store" placeholder="1.0.3" value={version} onChange={(e) => setVersion(e.target.value)} size="small" sx={{ width: { xs: '100%', sm: 260 } }} helperText="For example 1.0.3. Leave empty to turn it off." />
+        <TextField label={`Newest version on ${STORE_NAME[store]}`} placeholder="1.0.3" value={version} onChange={(e) => setVersion(e.target.value)} size="small" sx={{ width: { xs: '100%', sm: 260 } }} helperText="For example 1.0.3. Leave empty to turn it off." />
         <Button variant="outlined" color="warning" disabled={busy || !versionChanged} onClick={save} sx={{ textTransform: 'none', fontWeight: 700, height: 40 }}>
           Save
         </Button>
@@ -98,7 +113,7 @@ export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode
 
       {saved ? (
         <Typography sx={{ fontSize: 14, mb: 1.5 }}>
-          <b>{older}</b> phone{older === 1 ? '' : 's'} ({info?.customers ?? 0} customer{info?.customers === 1 ? '' : 's'}) {older === 1 ? 'is' : 'are'} on a version older than {saved}, of {info?.allPhones ?? 0} customer{info?.allPhones === 1 ? '' : 's'} with the app.
+          <b>{older}</b> {store === 'android' ? 'Android' : 'iPhone'} phone{older === 1 ? '' : 's'} ({info?.customers ?? 0} customer{info?.customers === 1 ? '' : 's'}) {older === 1 ? 'is' : 'are'} on a version older than {saved}, of {info?.allPhones ?? 0} customer{info?.allPhones === 1 ? '' : 's'} with the app.
         </Typography>
       ) : (
         <Typography sx={{ fontSize: 14, color: '#6B7280', mb: 1.5 }}>No version saved yet.</Typography>
@@ -119,7 +134,7 @@ export default function AppUpdateCard({ call, mode, onSent }: { call: Call; mode
         <DialogTitle>{confirm === 'again' ? 'Send again?' : 'Send this notification?'}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {confirm === 'again' ? againText : `It goes to ${older} phone${older === 1 ? '' : 's'} on a version older than ${saved}. "${title}": ${body}`}
+            {confirm === 'again' ? againText : `It goes to ${older} ${store === 'android' ? 'Android' : 'iPhone'} phone${older === 1 ? '' : 's'} on a version older than ${saved}. "${title}": ${body}`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

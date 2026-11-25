@@ -8,7 +8,7 @@ import { CHANNEL_LABEL, CHANNELS, type Channel } from '@/utils/businessDashboard
 
 const COLOR: Record<Channel, string> = { website: SERIES[0], app: SERIES[1], offline: SERIES[2] };
 const ICON: Record<Channel, typeof IconWorld> = { website: IconWorld, app: IconBrandApple, offline: IconBuildingStore };
-const HINT: Record<Channel, string> = { website: 'nikfoods.com', app: 'iPhone app', offline: 'Entered by an admin: payment link, cash, Zelle' };
+const HINT: Record<Channel, string> = { website: 'nikfoods.com', app: 'iPhone and Android app', offline: 'Entered by an admin: payment link, cash, Zelle' };
 
 /** Paid orders split into Website / Mobile app / Offline: share of orders, sales, change against the prior period, and a chart per day / week / month */
 export default function ChannelSection({ data }: { data: DashboardData }) {

@@ -11,7 +11,7 @@ import { getDisplayPaymentStatus, getNetTotal, getRefundedAmount } from '@/utils
 import { formatPSTDate } from '@/utils/timezone';
 import { orderEmailStatusView, type EmailTone } from '@/utils/orderEmailStatus';
 import { orderOptimoView } from '@/utils/orderOptimoView';
-import { CHANNEL_LABELS, channelOf } from '@/utils/orderChannel';
+import { channelLabel, channelOf } from '@/utils/orderChannel';
 import { rescheduleView } from '@/utils/orderReschedule';
 import { isCountedEarly } from '@/utils/orderCounting';
 
@@ -175,12 +175,12 @@ export default function OrderTableRow({
         </Typography>
       </TableCell>
     ),
-    // Order Source (key channel): where the customer placed it: the website, the iPhone app, or an admin entered it
+    // Order Source (key channel): where the customer placed it: the website, the iPhone or Android app, or an admin entered it
     channel: (
       <TableCell sx={{ padding: '16px 8px', verticalAlign: 'middle' }}>
         <Chip
           size="small"
-          label={CHANNEL_LABELS[channelOf(order)]}
+          label={channelLabel(order)}
           sx={{ height: 22, fontSize: 12, fontWeight: 700, ...(channelOf(order) === 'mobile' ? { bgcolor: '#EEF2FF', color: '#3730A3' } : channelOf(order) === 'admin' ? { bgcolor: '#F3F4F6', color: '#374151' } : { bgcolor: '#ECFDF5', color: '#065F46' }) }}
         />
       </TableCell>
