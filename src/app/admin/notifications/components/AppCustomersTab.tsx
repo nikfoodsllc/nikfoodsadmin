@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, InputAdornment, Paper, TextField, Typography } from '@mui/material';
 import { IconRefresh, IconSearch } from '@tabler/icons-react';
 import AppActivitySection from './AppActivitySection';
-import { APP_FILTERS, filterAppCustomers, menuStatus, PERMISSION_LABEL, phoneText, seenText, type AppCounts, type AppCustomer, type AppFilter } from '@/utils/appCustomers';
+import { APP_FILTERS, filterAppCustomers, menuStatus, PERMISSION_LABEL, PLATFORM_FILTERS, PLATFORM_LABEL, phoneText, platformCounts, platformsOf, seenText, type AppCounts, type AppCustomer, type AppFilter, type PlatformFilter } from '@/utils/appCustomers';
 
 type Call = (path: string) => Promise<{ ok: boolean; status: number; json: { data?: unknown; error?: string } }>;
 
@@ -43,6 +43,7 @@ export default function AppCustomersTab({ call }: { call: Call }) {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<AppFilter>('all');
+  const [platform, setPlatform] = useState<PlatformFilter>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,7 +59,8 @@ export default function AppCustomersTab({ call }: { call: Call }) {
     void load();
   }, [load]);
 
-  const shown = useMemo(() => (data ? filterAppCustomers(data.customers, search, filter) : []), [data, search, filter]);
+  const shown = useMemo(() => (data ? filterAppCustomers(data.customers, search, filter, platform) : []), [data, search, filter, platform]);
+  const byPlatform = useMemo(() => platformCounts(data?.customers ?? []), [data]);
 
   if (loading && !data) {
     return (
@@ -74,9 +76,9 @@ export default function AppCustomersTab({ call }: { call: Call }) {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {counts && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(4, minmax(0, 1fr))' }, gap: 1.25, mb: 2 }}>
-          <Tile value={counts.customers} label="Using the app" hint={`${counts.phones} phone${counts.phones === 1 ? '' : 's'}, signed in`} />
+          <Tile value={counts.customers} label="Using the app" hint={`${byPlatform.ios} iPhone · ${byPlatform.android} Android`} />
           <Tile value={counts.allowed} label="Notifications allowed" />
-          <Tile value={counts.denied} label="Said No" hint="off in iPhone Settings" />
+          <Tile value={counts.denied} label="Said No" hint="off in the phone's Settings" />
           <Tile value={counts.notAsked} label="Not turned on" />
           <Tile value={counts.orders} label="Order updates on" hint="of those allowed" />
           <Tile value={counts.menu} label="Menu alerts on" hint="menu switch on" />
@@ -101,6 +103,11 @@ export default function AppCustomersTab({ call }: { call: Call }) {
         <Button onClick={() => void load()} disabled={loading} aria-label="Reload the list" sx={{ minWidth: 0, px: 1.25 }}>
           <IconRefresh size={20} />
         </Button>
+      </Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1 }} role="group" aria-label="Which app">
+        {PLATFORM_FILTERS.map((f) => (
+          <Chip key={f.key} label={f.key === 'all' ? f.label : `${f.label} (${byPlatform[f.key]})`} onClick={() => setPlatform(f.key)} color={platform === f.key ? 'primary' : 'default'} variant={platform === f.key ? 'filled' : 'outlined'} sx={{ fontWeight: 700 }} />
+        ))}
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
         {APP_FILTERS.map((f) => (
@@ -128,6 +135,9 @@ export default function AppCustomersTab({ call }: { call: Call }) {
                 <Typography sx={{ color: '#6B7280', fontSize: 12, whiteSpace: 'nowrap' }}>Last seen {seenText(c.lastSeenAt)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
+                {platformsOf(c).map((p) => (
+                  <Chip key={p} size="small" label={PLATFORM_LABEL[p]} sx={{ fontWeight: 700, bgcolor: p === 'android' ? '#E8F5E9' : '#F3F4F6', color: p === 'android' ? '#1B5E20' : '#111827', border: '1px solid', borderColor: p === 'android' ? '#A5D6A7' : '#D1D5DB' }} />
+                ))}
                 <Chip size="small" label={PERMISSION_LABEL[c.permission]} sx={{ fontWeight: 700, bgcolor: c.permission === 'allowed' ? '#DCFCE7' : c.permission === 'denied' ? '#FEE2E2' : '#FEF3C7', color: c.permission === 'allowed' ? '#166534' : c.permission === 'denied' ? '#991B1B' : '#92400E' }} />
                 {c.permission === 'allowed' && (
                   <>

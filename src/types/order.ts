@@ -280,8 +280,10 @@ export interface Order {
   offlineFollowUp?: { orderId: string; at: Date | string; by?: string };
   /** On an admin-entered order that was started from a failed or unpaid website order: that order's number */
   rebuiltFromOrderId?: string;
-  /** Where the customer placed the order: the website or the iPhone app (absent on older orders = website; admin-entered orders have `source: 'admin'`) */
+  /** Where the customer placed the order: the website or the app (iPhone or Android) (absent on older orders = website; admin-entered orders have `source: 'admin'`) */
   channel?: 'web' | 'mobile';
+  /** Which app placed an app order: 'ios' or 'android' (app orders from before Android have none = iPhone) */
+  appPlatform?: 'ios' | 'android';
   /** Where the delivery stop(s) stand in OptimoRoute, written by the live site when it sends them */
   optimo?: {
     state?: 'sent' | 'failed' | 'removed' | string;

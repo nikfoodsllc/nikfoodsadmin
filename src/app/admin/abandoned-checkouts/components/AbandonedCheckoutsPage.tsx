@@ -218,7 +218,7 @@ function PersonCard({ row, onHide, onRemind, onCreateOrder }: { row: AbandonedRo
       </Box>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
-        {row.channel === 'mobile' && <Chip size="small" label="App" sx={{ fontWeight: 700, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
+        {row.channel === 'mobile' && <Chip size="small" label={row.appPlatform === 'android' ? 'Android app' : 'iPhone app'} sx={{ fontWeight: 700, bgcolor: '#E0E7FF', color: '#3730A3' }} />}
         {row.triedToPay ? <Chip size="small" color="warning" label="Pressed Pay, payment did not go through" sx={{ fontWeight: 600 }} /> : <Chip size="small" label="Never pressed Pay" sx={{ fontWeight: 600 }} />}
         {!row.reminder && (
           <Chip

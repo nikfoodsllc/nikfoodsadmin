@@ -36,6 +36,7 @@ export interface DraftDoc {
   source?: string;
   /** 'mobile' when the checkout was opened in the iPhone app, 'web' on the website (checkouts from before this was recorded have none) */
   channel?: string;
+  appPlatform?: string;
   createdAt: Date | string;
   lastActivityAt: Date | string;
   contacted?: { at: Date | string; by?: string; note?: string };
@@ -64,6 +65,7 @@ export interface PaidOrderRef {
 export interface OrderInfo {
   orderId: string;
   channel?: string;
+  appPlatform?: string;
   status?: string;
   paymentStatus?: string;
   paymentError?: { code?: string; declineCode?: string; message?: string };
@@ -126,8 +128,10 @@ export interface AbandonedRow {
   /** The minimum order value of this zip, when the list route looked it up (used to work out which day is delivered when) */
   minCartValue?: number;
   lastActivityAt: string;
-  /** Where the checkout was opened: the iPhone app or the website (unset when we cannot tell) */
+  /** Where the checkout was opened: the app or the website (unset when we cannot tell) */
   channel?: 'web' | 'mobile';
+  /** For an app checkout: the iPhone or the Android app */
+  appPlatform?: 'ios' | 'android';
   /** More checkouts this person left behind before this one */
   earlierCheckouts: number;
   /** They pressed Pay (an order row exists) but the payment did not go through */
@@ -195,6 +199,12 @@ export function draftChannel(d: Pick<DraftDoc, 'channel' | 'orderId'>, orderInfo
 }
 
 /** App = known to be the app. Website = everything else (like the Orders list: nothing recorded counts as the website). */
+/** Which app an app checkout came from (older app checkouts have none and were the iPhone app). */
+export function draftAppPlatform(d: Pick<DraftDoc, 'appPlatform' | 'orderId'>, orderInfo: Map<string, OrderInfo>): 'ios' | 'android' {
+  const own = d.appPlatform ?? (d.orderId ? orderInfo.get(d.orderId)?.appPlatform : undefined);
+  return own === 'android' ? 'android' : 'ios';
+}
+
 export function matchesChannel(filter: ChannelFilter, channel: 'web' | 'mobile' | undefined): boolean {
   if (filter === 'all') return true;
   return filter === 'mobile' ? channel === 'mobile' : channel !== 'mobile';
@@ -248,6 +258,7 @@ export function buildAbandonedRows(
       ...(latest.zip ? { zip: latest.zip } : {}),
       lastActivityAt: iso(latest.lastActivityAt),
       ...(draftChannel(latest, orderInfo) ? { channel: draftChannel(latest, orderInfo) } : {}),
+      ...(draftChannel(latest, orderInfo) === 'mobile' ? { appPlatform: draftAppPlatform(latest, orderInfo) } : {}),
       earlierCheckouts: sorted.length - 1,
       triedToPay: Boolean(latest.orderId),
       ...(problemText(info) && latest.orderId ? { problem: problemText(info) } : {}),

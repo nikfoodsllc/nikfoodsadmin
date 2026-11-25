@@ -234,7 +234,8 @@ export default function NotificationsPage({ view = 'send' }: { view?: 'send' | '
         <Typography sx={{ color: '#6B7280', fontSize: 14, mb: 1.5 }}>
           {audience === 'specific'
             ? 'Sent only to the customers you choose below. They need the app with notifications allowed.'
-            : <>Sent to customers who have the app with notifications allowed and menu alerts on: <b>{reachAll}</b> can get it now ({data?.menu.subscribersWithApp ?? 0} have the app).</>}
+            : <>Sent to customers who have the app with notifications allowed and menu alerts on: <b>{reachAll}</b> can get it now ({data?.menu.subscribersWithApp ?? 0} have the app).</>}{' '}
+          Write it once: it goes to the iPhone app and the Android app.
         </Typography>
 
         <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 0.75 }}>Send to</Typography>
