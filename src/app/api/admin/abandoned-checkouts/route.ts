@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     {
       const ids = [...new Set(allDrafts.map((d) => d.orderId).filter((x): x is string => Boolean(x)))];
       if (ids.length > 0) {
-        const orders = await db.read<OrderInfo>('orders', { orderId: { $in: ids } } as never, { projection: { orderId: 1, status: 1, paymentStatus: 1, paymentError: 1, channel: 1 } });
+        const orders = await db.read<OrderInfo>('orders', { orderId: { $in: ids } } as never, { projection: { orderId: 1, status: 1, paymentStatus: 1, paymentError: 1, channel: 1, appPlatform: 1 } });
         for (const o of orders.data ?? []) info.set(o.orderId, o);
       }
     }
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
     {
       const ids = [...new Set(everyoneDrafts.map((d) => d.orderId).filter((x): x is string => Boolean(x) && !info.has(x as string)))];
       if (ids.length > 0) {
-        const more = await db.read<OrderInfo>('orders', { orderId: { $in: ids } } as never, { projection: { orderId: 1, channel: 1 } });
+        const more = await db.read<OrderInfo>('orders', { orderId: { $in: ids } } as never, { projection: { orderId: 1, channel: 1, appPlatform: 1 } });
         for (const o of more.data ?? []) info.set(o.orderId, o);
       }
     }

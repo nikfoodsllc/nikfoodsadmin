@@ -1,6 +1,6 @@
 /** The Notifications page's "App customers" list: the shape the customer site sends, and the search / filter / wording used on screen. */
 
-/** Allowed = a phone can get notifications; denied = said No (or switched them off in iPhone Settings); notAsked = never answered. */
+/** Allowed = a phone can get notifications; denied = said No (or switched them off in the phone's Settings); notAsked = never answered. */
 export type AppPermission = 'allowed' | 'denied' | 'notAsked';
 
 export interface AppPhone {
@@ -85,7 +85,8 @@ export const PERMISSION_LABEL: Record<AppPermission, string> = { allowed: 'Notif
 
 /** "iPhone of Amy · app 1.0.1", or "iPhone" when the phone sent no name; a phone that is not allowed says so. */
 export function phoneText(p: AppPhone): string {
-  const base = p.deviceName || (p.platform === 'ios' ? 'iPhone' : p.platform || 'Phone');
+  // Android phones name themselves by model ("Pixel 7"), so the app type is added to be clear
+  const base = p.deviceName ? (p.platform === 'android' && !/android/i.test(p.deviceName) ? `${p.deviceName} (Android)` : p.deviceName) : p.platform === 'android' ? 'Android phone' : p.platform === 'ios' ? 'iPhone' : p.platform || 'Phone';
   const named = p.appVersion ? `${base} · app ${p.appVersion}` : base;
   return p.permission === 'allowed' || !p.permission ? named : `${named} (${PERMISSION_LABEL[p.permission].toLowerCase()})`;
 }

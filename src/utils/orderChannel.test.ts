@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { channelFilterFor, channelOf } from './orderChannel';
+import { channelFilterFor, channelLabel, channelOf } from './orderChannel';
 
 describe('channelOf', () => {
   it('older orders (no field) are website', () => expect(channelOf({})).toBe('web'));
@@ -23,4 +23,19 @@ describe('channelFilterFor', () => {
   it('mobile excludes admin-entered orders', () => expect(channelFilterFor('mobile')).toEqual({ channel: 'mobile', source: { $ne: 'admin' } }));
   it('website is everything that is neither mobile nor admin (older orders included)', () => expect(channelFilterFor('web')).toEqual({ source: { $ne: 'admin' }, channel: { $ne: 'mobile' } }));
   it('admin is the source', () => expect(channelFilterFor('admin')).toEqual({ source: 'admin' }));
+});
+
+describe('app platform', () => {
+  it('labels app orders by phone (older app orders are iPhone)', () => {
+    expect(channelLabel({ channel: 'mobile', appPlatform: 'android' })).toBe('Android app');
+    expect(channelLabel({ channel: 'mobile', appPlatform: 'ios' })).toBe('iPhone app');
+    expect(channelLabel({ channel: 'mobile' })).toBe('iPhone app');
+    expect(channelLabel({ channel: 'web' })).toBe('Website');
+    expect(channelLabel({ source: 'admin', channel: 'mobile', appPlatform: 'android' })).toBe('Admin');
+  });
+  it('filters by phone', () => {
+    expect(channelFilterFor('mobile_android')).toEqual({ channel: 'mobile', source: { $ne: 'admin' }, appPlatform: 'android' });
+    expect(channelFilterFor('mobile_ios')).toEqual({ channel: 'mobile', source: { $ne: 'admin' }, appPlatform: { $ne: 'android' } });
+    expect(channelFilterFor('mobile')).toEqual({ channel: 'mobile', source: { $ne: 'admin' } });
+  });
 });

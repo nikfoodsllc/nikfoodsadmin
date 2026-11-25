@@ -9,13 +9,15 @@ interface Activity {
   today: string;
   days: string[];
   onApp: { customers: number; installs: number };
+  /** iPhone vs Android (missing on an older server) */
+  platforms?: Record<'ios' | 'android', { customers: number; installs: number; last30: number }>;
   active: { today: number; last7: number; last30: number };
   newInstalls: Array<{ day: string; installs: number }>;
   daily: Array<{ day: string; customers: number | null }>;
   recordingSince: string | null;
   returning7: number | null;
-  orders: Array<{ day: string; app: number; all: number; appCustomers: number }>;
-  versions: Array<{ version: string; customers: number }>;
+  orders: Array<{ day: string; app: number; appAndroid?: number; all: number; appCustomers: number }>;
+  versions: Array<{ version: string; platform?: 'ios' | 'android'; customers: number }>;
   lists: {
     have: string[];
     today: string[];
@@ -167,7 +169,7 @@ export default function AppActivitySection({ call }: { call: Call }) {
         {data && (
           <Box sx={{ mt: 1.5 }}>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', md: 'repeat(5, minmax(0, 1fr))' }, gap: 1.25, mb: 2 }}>
-              <Tile value={data.onApp.customers} label="Have the app" hint={`${data.onApp.installs} phones`} onClick={() => setPicked({ title: 'Customers with the app', ids: data.lists.have })} />
+              <Tile value={data.onApp.customers} label="Have the app" hint={data.platforms ? `${data.platforms.ios.customers} iPhone · ${data.platforms.android.customers} Android` : `${data.onApp.installs} phones`} onClick={() => setPicked({ title: 'Customers with the app', ids: data.lists.have })} />
               <Tile value={todayRow?.customers ?? data.active.today} label="Opened today" onClick={() => setPicked({ title: 'Opened the app today', ids: data.lists.byDay[data.today] ?? data.lists.today })} />
               <Tile value={data.active.last7} label="Last 7 days" hint={`${pct}% of customers with the app`} onClick={() => setPicked({ title: 'Opened the app in the last 7 days', ids: data.lists.last7 })} />
               <Tile value={data.active.last30} label="Last 30 days" onClick={() => setPicked({ title: 'Opened the app in the last 30 days', ids: data.lists.last30 })} />
@@ -201,8 +203,8 @@ export default function AppActivitySection({ call }: { call: Call }) {
                 <Box component="table" sx={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr>
-                      {['Day', 'App', 'All', 'App %'].map((h) => (
-                        <Box component="th" key={h} sx={{ width: h === 'Day' ? '40%' : '20%', textAlign: h === 'Day' ? 'left' : 'right', color: '#6B7280', fontWeight: 600, fontSize: 12, pb: 0.5 }}>{h}</Box>
+                      {['Day', 'App', 'Android', 'All', 'App %'].map((h) => (
+                        <Box component="th" key={h} sx={{ width: h === 'Day' ? '32%' : '17%', textAlign: h === 'Day' ? 'left' : 'right', color: '#6B7280', fontWeight: 600, fontSize: 12, pb: 0.5 }}>{h}</Box>
                       ))}
                     </tr>
                   </thead>
@@ -211,6 +213,7 @@ export default function AppActivitySection({ call }: { call: Call }) {
                       <tr key={o.day}>
                         <Box component="td" sx={{ py: 0.4 }}>{weekday(o.day)} {shortDay(o.day)}</Box>
                         <Box component="td" sx={{ textAlign: 'right', fontWeight: 700 }}>{o.app}</Box>
+                        <Box component="td" sx={{ textAlign: 'right', color: '#6B7280' }}>{o.appAndroid ?? 0}</Box>
                         <Box component="td" sx={{ textAlign: 'right' }}>{o.all}</Box>
                         <Box component="td" sx={{ textAlign: 'right', color: '#6B7280' }}>{o.all ? `${Math.round((o.app / o.all) * 100)}%` : '–'}</Box>
                       </tr>
@@ -222,11 +225,11 @@ export default function AppActivitySection({ call }: { call: Call }) {
 
             {data.versions.length > 0 && (
               <Typography sx={{ fontSize: 12, color: '#374151', mt: 2 }}>
-                <b>App versions (last 30 days):</b> {data.versions.map((v) => `${v.version} · ${v.customers}`).join('   ')}
+                <b>App versions (last 30 days):</b> {data.versions.map((v) => `${v.platform === 'android' ? 'Android' : 'iPhone'} ${v.version} · ${v.customers}`).join('   ')}
               </Typography>
             )}
             <Alert severity="info" sx={{ mt: 1.5, py: 0 }}>
-              Downloads are not here: the App Store only shows those in App Store Connect. This counts customers who signed in on the app (older app versions are not counted).
+              Downloads are not here: the App Store and Google Play only show those in App Store Connect and Play Console. This counts customers who signed in on the app (older app versions are not counted).
               {loading ? ' Refreshing…' : ''}
             </Alert>
           </Box>
